@@ -22,13 +22,13 @@ Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 120 × 60 ×
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 2 ===
 kolize: 1 – šroub v závitu 0, skutečné 1
-⚠ řádek 1: kolize „Deska“ × „Deska“ (23 134,1 mm³)
+⚠ řádek 1: kolize „Deska #1“ × „Deska #2“ (23 134,1 mm³) – místo [60; 30; 5] · obálka 40 × 60 × 10 mm
 ✓ název = B2
 
 Dokument: „B2“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Deska [40; 0; 0]
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 120 × 60 × 10 mm · objem Σ 94,27 cm³ · hmotnost Σ 0,740 kg
-Kolize: 1 – Deska × Deska (23 134,1 mm³) (zkontrolováno ?)
+Kolize: 1 – skutečné 1: Deska #1 × Deska #2 (23 134,1 mm³) v místě [60; 30; 5] (zkontrolováno ?)
 === run 3 ===
 ✓ záložka „A“ (sestava) je aktivní – další příkazy pracují s ní
 
@@ -43,6 +43,6 @@ Kolize: žádné (zkontrolováno ?)
 Dokument: „B2“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Deska [40; 0; 0]
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 120 × 60 × 10 mm · objem Σ 94,27 cm³ · hmotnost Σ 0,740 kg
-Kolize: 1 – Deska × Deska (23 134,1 mm³) (zkontrolováno ?)
+Kolize: 1 – skutečné 1: Deska #1 × Deska #2 (23 134,1 mm³) v místě [60; 30; 5] (zkontrolováno ?)
 === tabs ===
 Deska | Čep | A | B2

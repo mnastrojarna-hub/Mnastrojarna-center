@@ -358,7 +358,8 @@ async function checkPart(ctx: OpCtx, d: CadDoc, cmd: CheckCmd, label = d.name): 
   partWarnings(ctx, label, valid, missing);
 }
 
-const clashKvShort = (c: ClashCounts) => `${c.total}(thread=${c.thread},underhead=${c.underhead},real=${c.real},undetermined=${c.undetermined})`;
+// dotyk a pracovní kontakt (vlna 22, bod 5 – pravidla dokumentu) jen nenulové na konci
+const clashKvShort = (c: ClashCounts) => `${c.total}(thread=${c.thread},underhead=${c.underhead},real=${c.real},undetermined=${c.undetermined}${c.touch ? `,touch=${c.touch}` : ""}${c.work ? `,work=${c.work}` : ""})`;
 
 async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void> {
   const k = ctx.host.kernel;

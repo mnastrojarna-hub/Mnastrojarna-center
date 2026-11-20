@@ -1,0 +1,78 @@
+# Vlna 22, balík C1 (bod 5): třídy kolizí všude – panel, stav, pohyb, pravidla kolizí, dotyk, místo průniku
+ · dotyk {0} dvojic	 · Berührung {0} Paare
+ · pracovní kontakt {0} dvojic	 · Arbeitskontakt {0} Paare
+ dotyk: {0}	 Berührung: {0}
+ pracovní kontakt: {0}	 Arbeitskontakt: {0}
+… a další {0}	… und {0} weitere
+„{0}“ není podsestava – díl v ní nelze vybrat	„{0}“ ist keine Unterbaugruppe – darin kann kein Teil gewählt werden
+{0}: čekám rozsah od..do (např. 10..20), ne „{1}“	{0}: erwartet ist ein Bereich von..bis (z. B. 10..20), nicht „{1}“
+✓ odebráno pravidel kolizí: {0}	✓ Kollisionsregeln entfernt: {0}
+✓ pravidlo kolizí {0}	✓ Kollisionsregel {0}
+✓ tolerance dotyku {0} mm (průnik tenčí = dotyk, ne kolize)	✓ Berührungstoleranz {0} mm (dünnere Durchdringung = Berührung, keine Kollision)
+cokoli	beliebig
+dotyk	Berührung
+dotyk {0} – přesah {1} mm pod tolerancí {2} mm	Berührung {0} – Überdeckung {1} mm unter der Toleranz {2} mm
+dotyk pod tolerancí {0} mm: {1} dvojic	Berührung unter der Toleranz {0} mm: {1} Paare
+Je to závit	Es ist ein Gewinde
+Kolize (zkontrolováno {0}): {1} · zobrazeno {2} skupin ({3})	Kollisionen (geprüft {0}): {1} · {2} Gruppen angezeigt ({3})
+kolize [seznam [skutečné|závit|dotyk|pracovní|vše]] · kolize pravidlo pracovní "A" "B" [kroky 10..20 | pohyb "ZDVIH" 30..27] · kolize pravidlo závit "A" ["B"] · kolize pravidla · kolize pravidlo N smazat · kolize tolerance 0,01	kollision [liste [echte|gewinde|berührung|arbeit|alle]] · kollision regel arbeit "A" "B" [schritte 10..20 | bewegung "HUB" 30..27] · kollision regel gewinde "A" ["B"] · kollision regeln · kollision regel N löschen · kollision toleranz 0,01
+kolize {0} ({1} mm³)	Kollision {0} ({1} mm³)
+kolize po pravidlech: {0}	Kollisionen nach den Regeln: {0}
+kolize pravidlo závit platí vždy – bez kroků a pohybu	kollision regel gewinde gilt immer – ohne Schritte und Bewegung
+kolize pravidlo: druh pracovní nebo závit – {0}	kollision regel: Art arbeit oder gewinde – {0}
+kolize pravidlo: chybí komponenta – {0}	kollision regel: Komponente fehlt – {0}
+kolize pravidlo: nečekané „{0}“ – {1}	kollision regel: unerwartet „{0}“ – {1}
+kolize pravidlo: za „pohyb“ název vazby motoru v uvozovkách nebo číslo vazby	kollision regel: nach „bewegung“ der Name der Antriebsverknüpfung in Anführungszeichen oder ihre Nummer
+kolize seznam: neznámá třída „{0}“ – skutečné, nevyhodnotitelné, závit, pod hlavou, dotyk, pracovní, závady, vše	kollision liste: unbekannte Klasse „{0}“ – echte, unbestimmt, gewinde, unterkopf, berührung, arbeit, fehler, alle
+kolize seznam: sestava ještě nebyla zkontrolována – nejdřív „kolize“	kollision liste: die Baugruppe wurde noch nicht geprüft – zuerst „kollision“
+kolize tolerance: čekám tloušťku dotyku v mm (např. kolize tolerance 0,01)	kollision toleranz: erwartet ist die Berührungsdicke in mm (z. B. kollision toleranz 0,01)
+kolize: {0} – {1}	Kollisionen: {0} – {1}
+kolizi {0} nelze vyhodnotit	Kollision {0} nicht auswertbar
+místo	Ort
+nevyhodnotitelné	nicht auswertbar
+obálka {0} × {1} × {2} mm	Hüllquader {0} × {1} × {2} mm
+Odebrat pravidlo	Regel entfernen
+pod hlavou	unter dem Kopf
+pod hlavou šroubu	unter dem Schraubenkopf
+pohyb	Bewegung
+pracovní kontakt	Arbeitskontakt
+pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³	Arbeitskontakt „{0}“ × „{1}“ in den Schritten {2} (Regel {3}), größte Durchdringung {4} mm³
+Pracovní kontakt {0} – mimo okno zůstane skutečnou kolizí.	Arbeitskontakt {0} – außerhalb des Fensters bleibt es eine echte Kollision.
+pracovní kontakt {0} ({1} mm³) – pravidlo {2}	Arbeitskontakt {0} ({1} mm³) – Regel {2}
+Pracovní kontakt…	Arbeitskontakt…
+Pravidla kolizí ({0}) · dotyk pod {1} mm	Kollisionsregeln ({0}) · Berührung unter {1} mm
+Pravidla kolizí ({0}) · tolerance dotyku {1} mm:	Kollisionsregeln ({0}) · Berührungstoleranz {1} mm:
+pravidla kolizí s komponentou v podsestavě nebo s vazbou mimo skript se do skriptu nepřenášejí ({0})	Kollisionsregeln mit einer Komponente in einer Unterbaugruppe oder einer Verknüpfung außerhalb des Skripts werden nicht ins Skript übernommen ({0})
+pravidla kolizí sestavy: pracovní kontakt nástroj × plech v okně operace (kroky studie / hodnota motoru vazby) = ℹ clash.work, mimo okno ⚠ skutečná kolize; závit = šroub v hladké jádrové díře bez prvku závitu je závitový záběr; díl v podsestavě cestou "Skupina/Díl"	Kollisionsregeln der Baugruppe: Arbeitskontakt Werkzeug × Blech im Operationsfenster (Studienschritte / Antriebswert der Verknüpfung) = ℹ clash.work, außerhalb des Fensters ⚠ echte Kollision; gewinde = Schraube in glatter Kernlochbohrung ohne Gewindeelement ist ein Gewindeeingriff; Teil in einer Unterbaugruppe über den Pfad "Gruppe/Teil"
+Pravidla kolizí: žádná · tolerance dotyku {0} mm – kolize pravidlo pracovní "A" "B" [kroky 10..20]	Kollisionsregeln: keine · Berührungstoleranz {0} mm – kollision regel arbeit "A" "B" [schritte 10..20]
+pravidlo kolizí {0} v sestavě není – pravidel: {1}	Kollisionsregel {0} gibt es in der Baugruppe nicht – Regeln: {1}
+pravidlo závit	Gewinderegel
+prstenec pod hlavou šroubu {0}	Ring unter dem Schraubenkopf {0}
+při hodnotě motoru / vazby	bei einem Antriebs- / Verknüpfungswert
+při hodnotě vazby „{0}“ {1}–{2}	bei einem Wert der Verknüpfung „{0}“ {1}–{2}
+skutečná kolize	echte Kollision
+skutečné	echte
+šroub Ø{0} v díře Ø{1} bez prvku závitu – zadejte díru se závitem (díra … závit {2}), nebo dvojici označte pravidlem „kolize pravidlo závit“	Schraube Ø{0} in einer Bohrung Ø{1} ohne Gewindeelement – geben Sie eine Gewindebohrung ein (bohrung … gewinde {2}) oder kennzeichnen Sie das Paar mit der Regel „kollision regel gewinde“
+šroub v závitu	Schraube im Gewinde
+šroub v závitu {0}	Schraube im Gewinde {0}
+Tolerance dotyku [mm]	Berührungstoleranz [mm]
+tolerance dotyku [mm]: průnik tenčí než tolerance (přesah 0,0001 mm) = ℹ clash.touch, ne kolize	Berührungstoleranz [mm]: eine Durchdringung dünner als die Toleranz (0,0001 mm) = ℹ clash.touch, keine Kollision
+Třídy kolizí	Kollisionsklassen
+Uložit pravidlo	Regel speichern
+v krocích {0}–{1}	in den Schritten {0}–{1}
+v krocích pohybové studie	in Schritten der Bewegungsstudie
+v kroku {0}	in Schritt {0}
+výpis poslední kontroly kolizí po třídách a skupinách (opakované nálezy jednou s počtem a instancemi [S2] / #4, místo průniku a obálka) s filtrem třídy; pravidla dokumentu se uplatní hned	Liste der letzten Kollisionsprüfung nach Klassen und Gruppen (wiederholte Befunde einmal mit Anzahl und Instanzen [S2] / #4, Ort der Durchdringung und Hüllquader) mit Klassenfilter; die Regeln des Dokuments gelten sofort
+vždy	immer
+závady	Fehler
+závit bez prvku	Gewinde ohne Element
+Zvolte třídu nahoře – dvojice jsou skryté filtrem.	Wählen Sie oben eine Klasse – die Paare sind durch den Filter ausgeblendet.
+nelze vyhodnotit	nicht auswertbar
+skutečné {0}	echte {0}
+v místě {0}	bei {0}
+bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)	keine echte Kollision in den geprüften Schritten (nur Schraube im Gewinde, Berührung oder Arbeitskontakt)
+nevyhodnotitelné {0}	nicht auswertbar {0}
+#!dynamic – texty kódů kolizí (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+dotyk „{0}“ × „{1}“ (průnik tenčí než tolerance dotyku)	Berührung „{0}“ × „{1}“ (Durchdringung dünner als die Berührungstoleranz)
+pracovní kontakt „{0}“ × „{1}“ podle pravidla kolizí	Arbeitskontakt „{0}“ × „{1}“ nach einer Kollisionsregel
+výpis kolizí platí pro dřívější stav sestavy (zkontrolováno {0}) – spusťte „kolize“ znovu	die Kollisionsliste gilt für einen früheren Stand der Baugruppe (geprüft {0}) – „kollision“ erneut ausführen

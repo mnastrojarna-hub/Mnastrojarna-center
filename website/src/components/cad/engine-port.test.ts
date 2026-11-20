@@ -96,6 +96,8 @@ const kernel = {
   build: async (d: CadDoc) => result(d),
   asmParts: async (parts: { key: string; source: ComponentSource }[]) => parts.map((p) => ({ key: p.key, result: result(p.source.kind === "part" ? p.source.doc : emptyDoc()) })),
   interference: async (d: CadDoc) => (d.name === "A" ? [{ a: d.components![0].id, b: d.components![1].id, volume: 16000 }] : []),
+  // zařazení dvojic (vlna 22, bod 5): bez jádra skutečná kolize – stav pak vypíše instance „Blok #1 × Blok #2“
+  clashDetail: async (_d: CadDoc, pairs: { a: string; b: string; volume: number }[]) => pairs.map((p) => ({ ...p, cls: "real", why: "no-thread" })),
 } as unknown as KernelApi;
 const host: EngineHost = { kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() };
 const titles = (ws: Workspace) => ws.tabs().map((t) => t.title);
@@ -169,7 +171,7 @@ describe("engine-port: stav vazeb a kolizí podle id dokumentu (zrcadlo do zobra
   it("kolize A se nepřenese na B; přejmenování A stav zachová; aplikace = MemoryWorkspace", async () => {
     const r = await both([ASM2, 'záložka "A"\nkolize', 'záložka "B"\nstav', 'záložka "A"\nnázev "A2"\nstav']);
     expect(r.a[2]).toMatch(/^Kolize: nezkontrolováno/m);
-    expect(r.a[3]).toMatch(/^Kolize: 1 – Blok × Blok/m);
+    expect(r.a[3]).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2/m); // vlna 22, bod 5: instance a třída místo „Blok × Blok“
     expect(r.a).toEqual(r.m);
     expect(r.app.shown.clash).toMatchObject({ res: [{ volume: 16000 }] }); // panel Kolize ukazuje poslední kontrolu
   });

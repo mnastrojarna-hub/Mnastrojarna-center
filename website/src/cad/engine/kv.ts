@@ -8,6 +8,7 @@
  * jsou pokračovací řádky výpisu (volný text v jazyce běhu, jako text za kódem u ✗/⚠).
  */
 import type { AsmStatus, StaleNote } from "../agent";
+import { clashCountsKv } from "../clash-report";
 import { sourceKey } from "../assembly";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
@@ -187,7 +188,9 @@ export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, 
   const old = kv([["mates.stale", asm?.matesStale ? true : undefined], ...[...new Set(stale.map((n) => n.kind))].map((k): [string, true] => [`${k}.stale`, true])]);
   const tail = old ? ` ${old}` : "";
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
-  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])}${tail}`;
+  // třídy kolizí jako v řádku D (`clash=5(thread=3,real=2)`, vlna 22 bod 5) – bez uvozovek, stejný tvar pro parser
+  const clashTok = asm?.clash?.classes?.total ? `clash=${clashCountsKv(asm.clash.classes)}` : kv([["clash", asm?.clash ? asm.clash.count : "-"]]);
+  if (doc.kind === "assembly") return `${base} ${[kv([["bbox", asm?.bbox ? undefined : "-"]]), clashTok, kv([["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])].filter(Boolean).join(" ")}${tail}`;
   if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;
   return `${`${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;
 }

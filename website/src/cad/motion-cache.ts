@@ -13,6 +13,7 @@
  * společná identita výsledků (engine/result-key.ts, balík A) ji může nahradit beze změny volajících.
  */
 import { flattenAssembly } from "./assembly";
+import { stepHasFault } from "./clash-report";
 import { tr } from "./i18n";
 import type { MotionResult } from "./motion";
 import type { CadDoc, MotionStudy } from "./types";
@@ -202,8 +203,10 @@ export function motionStatusOf(store: MotionStore, key: string, d: CadDoc): Moti
   if (st.state === "stale") return { state: "stale", line: tr("Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: {0}; přepočítá „pohyb spustit“", st.changed.join("; ")) };
   const r = st.entry.res;
   const steps = Math.max(0, r.steps.length - 1);
-  const hit = r.steps.filter((x) => x.clashes?.length).length;
+  // jen kroky se SKUTEČNOU kolizí (vlna 22, bod 5 – clash-report.ts); šroub v závitu / dotyk / pracovní kontakt kolizí nejsou
+  const hit = r.steps.filter((x) => stepHasFault(d, x)).length;
+  const other = !hit && r.steps.some((x) => x.clashes?.length);
   const mates = r.conflictSteps ? tr("nesplněné vazby v {0} krocích", r.conflictSteps) : tr("vazby splněny");
-  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : hit ? tr("průnik těles v {0} krocích", hit) : tr("bez průniku těles v kontrolovaných krocích");
+  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : hit ? tr("průnik těles v {0} krocích", hit) : other ? tr("bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)") : tr("bez průniku těles v kontrolovaných krocích");
   return { state: r.conflictSteps ? "conflict" : hit ? "clash" : "ok", line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, clash) };
 }

@@ -30,6 +30,7 @@
  * Čistý modul bez prohlížeče a bez jádra; stejný dokument a volby dají vždy stejný text.
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
+import { clashRulesScript } from "./agent-clash";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
@@ -2078,6 +2079,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     // čas, krok, gravitace, tlumení, odraz, snímky (i nastavení uložené u kinematické studie) – doc-script-asm.ts
     emitDynamics(c.sheetOut, mo);
   }
+  // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
+  const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
+  for (const l of cr.lines) c.line(l);
+  if (cr.skipped) c.note(tr("pravidla kolizí s komponentou v podsestavě nebo s vazbou mimo skript se do skriptu nepřenášejí ({0})", cr.skipped));
   emitDrawings(c, doc);
 }
 

@@ -22,7 +22,6 @@
 ▶ přehrávání {0} kroků ({1} s){2}	▶ playing {0} steps ({1} s){2}
 ⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ the mate geometry could not be loaded from the kernel – assembly mates recomputes the mate once the parts are built
 ⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)	⚠ unsatisfied mates in {0} steps (the mechanism locked up or the motor exceeded a limit)
-⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)	⚠ first interference at step {0} (t = {1} s): “{2}” × “{3}” ({4} mm³)
 ⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně	⚠ the {0} mate cannot be satisfied together with the others – assembly mates, assembly mate {1} suppress|delete|flip
 ✓ motor {0} odebrán	✓ motor {0} removed
 ✓ motor {0}: {1}{2}	✓ motor {0}: {1}{2}

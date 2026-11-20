@@ -108,6 +108,8 @@ function asmKernel(gen = { n: 1 }) {
   return fakeKernel({
     generation: () => gen.n,
     interference: async (d: CadDoc) => (d.name === "A" ? [{ a: d.components![0].id, b: d.components![1].id, volume: 16000 }] : []),
+    // zařazení dvojic (vlna 22, bod 5): skutečná kolize – stav vypíše instance „Blok #1 × Blok #2“ a třídy `clash=1(thread=0,real=1)`
+    clashDetail: async (_d: CadDoc, pairs: { a: string; b: string; volume: number }[]) => pairs.map((p) => ({ ...p, cls: "real", why: "no-thread" })),
   }).kernel;
 }
 const ASM2 = 'nový díl Blok\nkvádr 40 40 40\nnová sestava A\nvložit "Blok" ukotvit\nvložit "Blok" v 30 0 0\nnová sestava B\nvložit "Blok" ukotvit\nvložit "Blok" v 100 0 0';
@@ -118,9 +120,9 @@ describe("stav vazeb a kolizí podle dokumentu (klíč = id dokumentu záložky)
     const ws = new MemoryWorkspace();
     const host = hostOf(asmKernel());
     await runScript(ws, ASM2, host);
-    expect(clashLine(await runScript(ws, 'záložka "A"\nkolize', host))).toMatch(/^Kolize: 1 – Blok × Blok \(16.000,0 mm³\)/);
+    expect(clashLine(await runScript(ws, 'záložka "A"\nkolize', host))).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2 \(16.000,0 mm³\)/);
     expect(clashLine(await runScript(ws, 'záložka "B"\nstav', host))).toMatch(/^Kolize: nezkontrolováno/);
-    expect(clashLine(await runScript(ws, 'záložka "A"\nnázev "Přejmenováno"\nstav', host))).toMatch(/^Kolize: 1 – Blok × Blok/);
+    expect(clashLine(await runScript(ws, 'záložka "A"\nnázev "Přejmenováno"\nstav', host))).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2/);
     // klíč je id dokumentu záložky, ne název: sestava téhož názvu v jiné záložce stav nepřebírá
     const r = await runScript(ws, "nová sestava Přejmenováno\nstav", host);
     expect(clashLine(r)).toMatch(/^Kolize: nezkontrolováno/);
@@ -129,8 +131,8 @@ describe("stav vazeb a kolizí podle dokumentu (klíč = id dokumentu záložky)
     const ws = new MemoryWorkspace();
     const r = await runScript(ws, 'nový díl Blok\nkvádr 40 40 40\nnová sestava A\nvložit "Blok" ukotvit\nvložit "Blok" v 30 0 0\nkolize\nstav', hostOf(asmKernel()));
     expect(formatConsole(r)).toMatch(/^Sestava: 2 komponent \(2 dílů po rozložení podsestav\) · obálka 40 × 10 × 10 mm · objem Σ 2 cm³ · hmotnost Σ 0,016 kg$/m);
-    expect(clashLine(r)).toMatch(/^Kolize: 1 – Blok × Blok/);
-    expect(r.entries.find((e) => e.code === "status")!.text).toBe("asm comp=2 parts=1 V.sum=2cm3 m=0.02kg bbox=40x10x10 clash=1");
+    expect(clashLine(r)).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2/);
+    expect(r.entries.find((e) => e.code === "status")!.text).toBe("asm comp=2 parts=1 V.sum=2cm3 m=0.02kg bbox=40x10x10 clash=1(thread=0,real=1)");
   });
   it("window.mncad.status() = `stav` (presentStatusText: díly postavené, kolize pod klíčem aktivní záložky)", async () => {
     const ws = new MemoryWorkspace();
@@ -139,7 +141,7 @@ describe("stav vazeb a kolizí podle dokumentu (klíč = id dokumentu záložky)
     const stav = (await runScript(ws, "stav", host)).entries.find((e) => e.code === "status")!.detail!;
     expect(await presentStatusText(ws, host.kernel)).toBe(stav);
     await ws.activate(ws.tabs().find((t) => t.title === "A")!.id);
-    expect(await presentStatusText(ws, host.kernel)).toMatch(/^Kolize: 1 – Blok × Blok/m);
+    expect(await presentStatusText(ws, host.kernel)).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2/m);
   });
   it("restart jádra mezi běhy: stav, kolize i výkres vypíší ℹ asm.kernel-restarted (mezipaměti vyprázdněné a znovu postavené)", async () => {
     const gen = { n: 1 };

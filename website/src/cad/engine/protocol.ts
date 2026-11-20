@@ -377,8 +377,9 @@ function matesStr(m: NonNullable<DocSummary["mates"]>): string {
   const extra = (["conflict", "missing", "suppressed"] as const).filter((k) => m[k] > 0).map((k) => `${k}=${m[k]}`);
   return `${m.ok}/${m.total}${extra.length ? `(${extra.join(",")})` : ""}`;
 }
-const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""})`;
-const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread}${c.underhead ? `,underhead:${c.underhead}` : ""},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}`;
+// dotyk a pracovní kontakt (vlna 22, bod 5) jen nenulové a na konci – dřívější řádky D beze změny
+const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""}${c.touch ? `,touch=${c.touch}` : ""}${c.work ? `,work=${c.work}` : ""})`;
+const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread}${c.underhead ? `,underhead:${c.underhead}` : ""},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}${c.touch ? `,touch:${c.touch}` : ""}${c.work ? `,work:${c.work}` : ""}`;
 
 /** strojová část souhrnu dokumentu: `<part|asm|draft> <klíč=hodnota …>` (řádek D, výpis `= … status`) */
 export function docKv(d: DocSummary): string {

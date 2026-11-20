@@ -19,9 +19,9 @@ Komponenty: Blok [0; 0; 0] ⚓ · Blok [30; 0; 0] · Blok [100; 0; 0]
 Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
 === run 3 ===
 kolize: 1 – šroub v závitu 0, skutečné 1
-⚠ řádek 1: kolize „Blok“ × „Blok“ (16 000,0 mm³)
+⚠ řádek 1: kolize „Blok #1“ × „Blok #2“ (16 000,0 mm³) – místo [35; 20; 20] · obálka 10 × 40 × 40 mm
 
 Dokument: „Kolize“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Blok [0; 0; 0] ⚓ · Blok [30; 0; 0] · Blok [100; 0; 0]
 Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 140 × 40 × 40 mm · objem Σ 192 cm³ · hmotnost Σ 1,507 kg
-Kolize: 1 – Blok × Blok (16 000,0 mm³) (zkontrolováno ?)
+Kolize: 1 – skutečné 1: Blok #1 × Blok #2 (16 000,0 mm³) v místě [35; 20; 20] (zkontrolováno ?)

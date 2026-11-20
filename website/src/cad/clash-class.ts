@@ -24,9 +24,17 @@ import { flattenLeaves } from "./asm-flatten";
 import { holeDrillD } from "./hole-spec";
 import type { CadDoc, Feature, Vec3 } from "./types";
 
-export type ClashClass = "thread" | "underhead" | "real" | "undetermined";
-/** dvojice kolize z `interference` (a, b = id komponent nejvyšší úrovně; cesty = celé cesty listů v podsestavách) */
-export type ClashPair = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] };
+/**
+ * Třída dvojice: geometrické zařazení jádra (`thread` / `underhead` / `real` / `undetermined`) a třídy podle nastavení dokumentu
+ * (vlna 22, bod 5 – clash-rules.ts): `touch` = numerický dotyk (průnik tenčí než tolerance dotyku), `work` = pracovní kontakt
+ * podle pravidla operace (`doc.clashRules`, např. střižník × plech v úseku zdvihu).
+ */
+export type ClashClass = "thread" | "underhead" | "real" | "undetermined" | "touch" | "work";
+/**
+ * dvojice kolize z `interference` (a, b = id komponent nejvyšší úrovně; cesty = celé cesty listů v podsestavách); místo průniku
+ * ve světových souřadnicích: `at` = těžiště, `box` = obálka, `depth` = tloušťka průniku (2·V/S nejtlustšího kusu, mm)
+ */
+export type ClashPair = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[]; at?: Vec3; box?: [Vec3, Vec3]; depth?: number };
 /** důvod zařazení (strojově, pro JSON / plný protokol) */
 export type ClashWhy =
   | "no-thread"
@@ -39,7 +47,15 @@ export type ClashWhy =
   | "unknown-designation"
   | "no-geometry"
   | "missing-component"
-  | "kernel-failed";
+  | "kernel-failed"
+  /** vlna 22: průnik tenčí než tolerance dotyku (`kolize tolerance`) */
+  | "touch"
+  /** vlna 22: pracovní kontakt podle pravidla `doc.clashRules` (kind „work“) */
+  | "work-rule"
+  /** vlna 22: šroub v jádrové díře BEZ prvku závitu (hladká díra / import) – nelze rozhodnout, nápověda */
+  | "no-thread-feature"
+  /** vlna 22: totéž, ale pravidlo „závit“ dvojici označilo jako závitový záběr */
+  | "thread-rule";
 /** výsledek jedné dvojice (jádro `clashDetail`) */
 export type ClashDetail = ClashPair & {
   cls: ClashClass;
@@ -54,9 +70,14 @@ export type ClashDetail = ClashPair & {
   restDepth?: number;
   /** podrobnost (úhel / vzdálenost os, označení) do plného protokolu */
   note?: string;
+  /** díra bez prvku závitu (`no-thread-feature`): co by dalo pásmo závitu, kdyby díra závit měla (pravidlo „závit“ to převezme) */
+  bandCls?: "thread" | "underhead" | "real";
+  /** pravidlo dokumentu, které třídu určilo (`clash-rules.ts`) */
+  rule?: string;
 };
 export type ClassifiedClash = ClashDetail;
-export type ClashCounts = { total: number; thread: number; underhead: number; real: number; undetermined: number };
+/** počty tříd; `touch` / `work` jen u výsledku po pravidlech dokumentu (clash-rules.ts) */
+export type ClashCounts = { total: number; thread: number; underhead: number; real: number; undetermined: number; touch?: number; work?: number };
 
 /** meze pravidla (kap. 6.3) */
 export const CLASH_RULE = {
@@ -173,7 +194,7 @@ export function tapFeatureOf(features: readonly TapFeature[], r: number, axis: V
 }
 
 /** Rozhodnutí podle objemů (kap. 6.3 bod 4): v pásmu, mimo pásmo, nejhlubší místo zbytku od vstupu (mm). */
-export function decideBand(o: { volume: number; band: number; rest: number; restDepth: number; D: number }): { cls: Exclude<ClashClass, "undetermined">; why: ClashWhy } {
+export function decideBand(o: { volume: number; band: number; rest: number; restDepth: number; D: number }): { cls: "thread" | "underhead" | "real"; why: ClashWhy } {
   const R = CLASH_RULE;
   if (!(o.band > 1e-3)) return { cls: "real", why: "outside-band" };
   // numerický šum booleovských operací (pásmo je o ε širší než díra i dřík)
@@ -187,19 +208,24 @@ export function decideBand(o: { volume: number; band: number; rest: number; rest
 export function worstClass(list: readonly ClashClass[]): ClashClass {
   if (list.includes("real")) return "real";
   if (list.includes("undetermined")) return "undetermined";
+  if (list.includes("work")) return "work";
+  if (list.includes("touch")) return "touch";
   if (list.includes("underhead")) return "underhead";
   return "thread";
 }
 
-/** počty tříd */
+/** počty tříd (`touch` / `work` vždy vyplněné – výsledek po pravidlech dokumentu) */
 export function countClasses(list: readonly Pick<ClashDetail, "cls">[]): ClashCounts {
-  const c: ClashCounts = { total: list.length, thread: 0, underhead: 0, real: 0, undetermined: 0 };
+  const c: Required<ClashCounts> = { total: list.length, thread: 0, underhead: 0, real: 0, undetermined: 0, touch: 0, work: 0 };
   for (const x of list) c[x.cls]++;
   return c;
 }
 
-/** strojová část výpisu kolizí (`= clash …`), stejná v cs/en/de */
-export const clashKv = (c: ClashCounts) => `total=${c.total} thread=${c.thread} underhead=${c.underhead} real=${c.real} undetermined=${c.undetermined}`;
+/**
+ * strojová část výpisu kolizí (`= clash …`), stejná v cs/en/de; dotyk a pracovní kontakt (vlna 22) se přidávají na konec, jen
+ * když nejsou nulové (dřívější parsery a zlaté snímky beze změny)
+ */
+export const clashKv = (c: ClashCounts) => `total=${c.total} thread=${c.thread} underhead=${c.underhead} real=${c.real} undetermined=${c.undetermined}${c.touch ? ` touch=${c.touch}` : ""}${c.work ? ` work=${c.work}` : ""}`;
 
 /**
  * Otisk sestavy, pro který platí výsledek kontroly kolizí: listy (cesta id, obsah dílu = `sourceKey`, skrytí) a jejich světové
@@ -232,5 +258,10 @@ export async function classifyClashes(kernel: ClashKernel, doc: CadDoc, pairs: r
     const note = e instanceof Error ? e.message : String(e);
     list = plain.map((p) => ({ ...p, cls: "undetermined" as const, why: "kernel-failed" as const, note }));
   }
+  // místo průniku (těžiště, obálka, tloušťka) z kontroly kolizí – jádro ho při zařazení nepočítá znovu (pořadí = pořadí dvojic)
+  list = list.map((x, i) => {
+    const p = pairs[i];
+    return p && (p.at || p.box || p.depth !== undefined) ? { ...x, ...(p.at ? { at: p.at } : {}), ...(p.box ? { box: p.box } : {}), ...(p.depth !== undefined ? { depth: p.depth } : {}) } : x;
+  });
   return { list, counts: countClasses(list) };
 }

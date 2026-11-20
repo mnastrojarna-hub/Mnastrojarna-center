@@ -157,7 +157,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `výkres razítko číslo="MN-1" kreslil="AI" …` · `výkres revize B "popis"` · `výkres otočení 90` · `výkres řez XZ poloviční` · `výkres kusovník ano` · `výkres balónky ne` · `kótovat základní` | razítko, revize a další volby listu |
 | `výkres pohled pomocný přední hrana x1 y1 x2 y2` · `výkres řez zalomený|natočený|částečný …` · `výkres přerušení přední x od 50 do 250` · `výkres uložení Ø40 H7` · `výkres revize značka B na Ø40` · `výkres zóny ano` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | `výkres značka drsnost Ra 1,6 na Ø40` · `výkres kóta vodorovně pohled přední x1 y1 x2 y2` · `výkres upravit a3 odsazení=8` · `výkres smazat a3` · `výkres detail přední v x y poloměr r` · `výkres model "Hřídel"` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export `window.mncad.exportDrawing("pdf")` |
-| `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` | správa; kolize = kontrola průniků komponent sestavy |
+| `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` · `kolize seznam [třída]` · `kolize pravidlo pracovní "A" "B" [kroky 10..20]` · `kolize tolerance 0,01` | správa; kolize = kontrola průniků komponent sestavy po třídách (viz „Třídy, místo a pravidla kolizí“) |
 | `uložit [název]` · `export step|stl|brep|obj|glb|3mf|wrl|mncad [název]` · `výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]` · `skica export dxf ["Skica 1"]` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
 | `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` | sdílený odkaz – adresa se vypíše do protokolu na řádek `URL: …`; `odkaz` ji vypíše znovu |
 | `upravit` · `potlačit` / `zapnout` · `smazat <prvek>` · `přejmenovat` · `přesunout` · `duplikovat` · `zpět` / `znovu` · `proměnná` · `konfigurace` · `skica "Skica 1"` · `entita` · `kóta k1` · `odsadit` · `promítnout hrany` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
@@ -829,7 +829,7 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `motion.duration-extended`). **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
   znaménko = směr. Popis motoru: `hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s` (↓ hodnota klesá, ↑ roste,
   ↺ / ↻ natočení). Mezera Vzdálenosti pod nulou bez kontroly kolizí = ⚠ `motion.gap-negative` (plochy se prostoupí).
-- `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); `pohyb krok 12` – polohy
+- `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
   `pohyb kroky 48 čas 2 kolize vyp`, `pohyb motor smazat 1`, `pohyb smazat`.
@@ -928,7 +928,7 @@ rychlost do dorazu se nahradí odrazem −e·v (`odraz e`, 0 = zůstane ležet).
 hustota materiálu, těžiště a setrvačnost ze sítě (`pohyb hmotnost "X" 2,4` přepíše, `auto` vrátí). Integrace: rychlostní Verlet
 s projekcí na vazby (RATTLE), pevný krok `krok dt` [s]; záznam ≤ 400 snímků (`snímky N`). S `kolize` se kolize kontrolují
 jen v `kroky` rovnoměrně rozložených snímcích (+ poslední; výchozí 36 jako kinematika, `pohyb kroky N` zhustí) – souhrn
-`Kolize v pohybu: kroků s kolizí K z N` a ` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)`, `clash.steps=K/N`;
+`Kolize v pohybu: kroků s kolizí K z N` (jen kroky se skutečnou kolizí) a ` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)`, `clash.steps=K/N`;
 ostatní snímky `pohyb krok` / CSV označí „nekontrolováno“. Kinematická studie zůstává výchozí –
 `pohyb kinematika` přepne zpět (nastavení dynamiky zůstane).
 
@@ -2267,6 +2267,7 @@ třídí. Nejčastější:
 | `asm.stale-copy` ⚠ | díl změněný po `vložit` – komponenta je kopie, změna se do sestavy nepromítne | vložit znovu / `sestava upravit` |
 | `clash.thread` ℹ, `clash.underhead` ℹ / `clash.real` ⚠ | `kolize`, `kontrola sestava` i `pohyb … kolize` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen `clash.real` řešit; `pohyb krok N` vypíše kolize kroku |
 | `clash.undetermined` ⚠ / `clash.hidden` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (`závit M10`) |
+| `clash.touch` ℹ / `clash.work` ℹ / `clash.stale` ⚠ | dotyk – průnik tenčí než `kolize tolerance` (výchozí 0,01 mm) / pracovní kontakt podle pravidla `kolize pravidlo pracovní …` v okně operace / `kolize seznam` nad kontrolou z dřívějšího stavu sestavy | dotyk a pracovní kontakt nejsou závada; `clash.stale` → `kolize` znovu; jádrová díra bez závitu = `clash.undetermined` s nápovědou (`díra … závit M12` nebo `kolize pravidlo závit`) |
 | `feature.warning` ⚠ / `feature.failed` ✗ / `feature.unverified` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
@@ -2639,6 +2640,27 @@ ISO 4762 / ISO 4017 z knihovny i ze šroubového spoje (`sestava šroub`) nemaj�
 se přidá dřík) – v průchozí díře ani na podložce se se sevřeným dílem neprotnou; `clash.underhead` zůstává pro šrouby uložené
 starší verzí a pro vlastní modely.
 
+**Třídy, místo a pravidla kolizí** (vlna 22): každý výstup – protokol `kolize`, `stav`, řádek `D`, panel Kolize v aplikaci,
+zvýraznění ve 3D, souhrn pohybové studie i `window.mncad.motion()` – čte TÝŽ zařazený seznam, nikdy surové průniky. Třídy:
+⚠ skutečná (`clash.real`), ⚠ nevyhodnotitelná (`clash.undetermined`), ℹ pracovní kontakt (`clash.work`), ℹ dotyk
+(`clash.touch`), ℹ pod hlavou, ℹ šroub v závitu. Dvojice nese **instanci** (`„Šroub M12 [S2]“` přezdívka, `„Blok #2“` pořadí,
+v podsestavě `„Horní skupina › Šroub M12 [S1]“`) a **místo** průniku (těžiště a obálka ve světových souřadnicích:
+`– místo [50; 30; 28,5] · obálka 18 × 18 × 3 mm`; JSON `entries[].data.items[]` = `a, b, aPath, bPath, volume, at, box, depth`).
+Opakované nálezy se seskupí (stejná třída, stejné díly, objem v toleranci 2 %): `⚠ 4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4,
+#5, #6] (365,2 mm³)`. **Dotyk**: průnik tenčí než tolerance (`kolize tolerance 0,01`, výchozí 0,01 mm; tloušťka = 2·V/S
+nejtlustšího kusu) – přesah 0,0001 mm dvou desek je ℹ `clash.touch`, ne kolize (výpis `= clash … touch=1`, D `clash=3(thread=0,
+real=2,touch=1)`). **Jádrová díra bez prvku závitu** (hladká díra Ø10,2, importovaný díl) se šroubem Ø12 = ⚠ `clash.undetermined`
+s nápovědou „zadejte díru se závitem, nebo pravidlo“ – ne skutečná kolize; hlava nebo konec dříku v plném materiálu zůstanou
+skutečnou kolizí. **Pravidla** (`doc.clashRules`, jeden model i pro procesní vrstvu): `kolize pravidlo pracovní "Razník"
+"Plech" kroky 10..20` nebo `… pohyb "ZDVIH" 30..27` (hodnota motoru vazby; staticky hodnota vazby v dokumentu) = pracovní
+kontakt nástroj × plech jen v okně operace, mimo okno zůstává ⚠; `kolize pravidlo závit "Deska A" ["Šroub M12"]` = šroub
+v hladké jádrové díře je závitový záběr (třída podle pásma závitu). Pravidla se uplatní hned nad uloženou kontrolou (geometrie
+se nemění – výsledek neplatnost nezíská); `kolize pravidla` je vypíše, `kolize pravidlo 2 smazat` odebere, skript dokumentu
+je přenáší. `kolize seznam [skutečné|závit|dotyk|pracovní|závady|vše]` = výpis po skupinách s filtrem. V pohybu `clash.steps=K/N`
+počítá jen kroky se skutečnou (nebo nevyhodnotitelnou) kolizí, šrouby v závitu zvlášť (`thread=`), na konci `touch=` /
+`work=` (jen nenulové). Panel Kolize: přepínače tříd s počty (`data-clash-filter`), skupiny (`data-clash-group`,
+`data-clash-cls`), u závady „Pracovní kontakt…“ / „Je to závit“, pravidla a tolerance dotyku; ve 3D svítí jen listy se závadou.
+
 **Platnost výsledků (žádné falešné zelené):** každý uložený výsledek platí jen pro dokument + revizi geometrie + konfiguraci +
 polohu mechanismu, pro které vznikl – na jinou záložku se nikdy nepřenese. Ve `stav` (řádek `= … status`): `clash=-` =
 sestava kontrolována nebyla, `clash.stale=1` = kontrola je z jiného stavu sestavy; `mates=N/M` je vždy pro nynější stav (po
@@ -2941,6 +2963,10 @@ export type CadDoc = {
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
   motion?: MotionStudy;
+  /** pravidla kontroly kolizí sestavy (pracovní kontakt operace, závit bez prvku) – cad/clash-rules.ts (vlna 22, bod 5) */
+  clashRules?: ClashRule[];
+  /** tolerance dotyku kontroly kolizí [mm]: průnik tenčí než tolerance = ℹ dotyk, ne kolize (výchozí 0,01) */
+  clashTol?: number;
   /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */

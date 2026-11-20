@@ -1,0 +1,59 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+→ Díra 3 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Díra 4 (hole) přidán – výsledek po výpočtu níže
+→ Díra 5 (hole) přidán – výsledek po výpočtu níže
+→ Díra 6 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Šroub M12“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+✓ Díra 3 (hole)
+✓ Kvádr 2 (box)
+✓ Díra 4 (hole)
+✓ Díra 5 (hole)
+✓ Díra 6 (hole)
+✓ Válec 1 (cylinder)
+✓ Válec 2 (cylinder)
+✓ Kvádr 3 (box)
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 60 × 5 mm (X 0…20, Y 0…60, Z 0…5) · objem 6 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 20 × 60 × 5 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Sestava 5“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S1“
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S2“
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S3“
+✓ komponenta „Plech“ vložena do sestavy
+kolize: 5 – šroub v závitu 3, skutečné 2
+⚠ řádek 8: kolize „Přidržovač“ × „Šroub M12 [S2]“ (365,2 mm³) – místo [50; 30; 28,5] · obálka 18 × 18 × 3 mm
+⚠ řádek 8: kolize „Plech“ × „Šroub M12 [S3]“ (77,3 mm³) – místo [87,81; 30; 32,5] · obálka 2 × 11,31 × 5 mm
+Dokument: „Sestava 5“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [0; 0; 20] · Šroub M12 [S1] [20; 30; 12] · Šroub M12 [S2] [50; 30; 9] · Šroub M12 [S3] [80; 30; 12] · Plech [87; 0; 30]
+Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 107 × 60 × 42 mm · objem Σ 192,63 cm³ · hmotnost Σ 1,512 kg
+Kolize: 5 – skutečné 2: Přidržovač × Šroub M12 [S2] (365,2 mm³) v místě [50; 30; 28,5]; Plech × Šroub M12 [S3] (77,3 mm³) v místě [87,81; 30; 32,5]; šroub v závitu 3 (zkontrolováno ?)
+Kolize (zkontrolováno ?): skutečné 2 · šroub v závitu 3 · zobrazeno 2 skupin (šroub v závitu)
+ · šroub v závitu: 2× šroub v závitu „Deska A“ × „Šroub M12“ [S1, S3]
+ · šroub v závitu: šroub v závitu „Deska A“ × „Šroub M12 [S2]“
+Kolize (zkontrolováno ?): skutečné 2 · šroub v závitu 3 · zobrazeno 2 skupin (skutečná kolize)
+ ! skutečná kolize: kolize „Přidržovač“ × „Šroub M12 [S2]“ (365,2 mm³) – místo [50; 30; 28,5] · obálka 18 × 18 × 3 mm
+ ! skutečná kolize: kolize „Plech“ × „Šroub M12 [S3]“ (77,3 mm³) – místo [87,81; 30; 32,5] · obálka 2 × 11,31 × 5 mm
+
+Dokument: „Sestava 5“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [0; 0; 20] · Šroub M12 [S1] [20; 30; 12] · Šroub M12 [S2] [50; 30; 9] · Šroub M12 [S3] [80; 30; 12] · Plech [87; 0; 30]
+Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 107 × 60 × 42 mm · objem Σ 192,63 cm³ · hmotnost Σ 1,512 kg
+Kolize: 5 – skutečné 2: Přidržovač × Šroub M12 [S2] (365,2 mm³) v místě [50; 30; 28,5]; Plech × Šroub M12 [S3] (77,3 mm³) v místě [87,81; 30; 32,5]; šroub v závitu 3 (zkontrolováno ?)

@@ -20,6 +20,8 @@ import type { MateStatus } from "./mates";
 import type { DrawingExportFormat, DrawingExportOptions, DrawingExportResult } from "./drawing-export";
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
+import { parseClashText, type ClashCmd } from "./agent-clash";
+import type { ClashCounts } from "./clash-class";
 import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
 import { parseWeldLine, weldSummary, WELD_COMMANDS } from "./agent-welds";
 import { parseSpringLine, SPRING_COMMANDS } from "./agent-springs";
@@ -121,8 +123,8 @@ export type AgentOp =
   | { k: "status"; line: number }
   /** měření (agent-measure.ts): údaje o F/E/V, vzdálenost a úhel dvou entit, těleso, díry, válce – výsledek do protokolu */
   | { k: "measure"; cmd: MeasureCmd; line: number }
-  /** sestava: kontrola kolizí komponent, výsledek do protokolu */
-  | { k: "clash"; line: number }
+  /** sestava: kontrola kolizí komponent, výsledek do protokolu; `cmd` = výpis po třídách, pravidla, tolerance dotyku (agent-clash.ts) */
+  | { k: "clash"; line: number; cmd?: ClashCmd }
   /** úpravy existujícího modelu a skici, proměnné, konfigurace, zpět / znovu (agent-edit.ts) */
   | EditOp
   /** sestava textem (plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky) – cad/agent-asm.ts, provedení cad/asm-agent.ts */
@@ -1098,7 +1100,7 @@ export function parseAgentText(text: string): AgentProgram {
           ops.push({ k: "measure", cmd: parseMeasure(tokens), line: no });
           return;
         case "clash":
-          ops.push({ k: "clash", line: no });
+          ops.push({ k: "clash", line: no, ...(tokens.length ? { cmd: parseClashText(line.replace(/^\s*\S+/, "")) } : {}) });
           return;
         case "assembly":
         case "bom":
@@ -1536,7 +1538,7 @@ export type AsmStatus = {
   volume?: number;
   massKg?: number;
   /** null = kolize zatím nekontrolovány */
-  clash?: { count: number; pairs: string[]; at: string; /** sestava se od kontroly změnila – výsledek neplatí */ stale?: boolean } | null;
+  clash?: { count: number; pairs: string[]; at: string; /** sestava se od kontroly změnila – výsledek neplatí */ stale?: boolean; /** třídy po pravidlech dokumentu (vlna 22, bod 5) – `clash=5(thread=3,real=2)` */ classes?: ClashCounts } | null;
   /** stav vazeb z posledního přepočtu (řádek „Vazby:“) */
   mates?: Record<string, MateStatus>;
   /** stav vazeb nepatří nynějšímu stavu sestavy (polohy v dokumentu jsou jiné než po přepočtu) – nesmí se číst jako „splněno“ */
@@ -1706,6 +1708,9 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "analýza úkosů [směr +Z] [min 1] [zobrazit] · analýza tloušťky [limit 2] [zobrazit] · analýza křivosti [zobrazit] · analýza zebra · analýza vyp", en: "analyze draft / analyze thickness / analyze curvature / analyze zebra / analyze off", de: "analyse formschräge / analyse wandstärke / analyse krümmung / analyse zebra / analyse aus", desc: tr("formařské analýzy jako text: podíly úkosů a podkosy, nejtenčí stěna a místo, křivost; „zobrazit“ = barevná mapa v 3D okně (pro screenshot)") },
   { cmd: "dělicí rovina [směr +Z] · vyhazovače [Ø 6] [rozteč 60] [směr +Z] [díry|sestava] · chlazení [Ø8] [hloubka 15] [větve 4] [přesah 10] [díl|sestava] · smrštění 0,5|ABS", en: "parting plane / ejectors / cooling / shrinkage", de: "trennebene / auswerfer / kühlung / schwindung", desc: tr("formařské nástroje: návrh dělicí roviny (nastaví řez), polohy vyhazovačů (díry do dílu / sestava s vyhazovači), chladicí okruh (vrty do dílu / sestava), smrštění jako měřítko") },
   { cmd: "kolize", en: "clash", de: "kollision", desc: tr("sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)") },
+  { cmd: "kolize seznam [skutečné|nevyhodnotitelné|závit|pod hlavou|dotyk|pracovní|závady|vše]", en: "clash list [real|undetermined|thread|underhead|touch|work|faults|all]", de: "kollision liste [echte|unbestimmt|gewinde|unterkopf|berührung|arbeit|fehler|alle]", desc: tr("výpis poslední kontroly kolizí po třídách a skupinách (opakované nálezy jednou s počtem a instancemi [S2] / #4, místo průniku a obálka) s filtrem třídy; pravidla dokumentu se uplatní hned") },
+  { cmd: "kolize pravidlo pracovní \"A\" [\"B\"] [kroky 10..20 | pohyb \"ZDVIH\" 30..27] [pozn …] · kolize pravidlo závit \"A\" [\"B\"] · kolize pravidla · kolize pravidlo N smazat", en: "clash rule work \"A\" [\"B\"] [steps 10..20 | motion \"STROKE\" 30..27] · clash rule thread · clash rules · clash rule N delete", de: "kollision regel arbeit \"A\" [\"B\"] [schritte 10..20 | bewegung \"HUB\" 30..27] · kollision regel gewinde · kollision regeln · kollision regel N löschen", desc: tr("pravidla kolizí sestavy: pracovní kontakt nástroj × plech v okně operace (kroky studie / hodnota motoru vazby) = ℹ clash.work, mimo okno ⚠ skutečná kolize; závit = šroub v hladké jádrové díře bez prvku závitu je závitový záběr; díl v podsestavě cestou \"Skupina/Díl\"") },
+  { cmd: "kolize tolerance 0,01", en: "clash tolerance 0.01", de: "kollision toleranz 0,01", desc: tr("tolerance dotyku [mm]: průnik tenčí než tolerance (přesah 0,0001 mm) = ℹ clash.touch, ne kolize") },
   { cmd: "přísně [vyp] [kromě kód,kód]", en: "strict [off] [except code,code]", de: "streng [aus] [außer Code,Code]", desc: tr("přísný režim od tohoto řádku: chyba nebo varování rozboru = nic se neprovede, za běhu první ⚠ / ✗ zastaví (model se staví po každé operaci, list výkresu po bloku příkazů výkres); výjimky kódem nebo předponou (hole.); ℹ nezastaví nikdy") },
   { cmd: "sestava · sestava plochy \"<komponenta>\" [rovinné|válcové]", en: "assembly, assembly faces", de: "baugruppe, baugruppe flächen", desc: tr("sestava: výpis komponent (poloha, natočení, ukotvení, viditelnost, vazby); plochy komponenty pro vazby – F-číslo, druh, normála / osa a Ø, střed v souřadnicích sestavy, plocha / délka") },
   { cmd: "sestava vazba kontakt|zarovnat|vystředit|souosost|vzdálenost|úhel|rovnoběžně \"<A>\" <plocha A> \"<B>\" <plocha B> [hodnota N] [obráceně] [název \"…\"] · sestava vazba ukotvit \"<A>\"", en: "assembly mate", de: "baugruppe verknüpfung", desc: tr("trvalá vazba jako v panelu sestavy: plocha = F12 (sestava plochy) nebo pravidlo +Z|-X|horní|spodní|největší|nejmenší|válcová|rovinná|Ø8|R4; bez hodnoty se u Vzdálenosti / Úhlu vezme naměřená; po vazbě se sestava přepočítá a protokol napíše stav vazby a novou polohu komponenty") },
@@ -1785,7 +1790,7 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
    * pohybová studie otevřené sestavy: volitelně nejdřív příkaz „pohyb …“ (např. 'motor rotační "Klika" 0..360 krok 5'), pak výpočet;
    * vrátí tabulku kroků (čas, motory, poloha a natočení komponent podle názvu, stopa, kolize), souhrn, první kolizi a CSV
    */
-  motion?: (cmd?: string | MotionApiOpts) => Promise<{ steps: { step: number; t: number; motors: number[]; comps: Record<string, { position: Vec3; rotation: Vec3 }>; trace?: Vec3; clashes?: string[]; conflicts: number; dyn?: Record<string, { p: Vec3; v: Vec3; a: Vec3 }> }[]; summary: string[]; collision: { step: number; t: number; a: string; b: string; volume: number } | null; csv: string; dynamic?: MotionApiDynamic }>;
+  motion?: (cmd?: string | MotionApiOpts) => Promise<{ steps: { step: number; t: number; motors: number[]; comps: Record<string, { position: Vec3; rotation: Vec3 }>; trace?: Vec3; clashes?: string[]; /** dvojice kroku s třídou a místem (vlna 22, bod 5) */ clashList?: { a: string; b: string; cls: string; volume: number; at?: Vec3 }[]; conflicts: number; dyn?: Record<string, { p: Vec3; v: Vec3; a: Vec3 }> }[]; summary: string[]; /** první SKUTEČNÁ kolize (šroub v závitu, dotyk ani pracovní kontakt ne) s popisem instance */ collision: { step: number; t: number; a: string; b: string; volume: number; cls?: string; at?: Vec3 } | null; /** kroky se skutečnou kolizí, šrouby v závitu, dotyk, pracovní kontakt */ collisions?: { steps: number; of: number; thread: number; real: number; firstReal: number | null; touch?: number; work?: number }; csv: string; dynamic?: MotionApiDynamic }>;
   /** kusovník otevřené sestavy (plochý / strukturovaný) – řádky, textová tabulka a CSV (jako „kusovník“ a Export CSV) */
   bom: (opts?: { structured?: boolean }) => Promise<{ rows: { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; level?: number }[]; text: string; csv: string }>;
   /** otevřené záložky dokumentů (pořadí jako v titulní liště) */

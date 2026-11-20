@@ -20,6 +20,7 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
 import { defaultStudy, motionMotorNotes, type MotionResult } from "@/cad/motion";
+import { stepHasFault } from "@/cad/clash-report"; // štítek kroku jen u skutečné kolize (vlna 22, bod 5)
 import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
 import { studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
@@ -574,7 +575,7 @@ export function MotionPanel({
             </div>
             <p data-motion-step className="font-mono text-[11px] text-[#4a5664]">
               {tr("krok {0}/{1} · t = {2} s · motory {3}", cur.i, res.steps.length - 1, f(cur.t, 3), cur.motors.map((v, i) => `${f(v)}${res.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(", "))}
-              {cur.clashes?.length ? <span className="text-brand"> · {tr("kolize")}</span> : null}
+              {stepHasFault(doc, cur) ? <span className="text-brand"> · {tr("kolize")}</span> : null}
               {cur.conflicts.length ? <span className="text-brand"> · {tr("nesplněno {0}", cur.conflicts.length)}</span> : null}
             </p>
             <DynChart res={res} doc={doc} step={step} />

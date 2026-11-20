@@ -1,0 +1,32 @@
+# vlna 22, bod 5: numerický dotyk (přesah 0,0001 mm) = ℹ dotyk, ne kolize; hlava v téže závitové desce a dřík delší než díra
+# zůstanou skutečnou kolizí; jádrová díra bez prvku závitu = ⚠ nevyhodnotitelné s nápovědou, pravidlo závit ji zařadí
+nový díl Deska A
+kvádr 100 60 20
+díra závit M12 hloubka 18 v 20 30
+díra závit M12 hloubka 10 v 50 30
+nový díl Šroub M12
+válec 12 18
+válec 18 12 v 0 0 18
+nový díl Deska B
+kvádr 100 60 10
+nový díl Deska C
+kvádr 100 60 20
+díra 10,2 hloubka 18 v 20 30
+#--- run
+nová sestava Sestava 5b
+vložit "Deska A" ukotvit
+vložit "Šroub M12" v 20 30 0 jako "S4"
+vložit "Šroub M12" v 50 30 2 jako "S5"
+vložit "Deska B" v 0 59,9999 0
+kolize
+kolize tolerance 0,00001
+kolize seznam dotyk
+kolize tolerance 0,01
+#--- run
+nová sestava Sestava 5P
+vložit "Deska C" ukotvit
+vložit "Šroub M12" v 20 30 12 jako "S1"
+kolize
+kolize pravidlo závit "Deska C" "S1"
+kolize seznam
+stav
