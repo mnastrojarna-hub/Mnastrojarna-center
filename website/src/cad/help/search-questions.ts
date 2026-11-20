@@ -154,6 +154,44 @@ export const HELDOUT3: EvalQuestion[] = [
   { q: "neues blatt in der zeichnung", lang: "de", want: /zeichnung blatt|výkres list/i },
 ];
 
+/**
+ * zadržená sada č. 4 – napsaná druhým opravářem 20. 11. před prvním spuštěním, bez ladění podle ní; první (a jediný) běh
+ * 27/30 = 90 % (minuly: „nastavit vzdálenost mezi dvěma komponentami“ → měření, „vytvořit 2d výkres a uložit dwg“ →
+ * „uložení“ H7, DE „masse des teils“ → „Maße“ = rozměry)
+ */
+export const HELDOUT4: EvalQuestion[] = [
+  { q: "jak udělat díru skrz celý díl", want: /díra [^`]*skrz/i },
+  { q: "vložit stejný díl do sestavy dvakrát", want: /vložit "/i },
+  { q: "nastavit vzdálenost mezi dvěma komponentami", want: /vazba vzdálenost|vazba [^`]*vzdálenost/i },
+  { q: "jak zjistit objem tělesa", want: /měřit těleso|`stav`/i },
+  { q: "uložit výkres jako pdf", want: /výkres export pdf/i },
+  { q: "přidat toleranci H7 na průměr", want: /výkres tolerance/i },
+  { q: "jak spustit skript bez prohlížeče", want: /mncad run/i },
+  { q: "zaoblení všech hran", want: /zaoblit [^`]*hrany/i },
+  { q: "pole děr v řadě", want: /pole \d+ rozteč|pole [^`]*rozteč|`pole N/i },
+  { q: "zobrazit seznam vazeb sestavy", want: /sestava vazby/i },
+  { q: "vytvořit 2d výkres a uložit dwg", want: /2d export dwg|2d nový/i },
+  { q: "vnější závit na čepu", want: /závit M/i },
+  { q: "číslo výkresu do razítka", want: /výkres razítko/i },
+  { q: "jak zkontrolovat díl", want: /`kontrola/i },
+  { q: "pohyb s gravitací", want: /pohyb dynamika/i },
+  { q: "řez výkresu rovinou", want: /výkres řez/i },
+  { q: "drill a through hole", lang: "en", want: /díra [^`]*skrz|hole [^`]*through/i },
+  { q: "add a mate between two parts", lang: "en", want: /sestava vazba|assembly mate/i },
+  { q: "export the drawing as pdf", lang: "en", want: /výkres export pdf|drawing export pdf/i },
+  { q: "run a script from the command line", lang: "en", want: /mncad run/i },
+  { q: "chamfer top edges", lang: "en", want: /`srazit|`chamfer/i },
+  { q: "assembly clash detection", lang: "en", want: /`kolize|`clash/i },
+  { q: "set part material", lang: "en", want: /`materiál|`material/i },
+  { q: "bohrung durchgehend", lang: "de", want: /díra [^`]*skrz|bohrung [^`]*durch/i },
+  { q: "verknüpfung zwischen teilen", lang: "de", want: /sestava vazba|baugruppe (verknüpfung|bedingung|abhängigkeit)/i },
+  { q: "zeichnung maßstab", lang: "de", want: /výkres A3 měřítko|zeichnung [^`]*maßstab|výkres \[A4/i },
+  { q: "skript ohne browser ausführen", lang: "de", want: /mncad run/i },
+  { q: "kanten fasen", lang: "de", want: /`srazit|`fase/i },
+  { q: "masse des teils", lang: "de", want: /měřit těleso|messen körper|`stav`|`status`/i },
+  { q: "modell per link teilen", lang: "de", want: /`sdílet|`teilen/i },
+];
+
 /** překlepy a tvary slov */
 export const TYPOS: EvalQuestion[] = [
   { q: "sestva", want: /sestav/i },

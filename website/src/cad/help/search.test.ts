@@ -10,7 +10,7 @@ import { AGENT_COMMANDS } from "../agent";
 import { cheatAnswer, HELP_BUDGET, searchAnswer, searchSections, shareBudget } from "./answer";
 import { editDistance, foldText, SearchIndex, stem, utf8Len, words } from "./search-core";
 import { cheatChunks, commandChunks, docsChunks, guideChunks, helpIndex, textIn } from "./search-corpus";
-import { HELDOUT, HELDOUT2, HELDOUT3, REVIEW, TYPOS, type EvalQuestion } from "./search-questions";
+import { HELDOUT, HELDOUT2, HELDOUT3, HELDOUT4, REVIEW, TYPOS, type EvalQuestion } from "./search-questions";
 
 afterEach(() => setLang("cs"));
 
@@ -172,8 +172,8 @@ describe("hodnocení na otázkách agenta", () => {
     setLang("cs");
     return { rate: 1 - miss.length / set.length, miss };
   };
-  it("recenze: nezávislé otázky (60 recenzních + 70 zadržených) – správný příkaz ve vypsaných prvních třech řádcích u ≥ 90 %", () => {
-    const sets = { REVIEW, HELDOUT, HELDOUT2, HELDOUT3 };
+  it("recenze: nezávislé otázky (60 recenzních + 100 zadržených) – správný příkaz ve vypsaných prvních třech řádcích u ≥ 90 %", () => {
+    const sets = { REVIEW, HELDOUT, HELDOUT2, HELDOUT3, HELDOUT4 };
     const out: string[] = [];
     let n = 0;
     let bad = 0;
@@ -186,7 +186,7 @@ describe("hodnocení na otázkách agenta", () => {
       expect(r.rate, `${name} mimo první tři:\n${r.miss.join("\n")}`).toBeGreaterThanOrEqual(name === "REVIEW" ? 0.9 : 0.85);
     }
     console.log(`hodnocení podle vypsaných řádků: ${out.join(" · ")} · celkem ${n - bad}/${n} (${((1 - bad / n) * 100).toFixed(1)} %)`);
-    expect(n).toBe(130);
+    expect(n).toBe(160);
     expect(1 - bad / n).toBeGreaterThanOrEqual(0.9);
   });
   it("recenze: překlepy a tvary slov najdou správný oddíl (sestva, dyra, kusovnk, tolerence, zavyt, zalozkami…)", () => {

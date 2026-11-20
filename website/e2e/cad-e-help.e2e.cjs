@@ -269,7 +269,21 @@ let b;
       const crumb = await p.evaluate(() => { const n = document.querySelector('[data-docs-page] nav[aria-label] a, [data-docs-search-scope] nav[aria-label] a'); return n ? Math.round(n.getBoundingClientRect().top) : null; });
       ok(r.top >= 60 && r.bottom <= r.vh && r.top < 200, `5a ${url} ${w}×${h}: pole hledání v první obrazovce (y=${r.top}…${r.bottom})`);
       ok(crumb === null || crumb >= r.bottom, `5a ${url} ${w}×${h}: pole nezakrývá drobečkovou navigaci (drobečky y=${crumb}, pole do ${r.bottom})`);
-      ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `5a ${url} ${w}×${h}: bez vodorovného posuvu`);
+      // hledání nepřidá vodorovný posuv: pole, přepínač ani seznam nepřesahují okno; přesah stránky smí způsobit jen
+      // dlouhý řádkový kód příručky (`.doc code { white-space: nowrap }` v globals.css – stav před balíkem, vypíše se)
+      await p.keyboard.press('/');
+      await p.keyboard.type('export step', { delay: 10 });
+      await p.waitForTimeout(600);
+      const ov = await p.evaluate(() => {
+        const iw = innerWidth;
+        const out = (el) => { const q = el.getBoundingClientRect(); return q.width > 0 && (q.right > iw + 1 || q.left < -1); };
+        const own = [...document.querySelectorAll('[data-docs-search-bar], [data-docs-search-bar] *')].filter(out).map((el) => el.tagName + (el.id ? '#' + el.id : ''));
+        const clipped = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) if (/hidden|clip|auto|scroll/.test(getComputedStyle(a).overflowX)) return true; return false; };
+        const other = [...document.querySelectorAll('body *')].filter((el) => out(el) && !el.closest('[data-docs-search-bar]') && !clipped(el));
+        return { sw: document.documentElement.scrollWidth, iw, own, other: other.filter((el) => !el.closest('.doc code')).map((el) => el.tagName + '.' + String(el.className).slice(0, 30)), code: other.filter((el) => el.tagName === 'CODE').length };
+      });
+      ok(ov.own.length === 0 && ov.other.length === 0, `5a ${url} ${w}×${h}: hledání nepřidává vodorovný posuv (pole/seznam mimo okno: ${ov.own.join(', ') || '—'}; jiné přesahy: ${ov.other.join(', ') || '—'})`);
+      if (ov.sw > ov.iw + 1) console.log(`info: 5a ${url} ${w}×${h}: šířka stránky ${ov.sw} > okno ${ov.iw} jen kvůli ${ov.code}× dlouhému řádkovému kódu příručky (.doc code nowrap, stav před balíkem)`);
       await p.close();
     }
 
@@ -306,9 +320,11 @@ let b;
 
     // 5c. myš, která jen stojí nad místem seznamu, nepřebírá výběr: Enter po psaní = první výsledek
     for (const y of [300, 400]) {
-      await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      // uživatel klikl do textu (pole už není zaměřené) a ukazatel nechal stát tam, kde se za chvíli otevře seznam výsledků
+      // (místo kliku blur – klik na [683; y] by v úvodu mohl trefit odkaz)
+      await p.evaluate(() => { document.activeElement?.blur?.(); window.scrollTo({ top: 0, behavior: 'instant' }); });
       await p.waitForTimeout(200);
-      await p.mouse.move(683, y); // ukazatel zůstane stát tam, kde se za chvíli otevře seznam výsledků
+      await p.mouse.move(683, y);
       await p.keyboard.press('/');
       await p.keyboard.type('kusovnik', { delay: 15 });
       await p.waitForTimeout(600);
