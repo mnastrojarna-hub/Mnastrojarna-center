@@ -1582,7 +1582,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
 
 /** Seznam příkazů (pro nápovědu v konzoli a paletu). */
 export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string }[] = [
-  { cmd: "nový díl [název] [znovu|nový] / nová sestava [název] [znovu|nový]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: `${tr("nový dokument v nové záložce")}; ${tr("opakovaný běh téhož skriptu použije záložku stejného názvu z dřívějšího běhu (ℹ doc.reused, obsah nahrazen) – „nový“ = vždy nová záložka, „znovu“ = i záložka otevřená mimo běh")}` },
+  { cmd: "nový díl [název] [znovu|nový] / nová sestava [název] [znovu|nový]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: `${tr("nový dokument v nové záložce")}; ${tr("opakovaný běh téhož skriptu použije záložku stejného názvu, kterou založil dřívější běh (ℹ doc.reused, obsah nahrazen; platí i pro normálie, otevřít a JSON) – „nový“ = vždy nová záložka, „znovu“ = i otevřený soubor nebo ruční záložka téhož názvu")}` },
   { cmd: "název …, materiál …, barva #hex", en: "name, material, color", de: "name, werkstoff, farbe", desc: tr("materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)") },
   { cmd: "kvádr X Y Z [střed] [v x y z | na …] [osa …] [přidat|odebrat|průnik|nové] [těleso \"Název\"]", en: "box", de: "quader", desc: tr("kvádr; výchozí roh v poloze (počátek); „střed“ = poloha je střed kvádru („střed F1“ / „střed V3“ = střed v odkazu, „na střed plochy F1“ = roh); „osa“ = rozměr Z po ose, nejkratší otočení kolem polohy (osa -Z: Y a Z záporně; osa X: X 0…Z, Z −X…0; osa Y: Y 0…Z, Z −Y…0)") },
   { cmd: "válec D H [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "cylinder", de: "zylinder", desc: tr("válec průměr × výška; poloha = střed podstavy, válec roste ve směru osy (výchozí +Z); „odebrat“ = válcový otvor po libovolné ose (na výkrese popis díry Ø ↧ hloubka / skrz)") },
@@ -1728,9 +1728,10 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
   commands: () => string[];
   /**
    * provede textové příkazy nebo JSON; vrátí protokol + stav dokumentu (výchozí text konzole); `protocol: "short"` = stručný
-   * protokol MNCAD/1 jako `mncad run` (řádky D, Σ; `budget` B, `notes` = i ℹ), `"full"` = plný protokol, `"json"` = RunReport
+   * protokol MNCAD/1 jako `mncad run` (řádky D, F, Σ; `budget` B, `notes` = i ℹ), `"full"` = plný protokol, `"json"` = RunReport;
+   * místo objektu stačí název protokolu (`run(text, "short")`); neznámá volba nebo hodnota = chyba (engine/run-protocol.ts)
    */
-  run: (text: string, opts?: RunApiOptions) => Promise<string>;
+  run: (text: string, opts?: RunApiOptions | NonNullable<RunApiOptions["protocol"]>) => Promise<string>;
   /** kopie otevřeného dokumentu (formát .mncad) */
   getDocument: () => CadDoc;
   /**

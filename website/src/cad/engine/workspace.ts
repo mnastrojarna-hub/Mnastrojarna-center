@@ -14,6 +14,15 @@ import type { BuildResult, CadDoc } from "../types";
 
 export type DocKey = string;
 export type { TabInfo };
+/**
+ * Původ záložky, kterou založil běh skriptu (opakovaný běh – engine/runs.ts): `new` = dokument vytvořený příkazem běhu
+ * (`nový díl`, `nová sestava`, normálie, rám formy, `2d nový`, sestava z vyhazovačů…), `open` = dokument načtený zvenku
+ * (`otevřít "soubor"`, JSON / `window.mncad.setDocument`, `předloha otevřít`). Opakovaný běh převezme jen záložku téhož
+ * původu – `nový díl "A"` nikdy nepřepíše otevřený soubor „A“.
+ */
+export type RunOrigin = "new" | "open";
+/** druh záložky dokumentu pro opakovaný běh (záložky výkresu sdílí dokument zdrojové záložky) */
+export type RunDocKind = "part" | "assembly" | "draft";
 
 /** mezipaměti sestavy (klientská strana jádra) – platí pro jednu generaci jádra (`generation`) */
 export type AsmCaches = {
@@ -58,7 +67,7 @@ export interface Workspace {
    * Otevře dokument – vždy `normalizeDraftDoc(internBlobs(d))`. Prázdná záložka se znovu použije jen pro úvodní prázdný díl
    * relace (`reuseEmpty`, výchozí true), nikdy pro dokument vytvořený během (5.2 č. 14).
    */
-  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean; /** dokument založil běh skriptu (`flush`) – opakovaný běh záložku použije znovu */ made?: boolean }): Promise<{ id: DocKey; reused: boolean }>;
+  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean; /** dokument běhu skriptu (`flush`) a jeho původ – opakovaný běh záložku téhož původu použije znovu */ origin?: RunOrigin }): Promise<{ id: DocKey; reused: boolean }>;
   tabs(): TabInfo[];
   activate(id: DocKey): Promise<CadDoc>;
   close(id: DocKey): Promise<CadDoc>;
@@ -95,12 +104,16 @@ export interface Workspace {
   /** dokument záložky `id` bez přepnutí záložky (souhrny dokumentů – řádky D); neznámá záložka → null */
   docOf?(id: DocKey): CadDoc | null;
   /**
-   * záložky dílu / sestavy s názvem `name` (bez ohledu na velikost písmen) v pořadí záložek: `made` = založil ji běh skriptu
-   * (`openInTab({ made })`, i v dřívější relaci), `claimed` = patří už tomuto běhu (založil ji nebo převzal `claimTab`)
+   * záložky dílu / sestavy / 2D výkresu s názvem `name` (bez ohledu na velikost písmen) v pořadí záložek: `origin` = původ,
+   * pokud ji založil běh skriptu (`openInTab({ origin })`, i v dřívější relaci), `claimed` = patří už tomuto běhu (založil
+   * ji nebo převzal `claimTab`)
    */
-  namedTabs?(name: string, kind: "part" | "assembly"): { id: DocKey; made: boolean; claimed: boolean }[];
-  /** záložku `id` převezme tento běh (`nový díl "A"` podruhé): aktivuje ji; `findPart` ji pak bere jako dokument běhu */
-  claimTab?(id: DocKey): Promise<CadDoc>;
+  namedTabs?(name: string, kind: RunDocKind): { id: DocKey; origin?: RunOrigin; claimed: boolean }[];
+  /**
+   * záložku `id` převezme tento běh (opakovaný běh `nový díl "A"`, `normálie …`, `otevřít …`): aktivuje ji a zapamatuje
+   * si nový původ; `findPart` ji pak bere jako dokument běhu
+   */
+  claimTab?(id: DocKey, origin: RunOrigin): Promise<CadDoc>;
   /** klíče dokumentů (`docKey`), které tento běh založil nebo změnil (`openInTab` / `commit` od `beginRun`) */
   runDocKeys?(): DocKey[];
 }

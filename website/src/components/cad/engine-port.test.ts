@@ -4,7 +4,7 @@
  * aktivní záložku, smí-li). Smlouva B2 po recenzi: dokument dřívějšího běhu se nikdy nepřepíše, `vložit` vidí aktuální díl
  * a název, stav vazeb a kolizí je podle id dokumentu – stejně jako MemoryWorkspace (CLI, serve).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TabInfo } from "@/cad/agent-asm";
 import { docHasContent, docTabKind } from "@/cad/draft/doc";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "@/cad/engine/host";
@@ -15,7 +15,8 @@ import { runScript } from "@/cad/engine/run";
 import type { Workspace } from "@/cad/engine/workspace";
 import type { MateStatus } from "@/cad/mates";
 import { emptyDoc, uid, type BuildResult, type CadDoc, type ComponentSource } from "@/cad/types";
-import { makeAppWorkspace, type AppPortDeps, type PortTab } from "./engine-port";
+import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps, type PortTab } from "./engine-port";
+import { histStep as stepHist } from "@/cad/agent-edit";
 
 type Hist = PortTab["hist"];
 type Entry = PortTab & { docId: string };
@@ -332,6 +333,28 @@ function lazyDeps(app: FakeApp): () => AppPortDeps {
         app.tabId = id;
       });
     },
+    // `zpět` / `znovu`: cad-app.tsx volá setHist ve `flushSync` – čekající zápisy se promítnou a krok proběhne hned
+    histStep: (dir, n) => {
+      render();
+      const step = stepHist(app.hist, dir, n);
+      app.hist = step.hist;
+      return step.moved;
+    },
+    // zavření záložky jako cad-app.tsx `closeTab`: snímek ze stavu před vykreslením, projeví se vykreslením
+    closeTab: (id) => {
+      const all = app.snapshot();
+      queue.push(() => {
+        const idx = all.findIndex((t) => t.id === id);
+        const snap = all.filter((t) => t.id !== id);
+        app.list = snap;
+        if (id === app.tabId && snap.length) {
+          const next = snap[Math.min(Math.max(0, idx - 1), snap.length - 1)];
+          app.hist = next.hist;
+          app.docId = next.docId;
+          app.tabId = next.id;
+        }
+      });
+    },
     settle: async (ok) => {
       render();
       return ok();
@@ -361,5 +384,73 @@ describe("zápis do záložky před přepnutím (aplikace vykresluje až po běh
     const box = app.snapshot().find((t) => t.title === "R1")!.hist.present.features[0] as { size: number[] };
     expect(box.size).toEqual([20, 20, 20]);
     expect((app.snapshot().find((t) => t.title === "R2")!.hist.present.features[0] as { size: number[] }).size).toEqual([6, 6, 6]);
+  });
+});
+
+/* ───────── recenze vlny E (nález 1): `zpět` / `znovu` a hned přepnutí, nová záložka nebo zavření záložky v témže běhu ───────── */
+describe("zpět / znovu a pak záložka, nový díl nebo zavřít záložku v témže běhu (krok historie je synchronní)", () => {
+  const setup = async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "W1"\nkvádr 10 10 10\nnový díl "W2"\nkvádr 5 5 5', host);
+    return { app, ws };
+  };
+  const errs = (r: { entries: { level: string; line?: number | null; code?: string }[] }) => r.entries.filter((e) => e.level === "error").map((e) => `${e.line} ${e.code}`);
+  it("`záložka W1`, válec, `zpět`, `záložka W2`, válec → válec ve W2, W1 jen kvádr, žádné ✗ tab.settle-timeout", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nzáložka "W2"\nválec 2 10', host);
+    expect(errs(r)).toEqual([]);
+    expect(featsOf(app, "W1")).toEqual(["box"]);
+    expect(featsOf(app, "W2")).toEqual(["box", "cylinder"]);
+    expect(app.hist.present.name).toBe("W2");
+  });
+  it("`zpět` a hned `nový díl \"U2\"` → záložka U2 vznikne (dřív ✗ timeout a dokument ztracen)", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'válec 5 20\nzpět\nnový díl "U2"\nkvádr 5 5 5', host);
+    expect(errs(r)).toEqual([]);
+    expect(titles(ws)).toEqual(["W1", "W2", "U2"]);
+    expect(featsOf(app, "W2")).toEqual(["box"]);
+    expect(featsOf(app, "U2")).toEqual(["box"]);
+  });
+  it("`zpět` a hned `zavřít záložku \"W2\"` → W2 zavřená", async () => {
+    const { ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nzavřít záložku "W2"', host);
+    expect(errs(r)).toEqual([]);
+    expect(titles(ws)).toEqual(["W1"]);
+  });
+  it("`zpět` + `znovu` a pak `záložka` → krok vrácený `znovu` zůstane ve W1", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nznovu\nzáložka "W2"\nkoule 4', host);
+    expect(errs(r)).toEqual([]);
+    expect(featsOf(app, "W1")).toEqual(["box", "cylinder"]);
+    expect(featsOf(app, "W2")).toEqual(["box", "sphere"]);
+  });
+});
+
+/* ───────── recenze vlny E (nález 4): soubor skriptu v aplikaci = stažení + záznam pro řádek F (SHA-256 jako CLI) ───────── */
+describe("aplikace: FileSink textových příkazů (stažení bez dialogu, záznam souboru pro řádek F)", () => {
+  const data = new TextEncoder().encode("ISO-10303-21;");
+  const sink = () => {
+    const got: { name: string; bytes: number; mime: string }[] = [];
+    const deps = { download: (name: string, d: Uint8Array, mime: string) => void got.push({ name, bytes: d.length, mime }) } as unknown as AppHostDeps;
+    return { got, files: makeAppHost(kernel, () => deps).files };
+  };
+  it("vrátí název, formát, velikost a SHA-256 (JSON `files[].sha256` jako CLI)", async () => {
+    const { got, files } = sink();
+    const f = await files.write({ name: "E.step", format: "step", data, mime: "model/step", doc: "E" });
+    expect(got).toEqual([{ name: "E.step", bytes: data.length, mime: "model/step" }]);
+    expect(f).toMatchObject({ name: "E.step", format: "step", bytes: data.length, doc: "E" });
+    expect(f.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+  it("stránka bez WebCrypto (http mimo localhost): soubor se stáhne dál, otisk je prázdný – žádná výjimka", async () => {
+    const { got, files } = sink();
+    vi.stubGlobal("crypto", {});
+    try {
+      const f = await files.write({ name: "E.step", format: "step", data, mime: "model/step", doc: "E" });
+      expect(f).toMatchObject({ name: "E.step", bytes: data.length, sha256: "" });
+      expect(got).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

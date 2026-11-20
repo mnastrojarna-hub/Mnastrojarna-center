@@ -2,10 +2,11 @@
  * Opakovaný běh skriptu (vlna E, balík runs): volba za názvem nového dokumentu `nový díl "A" znovu|nový`
  * (EN `new part "A" again|new`, DE `neues Teil "A" erneut|neu`).
  *
- * Pravidlo (engine/ops/new.ts): `nový díl "A"` / `nová sestava "A"` použije záložku „A“ stejného druhu, kterou založil
- * DŘÍVĚJŠÍ běh skriptu (a tento běh ji ještě nepoužil) – obsah nahradí prázdným dokumentem (jeden krok historie) a ohlásí to
- * (ℹ `doc.reused`, v konzoli věta na řádku ✓). Opakované spuštění téhož skriptu tak nezaloží druhou sadu záložek.
- * * `znovu` (again / erneut) = použít i záložku „A“, kterou běh nezaložil (otevřený soubor, ruční práce, `--open`);
+ * Pravidlo (engine/runs.ts, pro všechny dokumenty běhu): `nový díl "A"` / `nová sestava "A"` použije záložku „A“ stejného
+ * druhu, kterou založil DŘÍVĚJŠÍ běh příkazem, který dokument vytváří (ne `otevřít` / JSON), a tento běh ji ještě nepoužil –
+ * obsah nahradí prázdným dokumentem (jeden krok historie) a ohlásí to (ℹ `doc.reused`, v konzoli věta na řádku ✓).
+ * Opakované spuštění téhož skriptu tak nezaloží druhou sadu záložek.
+ * * `znovu` (again / erneut) = použít i záložku „A“ jiného původu (otevřený soubor, JSON, ruční práce, `--open`);
  * * `nový` (new / neu) = vždy nová záložka (dnešní chování – dvě záložky stejného názvu);
  * * bez názvu (`nový díl`) = vždy nový dokument s číslovaným výchozím názvem („Nový díl 2“) – nic se znovu nepoužije.
  *

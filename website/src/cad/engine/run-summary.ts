@@ -69,7 +69,8 @@ export type BuildOutcome = { summary: DocSummary; built: boolean };
  * Závěrečná stavba a souhrn dokumentu (řádek D). Díl se postaví v jádře; u sestavy se díly komponent postaví před
  * souhrnem (`asmStatus` → `ensureLeaves`, engine/asm-status.ts): objem Σ (V.sum), hmotnost, obálka a stav vazeb z běhu.
  * `o.cached`: díl, který není hlavním dokumentem, vezme výsledek z mezipaměti dílů (`ws.asm.cache`, postavil ho běh), a
- * postaví se jen tehdy, když tam není.
+ * postaví se jen tehdy, když tam není. Takový vedlejší dokument běhu bez tělesa (jen skica – profil, dráha) není chyba:
+ * řádek D ukáže `V=-`, ✗ `build.failed` „model nemá těleso“ patří jen dokumentu, který se má odevzdat (hlavní, `--all-docs`).
  */
 export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: ReportBuilder, build: boolean, ws?: Workspace, key?: string, o: { cached?: boolean } = {}): Promise<BuildOutcome> {
   const s: DocSummary = { ref: d.name, name: d.name, kind: docKind(d) };
@@ -150,7 +151,7 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
       }
     }
     const built = !!res.metrics && error === 0 && !(res.paramErrors?.length);
-    if (!built && !error) rb.code("build.failed", { doc: d.name, args: [tr("model nemá těleso")] });
+    if (!built && !error && !(o.cached && !res.metrics && !res.paramErrors?.length)) rb.code("build.failed", { doc: d.name, args: [tr("model nemá těleso")] });
     return { summary: s, built };
   } catch (e) {
     rb.code("build.failed", { doc: d.name, args: [errText(e)] });

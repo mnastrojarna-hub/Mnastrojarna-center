@@ -34,6 +34,8 @@ export interface RunState {
    * stav vazeb a kolizí zapsaný před zápisem do záložky k dokumentu patří i potom (`docKeyOf` v run-doc.ts)
    */
   docId?: string;
+  /** původ nového dokumentu běhu (`startDoc`) – `flush` ho předá `openInTab`; opakovaný běh pak záložku převezme (engine/runs.ts) */
+  origin?: import("../workspace").RunOrigin;
   /** prvky přidané během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě */
   added?: Feature[];
   /** těleso zvolené příkazem „těleso N“ – další prvky pracují s ním */

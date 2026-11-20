@@ -42,7 +42,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 
 | Příkaz | Význam |
 | --- | --- |
-| `nový díl [název] [znovu|nový]` / `nová sestava [název] [znovu|nový]` | nový dokument v nové záložce; opakovaný běh použije záložku stejného názvu z dřívějšího běhu (ℹ `doc.reused`), `nový` = vždy nová záložka |
+| `nový díl [název] [znovu|nový]` / `nová sestava [název] [znovu|nový]` | nový dokument v nové záložce; opakovaný běh použije záložku stejného názvu, kterou založil dřívější běh (ℹ `doc.reused`; otevřený soubor / JSON téhož názvu ne – ℹ `doc.name-taken`), `nový` = vždy nová záložka, `znovu` = převzít i otevřenou |
 | `název …`, `materiál …`, `barva #hex` | popis dokumentu |
 | `kvádr X Y Z [střed] [v x y z] [osa …] [odebrat|průnik|nové]` | kvádr; roh v poloze, „střed“ = poloha je střed kvádru; `osa` natočí osu Z kvádru |
 | `válec D H [v x y z] [osa X|Y|Z|-Z|x y z|hrana E3|plocha F2|"Osa 1"] [odebrat|průnik|nové]` | válec průměr × výška; poloha = střed podstavy, roste ve směru osy |
@@ -2308,21 +2308,36 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   nepřepíše jiný dokument – ani prázdnou sestavu z dřívějšího běhu konzole (prázdnou záložku znovu použije jen úvodní
   prázdný díl, do kterého žádný běh nezapsal). Skript lze tedy posílat po částech.
 - **Opakovaný běh téhož skriptu** (`window.mncad.run` dvakrát, konzole, CLI `--resume relace`) nezaloží druhou sadu
-  záložek: `nový díl "A"` / `nová sestava "A"` vezme záložku „A“ stejného druhu, kterou založil **dřívější běh**, nahradí
-  její obsah prázdným dokumentem (jeden krok historie – `zpět` ho vrátí) a ohlásí to (✓ „… – znovu použitá záložka“ a
-  ℹ `doc.reused`); stejné záložky, stejné objemy, žádné „Kvádr 2“. Záložka „A“, kterou běh nezaložil (otevřený soubor,
-  ruční práce, `--open`, jiná karta prohlížeče), zůstane beze změny – dokument jde do nové záložky (ℹ `doc.name-taken`). Volba na konci řádku:
+  záložek. Platí pro **každý** dokument běhu – `nový díl`, `nová sestava`, `normálie`, `otevřít`, JSON dokument
+  (`window.mncad.setDocument`), `2d nový`, rám formy, `předloha otevřít`: záložku stejného názvu a druhu, kterou
+  **dřívější běh** založil **stejným druhem příkazu**, běh převezme – nahradí její obsah (jeden krok historie – `zpět` ho
+  vrátí) a ohlásí to (✓ „… – znovu použitá záložka“ a ℹ `doc.reused`); stejné záložky, stejné objemy, žádné „Kvádr 2“.
+  Druhy jsou dva: dokument **vytvořený** příkazem (`nový díl`, `nová sestava`, normálie, `2d nový`, rám formy…) a dokument
+  **načtený** zvenku (`otevřít`, JSON / `setDocument`, `předloha otevřít`). Záložku jiného druhu běh nepřepíše –
+  `nový díl "Deska"` nikdy nenahradí otevřený soubor „Deska“ ani ruční práci, `--open` nebo záložku z jiné karty
+  prohlížeče: dokument jde do nové záložky a ℹ `doc.name-taken` to řekne. Volba na konci řádku `nový díl` / `nová sestava`:
   `nový díl "A" nový` (EN `new`, DE `neu`) = vždy nová záložka, `nový díl "A" znovu` (EN `again`, DE `erneut`) =
-  převzít i záložku otevřenou mimo běh. V prohlížeči si aplikace záložky běhů pamatuje i po obnovení stránky v téže
-  kartě (jen jejich id v sessionStorage). Bez názvu (`nový díl`) je to vždy nový číslovaný dokument – pro opakovatelné skripty
-  **pojmenujte každý dokument** a začněte jím každý blok (příkazy bez `nový díl` se přidají do otevřeného dokumentu).
-- Každý dokument, který běh založil nebo změnil, má v CLI / HTTP i ve stručném protokolu prohlížeče řádek `D` s čísly
-  (`feat=`, `V=`, `m=`, `bbox=`) – díl se znovu nestaví, výsledek je z ověření dílu během; prázdný dokument běhu
-  (prázdná sestava) má řádek `D` také. Dokumenty dřívějších běhů relace beze změny se nestaví (`V=-`).
-- **Stručný protokol i v prohlížeči:** `await window.mncad.run(text, { protocol: "short" })` vrátí tentýž protokol MNCAD/1
-  jako `mncad run … --formats none` (≤ 2 kB, řádky D, Σ; liší se jen `t=`, `slow=`, `mem=`); `"full"` = plný protokol,
-  `"json"` = RunReport (s `full`), `budget` / `notes` jako `--budget` / `--notes`, výchozí (`"console"`) = text konzole.
-  Konzole Textové příkazy má přepínač **Stručný protokol** (pamatuje si ho).
+  převzít i záložku jiného druhu. Dokument s výchozím názvem (`nový díl` bez názvu, JSON bez názvu, „Nový díl 2“) se
+  nepřevezme nikdy – pro opakovatelné skripty **pojmenujte každý dokument** a začněte jím každý blok (příkazy bez
+  `nový díl` se přidají do otevřeného dokumentu). Převzetí je vidět vždy: ℹ `doc.reused` / `doc.name-taken` jsou ve
+  stručném protokolu i bez `--notes` – víc dokumentů jedním řádkem s počtem a názvy
+  (`ℹ L1,L3,L5 ×3 doc.reused záložky z dřívějšího běhu použité znovu – …: „Deska“, „Čep“, „S“`; s `--notes`, v plném
+  protokolu a v JSON každý dokument zvlášť) – a Σ má `reused=<n>` / `name-taken=<n>`. V prohlížeči si aplikace
+  záložky běhů pamatuje i po obnovení stránky v téže kartě (jen jejich id v sessionStorage).
+- Každý dokument, který běh založil nebo změnil, se na konci postaví a změří (díl se znovu nestaví, výsledek je z ověření
+  dílu během) a má řádek `D` s čísly (`feat=`, `V=`, `m=`, `bbox=`) v **plném** protokolu (`--full`,
+  `protocol: "full"`) a v JSON (`docs`); prázdný dokument běhu (prázdná sestava) také. **Stručný** protokol (CLI výchozí,
+  `protocol: "short"`) vypíše řádek `D` jen hlavního dokumentu a dokumentů s ✗ / ⚠ – čísla jiného dílu tedy čtěte z plného
+  protokolu nebo JSON. Dokumenty dřívějších běhů relace beze změny se nestaví (`V=-`). Vedlejší dokument běhu bez tělesa
+  (jen skica – profil, dráha) není chyba (`V=-`); ✗ `build.failed` „model nemá těleso“ dostane jen hlavní dokument.
+- **Stručný protokol i v prohlížeči:** `await window.mncad.run(text, { protocol: "short" })` (nebo jen
+  `run(text, "short")`) vrátí tentýž protokol MNCAD/1 jako `mncad run … --formats none` (≤ 2 kB, řádky D, F souborů, které
+  skript zapsal – `export step` i s `check=ok`, Σ `files=`; liší se jen `t=`, `slow=`, `mem=`); `"full"` = plný
+  protokol, `"json"` = RunReport (s `full`), `budget` (celé číslo 1–1048576, jen `short` / `json`) a `notes`
+  (true / false, ne u `console`) jako `--budget` / `--notes`, výchozí (`"console"`) = text konzole. Neznámá volba nebo
+  hodnota (`protocoll`, `budget: -5`) je chyba, ne tichý jiný výstup. Značka přebytku `… in protocol-full.txt` znamená
+  v prohlížeči: celý protokol vrátí `protocol: "full"`. Konzole Textové příkazy má přepínač **Stručný protokol**
+  (pamatuje si ho).
 - `vložit "Díl"` a `výkres model "Díl"` berou **aktuální** dokument záložky (i změněný v dřívějším běhu) pod jeho
   aktuálním názvem; po `název "B"` už starý název neplatí.
 - Stav sestavy (řádek „Sestava: … obálka, objem Σ, hmotnost Σ“), stav vazeb, kusovník a kolize se počítají z dílů

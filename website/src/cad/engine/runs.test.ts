@@ -12,10 +12,10 @@ import { engineRun, finishRun, type RunHooks } from "../cli/job";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "./host";
 import type { KernelApi } from "./kernel";
 import { loadWorkspace, MemoryWorkspace } from "./memory-workspace";
-import { docLine, finalizeReport, formatConsole, GRAMMAR, ReportBuilder } from "./protocol";
+import { docLine, finalizeReport, formatConsole, GRAMMAR, mergeTakeovers, ReportBuilder, shortProtocol } from "./protocol";
 import type { RunReport } from "./protocol-types";
 import { runScript } from "./run";
-import { formatRun, runReport, scriptLineCount } from "./run-protocol";
+import { checkRunOptions, formatRun, runReport, scriptLineCount } from "./run-protocol";
 import { scriptLines } from "../cli/watchdog";
 
 const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
@@ -152,6 +152,156 @@ describe("protokol v prohlížeči = CLI (engine/run-protocol.ts)", () => {
   });
 });
 
+/* ───────── recenze vlny E: idempotence všech dokumentů běhu, původ záložky, viditelnost, volby, vedlejší dokument bez tělesa ───────── */
+const box = (id: string, n = 5): CadDoc["features"] => [{ id, name: "Kvádr 1", type: "box", size: [n, n, n], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"];
+const fileHost = (files: Record<string, CadDoc>): EngineHost => ({ ...hostOf(), inputs: memoryFileSource(Object.fromEntries(Object.entries(files).map(([k, d]) => [k, new TextEncoder().encode(JSON.stringify(d))]))) });
+const NORM = 'nový díl "Deska"\nkvádr 100 60 20\nnormálie kolík 8x40 ISO 8734\nnormálie podložka M8 ISO 7089\nnová sestava "Sestava"\nvložit "Deska" ukotvit\nvložit "Kolík Ø8×40 ISO 8734" v 20 20 20\nvložit "Podložka 8 ISO 7089" v 50 20 20';
+
+describe("recenze (nález 2): opakovaný běh je idempotentní i pro normálie, otevřít a JSON dokumenty", () => {
+  it("normálie dvakrát (prohlížeč i CLI --resume): 4 záložky, ne 6; ✓ normálie „… – znovu použitá záložka“ + ℹ doc.reused", async () => {
+    const ws = new MemoryWorkspace();
+    await runScript(ws, NORM, hostOf());
+    expect(titles(ws)).toEqual(["Deska:part", "Kolík Ø8×40 ISO 8734:part", "Podložka 8 ISO 7089:part", "Sestava:assembly"]);
+    const r2 = await runScript(ws, NORM, hostOf());
+    expect(titles(ws)).toEqual(["Deska:part", "Kolík Ø8×40 ISO 8734:part", "Podložka 8 ISO 7089:part", "Sestava:assembly"]);
+    expect(codes(r2, "doc.reused").map((e) => `L${e.line} ${e.doc}`)).toEqual(["L1 Deska", "L3 Kolík Ø8×40 ISO 8734", "L4 Podložka 8 ISO 7089", "L5 Sestava"]);
+    expect(formatConsole(r2)).toContain("✓ normálie „ISO 8734 – 8×40 – m6“ – znovu použitá záložka z dřívějšího běhu");
+    expect(ws.present().components?.map((c) => c.name)).toEqual(["Deska", "Kolík Ø8×40 ISO 8734", "Podložka 8 ISO 7089"]);
+    // CLI: relace → --resume → stejné dokumenty (dřív Σ docs 4 → 6)
+    const c1 = new MemoryWorkspace();
+    const a = await cliRun(c1, NORM, hostOf());
+    const b = await cliRun(loadWorkspace(c1.save()), NORM, hostOf(), { resume: true });
+    expect(a.docs).toHaveLength(4);
+    expect(b.docs.map((d) => d.name)).toEqual(a.docs.map((d) => d.name));
+  });
+
+  it("`otevřít \"Deska.mncad\"` dvakrát = jedna záložka (CLI --resume: Σ docs 3 → 3, ne 5); JSON dokument dvakrát = jedna záložka", async () => {
+    const host = fileHost({ "Deska.mncad": { ...emptyDoc("Deska"), features: box("f1", 50) } });
+    const script = 'otevřít "Deska.mncad"\nnormálie kolík 8x40 ISO 8734\nnová sestava "S"\nvložit "Deska"\nvložit "Kolík Ø8×40 ISO 8734" v 10 10 10';
+    const ws = new MemoryWorkspace();
+    const a = await cliRun(ws, script, host);
+    const saved = ws.save();
+    expect(JSON.parse(new TextDecoder().decode(saved))).toMatchObject({ made: [1, 2], opened: [0] });
+    const b = await cliRun(loadWorkspace(saved), script, host, { resume: true });
+    expect(a.docs).toHaveLength(3);
+    expect(b.docs.map((d) => d.name)).toEqual(["Deska", "Kolík Ø8×40 ISO 8734", "S"]);
+    expect(codes(b, "doc.reused")).toHaveLength(3);
+    const json = JSON.stringify({ ...emptyDoc("Agent"), features: box("j1") });
+    const wj = new MemoryWorkspace();
+    await runScript(wj, json, hostOf());
+    const rj = await runScript(wj, json, hostOf());
+    expect(titles(wj)).toEqual(["Agent:part"]);
+    expect(formatConsole(rj)).toContain("✓ dokument „Agent“ (1 prvků) – nahradí záložku téhož názvu z dřívějšího běhu");
+  });
+
+  it("dokument s výchozím názvem se nikdy nepřevezme (dva různé nepojmenované JSON dokumenty = dvě záložky)", async () => {
+    const ws = new MemoryWorkspace();
+    await runScript(ws, JSON.stringify({ ...emptyDoc(), features: box("a1") }), hostOf());
+    await runScript(ws, JSON.stringify({ ...emptyDoc(), features: box("b1", 7) }), hostOf());
+    expect(titles(ws)).toEqual(["Nový díl:part", "Nový díl:part"]);
+    expect(ws.docOf(ws.tabs()[0].id)!.features[0].id).toBe("a1");
+  });
+});
+
+describe("recenze (nález 3): dokument, který běh OTEVŘEL, `nový díl` téhož názvu nepřepíše", () => {
+  it("`otevřít` → `nový díl \"Deska\"` (i přes relaci CLI): nová záložka + ℹ doc.name-taken, otevřený dokument zůstane", async () => {
+    const host = fileHost({ "Deska.mncad": { ...emptyDoc("Deska"), features: box("f1", 50) } });
+    const ws = new MemoryWorkspace();
+    await cliRun(ws, 'otevřít "Deska.mncad"', host);
+    const ws2 = loadWorkspace(ws.save());
+    const r = await cliRun(ws2, 'nový díl "Deska"\nkvádr 10 10 10', host, { resume: true });
+    expect(titles(ws2)).toEqual(["Deska:part", "Deska:part"]);
+    expect(codes(r, "doc.name-taken")).toHaveLength(1);
+    expect(codes(r, "doc.reused")).toHaveLength(0);
+    expect(ws2.docOf(ws2.tabs()[0].id)!.features[0].id).toBe("f1");
+    // opačně: `otevřít` nepřepíše záložku, kterou založil `nový díl` téhož názvu
+    const ws3 = new MemoryWorkspace();
+    await runScript(ws3, 'nový díl "Deska"\nkvádr 10 10 10', host);
+    const r3 = await runScript(ws3, 'otevřít "Deska.mncad"', host);
+    expect(titles(ws3)).toEqual(["Deska:part", "Deska:part"]);
+    expect(codes(r3, "doc.name-taken")).toHaveLength(1);
+  });
+
+  it("JSON / setDocument „Ručně“ → `nový díl \"Ručně\"` = nová záložka + ℹ doc.name-taken; `znovu` ji převezme a příště je to záložka běhu", async () => {
+    const ws = new MemoryWorkspace();
+    await runScript(ws, JSON.stringify({ ...emptyDoc("Ručně"), features: [] }), hostOf());
+    const r = await runScript(ws, 'nový díl "Ručně"\nkvádr 3 3 3', hostOf());
+    expect(titles(ws)).toEqual(["Ručně:part", "Ručně:part"]);
+    expect(codes(r, "doc.name-taken").map((e) => e.line)).toEqual([1]);
+    const ws2 = new MemoryWorkspace();
+    await runScript(ws2, JSON.stringify({ ...emptyDoc("R2"), features: box("u1") }), hostOf());
+    await runScript(ws2, 'nový díl "R2" znovu\nkvádr 3 3 3', hostOf());
+    const r2 = await runScript(ws2, 'nový díl "R2"\nkvádr 4 4 4', hostOf());
+    expect(titles(ws2)).toEqual(["R2:part"]);
+    expect(codes(r2, "doc.reused")).toHaveLength(1);
+  });
+});
+
+describe("recenze (nález 6): převzetí záložky je vidět i ve stručném protokolu bez --notes", () => {
+  it("ℹ doc.reused / doc.name-taken ve stručném protokolu, Σ reused= / name-taken=; ostatní ℹ dál jen s notes", async () => {
+    const ws = new MemoryWorkspace();
+    await runScript(ws, THREE, hostOf());
+    const rep = await cliRun(ws, THREE, hostOf());
+    const short = finalizeReport(rep).protocol;
+    // víc převzatých záložek = jeden řádek (počet ×N, řádky skriptu, názvy) – 20 hlášek po 200 B by se do 2 kB nevešlo
+    expect(short).toContain("\nℹ L1,L3,L5 ×3 doc.reused záložky z dřívějšího běhu použité znovu – obsah nahrazen (volba „nový“ = nová záložka): „Deska“, „Čep“, „S“\n");
+    expect(short.match(/doc\.reused/g)).toHaveLength(1);
+    expect(short).toMatch(/\nΣ docs=3 comp=2 .* files=0 reused=3 t=/);
+    for (const l of short.split("\n")) expect(Object.values(GRAMMAR).some((re) => re.test(l)), l).toBe(true);
+    // s notes každá hláška zvlášť (a ostatní ℹ); plný protokol a JSON také
+    const withNotes = shortProtocol(rep, { notes: true }).text;
+    expect(withNotes).toMatch(/\nℹ L1 doc\.reused "Deska": záložka „Deska“ z dřívějšího běhu použita znovu/);
+    expect(withNotes).toMatch(/\nℹ L5 doc\.reused "S": /);
+    expect(withNotes).toMatch(/\nℹ L2 msg\.note /);
+    expect(rep.entries.filter((e) => e.code === "doc.reused")).toHaveLength(3);
+    // jedna převzatá záložka = obyčejný řádek s názvem dokumentu
+    const one = new MemoryWorkspace();
+    await runScript(one, 'nový díl "Deska"\nkvádr 1 1 1', hostOf());
+    expect(finalizeReport(await cliRun(one, 'nový díl "Deska"\nkvádr 2 2 2', hostOf())).protocol).toMatch(/\nℹ L1 doc\.reused "Deska": záložka „Deska“ z dřívějšího běhu použita znovu/);
+    const w2 = new MemoryWorkspace();
+    await w2.openInTab({ ...emptyDoc("U"), features: box("u1") });
+    const s2 = finalizeReport(await cliRun(w2, 'nový díl "U"\nkvádr 1 1 1', hostOf())).protocol;
+    expect(s2).toMatch(/\nℹ L1 doc\.name-taken "U": /);
+    expect(s2).toMatch(/ name-taken=1 /);
+    // první běh: žádné převzetí – protokol beze změny proti dřívějšku (bez ℹ, bez reused=)
+    const s3 = finalizeReport(await cliRun(new MemoryWorkspace(), THREE, hostOf())).protocol;
+    expect(s3).not.toMatch(/ℹ|reused=|name-taken=/);
+  });
+
+  it("mnoho převzatých záložek (nástroj se 30 díly): jeden řádek ℹ ×30 se do 2 kB vejde vedle ostatních řádků, Σ reused=30", async () => {
+    const script = Array.from({ length: 30 }, (_, i) => `nový díl "900-01-00-${String(i + 1).padStart(2, "0")} Deska nástroje"\nkvádr 10 10 ${i + 1}`).join("\n");
+    const ws = new MemoryWorkspace();
+    await runScript(ws, script, hostOf());
+    const rep = await cliRun(ws, script, hostOf());
+    const p = shortProtocol(rep);
+    expect(p.bytes).toBeLessThanOrEqual(2048);
+    const line = p.text.split("\n").find((l) => l.includes("doc.reused"))!;
+    expect(line).toMatch(/^ℹ L1-L59 ×30 doc\.reused záložky z dřívějšího běhu použité znovu – obsah nahrazen \(volba „nový“ = nová záložka\): „900-01-00-01 Deska nástroje“, .*…$/);
+    expect(GRAMMAR.msg.test(line)).toBe(true);
+    expect(p.text).toMatch(/ reused=30 /);
+    expect(mergeTakeovers(rep.entries).filter((e) => e.code === "doc.reused")).toEqual([expect.objectContaining({ line: 1, count: 30, level: "note" })]);
+  });
+});
+
+describe("recenze (nález 7): volby window.mncad.run se kontrolují, nikdy tiše", () => {
+  it("název protokolu místo objektu; překlep, budget mimo rozsah / ne-číslo, notes ne-boolean a volby bez účinku = chyba", () => {
+    expect(checkRunOptions(undefined)).toEqual({});
+    expect(checkRunOptions("short")).toEqual({ protocol: "short" });
+    expect(checkRunOptions({ protocol: "short", budget: 512, notes: true })).toEqual({ protocol: "short", budget: 512, notes: true });
+    expect(checkRunOptions({ protocol: "json", budget: 1048576 })).toEqual({ protocol: "json", budget: 1048576 });
+    expect(checkRunOptions({ protocol: "full", notes: false })).toEqual({ protocol: "full", notes: false });
+    expect(() => checkRunOptions("brief")).toThrow(/neznámý protokol „brief“/);
+    expect(() => checkRunOptions({ protocoll: "short" })).toThrow(/neznámá volba „protocoll“ – protocol, budget, notes/);
+    for (const b of [-5, 0, 1048577, 2.5, "abc", NaN, null]) expect(() => checkRunOptions({ protocol: "short", budget: b }), String(b)).toThrow(/budget musí být celé číslo 1–1048576/);
+    expect(() => checkRunOptions({ budget: 500 })).toThrow(/budget platí jen pro protokol short/);
+    expect(() => checkRunOptions({ protocol: "full", budget: 500 })).toThrow(/budget platí jen pro protokol short/);
+    expect(() => checkRunOptions({ protocol: "short", notes: "ano" })).toThrow(/notes musí být true nebo false/);
+    expect(() => checkRunOptions({ notes: true })).toThrow(/notes platí jen pro protokol short, full a json/);
+    expect(() => checkRunOptions(["short"])).toThrow(/volby musí být objekt/);
+    expect(() => checkRunOptions(5)).toThrow(/volby musí být objekt/);
+  });
+});
+
 describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po opakování, prohlížeč = CLI", async () => {
   setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
   const { inProcessTransport } = await import("../kernel-inprocess");
@@ -173,6 +323,42 @@ describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po o
     expect(lines[1]).toMatch(/^D "Čep" part feat=1\/0\/0 V=0\.59cm3 m=0\.005kg bbox=5x5x30$/);
     expect(lines[2]).toBe('D "S" asm comp=2 parts=2 V.sum=50.59cm3 m=0.4kg bbox=100x50x40');
     expect(r2.docs.map(docLine)).toEqual(r1.docs.map(docLine));
+  }, 240_000);
+
+  it("recenze (nález 4): soubory skriptu (export step, výkres export pdf) = řádky F a Σ files= v prohlížeči jako v CLI", async () => {
+    const cliFiles = async (script: string) => {
+      const sink = memoryFileSink();
+      const h: EngineHost = { ...hostOf(kernel), files: sink };
+      const rb = new ReportBuilder({ lang: "cs", lines: scriptLines(script), strict: false });
+      const ws = new MemoryWorkspace();
+      await engineRun(ws, script, h, rb, { strict: false, open: [] }, noHooks);
+      const fin = await finishRun(ws, h, rb, { formats: "none", allDocs: false, noOutputOnError: false, share: false, strict: false }, noHooks);
+      const files = [...sink.files.values()].map((x) => x.file);
+      if (rb.count("error") > 0) for (const f of files) f.run = "fail";
+      return finalizeReport(rb.finish({ docs: fin.docs, files })).protocol;
+    };
+    for (const script of ['nový díl "E"\nkvádr 10 10 10\nexport step', 'nový díl "E2"\nkvádr 10 10 10\nvýkres A4 pohledy přední\nkótovat\nvýkres export pdf', 'nový díl "E3"\nkvádr 10 10 10\nexport step\nblbost']) {
+      const cli = await cliFiles(script);
+      const web = formatRun(await runReport(new MemoryWorkspace(), script, hostOf(kernel)), { protocol: "short" });
+      expect(strip(web), script).toBe(strip(cli));
+      expect(web).toMatch(/\nF (step|pdf) "E\d?(_vykres)?\.(step|pdf)" \d+B/);
+      expect(web).toMatch(/ files=1 /);
+    }
+    const w = formatRun(await runReport(new MemoryWorkspace(), 'nový díl "E"\nkvádr 10 10 10\nexport step', hostOf(kernel)), { protocol: "short" });
+    expect(w).toMatch(/\nF step "E\.step" \d+B check=ok\n/);
+    const j = JSON.parse(formatRun(await runReport(new MemoryWorkspace(), 'nový díl "E"\nkvádr 10 10 10\nexport step', hostOf(kernel)), { protocol: "json" })) as RunReport;
+    expect(j.files[0]).toMatchObject({ name: "E.step", format: "step", check: { ok: true } });
+    expect(j.files[0].sha256).toMatch(/^[0-9a-f]{64}$/);
+  }, 480_000);
+
+  it("recenze (nález 8): vedlejší dokument běhu jen se skicou není ✗ build.failed (běh OK jako dřív); hlavní dokument bez tělesa ano", async () => {
+    const r = await cliRun(new MemoryWorkspace(), 'nový díl "Profil"\nskica XY\nobdélník 40 20\nnový díl "Pevný"\nkvádr 10 10 10\n', hostOf(kernel));
+    expect(codes(r, "build.failed")).toEqual([]);
+    expect(r.counts.errors).toBe(0);
+    expect(finalizeReport(r).protocol).toMatch(/^MNCAD\/1 OK /);
+    expect(r.docs.map(docLine)).toEqual(['D "Profil" part feat=1/0/0 V=- bbox=-', 'D "Pevný" part feat=1/0/0 V=1cm3 m=0.008kg bbox=10x10x10']);
+    const main = await cliRun(new MemoryWorkspace(), 'nový díl "Profil"\nskica XY\nobdélník 40 20\n', hostOf(kernel));
+    expect(codes(main, "build.failed").map((e) => e.doc)).toEqual(["Profil"]);
   }, 240_000);
 
   it("stručný protokol enginu (prohlížeč) = CLI `--formats none` kromě t= / slow= / mem=", async () => {

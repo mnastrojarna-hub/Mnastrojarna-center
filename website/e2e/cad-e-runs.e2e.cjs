@@ -7,6 +7,9 @@
 //  4) ověření: stav v témže běhu, který sestavu založil (natočená komponenta) = přesná obálka jako samostatné status();
 //     B1 prázdná sestava běhu = vlastní záložka + řádek D; B2 27× nový díl = 27 záložek
 //  5) anglické rozhraní: `new part "Plate"` dvakrát = jedna záložka, anglická hláška
+//  6) recenze: `zpět` / `znovu` a hned záložka / nový díl / zavřít záložku (bez ✗ tab.settle-timeout); normálie a JSON dokument
+//     dvakrát = stejné záložky; `nový díl` nepřepíše dokument z setDocument (ℹ doc.name-taken); řádky F souborů skriptu ve
+//     stručném protokolu = CLI; převzetí záložky vidět ve stručném protokolu bez notes (jeden řádek ℹ ×N + Σ reused=); volby run kontrolované
 // Spuštění: E2E_BASE=http://localhost:3522 node e2e/cad-e-runs.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -176,6 +179,72 @@ const start = async (p, url) => {
   const b2after = (await tabs()).length;
   const d27 = dLines(f27).filter((l) => /^D "B2-\d+" part feat=1\/0\/0 V=[\d.]+cm3 /.test(l));
   ok(b2after - b2before === 27 && d27.length === 27 && !/^✗/m.test(f27), `4b B2: 27× nový díl → +${b2after - b2before} záložek, ${d27.length} řádků D s čísly`);
+
+  // ════════════ 6) recenze ════════════
+  {
+    const r = await ctx.newPage();
+    r.on('pageerror', (e) => errs.push(e.message));
+    await start(r, BASE + '/cad');
+    const rr = (t, o) => r.evaluate(([t, o]) => window.mncad.run(t, o), [t, o]);
+    const rtabs = () => r.evaluate(() => window.mncad.tabs().map((t) => `${t.title}:${t.kind}`));
+    const feats = async (name) => { const o = await rr(`záložka "${name}"\nstav`); return Number((/prvků (\d+)/.exec(o) || [])[1]); };
+    // 6a – zpět / znovu a hned přepnutí záložky, nová záložka, zavření (dřív ✗ tab.settle-timeout po 5 s)
+    await rr('nový díl "W1"\nkvádr 10 10 10\nnový díl "W2"\nkvádr 5 5 5');
+    let t0 = Date.now();
+    const a1 = await rr('záložka "W1"\nválec 3 30\nzpět\nzáložka "W2"\nválec 2 10', { protocol: 'full' });
+    const ms1 = Date.now() - t0;
+    ok(!/^✗/m.test(a1) && !/settle-timeout/.test(a1) && ms1 < 4500, `6a: záložka W1, válec, zpět, záložka W2, válec → bez ✗ (${ms1} ms)${/^✗/m.test(a1) ? '\n' + a1 : ''}`);
+    ok((await feats('W1')) === 1 && (await feats('W2')) === 2, '6a: válec ve W2, W1 jen kvádr (zpět platí)');
+    t0 = Date.now();
+    const a2 = await rr('záložka "W2"\nválec 5 20\nzpět\nnový díl "U2"\nkvádr 5 5 5', { protocol: 'full' });
+    const ms2 = Date.now() - t0;
+    ok(!/^✗/m.test(a2) && (await rtabs()).includes('U2:part') && ms2 < 4500, `6a: zpět a hned nový díl "U2" → záložka U2 existuje (${(await rtabs()).join(', ')}, ${ms2} ms)`);
+    const a3 = await rr('záložka "W1"\nválec 3 30\nzpět\nznovu\nzpět\nzavřít záložku "W2"', { protocol: 'full' });
+    ok(!/^✗/m.test(a3) && !(await rtabs()).includes('W2:part'), `6a: zpět / znovu a hned zavřít záložku "W2" → W2 zavřená (${(await rtabs()).join(', ')})`);
+    // 6b – normálie dvakrát = stejné záložky
+    const NORM = 'nový díl "Deska N"\nkvádr 100 60 20\nnormálie kolík 8x40 ISO 8734\nnormálie podložka M8 ISO 7089\nnová sestava "Sestava N"\nvložit "Deska N" ukotvit\nvložit "Kolík Ø8×40 ISO 8734" v 20 20 20\nvložit "Podložka 8 ISO 7089" v 50 20 20';
+    const n0 = (await rtabs()).length;
+    await rr(NORM);
+    const n1 = (await rtabs()).length;
+    const no2 = await rr(NORM);
+    const n2 = (await rtabs()).length;
+    ok(n1 - n0 === 4 && n2 === n1, `6b: normálie dvakrát → +${n1 - n0}, pak +${n2 - n1} záložek (dřív +2 při každém dalším běhu)`);
+    ok(/✓ normálie „ISO 8734 – 8×40 – m6“ – znovu použitá záložka z dřívějšího běhu/.test(no2) && !/^✗/m.test(no2), '6b: druhý běh ohlásí převzetí záložky normálie');
+    // 6c – JSON / setDocument: dvakrát = jedna záložka; `nový díl` téhož názvu ji nepřepíše
+    const docA = { app: 'mnastrojarna-cad', version: 2, name: 'Agent JSON', material: 'ocel', features: [{ id: 'j1', name: 'Kvádr 1', type: 'box', size: [5, 5, 5], position: [0, 0, 0], centered: false, mode: 'new' }] };
+    await r.evaluate((d) => window.mncad.setDocument(d), docA);
+    await r.evaluate((d) => window.mncad.setDocument(d), docA);
+    ok((await rtabs()).filter((t) => t === 'Agent JSON:part').length === 1, '6c: setDocument téhož dokumentu dvakrát → jedna záložka');
+    await r.evaluate((d) => window.mncad.setDocument({ ...d, name: 'Ručně', features: [] }), docA);
+    const nt = await rr('nový díl "Ručně"\nkvádr 3 3 3');
+    ok((await rtabs()).filter((t) => t === 'Ručně:part').length === 2 && /doc\.name-taken|nezaložil ji stejný druh příkazu/.test(nt) && /– nová záložka/.test(nt), '6c: `nový díl "Ručně"` po setDocument „Ručně“ → nová záložka + ℹ doc.name-taken (dokument z JSON zůstal)');
+    // 6e – převzetí záložky ve stručném protokolu bez notes
+    await rr(THREE.replace(/"S"/g, '"S6"'));
+    const sh = await rr(THREE.replace(/"S"/g, '"S6"'), { protocol: 'short' });
+    ok(/^ℹ L1,L3,L5 ×3 doc\.reused záložky z dřívějšího běhu použité znovu – obsah nahrazen \(volba „nový“ = nová záložka\): „Deska“, „Čep“, „S6“$/m.test(sh) && / reused=3 /.test(sh) && grammarOk(sh), `6e: stručný protokol bez notes ukáže převzetí jedním řádkem (ℹ ×3 s názvy, Σ reused=3)\n${sh}`);
+    const shn = await rr(THREE.replace(/"S"/g, '"S6"'), { protocol: 'short', notes: true });
+    ok((shn.match(/^ℹ L\d+ doc\.reused "/gm) || []).length === 3 && grammarOk(shn), '6e: s notes každé převzetí zvlášť (ℹ L1 / L3 / L5 doc.reused "…")');
+    // 6f – volby run
+    const rej = (o) => r.evaluate((o) => window.mncad.run('stav', o).then(() => 'OK', (e) => String(e.message || e)), o);
+    ok(/^MNCAD\/1 /.test(await r.evaluate(() => window.mncad.run('stav', 'short'))), '6f: run(text, "short") = stručný protokol');
+    ok(/neznámá volba „protocoll“/.test(await rej({ protocoll: 'short' })), '6f: překlep {protocoll} = chyba');
+    ok(/budget musí být celé číslo 1–1048576/.test(await rej({ protocol: 'short', budget: -5 })) && /budget musí být celé číslo/.test(await rej({ protocol: 'short', budget: 'abc' })), '6f: budget -5 / "abc" = chyba');
+    ok(/budget platí jen pro protokol short/.test(await rej({ budget: 500 })), '6f: budget bez short = chyba');
+    await r.close();
+  }
+  // 6d – soubory skriptu: řádky F a Σ files= jako CLI (čerstvá stránka = čerstvá relace)
+  for (const sc of ['nový díl "E"\nkvádr 10 10 10\nexport step', 'nový díl "E2"\nkvádr 10 10 10\nvýkres A4 pohledy přední\nkótovat\nvýkres export pdf']) {
+    const q = await ctx.newPage();
+    await start(q, BASE + '/cad');
+    const web = await q.evaluate((t) => window.mncad.run(t, { protocol: 'short' }), sc);
+    await q.close();
+    const cli = cliShort(sc);
+    const fl = (t) => (t.match(/^F .*$/m) || [''])[0];
+    ok(/^F (step|pdf) "E2?(_vykres)?\.(step|pdf)" \d+B/m.test(web) && / files=1 /.test(web), `6d: ${sc.split('\n').pop()}: řádek F a files=1 v prohlížeči (${fl(web)})`);
+    const norm = (t) => strip(t).replace(/^(F \S+ "[^"]+") \d+B/m, '$1 #B');
+    ok(norm(web) === norm(cli.text), `6d: ${sc.split('\n').pop()}: stručný protokol prohlížeče = CLI (F: web ${fl(web)} / cli ${fl(cli.text)})${norm(web) === norm(cli.text) ? '' : `\n--- web\n${web}\n--- cli\n${cli.text}`}`);
+    if (sc.endsWith('export step')) ok(/^F step "E\.step" \d+B check=ok$/m.test(web), '6d: STEP s kontrolou check=ok i v prohlížeči');
+  }
 
   // ════════════ 5) anglické rozhraní ════════════
   const e = await ctx.newPage();

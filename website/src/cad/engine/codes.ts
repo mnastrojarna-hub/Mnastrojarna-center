@@ -12,7 +12,8 @@ import { tr } from "../i18n";
 import type { Entry } from "./protocol-types";
 
 export type CodeLevel = "error" | "warn" | "note";
-export type CodeDef = { code: string; level: CodeLevel; key: string };
+/** `short` = ℹ, které stručný protokol vypíše i bez volby `notes` (převzetí záložky opakovaným během – protocol.ts) */
+export type CodeDef = { code: string; level: CodeLevel; key: string; short?: true };
 
 /** tvar kódu – shodně s gramatikou protokolu (kap. 4.2) */
 export const CODE_RE = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
@@ -68,8 +69,8 @@ export const CODES = [
   { code: "tab.empty-replaced", level: "warn", key: "prázdná záložka „{0}“ nahrazena dokumentem „{1}“" },
   { code: "tab.settle-timeout", level: "error", key: "přepnutí záložky nedoběhlo do {0} s" },
   // ── opakovaný běh (vlna E, balík runs – agent-runs.ts, engine/ops/new.ts) ──
-  { code: "doc.reused", level: "note", key: "záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (vlastní záložku dá volba „nový“)" },
-  { code: "doc.name-taken", level: "note", key: "záložka „{0}“ je otevřená mimo textový běh – dokument je v nové záložce (volba „znovu“ použije otevřenou)" },
+  { code: "doc.reused", level: "note", short: true, key: "záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (novou záložku dá u nový díl / nová sestava volba „nový“)" },
+  { code: "doc.name-taken", level: "note", short: true, key: "záložka „{0}“ už je otevřená, ale nezaložil ji stejný druh příkazu běhu (otevřený soubor, JSON, ruční práce) – dokument je v nové záložce (u nový díl / nová sestava ji převezme volba „znovu“)" },
   // ── díry a výběr (5.2 č. 5, 7, 8, 12, 13, 18, 38) ──
   { code: "hole.depth-default", level: "warn", key: "díra bez hloubky – vrtá se skrz" },
   { code: "hole.conflict", level: "warn", key: "zahloubení a kuželové zahloubení zároveň – použito {0}" },
