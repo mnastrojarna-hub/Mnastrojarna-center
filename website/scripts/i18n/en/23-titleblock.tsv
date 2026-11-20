@@ -38,7 +38,6 @@ logo	logo
 Logo	Logo
 Logo „{0}“ {1}×{2} px vloženo do razítka	Logo “{0}” {1}×{2} px placed in the title block
 logo „{0}“ {1}×{2} px{3}	logo “{0}” {1}×{2} px{3}
-logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ nebo zadejte data URL (data:image/png;base64,…); připojené: {1}	logo “{0}”: the file is not attached – attach it in the console with “Attach file…” or give a data URL (data:image/png;base64,…); attached: {1}
 logo {0} jde převést jen v prohlížeči – bez něj použijte PNG nebo JPEG	a {0} logo can only be converted in the browser – without it use PNG or JPEG
 logo je příliš velké ({0} kB) – nejvýš {1} kB	the logo is too large ({0} kB) – at most {1} kB
 logo JPEG bez prohlížeče: v DXF / DWG jen rámeček (pro obrys použijte PNG)	JPEG logo without a browser: only a frame in DXF / DWG (use PNG for an outline)

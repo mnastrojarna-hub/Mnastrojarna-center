@@ -23,7 +23,6 @@ nastavení dynamiky pohybové studie nejde zapsat příkazem pohyb dynamika (ča
 ruční hmotnost komponenty mimo skript (podsestava / import) se do skriptu nepřenáší	eine manuelle Masse einer Komponente außerhalb des Skripts (Unterbaugruppe / Import) wird nicht ins Skript übernommen
 síla / moment na vazbě, která ve skriptu není, se do skriptu nepřenáší	eine Kraft / ein Moment an einer Verknüpfung, die nicht im Skript ist, wird nicht ins Skript übernommen
 # výkres vygenerované … (skrytí / posun kót celkových rozměrů a pozic textem)
-výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	zeichnung generiert · zeichnung generiert ausblenden|einblenden <Schlüssel…> · zeichnung generiert verschieben <Schlüssel> dx dy · zeichnung generiert wiederherstellen [<Schlüssel…>] – Schlüssel: dim:<Ansicht>:t|l (Gesamtmaß oben / links), pos:<Nummer> (Positionsnummer)
 výkres vygenerované posun <klíč> dx dy – jeden klíč a posun v mm listu (y nahoru), např. výkres vygenerované posun pos:3 5 -3	zeichnung generiert verschieben <Schlüssel> dx dy – ein Schlüssel und eine Verschiebung in Blatt-mm (y nach oben), z. B. zeichnung generiert verschieben pos:3 5 -3
 výkres vygenerované: „{0}“ není klíč vygenerovaného objektu – {1}	zeichnung generiert: „{0}“ ist kein Schlüssel eines generierten Objekts – {1}
 výkres vygenerované: neznámé „{0}“ – {1}	zeichnung generiert: unbekannt „{0}“ – {1}

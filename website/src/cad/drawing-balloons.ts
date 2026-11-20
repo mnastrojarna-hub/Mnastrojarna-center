@@ -186,6 +186,9 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
   const placed: PlacedBalloon[] = [];
   const box = (p: Vec2): BRect => ({ x: p[0] - R - 0.6, y: p[1] - R - 0.6, w: 2 * R + 1.2, h: 2 * R + 1.2 });
   const free = (p: Vec2) => inRect(box(p), inp.bounds) && !occ.hit(box(p)) && placed.every((b) => dist([b.x, b.y], p) >= 2 * R + 1);
+  /** odkaz z `p` ke kotvě `a` nevede přes jiný balónek a balónek v `p` neleží na cizím odkazu */
+  const leaderClear = (p: Vec2, a: Vec2, self?: { x: number; y: number }) =>
+    placed.every((b) => b === self || (!segmentHitsCircle(p, a, [b.x, b.y], R + 0.3) && !segmentHitsCircle([b.x, b.y], b.a, p, R + 0.3)));
   const missingView: number[] = [];
   // klíče úprav (opakovaná pozice → pos:<n>#k jako vlna E)
   const seen = new Map<number, number>();
@@ -197,7 +200,8 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
   const edit = inp.edit ?? {};
   const shown = items.filter((x) => !edit.off?.includes(x.id));
   const usedAnchors = new Map<string, Vec2[]>();
-  const anchorFor = (it: BItem, v: BView): Vec2 => {
+  /** kotva v pohledu: střed prvního výskytu; splývá-li s kotvou jiné pozice, bod uvnitř průmětu nejdál od ostatních */
+  const anchorPick = (it: BItem, v: BView): Vec2 => {
     const cands = anchorsOf(it, v);
     const used = usedAnchors.get(v.key) ?? [];
     let best = cands[0] ?? [v.rect.x + v.rect.w / 2, v.rect.y + v.rect.h / 2];
@@ -211,77 +215,109 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
         }
       }
     }
-    usedAnchors.set(v.key, [...used, best]);
     return best;
   };
+  const anchorUse = (v: BView, a: Vec2) => usedAnchors.set(v.key, [...(usedAnchors.get(v.key) ?? []), a]);
+  const anchorFor = (it: BItem, v: BView): Vec2 => {
+    const a = anchorPick(it, v);
+    anchorUse(v, a);
+    return a;
+  };
+  /**
+   * Pohledy pro automatické přiřazení v pořadí vhodnosti: v pohledu, kde průmět komponenty zakrývá méně jiných komponent
+   * (pole desek shora × zepředu, kde splývají), je pozice jednoznačná; při shodě pořadí pohledů (hlavní první).
+   */
+  const rects = new Map<string, [number, number, number, number][]>();
+  for (const v of views)
+    rects.set(
+      v.key,
+      shown.map(({ it }) => {
+        const b = it.boxes[0];
+        if (!b) return [0, 0, -1, -1];
+        const pts: Vec2[] = [];
+        for (const x of [b[0][0], b[1][0]]) for (const y of [b[0][1], b[1][1]]) for (const z of [b[0][2], b[1][2]]) pts.push(v.project([x, y, z]));
+        return [Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))];
+      }),
+    );
+  const crowd = (i: number, v: BView) => {
+    const rs = rects.get(v.key)!;
+    const r = rs[i];
+    const c: Vec2 = [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2];
+    let n = 0;
+    rs.forEach((q, j) => {
+      if (j !== i && c[0] > q[0] + 0.2 && c[0] < q[2] - 0.2 && c[1] > q[1] + 0.2 && c[1] < q[3] - 0.2) n++;
+    });
+    return n;
+  };
+  const prefsOf = (i: number, it: BItem) =>
+    views
+      .map((v, k) => ({ v, k, c: visibleIn(it, v) ? crowd(i, v) : Infinity }))
+      .filter((x) => x.c < Infinity)
+      .sort((p, q) => p.c - q.c || p.k - q.k)
+      .map((x) => x.v);
 
   // 1) zamčené: absolutní poloha (pevná překážka pro ostatní)
-  const viewOf = (it: BItem): { v: BView | null; assigned: "user" | "auto" } => {
-    const want = inp.assign?.[String(it.pos)];
-    if (want) {
-      const v = vmap.get(want);
-      if (v) return { v, assigned: "user" };
-      missingView.push(it.pos);
-    }
-    return { v: views.find((v) => visibleIn(it, v)) ?? views[0] ?? null, assigned: "auto" };
-  };
-  const rest: { it: BItem; id: string; v: BView; assigned: "user" | "auto" }[] = [];
-  for (const x of shown) {
-    const { v, assigned } = viewOf(x.it);
-    if (!v) continue;
+  type Rest = { it: BItem; id: string; prefs: BView[]; assigned: "user" | "auto" };
+  const rest: Rest[] = [];
+  shown.forEach((x, i) => {
+    const want = inp.assign?.[String(x.it.pos)];
+    const wv = want ? vmap.get(want) : undefined;
+    if (want && !wv) missingView.push(x.it.pos);
+    const prefs = wv ? [wv] : prefsOf(i, x.it);
+    if (!prefs.length && views[0]) prefs.push(views[0]);
+    if (!prefs.length) return;
+    const assigned = wv ? "user" : "auto";
     const lk = edit.lock?.[x.id];
     if (lk) {
-      placed.push({ id: x.id, pos: x.it.pos, view: v.key, x: lk[0], y: lk[1], a: anchorFor(x.it, v), mode: "locked", assigned });
-      continue;
+      placed.push({ id: x.id, pos: x.it.pos, view: prefs[0].key, x: lk[0], y: lk[1], a: anchorFor(x.it, prefs[0]), mode: "locked", assigned });
+      return;
     }
-    rest.push({ ...x, v, assigned });
-  }
+    rest.push({ ...x, prefs, assigned });
+  });
 
-  // 2) automaticky po pohledech: pořadí podle úhlu kotvy ke středu pohledu, nejbližší volný slot
-  const RINGS = 8;
-  const pending = [...rest];
-  const tried = new Map<string, Set<string>>();
-  const results: (PlacedBalloon & { slotRing: number })[] = [];
-  while (pending.length) {
-    const key = pending[0].v.key;
-    const group = pending.filter((x) => x.v.key === key);
-    for (const g of group) pending.splice(pending.indexOf(g), 1);
-    const v = vmap.get(key)!;
-    const slots = slotsOf(v, R, RINGS);
-    const cx = v.rect.x + v.rect.w / 2;
-    const cy = v.rect.y + v.rect.h / 2;
-    const withA = group.map((g) => ({ ...g, a: anchorFor(g.it, v) }));
-    withA.sort((p, q) => Math.atan2(p.a[1] - cy, p.a[0] - cx) - Math.atan2(q.a[1] - cy, q.a[0] - cx));
-    const overflow: typeof withA = [];
-    for (const g of withA) {
-      let best: { p: Vec2; ring: number; cost: number } | null = null;
-      for (const s of slots) {
-        if (!free(s.p)) continue;
-        const cost = dist(s.p, g.a) + s.ring * 6;
-        if (!best || cost < best.cost) best = { ...s, cost };
+  // 2) automaticky: nejdřív první řada kolem všech pohledů, pak další řady (odkaz vnější řady by vedl přes vnitřní
+  //    balónky); v pohledu pořadí podle úhlu kotvy ke středu pohledu, nejbližší volný slot, odkaz nevede přes balónek
+  // nejvýš 5 řad kolem pohledu (~50 mm) – dál od pohledu je pozice nečitelná
+  const RINGS = 5;
+  const slotsAll = new Map(views.map((v) => [v.key, slotsOf(v, R, RINGS)]));
+  const results: PlacedBalloon[] = [];
+  const angleIn = (x: Rest) => {
+    const v = x.prefs[0];
+    const a = anchorPick(x.it, v);
+    return Math.atan2(a[1] - (v.rect.y + v.rect.h / 2), a[0] - (v.rect.x + v.rect.w / 2));
+  };
+  let pending = [...rest].sort((p, q) => views.indexOf(p.prefs[0]) - views.indexOf(q.prefs[0]) || angleIn(p) - angleIn(q));
+  const tryPlace = (x: Rest, lim: number, strict: boolean): boolean => {
+    for (const v of x.prefs) {
+      const a = anchorPick(x.it, v);
+      let best: { p: Vec2; cost: number } | null = null;
+      for (const sl of slotsAll.get(v.key)!) {
+        if (sl.ring >= lim || !free(sl.p)) continue;
+        const cost = dist(sl.p, a) + sl.ring * 6;
+        if (best && cost >= best.cost) continue;
+        if (strict && !leaderClear(sl.p, a)) continue;
+        best = { p: sl.p, cost };
       }
       if (best) {
-        const b = { id: g.id, pos: g.it.pos, view: key, x: best.p[0], y: best.p[1], a: g.a, mode: "auto" as BalloonMode, assigned: g.assigned, slotRing: best.ring };
+        anchorUse(v, a);
+        const b: PlacedBalloon = { id: x.id, pos: x.it.pos, view: v.key, x: best.p[0], y: best.p[1], a, mode: "auto", assigned: x.assigned };
         placed.push(b);
         results.push(b);
-      } else overflow.push(g);
-    }
-    // přelití: automaticky přiřazené do dalšího pohledu, kde je komponenta vidět; ručně přiřazené zůstanou (lost)
-    for (const g of overflow) {
-      const t = tried.get(g.id) ?? new Set<string>();
-      t.add(key);
-      tried.set(g.id, t);
-      const next = g.assigned === "auto" ? views.find((w) => !t.has(w.key) && visibleIn(g.it, w)) : undefined;
-      if (next) {
-        pending.push({ it: g.it, id: g.id, v: next, assigned: "auto" });
-        continue;
+        return true;
       }
-      // nikde místo: nejbližší slot v rámu (i přes překážky) – kontrola překryvů listu ho započte
-      const all = slotsOf(v, R, RINGS).filter((s) => inRect(box(s.p), inp.bounds));
-      const p = all.sort((m, n) => dist(m.p, g.a) - dist(n.p, g.a))[0]?.p ?? [Math.max(inp.bounds.x + R, Math.min(inp.bounds.x + inp.bounds.w - R, g.a[0])), inp.bounds.y + R];
-      const b = { id: g.id, pos: g.it.pos, view: key, x: p[0], y: p[1], a: g.a, mode: "auto" as BalloonMode, assigned: g.assigned, lost: true, slotRing: RINGS };
-      placed.push(b);
     }
+    return false;
+  };
+  for (let lim = 1; lim <= RINGS && pending.length; lim++) pending = pending.filter((x) => !tryPlace(x, lim, true));
+  // odkaz bez průchodu balónkem nejde: volné místo i tak (kontrola překryvů ho započte)
+  pending = pending.filter((x) => !tryPlace(x, RINGS, false));
+  // nikde místo: nejbližší slot v rámu (i přes překážky) – kontrola překryvů listu ho započte
+  for (const x of pending) {
+    const v = x.prefs[0];
+    const a = anchorFor(x.it, v);
+    const all = slotsAll.get(v.key)!.filter((sl) => inRect(box(sl.p), inp.bounds));
+    const p = all.sort((m, n) => dist(m.p, a) - dist(n.p, a))[0]?.p ?? [Math.max(inp.bounds.x + R, Math.min(inp.bounds.x + inp.bounds.w - R, a[0])), inp.bounds.y + R];
+    placed.push({ id: x.id, pos: x.it.pos, view: v.key, x: p[0], y: p[1], a, mode: "auto", assigned: x.assigned, lost: true });
   }
 
   // 3) výměny proti křížení odkazových čar (jen automaticky umístěné ve stejném pohledu)
@@ -298,6 +334,12 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
         if (!segmentsCross(p1, p2, q1, q2)) continue;
         [p.x, q.x] = [q.x, p.x];
         [p.y, q.y] = [q.y, p.y];
+        // výměna, po které by odkaz vedl přes jiný balónek, se vrátí
+        if (!leaderClear([p.x, p.y], p.a, p) || !leaderClear([q.x, q.y], q.a, q)) {
+          [p.x, q.x] = [q.x, p.x];
+          [p.y, q.y] = [q.y, p.y];
+          continue;
+        }
         swapped = true;
       }
     if (!swapped) break;
@@ -312,11 +354,7 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
       b.mode = "moved";
     }
   }
-  const out = placed.map(({ ...b }) => {
-    delete (b as { slotRing?: number }).slotRing;
-    return b as PlacedBalloon;
-  });
-  return { placed: out, lost: out.filter((b) => b.lost).length, crossings: countCrossings(out), missingView };
+  return { placed, lost: placed.filter((b) => b.lost).length, crossings: countCrossings(placed), missingView };
 }
 
 /** počet křížení odkazových čar (dvojice) */

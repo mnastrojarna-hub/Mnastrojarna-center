@@ -1,5 +1,6 @@
 "use client";
 
+import { templateText } from "@/cad/title-templates";
 import { CAD_LANGS, getLang, langMeta, tr } from "@/cad/i18n";
 import { disableEncrypted, enableEncrypted, isUnlocked, lock, notifyVault, persistMode, unlock, VAULT_EVENT, wipeStoredDocuments } from "@/cad/vault";
 import { useEffect, useState as useLocalState } from "react";
@@ -282,6 +283,27 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
                     </option>
                   ))}
                 </select>
+              </Field>
+              {/* pojmenované šablony hlavičky s logem (vlna 22, bod 22j): výchozí pro nové listy, smazat */}
+              <Field label={tr("Šablony hlavičky (logo, firma, druh razítka)")} hint={tr("ukládají se z panelu Razítko ve výkrese nebo příkazem výkres hlavička uložit")}>
+                <div className="space-y-1" data-settings-title-tpls>
+                  <select value={draft.titleTemplateDefault ?? ""} onChange={(e) => set("titleTemplateDefault", e.target.value || undefined)} className={selectCls} aria-label={tr("Výchozí šablona hlavičky nových listů")} data-settings-title-tpl-default>
+                    <option value="">{tr("bez výchozí šablony hlavičky")}</option>
+                    {(draft.titleTemplates ?? []).map((t) => (
+                      <option key={t.name} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  {(draft.titleTemplates ?? []).map((t) => (
+                    <div key={t.name} className="flex items-center justify-between gap-2 text-[12px]" data-settings-title-tpl={t.name}>
+                      <span className="truncate">{templateText(t)}</span>
+                      <button type="button" className="rounded border border-ink-700/15 px-1.5 text-[11px] hover:bg-steel-100" onClick={() => setDraft((d) => ({ ...d, titleTemplates: (d.titleTemplates ?? []).filter((x) => x.name !== t.name), ...(d.titleTemplateDefault === t.name ? { titleTemplateDefault: undefined } : {}) }))}>
+                        {tr("Smazat")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </Field>
             </>
           )}

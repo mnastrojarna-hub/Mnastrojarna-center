@@ -421,6 +421,7 @@ export function docKv(d: DocSummary): string {
   if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓
   if (d.rev) kv.push(`rev=${d.rev}`); // revize modelu dokumentu s výkresy / exporty (vlna 22, bod 20 – před `stale=`)
   if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
+  if (d.overlaps !== undefined) kv.push(`overlaps=${d.overlaps}`); // překryvy na listech zkontrolovaných v běhu (vlna 22, bod 17 – jen po kontrole)
   return `${kind} ${kv.join(" ") || "-"}`;
 }
 

@@ -27,6 +27,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
   horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
@@ -70,6 +71,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
   horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
@@ -107,6 +109,7 @@ Polohy:
   ✓ 10. poloha Díra 2 – X 85
   ✓ 11. poloha Díra 2 – Y 45
 Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 2: překryv na listu List 1: 2 překryvů – text × text 1, text × geometrie 1; např. „Ø8“ × „2× Ø8“; „45“ – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
 Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30
@@ -148,6 +151,7 @@ Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční p
 ⚠ řádek 5: funkční poloha Díra 1 – Y 15: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
 ⚠ řádek 5: funkční 2× Ø8 skrz (Díra 1, Díra 2): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
 ℹ řádek 5: list List 1: přesná tolerance na rozměru, který není funkční – 100 ±0,01
+⚠ řádek 5: překryv na listu List 1: 2 překryvů – text × text 1, text × geometrie 1; např. „Ø8“ × „2× Ø8“; „45“ – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
 Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30

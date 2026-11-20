@@ -46,7 +46,6 @@ hrana	edge
 Id (výkres upravit / smazat / značka na <id>): {0}	Ids (drawing edit / delete / mark on <id>): {0}
 izometrie nemá souřadnice pro značky a kóty – použijte pravoúhlý pohled ({0}) nebo místo na listu	the isometric view has no coordinates for marks and dimensions – use an orthographic view ({0}) or a place on the sheet
 kusovník	parts list
-kusovník ano|ne	bom yes|no
 Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá.	The parts list CSV exists only for an assembly with components – a part has no parts list.
 kusovník nad razítkem	parts list above the title block
 kóta svisle: body mají stejné y – svislá vzdálenost je nulová	vertical dimension: the points have the same y – the vertical distance is zero

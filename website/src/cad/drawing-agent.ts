@@ -5,6 +5,9 @@
  * (tolerance, přípona, text) se podle klíče přenesou.
  * Příkazy pracují s aktivním listem (`výkres list N`, záložka listu ve výkresu) – viz `activeSheet`.
  */
+import { applyTemplate, defaultTemplateRec, deleteTemplate, findTemplate, sameName, saveTemplate, templateFromMeta, templatesLine, templateText, withDocTemplate, type TitleTemplateRec } from "./title-templates";
+import { overlapIssueText, sheetOverlaps } from "./drawing-overlaps";
+import { positionLines } from "./drawing-pos-agent";
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
 import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
@@ -41,7 +44,11 @@ export type DrawingExtras = { massKg?: number; bom?: BomItem[]; balloons?: Ballo
  * Prostředí příkazů výkresu v aplikaci: doplňky razítka a otevřené záložky (pro „výkres model "záložka"“);
  * `referenceDims` = tolerované kóty předlohy (výtah z DWG/DXF/PDF – balík předlohy) pro `výkres kontrola tolerancí`.
  */
-export type DrawingEnv = { extras?: (doc: CadDoc) => DrawingExtras; tabs?: () => { title: string; doc: CadDoc }[]; referenceDims?: (doc: CadDoc) => RefTolDim[] };
+/**
+ * `input` = soubor vstupů hostitele podle názvu (CLI `--files`, HTTP `body.files`, připojené soubory konzole) – logo razítka
+ * a šablony hlavičky názvem souboru i bez prohlížeče (vlna 22, bod 22j)
+ */
+export type DrawingEnv = { extras?: (doc: CadDoc) => DrawingExtras; tabs?: () => { title: string; doc: CadDoc }[]; referenceDims?: (doc: CadDoc) => RefTolDim[]; input?: (name: string) => Promise<{ name: string; bytes: Uint8Array } | null> };
 
 /** číslo do protokolu: na setiny, desetinná čárka podle jazyka (EN 6.8, CS / DE 6,8) */
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", getLang() === "en" ? "." : ",");
@@ -131,9 +138,26 @@ export function newSheet(doc: CadDoc, n = 1): DrawingDoc {
     id: uid(),
     name: tr("List {0}", n),
     options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>,
-    meta: { name: doc.name, number: doc.props?.number ?? "", author: doc.props?.author ?? "", revision: doc.props?.revision ?? "", tolerance: "", ...defaultTemplate() },
+    meta: withDefaultTitle({ name: doc.name, number: doc.props?.number ?? "", author: doc.props?.author ?? "", revision: doc.props?.revision ?? "", tolerance: "", ...defaultTemplate() }),
     annotations: [],
   };
+}
+
+/** výchozí pojmenovaná šablona hlavičky z Nastavení (logo, firma, druh razítka …) na údaje nového listu (vlna 22, bod 22j) */
+function withDefaultTitle(meta: Record<string, unknown>): Record<string, unknown> {
+  const rec = defaultTemplateRec();
+  if (rec) applyTemplate(meta, rec);
+  return meta;
+}
+
+/** šablony hlavičky z Nastavení, které listy dokumentu používají (`titleTpl`), se zkopírují do dokumentu (jdou s ním dál) */
+export function syncDocTemplates(doc: CadDoc): void {
+  for (const s of doc.drawings ?? []) {
+    const n = (s.meta as Partial<DrawingMeta>).titleTpl;
+    if (!n || doc.titleTemplates?.some((t) => sameName(t.name, n))) continue;
+    const hit = findTemplate(doc, n);
+    if (hit) doc.titleTemplates = withDocTemplate(doc, hit.rec).titleTemplates;
+  }
 }
 
 /** šablona razítka nových listů z Nastavení (výchozí ISO 7200 se do listu nezapisuje) */
@@ -226,6 +250,8 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
         if (o.text !== undefined && o.text !== keep.text) keep.text = o.text;
       }
       if (keep.type === "callout" && o.type === "callout" && o.tol) keep.tol = o.tol;
+      // ruční poloha (odsazení / posun) vygenerované kóty a popisu přežije přegenerování po změně modelu (vlna 22, bod 17)
+      if (o.placed === "user") keepPlacement(keep, o);
       // revize (trojúhelník) a zobrazení úchylek uložení zůstávají u přegenerované kóty
       if (o.rev) keep.rev = o.rev;
       if (o.tolShow) keep.tolShow = o.tolShow;
@@ -242,9 +268,24 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
 /** varování listu: ruční úpravy vygenerovaných kót se nepodařilo přiřadit (do protokolu ⚠ drawing.warning) */
 export const lostEditsText = (n: number) => tr("{0} ručních úprav kót se nepodařilo přiřadit – kóty se přegenerovaly bez nich (tolerance, uložení, přípony)", n);
 
-/** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek) */
+/**
+ * Ruční poloha staré vygenerované kóty / popisu přenesená na novou (vlna 22, bod 17): délková kóta odsazení (znaménko strany
+ * podle nové kóty), průměr / poloměr / úhel směr a odsazení, souřadnicová posun textu, popis koleno. Měřené body jsou nové.
+ */
+function keepPlacement(keep: DrawingAnnotation, o: DrawingAnnotation) {
+  keep.placed = "user";
+  if (keep.type === "dim" && o.type === "dim") {
+    const k = keep as Record<string, unknown>;
+    const q = o as Record<string, unknown>;
+    if (typeof q.offset === "number" && typeof k.offset === "number") k.offset = "ang" in q || (k.offset as number) === 0 ? q.offset : Math.sign(k.offset as number) * Math.abs(q.offset as number);
+    if (typeof q.ang === "number" && "ang" in k) k.ang = q.ang;
+    if (typeof q.jog === "number") k.jog = q.jog;
+  } else if (keep.type === "callout" && o.type === "callout") keep.at = o.at;
+}
+
+/** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek, ruční poloha) */
 function userEdited(a: DrawingAnnotation): boolean {
-  if (a.rev || a.tolShow) return true;
+  if (a.rev || a.tolShow || a.placed) return true;
   if (a.type === "dim") return !!splitSuffix(a).user.trim() || a.text !== undefined;
   return a.type === "callout" && !!a.tol?.trim();
 }
@@ -386,6 +427,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
   if (doc0.kind === "assembly" && cmd.k === "dim" && cmd.mode === "smart") throw new Error(tr("Chytré kóty jsou pro díly – u sestavy použijte „kótovat celkově“ a pozice"));
   const doc: CadDoc = { ...doc0, drawings: doc0.drawings?.length ? [...doc0.drawings] : [newSheet(doc0)] };
   const created = !doc0.drawings?.length;
+  if (created) syncDocTemplates(doc);
   let idx = activeSheetIndex(doc);
   const sheet = (): DrawingDoc => doc.drawings![idx];
   const put = (s: DrawingDoc) => (doc.drawings![idx] = s);
@@ -640,6 +682,64 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       return done({ changed: true, open: false });
     }
     case "views": {
+      if (cmd.cmd.op === "bomsheet") {
+        // kusovník na samostatném listu (vlna 22, bod 17): tento list ho nekreslí, nový list téhož výkresu jen s kusovníkem
+        if (doc.kind !== "assembly") throw new Error(tr("kusovník na samostatném listu – jen výkres sestavy"));
+        const list = doc.drawings!;
+        const set = setSheets(doc, idx);
+        const has = set.find((k) => (list[k].options as Partial<DrawingOptions>).bomOnly);
+        put({ ...sheet(), options: { ...sheet().options, bomPlace: "sheet", bomTable: true } });
+        if (has === undefined) {
+          const cur = sheet().meta as Partial<DrawingMeta>;
+          const s = newSheet(doc, set.length + 1);
+          list.push(inDrawing({ ...s, name: tr("Kusovník"), options: { ...s.options, bomOnly: true, dimensions: "none" }, meta: { ...inheritTitle(cur), name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
+        }
+        const bi = has ?? list.length - 1;
+        log.push(tr("✓ kusovník na samostatném listu {0} – list {1} ho nekreslí (zpět: výkres kusovník nad | sloupce)", sheetName(doc, bi), sheetName(doc, idx)));
+        return done({ changed: true, open: true });
+      }
+      if (cmd.cmd.op === "tpl") {
+        // pojmenované šablony hlavičky s logem (vlna 22, bod 22j – cad/title-templates.ts)
+        const c = cmd.cmd;
+        const cur = sheet().meta as Partial<DrawingMeta>;
+        switch (c.act) {
+          case "list":
+            log.push(templatesLine(doc, cur.titleTpl));
+            return { doc, log, changed: created, open: false };
+          case "save": {
+            let rec: TitleTemplateRec;
+            if (Object.keys(c.fields).length) {
+              const m: Record<string, unknown> = {};
+              const applied = await applyTitleFields(m, c.fields, env.input);
+              for (const w of applied.warnings) issue("other", tr("! {0}", w));
+              rec = templateFromMeta(c.name, m as Partial<DrawingMeta>);
+            } else {
+              rec = templateFromMeta(c.name, cur);
+              put({ ...sheet(), meta: { ...sheet().meta, titleTpl: rec.name } });
+            }
+            doc.titleTemplates = saveTemplate(doc, rec, c.setDefault).titleTemplates;
+            log.push(tr("✓ šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}", templateText(rec), c.setDefault ? tr(" · výchozí pro nové listy") : ""));
+            return done({ changed: true, open: false });
+          }
+          case "use": {
+            const hit = findTemplate(doc, c.name);
+            if (!hit) throw new Error(tr("šablona hlavičky „{0}“ neexistuje – {1}", c.name, templatesLine(doc)));
+            const m = { ...(sheet().meta as Record<string, unknown>) };
+            applyTemplate(m, hit.rec);
+            put({ ...sheet(), meta: m });
+            if (hit.from === "settings") doc.titleTemplates = withDocTemplate(doc, hit.rec).titleTemplates;
+            log.push(tr("✓ razítko podle šablony hlavičky {0}", templateText(hit.rec)));
+            return done({ changed: true, open: false });
+          }
+          case "delete": {
+            const r = deleteTemplate(doc, c.name);
+            if (!r.found) throw new Error(tr("šablona hlavičky „{0}“ neexistuje – {1}", c.name, templatesLine(doc)));
+            doc.titleTemplates = r.doc.titleTemplates;
+            log.push(tr("✓ šablona hlavičky „{0}“ smazána z dokumentu i z Nastavení (razítka listů zůstávají)", c.name));
+            return done({ changed: true, open: false });
+          }
+        }
+      }
       const r = await applyViewsCmd({ doc, sheet, put, compute: computeSheet }, cmd.cmd);
       log.push(...r.log);
       return done({ changed: r.changed, open: r.open });
@@ -675,6 +775,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
           list.push(inDrawing({ ...s, name, meta: { ...inheritTitle(cur), name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
           idx = list.length - 1;
           activeSheet.set(sheet().id);
+          syncDocTemplates(doc);
           log.push(tr("✓ nový list {0} (Chytré kóty) – další příkazy výkresu pracují s ním", sheetName(doc, idx)));
           break;
         }
@@ -766,15 +867,23 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       return { doc: doc0, log, changed: false, open: false, file: r, ...(issues.length ? { issues } : {}) };
     }
     case "title": {
-      const f = cmd.fields;
+      const f = { ...cmd.fields };
+      // šablona= pojmenovaná šablona hlavičky (dokument / Nastavení – vlna 22, bod 22j) má přednost před druhem razítka
+      const named = f.template !== undefined ? findTemplate(doc, f.template) : null;
+      if (named) delete f.template;
       const keys = Object.keys(f) as TitleCmdField[];
-      if (!keys.length) {
+      if (!keys.length && !named) {
         log.push(...titleLines(doc, sheet()));
         return { doc, log, changed: created, open: false };
       }
       const m = { ...(sheet().meta as Record<string, unknown>) };
-      // pole, šablona, logo (připojený soubor / data URL) a nepředepsané tolerance – cad/agent-title.ts
-      const applied = await applyTitleFields(m, f);
+      if (named) {
+        applyTemplate(m, named.rec);
+        if (named.from === "settings") doc.titleTemplates = withDocTemplate(doc, named.rec).titleTemplates;
+      } else if (f.template !== undefined || f.logo !== undefined) delete m.titleTpl; // ruční změna druhu / loga = už ne podle šablony
+      // pole, šablona, logo (připojený soubor / data URL / vstup hostitele) a nepředepsané tolerance – cad/agent-title.ts
+      const applied = keys.length ? await applyTitleFields(m, f, env.input) : { parts: [] as string[], warnings: [] as string[] };
+      if (named) applied.parts.unshift(tr("šablona hlavičky {0}", templateText(named.rec)));
       put({ ...sheet(), meta: m });
       // číslo, autor a revize i do dokumentu (výchozí pro nové listy, sdílí se se souborem) – jako výkresové prostředí
       if (f.number !== undefined || f.author !== undefined || f.revision !== undefined) {
@@ -782,7 +891,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       }
       if (f.material !== undefined) doc.materialName = f.material.trim() || undefined;
       // dosavadní pole se v protokolu jmenují jako dřív (TITLE_KEY), nová podle cad/agent-title.ts
-      log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (keys[i] in TITLE_KEY && !["tolerance", "logo", "template"].includes(keys[i]) ? `${tr(TITLE_KEY[keys[i] as TitleField])} „${f[keys[i]]}“` : p)).join(", ")));
+      const off = named ? 1 : 0;
+      log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (i >= off && keys[i - off] in TITLE_KEY && !["tolerance", "logo", "template"].includes(keys[i - off]) ? `${tr(TITLE_KEY[keys[i - off] as TitleField])} „${f[keys[i - off]]}“` : p)).join(", ")));
       for (const w of applied.warnings) issue("other", tr("! {0}", w));
       // revize mimo tabulku revizí se ohlásí hned (razítko a tabulka by si odporovaly)
       const rw = f.revision !== undefined ? titleRevisionCheck(m as Partial<DrawingMeta>).warning : undefined;
@@ -1052,6 +1162,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // tělesa, funkční prvky; nikdy „všech N“ – sestava: jen celkové rozměry (rozměry dílů patří na výkresy dílů)
   const dc = sheetDimCheck(doc, out, anns, o);
   if (dc) L.push(dimCheckLine(dc));
+  else if (o.bomOnly) L.push(tr("List jen s kusovníkem – pohledy ani kóty nemá"));
   else {
     const chk = dimCheck(doc, bbox, out.texts);
     L.push(tr("Kontrola kót: celkové rozměry {0}/{1} (sestava – rozměry dílů se kontrolují na výkresech dílů)", chk.filter((x) => x.present).length, chk.length));
@@ -1075,6 +1186,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(sheetIssueLine(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));
   L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
+  // pozice po pohledech, kusovník a překryvy celého listu (vlna 22, bod 17 – cad/drawing-overlaps.ts)
+  const ov = sheetOverlaps(out);
+  L.push(...positionLines(res, o, ov));
   L.push(...viewRangeLines(res, o));
   if (res.warnings.length) L.push(tr("Varování výkresu: {0}", res.warnings.join("; ")));
   const issues = issuesOf(res);
@@ -1085,6 +1199,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
   const sh = doc.drawings![idx];
   if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });
+  // překryvy na listu → ⚠ drawing.overlap s počtem a radou na řádku `výkres stav` (bod 17)
+  const ovText = overlapIssueText(ov);
+  if (ovText) issues.push({ level: "warn", code: "drawing.overlap", kind: "sheet-overlap", text: ovText, sheetId: sh.id, data: { total: ov.total, byKind: ov.byKind, crossings: ov.crossings } });
   return { text: L.join("\n"), changed, issues };
 }
 

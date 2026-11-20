@@ -517,7 +517,7 @@ export function patchAnn(a: DrawingAnnotation, p: AnnPatch, scale = 1): DrawingA
   switch (a.type) {
     case "dim": {
       let n: DimAnn = { ...a };
-      if (p.offset !== undefined) n = { ...n, offset: isRadialDim(n) ? p.offset : n.kind === "angle" ? Math.max(1, Math.abs(p.offset)) : (n.offset < 0 ? -1 : 1) * p.offset } as DimAnn;
+      if (p.offset !== undefined) n = { ...n, offset: isRadialDim(n) ? p.offset : n.kind === "angle" ? Math.max(1, Math.abs(p.offset)) : (n.offset < 0 ? -1 : 1) * p.offset, ...(n.auto ? { placed: "user" as const } : {}) } as DimAnn;
       if (p.text !== undefined) n = { ...n, text: opt(p.text) };
       if (p.suffix !== undefined) n = { ...n, suffix: opt(p.suffix) };
       return n;

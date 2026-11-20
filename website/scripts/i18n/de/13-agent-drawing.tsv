@@ -46,7 +46,6 @@ hrana	Kante
 Id (výkres upravit / smazat / značka na <id>): {0}	Ids (zeichnung bearbeiten / löschen / symbol an <id>): {0}
 izometrie nemá souřadnice pro značky a kóty – použijte pravoúhlý pohled ({0}) nebo místo na listu	die Isometrie hat keine Koordinaten für Symbole und Maße – verwenden Sie eine Normalansicht ({0}) oder eine Stelle auf dem Blatt
 kusovník	Stückliste
-kusovník ano|ne	stückliste ja|nein
 Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá.	Die Stückliste als CSV gibt es nur bei einer Baugruppe mit Komponenten – ein Teil hat keine Stückliste.
 kusovník nad razítkem	Stückliste über dem Schriftfeld
 kóta svisle: body mají stejné y – svislá vzdálenost je nulová	senkrechtes Maß: die Punkte haben dasselbe y – der senkrechte Abstand ist null
