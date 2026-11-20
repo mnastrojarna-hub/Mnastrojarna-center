@@ -237,8 +237,20 @@ const motion = (d) => {
   await settle(p, 'E3 stale');
   await runIn(p, 'výkres');
   await p.waitForFunction(() => ['60', '100'].every((t) => [...document.querySelectorAll('[data-sheet] > div svg text')].some((x) => x.textContent === t)), null, { timeout: 120000 }).catch(() => {});
+  // poloha textu až po ustálení listu (okno výkresu po výpočtu listu ještě přizpůsobí měřítko – panely kontroly kót, překryvů
+  // a vydání (vlna 22) mění rozvržení); klik na první změřenou polohu pak minul kótu a Delete nic neskryl
+  const tposStable = async (t) => {
+    let a = await tpos(t);
+    for (let i = 0; i < 20; i++) {
+      await p.waitForTimeout(400);
+      const b2 = await tpos(t);
+      if (a && b2 && Math.abs(a.x - b2.x) < 0.5 && Math.abs(a.y - b2.y) < 0.5) return b2;
+      a = b2;
+    }
+    return a;
+  };
   for (const t of ['60', '100']) {
-    const at = await tpos(t);
+    const at = await tposStable(t);
     ok(!!at, `E3: kóta celkového rozměru „${t}“ je na listu`);
     if (!at) continue;
     await p.mouse.click(at.x, at.y);
@@ -264,12 +276,16 @@ const motion = (d) => {
   const o4 = e4.d2.drawings[0].options;
   ok(!e4.e2.length && J((o4.cuts || []).map((c) => c.label)) === J(['B']) && J((o4.aux || []).map((a) => [a.label, a.parent])) === J([['C', 'cut:B']]), `E4: řez B a pomocný pohled C z řezu B, bez ✗ (${J(e4.e2)} ${J((o4.aux || []).map((a) => [a.label, a.parent]))})`);
   // E5: pohledy na vypnutém základním pohledu se vynechají s ℹ
-  const e5 = await trip(['nový díl "E5 vypnuté"', 'kvádr 200 60 40', 'výkres A2 měřítko 1:1 pohledy přední,horní,levý', 'výkres přerušení levý y od 10 do 30 mezera 4', 'výkres detail levý v 30 20 poloměr 8 měřítko 2:1', 'výkres pohled pomocný levý směr 0,5 0 0,87', 'výkres A2 měřítko 1:1 pohledy přední'], 'E5 vypnuté');
-  ok(!e5.e2.length && (e5.sc.match(/^# ℹ .*visí na pohledu, který na listu není \(levý\)/gm) || []).length === 3, `E5: tři položky na vypnutém levém pohledu vynechány s ℹ, bez ✗ ${J(e5.e2)}`);
+  // levý pohled má x = −Y (x −60…0, `výkres stav`): střed detailu −30 35 leží v pohledu mimo přerušení (y 10…30) (dřív „v 30 20“ = ✗ mimo pohled –
+  // detail nevznikl a test počítal jen se dvěma položkami); první běh nesmí mít ✗
+  const e5 = await trip(['nový díl "E5 vypnuté"', 'kvádr 200 60 40', 'výkres A2 měřítko 1:1 pohledy přední,horní,levý', 'výkres přerušení levý y od 10 do 30 mezera 4', 'výkres detail levý v -30 35 poloměr 4 měřítko 2:1', 'výkres pohled pomocný levý směr 0,5 0 0,87', 'výkres A2 měřítko 1:1 pohledy přední'], 'E5 vypnuté');
+  ok(!e5.e1.length && !e5.e2.length && (e5.sc.match(/^# ℹ .*visí na pohledu, který na listu není \(levý\)/gm) || []).length === 3, `E5: tři položky na vypnutém levém pohledu vynechány s ℹ, bez ✗ ${J(e5.e1)} ${J(e5.e2)}`);
   // E6 + E7: přezdívky D / H / R (dřív „chybí přezdívka“) a umístění detailu na listu sestavy s automatickým formátem
   const e6 = await trip(['nový díl "E6 Q"', 'kvádr 100 40 30', 'nová sestava "E6 sestava"', 'vložit "E6 Q" ukotvit', 'sestava komponenta #1 přezdívka "D"', 'vložit "E6 Q" v 0 60 0 jako "H"', 'vložit "E6 Q" v 0 120 0', 'sestava komponenta #3 přezdívka "R"', 'výkres pohledy přední,horní', 'výkres detail přední v 50 15 poloměr 10 měřítko 2:1 umístit 230 60'], 'E6 sestava');
   ok(!e6.e1.length && !e6.e2.length && J(e6.d2.components.map((c) => c.alias)) === J(['D', 'H', 'R']) && !/přezdívku/.test(e6.sc), `E6: přezdívky D, H, R tam a zpět (${J(e6.d2.components.map((c) => c.alias))} ${J(e6.e1)} ${J(e6.e2)})`);
-  ok(/umístit 230 150 odshora$/m.test(e6.sc) && J(e6.d2.drawings[0].options.details[0].at) === J(e6.d1.drawings[0].options.details[0].at) && !/bez jádra/.test(e6.sc), `E7: detail na listu sestavy s automatickým formátem na stejném místě ${J(e6.d2.drawings[0].options.details[0].at)}`);
+  // y od horního okraje závisí na formátu, který automatický list zvolí (list sestavy s kusovníkem se kvůli němu nezmenší –
+  // vlna 22, bod 17: dnes A3 → 297 − 60 = 237, dřív A4 → 150); podstatné je, že detail je po přečtení na stejném místě
+  ok(/umístit 230 \d+(?:[.,]\d+)? odshora$/m.test(e6.sc) && J(e6.d2.drawings[0].options.details[0].at) === J(e6.d1.drawings[0].options.details[0].at) && !/bez jádra/.test(e6.sc), `E7: detail na listu sestavy s automatickým formátem na stejném místě ${J(e6.d2.drawings[0].options.details[0].at)} (${(e6.sc.match(/umístit 230 \S+ odshora/) || [''])[0]})`);
   // E8 + E9: obnovit ověří klíč; stav pružiny píše vedení
   const l8 = String(await runIn(p, 'výkres vygenerované obnovit pos:99'));
   ok(errLines(l8).length === 1 && /„pos:99“ na listu není/.test(l8), `E8: výkres vygenerované obnovit pos:99 = ✗ (${l8.split('\n').filter((l) => /pos:99/.test(l)).join(' | ').slice(0, 160)})`);
