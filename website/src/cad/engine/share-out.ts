@@ -29,7 +29,20 @@ const STORE_MAX_DAYS = 90;
 
 /* ───────────────────────── poslední odkaz (`odkaz`, window.mncad.share) ───────────────────────── */
 
-export type LastLink = { url: string; mode: ShareMode; bytes: number; exp: number | null; name: string; view: ShareView; password: boolean; /** kód krátkého odkazu (část za #, vlna 16) */ code?: string; note?: string };
+export type LastLink = {
+  url: string;
+  mode: ShareMode;
+  bytes: number;
+  exp: number | null;
+  name: string;
+  view: ShareView;
+  password: boolean;
+  /** kód krátkého odkazu (část za #, vlna 16) */
+  code?: string;
+  note?: string;
+  /** co odkaz obsahuje (vlna 22, bod 16 – engine/share-content.ts) */
+  content?: import("./share-content").ShareContent;
+};
 let lastLink: LastLink | null = null;
 /** poslední sdílený odkaz (příkaz „odkaz“); zapisuje i window.mncad.share() */
 export const rememberLink = (l: LastLink) => void (lastLink = l);
@@ -119,7 +132,10 @@ async function sharePolicy(doc: CadDoc, q: ShareRequest, note: (n: ShareNote) =>
       note({ code: "share.store-unavailable", text: tr("úložiště krátkých odkazů není nastavené") });
       return null;
     }
-    return long(await asLink());
+    // vypnuté úložiště (CLI --share-store off) je vidět – ℹ s délkou odkazu, ne tichý dlouhý odkaz (vlna 22, bod 16)
+    const r = long(await asLink());
+    note({ code: "share.store-off", args: [r.url.length] });
+    return r;
   }
   const info = shareStoreConfigured() ? null : await probeSelfStore(false, q.store);
   if (!shareStoreConfigured() && !info) {

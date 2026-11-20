@@ -25,6 +25,7 @@ import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink 
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 import { runExportJob } from "../export-job";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
+import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
 
@@ -239,7 +240,7 @@ async function exportScript(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "s
 const withTimeout = <T>(p: Promise<T>, ms: number, dflt: T) => Promise.race([p.catch(() => dflt), new Promise<T>((r) => setTimeout(() => r(dflt), ms))]);
 
 /** řádky konzole o odkazu; adresa na samostatném řádku „URL: …“ (stejný tvar ve všech jazycích) */
-async function linkLines(ctx: OpCtx, l: LastLink, head: string): Promise<string[]> {
+async function linkLines(ctx: OpCtx, l: LastLink, head: string, content?: ShareContent): Promise<string[]> {
   const exp = l.exp ? new Date(l.exp).toLocaleDateString(cadLocale(), { day: "numeric", month: "numeric", year: "numeric" }) : tr("bez omezení");
   const clip = ctx.host.ui?.clipboard;
   const copied = clip ? await withTimeout(clip(l.url), 1500, false) : false;
@@ -249,6 +250,8 @@ async function linkLines(ctx: OpCtx, l: LastLink, head: string): Promise<string[
     `URL: ${l.url}`,
     // krátký odkaz (vlna 16): kód za # po čtveřicích k přečtení nebo opsání
     ...(l.code ? [tr("  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)", groupShareCode(l.code), l.url.length)] : []),
+    // co odkaz obsahuje (vlna 22, bod 16) – stejný popis jako výpis `= … link … content=…`
+    ...(content ? [tr("  obsah odkazu: {0}", shareContentText(content))] : []),
     ...(clip ? [copied ? tr("  (zkopírováno do schránky)") : tr("  (schránka není dostupná – adresu zkopírujte z protokolu)")] : []),
   ];
 }
@@ -273,21 +276,56 @@ async function shareCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "share
     (n) => e.code(n.code, { ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}) }),
   );
   if (!r) return;
-  const l: LastLink = { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: d.name, view, password: r.password, ...(r.code ? { code: r.code } : {}), ...(r.note ? { note: r.note } : {}) };
+  const content = shareContent(d);
+  const l: LastLink = { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: d.name, view, password: r.password, content, ...(r.code ? { code: r.code } : {}), ...(r.note ? { note: r.note } : {}) };
   rememberLink(l);
-  ctx.report.setShare(shareInfo(l));
-  const lines = await linkLines(ctx, l, tr("✓ sdílený odkaz vytvořen"));
+  reportLink(ctx, l);
+  const lines = await linkLines(ctx, l, tr("✓ sdílený odkaz vytvořen"), content);
   e.console(...lines);
   e.ok(lines[0].replace(/^✓\s*/, ""));
 }
 
-async function linkCmd(ctx: OpCtx, e: Emit): Promise<void> {
+/**
+ * Odkaz do reportu (vlna 22, bod 16): `shares[]` (každý odkaz běhu, `share` = poslední → řádek O) a výpis
+ * `= L<n> link "<dokument>" url=… mode=… exp=… view=… pw=… bytes=… chars=… content=… comp=… parts=… sheets=… files=…`
+ * – adresa každého `sdílet` zůstane v plném i stručném protokolu a v JSON, i když skript sdílí víckrát.
+ */
+function reportLink(ctx: OpCtx, l: LastLink): void {
+  const info = { ...shareInfo(l), line: ctx.line, view: l.view, password: l.password, ...(l.content ? { content: l.content } : {}) };
+  ctx.report.setShare(info);
+  ctx.report.measure(ctx.line, "link", shareLinkKv(info, l.content), { doc: l.name, data: info });
+}
+
+async function linkCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "link" }>): Promise<void> {
+  if (cmd.verify) return verifyLinkCmd(ctx, e, cmd.verify);
   const l = lastShareLink();
   if (!l) throw new Error(tr("zatím žádný sdílený odkaz – vytvořte ho příkazem „sdílet“"));
-  ctx.report.setShare(shareInfo(l));
-  const lines = await linkLines(ctx, l, tr("✓ poslední sdílený odkaz"));
+  reportLink(ctx, l);
+  const lines = await linkLines(ctx, l, tr("✓ poslední sdílený odkaz"), l.content);
   e.console(...lines);
   e.ok(lines[0].replace(/^✓\s*/, ""));
+}
+
+/**
+ * `odkaz ověřit [<odkaz|kód>] [heslo X]` (vlna 22, bod 16 – share-verify.ts): odkaz se otevře jako u příjemce (úložiště
+ * webu odkazu, dešifrování, rozbalení, kontrola dokumentu a platnosti) – nic se neotevře ani nezmění. Funkční odkaz = ✓
+ * s režimem, platností a obsahem; nefunkční = ✗ share.link-broken s důvodem (useknutý / poškozený / heslo / platnost /
+ * nenalezen / síť). Vždy výpis `= L<n> link url=… ok=1|0 …`. Bez adresy = poslední odkaz („sdílet“ v tomtéž běhu).
+ */
+async function verifyLinkCmd(ctx: OpCtx, e: Emit, v: { url?: string; password?: string }): Promise<void> {
+  const url = v.url ?? lastShareLink()?.url;
+  if (!url) throw new Error(tr("odkaz ověřit: chybí odkaz – zadejte odkaz nebo kód (odkaz ověřit https://…/s#KÓD), nebo nejdřív „sdílet“"));
+  const { verifyShareLink } = await import("../../share-verify");
+  const r = await verifyShareLink(url, v.password ? { password: v.password } : {});
+  const doc = r.ok ? r.content.doc : undefined;
+  if (r.ok) {
+    const exp = r.exp ? new Date(`${r.exp}T00:00:00Z`).toLocaleDateString(cadLocale(), { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }) : tr("bez omezení");
+    const where = r.mode === "link" ? tr("dokument v odkazu") : tr("v úložišti");
+    const text = tr("odkaz se otevře ({0} znaků, {1}, platí do: {2}, {3}): {4}", r.chars, where, exp, r.view === "drawing" ? tr("výkres") : tr("model"), shareContentText(r.content));
+    e.console(`✓ ${text}`);
+    e.ok(text);
+  } else e.code("share.link-broken", { args: [r.reason, r.text] });
+  ctx.report.measure(ctx.line, "link", verifyKv(r.ok ? { ok: true, url: r.url, mode: r.mode, exp: r.exp, content: r.content, chars: r.chars } : { ok: false, url: r.url, reason: r.reason, chars: r.chars }), { ...(doc ? { doc } : {}), data: r });
 }
 
 /* ───────────────────────── příkaz ───────────────────────── */
@@ -314,6 +352,6 @@ export const outOp: OpHandler<"out"> = async (op, ctx) => {
     case "script":
       return exportScript(ctx, e, cmd);
     case "link":
-      return linkCmd(ctx, e);
+      return linkCmd(ctx, e, cmd);
   }
 };
