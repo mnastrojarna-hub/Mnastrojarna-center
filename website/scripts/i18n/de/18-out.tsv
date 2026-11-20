@@ -10,7 +10,7 @@
 ✓ poslední sdílený odkaz	✓ letzter Freigabelink
 ✓ sdílený odkaz vytvořen	✓ Freigabelink erstellt
 ✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}	✗ {0}-Prüfung: die Datei konnte nicht erneut gelesen werden – {1}
-3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá	das 3D-Modell wird ohne Dialog heruntergeladen; bei STEP und BREP Prüfung: die Datei wird vom Kern neu eingelesen und mit dem Modell verglichen (Körper, Volumen, Hüllquader) → „originalgetreue Kopie des Modells“; „ohne prüfung“ lässt sie aus
+3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem, obálka) → „věrná kopie modelu“ jen s objemovým tělesem; bez tělesa ✗ out.no-solid, volné plochy vedle tělesa ⚠ out.free-surfaces (i u STL / 3MF a „bez kontroly“ podle modelu); „bez kontroly“ vynechá zpětné čtení	das 3D-Modell wird ohne Dialog heruntergeladen; bei STEP und BREP Prüfung: die Datei wird vom Kern neu eingelesen und mit dem Modell verglichen (Körper, Flächen außerhalb der Körper, Gültigkeit, Volumen, Hüllquader) → „originalgetreue Kopie des Modells“ nur mit Volumenkörper; ohne Körper ✗ out.no-solid, freie Flächen neben einem Körper ⚠ out.free-surfaces (auch bei STL / 3MF und „ohne prüfung“, aus dem Modell); „ohne prüfung“ lässt das erneute Einlesen aus
 3MF (síť)	3MF (Netz)
 export {0}	Export {0}
 export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)	export {0}: eine Zeichnung wird mit „zeichnung export {0}“ exportiert (zuerst „zeichnung A3 …“)
@@ -21,7 +21,6 @@ export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]	exportieren s
 export: model je prázdný – nejdřív vymodelujte díl	export: das Modell ist leer – zuerst ein Teil modellieren
 export: neznámý formát „{0}“ – {1}	export: unbekanntes Format „{0}“ – {1}
 glTF binární (síť)	glTF binär (Netz)
-jádro v souboru nenašlo těleso	der Kern hat in der Datei keinen Körper gefunden
 komponent	Komponenten
 kusovník CSV	Stückliste CSV
 list výkresu jako soubor bez dialogu (bez listu aktivní, „vše“ = každý list zvlášť); výkres nejdřív „výkres A3 …“ a „kótovat“	Zeichnungsblatt als Datei ohne Dialog (ohne Blatt das aktive, „alle“ = jedes Blatt einzeln); zuerst „zeichnung A3 …“ und „bemaßen“

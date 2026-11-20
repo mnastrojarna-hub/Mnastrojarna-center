@@ -1,0 +1,23 @@
+# Vlna 22 G3 – objemový export bez tělesa (22c): ✗ out.no-solid, ⚠ out.free-surfaces, objem a hmotnost jen z těles, export z menu
+kontrola {0}: {1}	{0}-Prüfung: {1}
+soubor neobsahuje objemové těleso (těles 0{0}) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě	die Datei enthält keinen Volumenkörper (Körper 0{0}) – Flächen haben weder Volumen noch Masse; Flächen zu einem Körper schließen (Flächen → Zu Körper schließen, Element surf.close) oder bewusst als Flächen exportieren
+soubor obsahuje vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles	neben den Körpern ({0}) enthält die Datei auch Flächen außerhalb der Körper ({1}) – sie sind kein Volumen, Volumen und Masse stammen nur aus den Körpern
+model nemá objemové těleso (těles 0{0}) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)	das Modell hat keinen Volumenkörper (Körper 0{0}) – die Datei wird kein Volumenmodell; Flächen zu einem Körper schließen (Flächen → Zu Körper schließen, Element surf.close)
+model má vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles	neben den Körpern ({0}) hat das Modell auch Flächen außerhalb der Körper ({1}) – sie sind kein Volumen, Volumen und Masse stammen nur aus den Körpern
+komponenty bez tělesa: {0}	Komponenten ohne Volumenkörper: {0}
+komponenty s volnými plochami: {0}	Komponenten mit freien Flächen: {0}
+volných skořepin {0}	freie Schalen {0}
+volných skořepin {0} (uzavřených {1})	freie Schalen {0} (geschlossen {1})
+volných ploch {0}	freie Flächen {0}
+ploch mimo tělesa {0}	Flächen außerhalb der Körper {0}
+ploch mimo tělesa {0} (model {1})	Flächen außerhalb der Körper {0} (Modell {1})
+ploch mimo tělesa {0} (objem jen z těles)	Flächen außerhalb der Körper {0} (Volumen nur aus den Körpern)
+po načtení neplatné (BRepCheck), model platný	nach dem Einlesen ungültig (BRepCheck), das Modell ist gültig
+jádro v souboru nenašlo těleso ani plochy	der Kern hat in der Datei weder einen Körper noch Flächen gefunden
+chyba jádra	Kernfehler
+Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem – (žádné těleso) · ploch {9} · hran {10}	Abmessungen: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · Volumen – (kein Körper) · Flächen {9} · Kanten {10}
+ · ŽÁDNÉ objemové těleso – objem a hmotnost se z ploch nepočítají	 · KEIN Volumenkörper – Volumen und Masse werden nicht aus Flächen berechnet
+– (žádné objemové těleso)	– (kein Volumenkörper)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+objemový export bez tělesa: {0}	Volumenexport ohne Volumenkörper: {0}
+objemový export s plochami mimo tělesa: {0}	Volumenexport mit Flächen außerhalb der Körper: {0}

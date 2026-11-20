@@ -9,6 +9,8 @@
  * `export`, `výkres export`, `skica export`) provádí engine/ops/out.ts, odkazy engine/share-out.ts.
  */
 import { checkFailed, exportCheck, FORMAT_EXT, outFileName, type ExportCheck, type Export3dFormat, type OutDrawingFormat } from "../agent-out";
+import { solidVerdict, type SolidParts } from "../solid-export";
+import { modelSolids } from "./solid-check";
 import type { DrawingResult } from "../drawing";
 import { sourceKey } from "../assembly";
 import { embedBlobs, missingBlobFiles } from "../blobs";
@@ -123,15 +125,16 @@ const CHECKS_MAX = 4;
  * Exportovaný soubor znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) – `kernel.exportStats`, bez sítě a
  * bez úložiště importů. Jen úspěšná kontrola se pamatuje (další export nezměněného modelu ji převezme s poznámkou).
  */
-export async function verifyExport(kernel: Pick<KernelApi, "exportStats">, d: CadDoc, bytes: Uint8Array, format: "step" | "brep"): Promise<ExportCheck> {
+export async function verifyExport(kernel: Pick<KernelApi, "exportStats">, d: CadDoc, bytes: Uint8Array, format: "step" | "brep", parts?: SolidParts): Promise<ExportCheck> {
   const label = format === "step" ? "STEP" : "BREP";
   const key = `${format}:${JSON.stringify({ ...d, name: "" })}`;
   const hit = checks.get(key);
   if (hit) return { ...hit, line: `${hit.line}${tr(" (model od minulé kontroly beze změny)")}` };
   try {
     const { model, file } = await kernel.exportStats(d, bytes, format);
-    if (!(file.volume > 0) && !file.solids) return checkFailed(label, tr("jádro v souboru nenašlo těleso"));
-    const c = exportCheck(model, file, label);
+    // soubor bez jediné plochy = nic se nenačetlo; soubor jen s plochami / skořepinami posoudí exportCheck (✗ out.no-solid, 22c)
+    if (!file.solids && !(file.freeShells > 0) && !(file.freeFaces > 0) && !(file.volume > 0)) return checkFailed(label, tr("jádro v souboru nenašlo těleso ani plochy"));
+    const c = exportCheck(model, file, label, parts);
     if (c.ok) {
       checks.delete(key);
       checks.set(key, c);
@@ -433,7 +436,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "geom.exact-invalid" | "msg.note"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.no-solid" | "out.free-surfaces" | "out.unsupported" | "geom.exact-invalid" | "msg.note"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
@@ -446,16 +449,24 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
   const write = (name: string, mime: string, data: Uint8Array, format: string) => host.files.write({ name, mime, data, doc: d.name, format });
   if (fmt === "mncad") return [await write(`${base}.mncad`, OUT_MIME.mncad, projectFile(d, "").data, "mncad")];
   if (fmt === "step" || fmt === "stl") {
-    // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ
-    const pre = fmt === "step" && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
+    // složení modelu (22c): bez tělesa → STL ✗ out.no-solid, u STEP to řekne kontrola souboru; jména komponent sestavy
+    const ms = await modelSolids(host.kernel, ws, d, o.hooks ?? {});
+    // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ; model bez tělesa ne
+    const pre = fmt === "step" && ms?.solids !== 0 && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
     const data = await modelBytes(host.kernel, d, fmt);
     const f = await write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt);
     if (pre && pre.level === "warn") note({ code: "geom.exact-invalid", args: [d.name, pre.text] });
     else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
     if (fmt === "step") {
-      const c = await verifyExport(host.kernel, d, data, "step");
+      const c = await verifyExport(host.kernel, d, data, "step", ms?.parts);
       f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };
-      if (!c.ok) note({ code: "out.check-failed", text: f.check.text, level: Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+      if (!c.ok) note({ code: c.code ?? "out.check-failed", text: f.check.text, level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+    } else if (ms) {
+      const v = solidVerdict(ms, "STL", "model", ms.parts);
+      if (v) {
+        f.check = { ok: false, text: v.text };
+        note({ code: v.code, text: v.text, level: v.level });
+      }
     }
     return [f];
   }

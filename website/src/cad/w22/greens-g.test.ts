@@ -15,6 +15,9 @@
  *   ✓ <závit> (helixSweep)     výsledek prvku        – ne, když drážka povrch neřeže (tečná špička, skrytý kanál – G2, 22a/22b-H)
  *   „· přesná kontrola“, „platné (přesná kontrola)“, vcheck=exact, „✓ těleso: přesná kontrola …“
  *                              Geometrie / kontrola / D – ne bez přesné kontroly, ne pro jinou revizi modelu (G2, 22a)
+ *   „→ věrná kopie modelu“, F check=ok, ✓ export STEP, objem / hmotnost
+ *                              kontrola exportu / řádek F / D – ne bez objemového tělesa (ani když soubor = model), ne s volnými
+ *                              plochami vedle tělesa, ne když se soubor nenačetl, ne bez kontroly („bez kontroly“, STL) (G3, 22c)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { docStatusText } from "../agent";
@@ -226,3 +229,29 @@ describe("„· přesná kontrola“, „platné (přesná kontrola)“, vcheck=
   });
 });
 
+describe("„věrná kopie modelu“, F check=ok, ✓ export STEP – jen s objemovým tělesem (G3, 22c)", () => {
+  const SHELL = 'nový díl "Deska A"\nskica XY: obdélník 40 30\nprvek surf.extrude sketchId="Skica 1" distance=20\nskica XY: obdélník 40 30\nprvek surf.planar sketchId="Skica 2"\nskica XY odsazení 20: obdélník 40 30\nprvek surf.planar sketchId="Skica 3"\nprvek surf.sew tolerance=0.01';
+  const run = async (t: string) => finalizeReport(await runReport(new MemoryWorkspace(), t, host(), { lang: "cs" }), { full: true });
+  it("skořepina bez tělesa: soubor = model, přesto žádné „věrná kopie“, žádné check=ok, zápis ℹ (ne ✓), V=- m=-", { timeout: 180_000 }, async () => {
+    const r = await run(`${SHELL}\nexport step`);
+    expect(r.full).not.toMatch(/věrná kopie/);
+    expect(r.protocol).not.toMatch(/check=ok/);
+    expect(r.full).not.toMatch(/^✓ L9 /m);
+    expect(r.protocol).toMatch(/^D "Deska A" part feat=7\/0\/0 V=- m=- /m);
+    expect(r.entries.some((e) => e.code === "out.no-solid" && e.level === "error")).toBe(true);
+  });
+  it("těleso s volnou plochou: soubor = model, přesto ne „věrná kopie“ (⚠ out.free-surfaces)", { timeout: 180_000 }, async () => {
+    const r = await run('nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano\nexport step');
+    expect(r.full).not.toMatch(/věrná kopie/);
+    expect(r.protocol).toMatch(/check=fail/);
+  });
+  it("„bez kontroly“ a STL: kontrola neproběhla → nikdy „věrná kopie“ ani check=ok, model bez tělesa = ✗", { timeout: 180_000 }, async () => {
+    const r = await run(`${SHELL}\nexport step bez kontroly\nexport stl`);
+    expect(r.full).not.toMatch(/věrná kopie/);
+    expect(r.protocol).not.toMatch(/check=ok/);
+    expect(r.entries.filter((e) => e.code === "out.no-solid")).toHaveLength(2);
+    const solid = await run("nový díl Kostka\nkvádr 10 10 10\nexport step bez kontroly\nexport stl");
+    expect(solid.full).not.toMatch(/věrná kopie/); // kontrola se vynechala – „věrná kopie“ by byla nepodložená
+    expect(solid.protocol).not.toMatch(/check=/); // bez kontroly není výsledek kontroly – ani ok, ani fail
+  });
+});

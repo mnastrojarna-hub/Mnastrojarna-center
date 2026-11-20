@@ -9,7 +9,8 @@
 // peak RSS (VmHWM of /proc/<pid>/status – the CLI job runs in worker_threads of the same process) measured outside):
 //   synth      scripts/cad-harness/synth-tool.txt + expected.json (generator check first: synth-tool.mjs --check), on every
 //              Node of --node: components, mates ok, Σ volume (V.sum or V.union, decision 15.1), clash classes (real 0),
-//              protocol ≤ 2048 B and every line in the grammar, < 120 s, ≤ 2048 MB, STEP check ok, PDF pages = sheets,
+//              protocol ≤ 2048 B and every line in the grammar, < 120 s, ≤ 2048 MB, STEP check ok + independent STEP check
+//              (scripts/cad-harness/step-check.ts: solids, free shells / faces, exact BRepCheck), PDF pages = sheets,
 //              short link (≤ 200 chars) that reopens in Node with the same components; then the strict run: exit 0, no STOP,
 //              overhead ≤ 25 % (wall, median of --runs), STEP bytes identical to the normal run
 //   ops        every text op headless on the session of the synth run (--resume): stav, sestava vazby, kolize, pohyb stav,
@@ -257,6 +258,20 @@ export async function checkRun(cs, run, exp, ctx) {
   if (ctx.formats.includes("step")) {
     const ok = !!step?.path && fs.existsSync(step.path) && fs.readFileSync(step.path).subarray(0, 13).toString() === "ISO-10303-21;";
     check(cs, "STEP written, check by re-reading = ok, F line check=ok", ok && step.check?.ok === true && lines.some((l) => l.startsWith("F step ") && l.includes("check=ok")), { file: step?.name, check: step?.check?.text });
+    // independent check (wave 22, 22c): the app's own check passed a STEP with 0 solids – read the file with a separate OCCT
+    // instance and the plain STEP reader: ≥ 1 solid (an assembly: at least one per component), no free shells / faces,
+    // valid by the exact BRepCheck; the time it takes is recorded next to the run
+    if (ok && ctx.lib.stepCheck) {
+      const t0 = Date.now();
+      try {
+        const c = await ctx.lib.stepCheck(new Uint8Array(fs.readFileSync(step.path)));
+        const minSolids = main?.kind === "assembly" ? Math.max(1, Math.min(main.components ?? 1, exp?.components ?? main.components ?? 1)) : 1;
+        const bad = ctx.lib.stepCheckProblems(c, { minSolids });
+        check(cs, `STEP independent check: ≥ ${minSolids} solid(s), no free shells / faces, valid by exact BRepCheck`, bad.length === 0, { problems: bad, solids: c.solids, shells: c.shells, freeShells: c.freeShells, freeFaces: c.freeFaces, validExact: c.validExact, ms: Date.now() - t0 });
+      } catch (e) {
+        check(cs, "STEP independent check: file read by a separate OCCT instance", false, { error: String(e?.message ?? e) });
+      }
+    }
   }
   if (ctx.formats.includes("pdf")) {
     const pdfs = files.filter((f) => f.format === "pdf");

@@ -1233,7 +1233,7 @@ Agent, který umí jen psát do konzole nebo volat window.mncad.run, dokončí c
 | Příkaz (anglicky · německy) | Co udělá |
 | --- | --- |
 | uložit [název] (save · speichern) | stáhne projekt .mncad; protokol potvrdí, že soubor jde znovu otevřít |
-| export step\|stl\|brep\|obj\|glb\|3mf\|wrl\|mncad [název] (export · exportieren) | 3D model; u STEP a BREP se stažený soubor znovu načte jádrem a porovná s modelem (počet těles, objem, obálka) – protokol napíše „věrná kopie modelu“, nebo co se liší; bez kontroly porovnání vynechá |
+| export step\|stl\|brep\|obj\|glb\|3mf\|wrl\|mncad [název] (export · exportieren) | 3D model; u STEP a BREP se stažený soubor znovu načte jádrem a porovná s modelem (počet těles, plochy mimo tělesa, platnost, objem, obálka) – protokol napíše „věrná kopie modelu“ (jen soubor s objemovým tělesem a bez volných ploch), nebo co se liší; model nebo soubor bez objemového tělesa = ✗ out.no-solid (i u STL / 3MF), volné plochy vedle tělesa = ⚠ out.free-surfaces; bez kontroly vynechá zpětné čtení, složení modelu se posoudí i tak |
 | výkres export pdf\|dxf\|dwg\|svg\|csv\|png [list N\|vše] [název] (drawing export · zeichnung export) | list výkresu (bez udání aktivní list); vše = všechny listy aktivního výkresu v jednom souboru: PDF vícestránkové, DXF / DWG / SVG / PNG jako ZIP s jedním souborem na list |
 | skica export dxf ["Skica 1"] (sketch export dxf · skizze export dxf) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
 | sdílet [model\|výkres] [dní N\|bez omezení] [heslo X] [od "Jméno"] (share · freigeben) | sdílený odkaz jako tlačítko Sdílet (výchozí 10 dní, bez hesla); adresa je v protokolu na řádku URL: … a pod ní kód po skupinách |

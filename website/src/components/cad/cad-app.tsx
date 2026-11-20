@@ -87,6 +87,8 @@ import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
 import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } from "./engine-port";
 import { runScript } from "@/cad/engine/run";
 import { stableStep } from "@/cad/engine/files";
+import { solidsOfLeaves } from "@/cad/solid-export";
+import { guiExportCheck, type GuiExportCheck } from "./export-solid-check";
 import { formatConsole } from "@/cad/engine/protocol";
 import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
@@ -186,6 +188,8 @@ export function CadApp() {
   const [core, setCore] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** výsledek kontroly posledního objemového exportu z menu (22c: ✗ bez tělesa, ⚠ volné plochy, ✓ věrná kopie) – do změny dokumentu */
+  const [exportChk, setExportChk] = useState<GuiExportCheck | null>(null);
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
   const [panels, setPanels] = useState(false);
   const [prefs, setPrefs] = useState<Settings>(loadSettings);
@@ -963,7 +967,9 @@ export function CadApp() {
         if (!meta) throw new Error(tr("Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.", format));
         const raw = new Uint8Array(await cad.exportFile(d, meta.f));
         const u8 = meta.f === "step" ? stableStep(raw) : raw; // stejné bajty (SHA-256) jako textový `export step` a CLI
-        return { name: `${safeName(d.name)}.${meta.ext}`, mime: meta.mime, bytes: u8.byteLength, base64: toB64(u8) };
+        // STEP / BREP bez objemového tělesa nebo s volnými plochami (22c) – varování jako u textového exportu
+        const chk = meta.f === "step" || meta.f === "brep" ? await guiExportCheck(cad, d, meta.f, raw, null) : null;
+        return { name: `${safeName(d.name)}.${meta.ext}`, mime: meta.mime, bytes: u8.byteLength, base64: toB64(u8), ...(chk && chk.level !== "ok" ? { warning: chk.text } : {}) };
       },
     }, () => apiHostRef.current);
     return () => {
@@ -2364,6 +2370,8 @@ export function CadApp() {
     try {
       // nejdřív dialog „Uložit jako“ (uživatelské gesto), pak teprve výpočet exportu
       let bytes = 0;
+      let data: Uint8Array | null = null;
+      setExportChk(null);
       const saved = await saveFile(`${safeName(doc.name)}.${meta.ext}`, async () => {
         flash(tr("Připravuji {0}…", meta.label));
         const t0 = Date.now();
@@ -2372,18 +2380,24 @@ export function CadApp() {
         try {
           const buf = await cad.exportFile(doc, format);
           bytes = buf.byteLength;
+          data = new Uint8Array(buf.slice(0));
           return buf;
         } finally {
           window.clearInterval(tick);
         }
       }, meta.mime);
-      if (saved) flash(tr("Export {0} hotov: {1} ({2})", meta.label, saved.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`));
+      // objemový formát (22c): stejná kontrola jako textový export – soubor bez tělesa ✗, volné plochy ⚠, jinak „věrná kopie“
+      const chk = saved && data ? await guiExportCheck(cad, doc, format, data, isAsm ? solidsOfLeaves(leaves, (k) => asmCache.current.get(k)?.metrics) : result?.metrics?.solids !== undefined ? { solids: result.metrics.solids, free: result.metrics.free ?? 0 } : null) : null;
+      setExportChk(chk);
+      if (saved) flash(tr("Export {0} hotov: {1} ({2})", meta.label, saved.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + (chk && chk.level !== "ok" ? ` – ${chk.text}` : ""));
       else flash(tr("Export {0} zrušen.", meta.label));
       track("cad_export", { format });
     } catch (e) {
       flash((e as Error).message);
     }
   };
+  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně dokumentu / záložky zmizí
+  useEffect(() => setExportChk(null), [doc]);
   /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
   const exportScript = async () => {
     try {
@@ -3902,6 +3916,12 @@ export function CadApp() {
               </div>
             )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
+            {exportChk && (
+              <div data-export-check={exportChk.level} data-export-format={exportChk.format} role={exportChk.level === "ok" ? "status" : "alert"} className={`absolute bottom-24 left-1/2 z-30 flex max-w-[90%] -translate-x-1/2 items-start gap-2 rounded-md border px-3 py-2 text-[12px] shadow-xl ${exportChk.level === "error" ? "border-red-300 bg-red-50 text-red-900" : exportChk.level === "warn" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
+                <span>{exportChk.text}</span>
+                <button type="button" aria-label={tr("Zavřít")} className="ml-1 shrink-0 opacity-60 hover:opacity-100" onClick={() => setExportChk(null)}>×</button>
+              </div>
+            )}
 
             {!sketch && (
               <div className={cn("pointer-events-none absolute bottom-2 left-24 right-24 flex flex-wrap justify-center gap-1.5 font-mono text-[10.5px]", bg.dark ? "text-white/80" : "text-[#26303b]")}>
@@ -3916,9 +3936,11 @@ export function CadApp() {
                     <Chip dark={bg.dark}>
                       {fmtNum(m.bbox[1][0] - m.bbox[0][0], 1)} × {fmtNum(m.bbox[1][1] - m.bbox[0][1], 1)} × {fmtNum(m.bbox[1][2] - m.bbox[0][2], 1)} mm
                     </Chip>
-                    <Chip dark={bg.dark}>V {fmtNum(m.volume / 1000, 1)} cm³</Chip>
                     <Chip dark={bg.dark}>
-                      {mat.label} {fmtNum(massKg(m.volume, mat.density), 3)} kg
+                      <span data-volume-chip={m.solids === 0 ? "none" : "solid"}>V {m.solids === 0 ? "–" : `${fmtNum(m.volume / 1000, 1)} cm³`}</span>
+                    </Chip>
+                    <Chip dark={bg.dark}>
+                      {mat.label} {m.solids === 0 ? "–" : `${fmtNum(massKg(m.volume, mat.density), 3)} kg`}
                     </Chip>
                   </>
                 ) : (
@@ -4134,8 +4156,8 @@ export function CadApp() {
                 className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
               />
             </label>
-            <Row k={tr("Hmotnost")} v={`${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
-            <Row k={tr("Objem")} v={`${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
+            <Row k={tr("Hmotnost")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
+            <Row k={tr("Objem")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
             <Row k={tr("Povrch")} v={`${fmtNum(m.area, 2)} mm² (${fmtNum(m.area / 100, 2)} cm²)`} />
             <Row k={tr("Hustota")} v={`${mat.density} g/cm³`} />
             <Row k={tr("Rozměry (X × Y × Z)")} v={`${fmtNum(m.bbox[1][0] - m.bbox[0][0], 3)} × ${fmtNum(m.bbox[1][1] - m.bbox[0][1], 3)} × ${fmtNum(m.bbox[1][2] - m.bbox[0][2], 3)} mm`} />
