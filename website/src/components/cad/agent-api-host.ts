@@ -53,6 +53,7 @@ import { compareReportCsv, compareReportText, regionHint, regionList } from "@/c
 import type { CompareOptions, ReferenceFile } from "@/cad/compare";
 import { distanceColors } from "@/cad/mesh-distance";
 import { projectionRange, type PlaneMesh, type SectionState } from "@/cad/section-plane";
+import { capSummary } from "@/cad/section-cap";
 import { sketchToDxf } from "@/cad/sketch";
 import { loadSettings, type Settings } from "@/cad/settings";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type Feature, type SketchEntity, type Vec3 } from "@/cad/types";
@@ -228,7 +229,10 @@ export async function runApiCmd(cmd: ApiCmd, d: CadDoc, host: ApiHost): Promise<
       const s: SectionState = { axis: cmd.axis, offset, flip: cmd.flip };
       host.setSection(s);
       const out = sectionReport(s, bbox ?? (range ? ([av.map((c) => c * range[0]), av.map((c) => c * range[1])] as [Vec3, Vec3]) : null));
-      return { log: [range && (offset < range[0] - 1e-6 || offset > range[1] + 1e-6) ? out + tr(" – ⚠ poloha je mimo model, řez nic neukáže") : out] };
+      // vlna 22: v sestavě věta o čelech řezu (stejné pravidlo jako 3D okno, @/cad/section-cap)
+      const caps = isPartDoc(d) ? "" : capSummary(items.length, host.prefs().display);
+      const line = caps ? `${out} · ${caps}` : out;
+      return { log: [range && (offset < range[0] - 1e-6 || offset > range[1] + 1e-6) ? line + tr(" – ⚠ poloha je mimo model, řez nic neukáže") : line] };
     }
     case "sectionOff":
       host.setSection(null);
