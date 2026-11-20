@@ -8,7 +8,16 @@ export type HostAssets = {
   /** písmo podle názvu souboru (`Roboto-Regular.ttf`, `Roboto-Bold.ttf`) */
   font?: (name: string) => Promise<ArrayBuffer>;
   /** sdílení: stránka CADu, na kterou odkaz vede (`https://…/cad`), a vlastní úložiště krátkých odkazů (`null` = jen v odkazu) */
-  share?: { page: string; store: string | null };
+  share?: {
+    page: string;
+    store: string | null;
+    /**
+     * stránka pro dlouhý odkaz (`#s=…`, dokument celý v adrese – úložiště nepotřebuje): CLI s `--share-store <cizí web>`
+     * dřív vedlo i náhradní dlouhý odkaz na web úložiště (nedostupné úložiště = mrtvá adresa); teď výchozí web CADu nebo
+     * `MNCAD_ORIGIN` (vlna 22, bod 16). Chybí = `page`.
+     */
+    linkPage?: string;
+  };
 };
 
 let assets: HostAssets = {};

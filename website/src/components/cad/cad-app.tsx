@@ -1,5 +1,7 @@
 "use client";
 
+import { softLimitsText, softStatusText } from "@/cad/soft-view";
+import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -610,7 +612,7 @@ export function CadApp() {
       return null;
     }
     if (r.reason !== "network") clearShareStash();
-    return { reason: r.reason, text: openErrorText(r.reason, r.exp, parsed.kind) };
+    return { reason: r.reason, text: openErrorText(r.reason, r.exp, parsed.kind, r) }; // useknutý × poškozený odkaz (bod 16)
   };
   /** sdílený odkaz z adresy (načtení stránky, odkaz vložený do adresy otevřeného CADu) nebo žádost o zadání kódu */
   const openShareEntry = (entry: ShareEntry) => {
@@ -761,11 +763,13 @@ export function CadApp() {
         motionSignalHold.begin();
         let cancelled = true; // výjimka / zrušení: pokyny běhu se zahodí (dokument běhu se nezapsal)
         try {
-          // protokol jako CLI (`protocol: "short" | "full" | "json"`, engine/run-protocol.ts); výchozí = text konzole beze změny
-          const r = protocol !== "console" ? await runReport(ws, text, host, { inPlace: opts.inPlace, signal }) : await runScript(ws, text, host, { inPlace: opts.inPlace, signal });
+          // protokol jako CLI (`protocol: "short" | "full" | "json"`, engine/run-protocol.ts); výchozí = text konzole beze změny;
+          // konzole vždy s reportem jako CLI (souhrn, historie, filtr, JSON – vlna 22, bod 15)
+          const withReport = protocol !== "console" || opts.source === "console";
+          const r = withReport ? await runReport(ws, text, host, { inPlace: opts.inPlace, signal }) : await runScript(ws, text, host, { inPlace: opts.inPlace, signal });
           cancelled = r.entries.some((e) => e.code === "run.cancelled");
           r.run = { ...stamp, state: cancelled ? "cancelled" : "done" };
-          return { text: protocol !== "console" ? formatRun(r, opts) : formatConsole(r), cancelled };
+          return { text: protocol !== "console" ? formatRun(r, opts) : formatConsole(r), cancelled, ...(opts.source === "console" ? { report: r } : {}) };
         } finally {
           engineBusy.current--;
           // pokyny pohybu až teď – dokument běhu je zapsaný a promítnutý (engine `flush` + `settle`); razítko = dokument po běhu
@@ -3638,11 +3642,24 @@ export function CadApp() {
               {tabChips}
             </div>
           )}
-          <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" || glError ? "text-brand" : "text-white/55")}>
+          {glError && (
+            // stav PROSTŘEDÍ (vlna 22, bod 21): softwarový náhled běží – neutrálně, odděleně od stavu jádra a modelu vedle;
+            // ztracený kontext bez náhledu by byl chyba, softwarové zobrazení je jen omezení prohlížeče
+            <button
+              type="button"
+              data-env-status="soft"
+              onClick={() => window.dispatchEvent(new Event(SOFT_WHY_EVENT))}
+              title={softLimitsText()}
+              className="hidden items-center gap-1.5 rounded border border-white/20 px-1.5 py-0.5 font-mono text-[10.5px] text-white/70 hover:border-white/50 hover:text-white lg:flex"
+            >
+              <CadIcon name="info" className="h-3 w-3" />
+              {softStatusText()}
+              <span className="text-white/45">· {tr("omezení")}</span>
+            </button>
+          )}
+          <span data-core-status={core === "error" ? "error" : core === "loading" ? "loading" : busy ? "busy" : stale ? "stale" : "ready"} className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" ? "text-brand" : "text-white/55")}>
             <span className={cn("h-2 w-2 rounded-full", core === "ready" ? (busy ? "animate-pulse bg-amber-400" : "bg-emerald-400") : core === "loading" ? "animate-pulse bg-amber-400" : "bg-brand")} />
-            {glError ? (
-              tr("3D okno: nedostupné (WebGL)")
-            ) : core === "loading" ? (
+            {core === "loading" ? (
               tr("Načítám jádro OpenCascade…")
             ) : core === "error" ? (
               tr("Jádro se nenačetlo")

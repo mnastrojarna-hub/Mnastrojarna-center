@@ -2,8 +2,6 @@
 ✓ {0} „{1}“ – znovu použitá záložka z dřívějšího běhu	✓ {0} „{1}“ – Tab aus einem früheren Lauf wiederverwendet
 opakovaný běh téhož skriptu použije záložku stejného názvu, kterou založil dřívější běh (ℹ doc.reused, obsah nahrazen; platí i pro normálie, otevřít a JSON) – „nový“ = vždy nová záložka, „znovu“ = i otevřený soubor nebo ruční záložka téhož názvu	ein erneuter Lauf desselben Skripts verwendet den gleichnamigen Tab wieder, den ein früherer Lauf angelegt hat (ℹ doc.reused, Inhalt ersetzt; auch für Normteile, öffnen und JSON) – „neu“ = immer ein neuer Tab, „erneut“ = auch eine geöffnete Datei oder ein manueller Tab gleichen Namens
 run: neznámý protokol „{0}“ – console, short, full, json	run: unbekanntes Protokoll „{0}“ – console, short, full, json
-Stručný protokol	Kurzprotokoll
-Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB	Ausgabe als Kurzprotokoll MNCAD/1 (wie mncad run in der Kommandozeile): Kopfzeile, ✗ / ⚠, D-Zeilen der Dokumente und Σ – bis 2 kB
 # recenze: opakovaný běh normálií, otevřít a JSON; volby window.mncad.run
 ✓ normálie „{0}“ – znovu použitá záložka z dřívějšího běhu	✓ Normteil „{0}“ – Tab aus einem früheren Lauf wiederverwendet
 ✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu	✓ geöffnet „{0}“ – Dokument „{1}“ im wiederverwendeten Tab aus einem früheren Lauf

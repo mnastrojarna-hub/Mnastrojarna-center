@@ -5,6 +5,7 @@
  *    clearSelection, action, export skici DXF (`exportFile("dxf")`) a save (projekt .mncad bez dialogu, agent-out-host.ts).
  * Aplikace (cad-app.tsx) předá přístup ke svému stavu objektem `ApiHost` (obnovuje se při každém vykreslení).
  */
+import { shareContent } from "@/cad/engine/share-content";
 import type { Dispatch, SetStateAction } from "react";
 import { cad } from "@/cad/client";
 import { cadLocale, tr } from "@/cad/i18n";
@@ -678,7 +679,7 @@ async function share(host: ApiHost, o: ShareApiOptions = {}) {
   if (o.mode !== undefined && o.mode !== "link" && o.mode !== "store" && o.mode !== "self") throw new Error(tr("share: mode je link | store | self"));
   if (o.days !== undefined && o.days !== null && !(typeof o.days === "number" && o.days > 0)) throw new Error(tr("share: days je počet dní (např. 10) nebo null = bez omezení"));
   const r = await createShareLink(doc, { days: o.days === undefined ? SHARE_DEFAULT_DAYS : o.days, password: o.password || undefined, from: o.from || undefined, view: o.view ?? "model", mode: o.mode });
-  rememberLink({ url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: doc.name, view: o.view ?? "model", password: r.password, ...(r.code ? { code: r.code } : {}) }); // příkaz „odkaz“
+  rememberLink({ url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: doc.name, view: o.view ?? "model", password: r.password, content: shareContent(doc), ...(r.code ? { code: r.code } : {}) }); // příkaz „odkaz“ (s obsahem odkazu – bod 16)
   return { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, message: shareMessage(doc.name, r), chars: r.url.length, ...(r.code ? { code: r.code } : {}), ...(r.note ? { note: r.note } : {}) };
 }
 

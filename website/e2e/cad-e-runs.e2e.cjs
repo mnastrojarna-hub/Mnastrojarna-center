@@ -118,18 +118,22 @@ const start = async (p, url) => {
   await run('zavřít záložku "R1"\nzavřít záložku "R2"');
 
   // ════════════ 3) stručný protokol: přepínač konzole ════════════
+  // vlna 22, bod 15 (vědomá změna): souhrn je VÝCHOZÍ (přepínač „Stručný souhrn“ zapnutý) a ukazuje se v [data-console-summary];
+  // [data-agent-output] drží dál plný text konzole (detail na vyžádání – záložka Detail)
   const sw = p.locator('[data-agent-short]');
-  ok(await sw.isVisible().catch(() => false) && !(await sw.isChecked()), '3: konzole má přepínač „Stručný protokol“ (výchozí vypnutý)');
+  ok(await sw.isVisible().catch(() => false) && (await sw.isChecked()), '3: konzole má přepínač „Stručný souhrn“ (výchozí zapnutý)');
   await sw.check();
-  const ks = await consoleRun(K);
+  await consoleRun(K);
+  const ks = await p.locator('[data-console-summary]').innerText();
   ok(/^MNCAD\/1 OK lines=4 /.test(ks) && grammarOk(ks) && /^D "Konzolová sestava" asm comp=1 /m.test(ks) && /^Σ docs=/m.test(ks), `3: konzole se stručným protokolem → MNCAD/1 (${ks.split('\n')[0]})`);
   await p.screenshot({ path: S + 'e-runs-console-short.png' });
   await p.reload({ waitUntil: 'networkidle' });
   await start(p, BASE + '/cad');
   await p.evaluate(() => window.mncad.openConsole());
   await p.getByLabel('Textové příkazy nebo JSON').waitFor({ timeout: 20000 });
-  ok(await p.locator('[data-agent-short]').isChecked(), '3: přepínač „Stručný protokol“ přežije obnovení stránky');
+  ok(await p.locator('[data-agent-short]').isChecked(), '3: přepínač „Stručný souhrn“ přežije obnovení stránky');
   await p.locator('[data-agent-short]').uncheck();
+  await p.locator('[data-agent-short]').check(); // zpět na výchozí (souhrn)
   await p.keyboard.press('Escape').catch(() => {});
   await p.getByRole('button', { name: 'Zavřít', exact: true }).first().click().catch(() => {});
 

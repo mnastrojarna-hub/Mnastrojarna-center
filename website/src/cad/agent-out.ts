@@ -47,8 +47,11 @@ export type OutCmd =
    * `orLink` = při selhání úložiště dlouhý odkaz s ⚠ (`sdílet úložiště nebo odkaz`)
    */
   | { kind: "share"; view?: "model" | "drawing"; days?: number | null; password?: string; from?: string; mode?: "link" | "store"; orLink?: true }
-  /** znovu vypsat poslední odkaz */
-  | { kind: "link" }
+  /**
+   * znovu vypsat poslední odkaz; `verify` (vlna 22, bod 16: `odkaz ověřit [<odkaz|kód>] [heslo X]`) = odkaz otevřít jako
+   * příjemce a vypsat režim, platnost a obsah, nebo důvod, proč se neotevře (useknutý / poškozený / heslo / platnost…)
+   */
+  | { kind: "link"; verify?: { url?: string; password?: string } }
   /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
   | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery };
 export type OutOp = { k: "out"; cmd: OutCmd; line: number };
@@ -61,6 +64,8 @@ const EXPORT = W("export", "exportovat", "exportuj", "exportieren", "exportiere"
 // DE „teilen“ NE: je to rozdělit tělesa (splitbodies, agent.ts) – sdílení je „freigeben“
 const SHARE = W("sdílet", "sdílej", "sdílení", "share", "freigeben");
 const LINK = W("odkaz", "link");
+/** `odkaz ověřit` (EN `link verify`, DE `link prüfen`) */
+const VERIFY = W("ověřit", "ověř", "zkontrolovat", "verify", "check", "prüfen", "pruefen", "überprüfen", "ueberpruefen");
 const SCRIPT = W("skript", "skriptu", "script", "textový-skript");
 const DRAWING = W("výkres", "drawing", "zeichnung");
 const SKETCH = W("skica", "skicu", "náčrt", "sketch", "skizze");
@@ -300,7 +305,18 @@ export function parseOutLine(tokens: string[], quoted: readonly boolean[] = []):
   }
 
   if (LINK.has(h)) {
-    if (t.length > 1) throw new Error(tr("odkaz nemá další volby – vypíše poslední sdílený odkaz; nový vytvoří „sdílet“"));
+    if (t.length > 1 && VERIFY.has(fold(t[1]))) {
+      const v: { url?: string; password?: string } = {};
+      for (let i = 2; i < t.length; i++) {
+        if (!tq[i] && PASSWORD.has(fold(t[i]))) {
+          if (!t[i + 1]) throw new Error(tr("odkaz ověřit: za „{0}“ chybí heslo", t[i]));
+          v.password = t[++i];
+        } else if (v.url === undefined) v.url = t[i];
+        else v.url += ` ${t[i]}`; // kód po skupinách „Ab3k Z9xQ 2m“
+      }
+      return { kind: "link", verify: v };
+    }
+    if (t.length > 1) throw new Error(tr("odkaz nemá další volby – vypíše poslední sdílený odkaz („odkaz ověřit [odkaz] [heslo X]“ ho ověří); nový vytvoří „sdílet“"));
     return { kind: "link" };
   }
   return null;
@@ -467,6 +483,12 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     en: "share, link",
     de: "freigeben, link",
     desc: tr("sdílený odkaz (jako tlačítko Sdílet odkazem): ADRESA SE VYPÍŠE DO PROTOKOLU (a zkopíruje do schránky, když to prohlížeč dovolí); výchozí platnost 10 dní; „odkaz“ vypíše poslední odkaz znovu"),
+  },
+  {
+    cmd: "odkaz ověřit · odkaz ověřit https://mnastrojarna.cz/s#Ab3kZ9xQ2m · odkaz ověřit <odkaz> heslo X",
+    en: "link verify",
+    de: "link prüfen",
+    desc: tr("otevře sdílený odkaz jako příjemce a nic nezmění: ✓ s režimem, platností a obsahem (komponenty, díly, listy, přílohy), nebo ✗ s důvodem – useknutý, změněný, heslo, platnost, nenalezen; bez odkazu ověří poslední odkaz běhu"),
   },
   {
     cmd: "výkres export pdf dokument · export step base64 · export step odkaz · sdílet úložiště nebo odkaz",

@@ -74,7 +74,24 @@ export type ParsedShare =
  * důvody neotevření: expired = platnost vypršela, revoked = odesílatel odkaz zneplatnil, notfound = v úložišti nic
  * takového není (u odkazu s kódem nejspíš překlep), insecure = stránka neběží přes https (prohlížeč nemá WebCrypto)
  */
-export type OpenResult = { ok: true; payload: SharePayload; mode: ShareMode } | { ok: false; reason: "expired" | "revoked" | "password" | "notfound" | "invalid" | "network" | "insecure"; exp?: number | null };
+export type OpenResult =
+  | { ok: true; payload: SharePayload; mode: ShareMode }
+  | {
+      ok: false;
+      reason: "expired" | "revoked" | "password" | "notfound" | "invalid" | "network" | "insecure";
+      exp?: number | null;
+      /**
+       * u `invalid` (vlna 22, bod 16): `truncated` = obsah odkazu končí předčasně (useknutý při kopírování, délka base64,
+       * komprimovaný proud bez konce, JSON bez konce), `corrupt` = obsah je úplný, ale změněný (znak mimo base64, chybná
+       * data uprostřed proudu, neplatný dokument); `chars` = délka části odkazu s daty
+       */
+      damage?: ShareDamage;
+      chars?: number;
+    };
+/** poškození obsahu dlouhého odkazu (`#s=…`): useknutý × změněný */
+export type ShareDamage = "truncated" | "corrupt";
+/** volby otevření: `store` = vlastní úložiště, ze kterého se stáhne obsah odkazu s kódem / `#q=` (výchozí `selfStoreBase()`) */
+export type OpenOptions = { store?: string | null };
 
 /** nabízené platnosti (dny); null = bez omezení (jen v odkazu) */
 export const SHARE_DAYS = [1, 7, 10, 30, 90] as const;
@@ -548,7 +565,9 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
       body = await encrypt(await keyFromPassword(password, salt), packed);
     }
     const flags = `1${compressed ? "d" : "r"}${salt ? "p" : ""}`;
-    const url = `${base}#s=${flags}.${salt ? b64u(salt) + "." : ""}${b64u(body)}`;
+    // dlouhý odkaz nepotřebuje úložiště: stránka CADu od hostitele (`linkPage`), ne web nedostupného úložiště (vlna 22, bod 16)
+    const linkBase = o.base ?? hostAssets().share?.linkPage ?? base;
+    const url = `${linkBase}#s=${flags}.${salt ? b64u(salt) + "." : ""}${b64u(body)}`;
     return { url, mode: "link", bytes: body.length, exp, password: !!password, ...(note ? { note } : {}) };
   };
   const linkOrThrow = async (note?: string, hint?: () => Promise<string | undefined>): Promise<ShareResult> => {
@@ -794,6 +813,152 @@ async function unpack(bytes: Uint8Array, compressed: boolean): Promise<SharePayl
     return null;
   }
 }
+/**
+ * Rozbalení obsahu dlouhého odkazu s rozlišením poškození (vlna 22, bod 16): komprimovaný proud, který skončí bez
+ * závěrečného bloku (chyba až při uzavření proudu), = useknutý; chyba uprostřed dat nebo neplatný dokument = změněný.
+ * Nekomprimovaný obsah: JSON, který je platným začátkem JSON a jen končí předčasně, = useknutý.
+ */
+async function unpackDiag(bytes: Uint8Array, compressed: boolean): Promise<{ payload: SharePayload } | { damage: ShareDamage }> {
+  let plain: Uint8Array;
+  if (compressed) {
+    const r = await inflateDiag(bytes);
+    if (r.damage) return { damage: r.damage };
+    plain = r.data!;
+  } else plain = bytes;
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(plain);
+  } catch {
+    return { damage: "corrupt" };
+  }
+  try {
+    const p = JSON.parse(text) as SharePayload;
+    return validPayload(p) ? { payload: p } : { damage: "corrupt" };
+  } catch {
+    return { damage: !compressed && isJsonPrefix(text) ? "truncated" : "corrupt" };
+  }
+}
+
+/** inflate s rozlišením: chyba při zápisu dat = změněná data, chyba až při uzavření = proud bez konce (useknutý) */
+export async function inflateDiag(bytes: Uint8Array): Promise<{ data?: Uint8Array; damage?: ShareDamage }> {
+  if (typeof DecompressionStream === "undefined") return { damage: "corrupt" };
+  const ds = new DecompressionStream("deflate-raw");
+  const w = ds.writable.getWriter();
+  const rd = ds.readable.getReader();
+  const chunks: Uint8Array[] = [];
+  let readFailed = false;
+  const reading = (async () => {
+    try {
+      for (;;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        chunks.push(value as Uint8Array);
+      }
+    } catch {
+      readFailed = true;
+    }
+  })();
+  let writeFailed = false;
+  let closeFailed = false;
+  try {
+    await w.write(bytes as Uint8Array<ArrayBuffer>);
+  } catch {
+    writeFailed = true;
+  }
+  if (!writeFailed) {
+    try {
+      await w.close();
+    } catch {
+      closeFailed = true;
+    }
+  }
+  await reading;
+  if (writeFailed) return { damage: "corrupt" };
+  if (closeFailed || readFailed) return { damage: "truncated" };
+  const n = chunks.reduce((s, c) => s + c.length, 0);
+  const data = new Uint8Array(n);
+  let at = 0;
+  for (const c of chunks) {
+    data.set(c, at);
+    at += c.length;
+  }
+  return { data };
+}
+
+/** je text platným ZAČÁTKEM dokumentu JSON (jen chybí konec)? – lexikální průchod bez stavby objektů */
+export function isJsonPrefix(t: string): boolean {
+  const stack: string[] = [];
+  let i = 0;
+  const ws = () => {
+    while (i < t.length && /\s/.test(t[i])) i++;
+  };
+  // očekávání: "value" | "key" | "colon" | "comma"
+  let want: "value" | "key" | "colon" | "comma" = "value";
+  for (;;) {
+    ws();
+    if (i >= t.length) return stack.length > 0 || want === "value";
+    const ch = t[i];
+    if (want === "comma") {
+      if (ch === ",") {
+        i++;
+        want = stack[stack.length - 1] === "{" ? "key" : "value";
+        continue;
+      }
+      if ((ch === "}" && stack[stack.length - 1] === "{") || (ch === "]" && stack[stack.length - 1] === "[")) {
+        stack.pop();
+        i++;
+        if (!stack.length) return false; // celý dokument je uzavřený – nejde o useknutí
+        continue;
+      }
+      return false;
+    }
+    if (want === "colon") {
+      if (ch !== ":") return false;
+      i++;
+      want = "value";
+      continue;
+    }
+    if (ch === '"') {
+      i++;
+      while (i < t.length && t[i] !== '"') i += t[i] === "\\" ? 2 : 1;
+      if (i >= t.length) return true; // řetězec useknutý uprostřed
+      i++;
+      want = want === "key" ? "colon" : "comma";
+      continue;
+    }
+    if (want === "key") {
+      if (ch === "}" && stack[stack.length - 1] === "{") {
+        stack.pop();
+        i++;
+        want = "comma";
+        if (!stack.length) return false;
+        continue;
+      }
+      return false;
+    }
+    if (ch === "{" || ch === "[") {
+      stack.push(ch);
+      i++;
+      ws();
+      if (i < t.length && ((ch === "[" && t[i] === "]") || (ch === "{" && t[i] === "}"))) {
+        stack.pop();
+        i++;
+        want = "comma";
+        if (!stack.length) return false;
+        continue;
+      }
+      want = ch === "{" ? "key" : "value";
+      continue;
+    }
+    const m = /^(?:-?\d+(?:\.\d*)?(?:[eE][+-]?\d*)?|true|false|null|tru|tr|t|fals|fal|fa|f|nul|nu|n|-)/.exec(t.slice(i, i + 40));
+    if (!m) return false;
+    i += m[0].length;
+    if (i >= t.length) return true; // číslo nebo literál na samém konci (mohl pokračovat)
+    if (!/^(?:-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)$/.test(m[0])) return false;
+    want = "comma";
+  }
+}
+
 function checkExp(p: SharePayload): OpenResult {
   if (p.exp && Date.now() > p.exp) return { ok: false, reason: "expired", exp: p.exp };
   return { ok: true, payload: p, mode: "link" };
@@ -804,8 +969,8 @@ const selfCache = new Map<string, Uint8Array>();
 
 type OpenFail = Extract<OpenResult, { ok: false }>;
 /** stáhne šifrovaný obsah z vlastního úložiště (nebo vrátí důvod, proč to nejde) */
-async function fetchSelf(id: string): Promise<Uint8Array | OpenFail> {
-  const base = selfStoreBase();
+async function fetchSelf(id: string, o: OpenOptions = {}): Promise<Uint8Array | OpenFail> {
+  const base = o.store !== undefined ? (o.store ? o.store.replace(/\/?$/, "/") : null) : selfStoreBase();
   if (!base) return { ok: false, reason: "notfound" };
   const cached = selfCache.get(id);
   if (cached) return cached;
@@ -853,8 +1018,8 @@ async function finishSelf(id: string, flags: number, plain: Uint8Array): Promise
 const hasMagic = (body: Uint8Array, magic: number[]) => magic.every((b, i) => body[i] === b);
 
 /** starší odkaz #q=<id>.<klíč> (obsah „MNQ“ v1) */
-async function openSelf(parsed: Extract<ParsedShare, { kind: "self" }>, password?: string): Promise<OpenResult> {
-  const body = await fetchSelf(parsed.id);
+async function openSelf(parsed: Extract<ParsedShare, { kind: "self" }>, password?: string, o: OpenOptions = {}): Promise<OpenResult> {
+  const body = await fetchSelf(parsed.id, o);
   if (!(body instanceof Uint8Array)) return body;
   if (body.length < 5 + 28 || !hasMagic(body, MAGIC)) return { ok: false, reason: "invalid" };
   const flags = body[4];
@@ -879,15 +1044,15 @@ async function openSelf(parsed: Extract<ParsedShare, { kind: "self" }>, password
 }
 
 /** odkaz s kódem (obsah „MNQ“ v2): z kódu se odvodí id i klíč, s heslem klíč z kódu + hesla */
-async function openCode(parsed: Extract<ParsedShare, { kind: "code" }>, password?: string): Promise<OpenResult> {
-  if (!selfStoreBase()) return { ok: false, reason: "notfound" };
+async function openCode(parsed: Extract<ParsedShare, { kind: "code" }>, password?: string, o: OpenOptions = {}): Promise<OpenResult> {
+  if (!(o.store !== undefined ? o.store : selfStoreBase())) return { ok: false, reason: "notfound" };
   let d: ShareDerived;
   try {
     d = await deriveShareCode(parsed.code);
   } catch {
     return { ok: false, reason: "invalid" };
   }
-  const body = await fetchSelf(d.id);
+  const body = await fetchSelf(d.id, o);
   if (!(body instanceof Uint8Array)) return body;
   if (body.length < 5 + 28 || !hasMagic(body, MAGIC2)) return { ok: false, reason: "invalid" };
   const flags = body[4];
@@ -905,28 +1070,32 @@ async function openCode(parsed: Extract<ParsedShare, { kind: "code" }>, password
 }
 
 /** Otevře sdílený dokument. Při ochraně heslem bez hesla vrací reason „password“. */
-export async function openShareLink(parsed: ParsedShare, password?: string): Promise<OpenResult> {
+export async function openShareLink(parsed: ParsedShare, password?: string, o: OpenOptions = {}): Promise<OpenResult> {
   // bez WebCrypto (stránka na http://) jde otevřít jen dokument v odkazu bez hesla
   if (!shareCryptoOk() && !(parsed.kind === "link" && !parsed.salt)) return { ok: false, reason: "insecure" };
-  if (parsed.kind === "code") return openCode(parsed, password);
-  if (parsed.kind === "self") return openSelf(parsed, password);
+  if (parsed.kind === "code") return openCode(parsed, password, o);
+  if (parsed.kind === "self") return openSelf(parsed, password, o);
   if (parsed.kind === "link") {
+    const chars = parsed.data.length;
+    // useknutý × poškozený obsah (vlna 22, bod 16): délka base64 se zbytkem 1 nevznikne nikdy – data končí uprostřed znaku
+    if (chars % 4 === 1) return { ok: false, reason: "invalid", damage: "truncated", chars };
     let bytes: Uint8Array;
     try {
       bytes = unb64u(parsed.data);
     } catch {
-      return { ok: false, reason: "invalid" };
+      return { ok: false, reason: "invalid", damage: "corrupt", chars };
     }
     if (parsed.salt) {
       if (!password) return { ok: false, reason: "password" };
       try {
         bytes = await decrypt(await keyFromPassword(password, unb64u(parsed.salt)), bytes);
       } catch {
-        return { ok: false, reason: "password" };
+        // šifrovaný obsah nejde odlišit: špatné heslo i useknutý / změněný odkaz selžou stejně (text to říká, s délkou)
+        return { ok: false, reason: "password", chars };
       }
     }
-    const p = await unpack(bytes, parsed.compressed);
-    return p ? checkExp(p) : { ok: false, reason: "invalid" };
+    const u = await unpackDiag(bytes, parsed.compressed);
+    return "payload" in u ? checkExp(u.payload) : { ok: false, reason: "invalid", damage: u.damage, chars };
   }
   const store = storeConfig();
   if (!store) return { ok: false, reason: "notfound" };
@@ -962,7 +1131,11 @@ export function shareMessage(docName: string, r: ShareResult): string {
  * Důvod neotevření odkazu česky. `kind` = druh odkazu: u odkazu s kódem „nenalezeno“ nejčastěji znamená překlep
  * (jiné písmeno, velikost písmen) – hlášení na to upozorní.
  */
-export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"]): string {
+export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"], damage?: { damage?: ShareDamage; chars?: number }): string {
+  // useknutý / změněný dlouhý odkaz (vlna 22, bod 16) – vlastní text s délkou dat, ne obecné „neplatný“
+  if (reason === "invalid" && damage?.damage === "truncated") return tr("Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.", damage.chars ?? 0);
+  if (reason === "invalid" && damage?.damage === "corrupt") return tr("Odkaz je poškozený – data dokumentu jsou úplná, ale změněná (část za #s= má {0} znaků; změnu mohl udělat program, kterým se odkaz předával). Požádejte odesílatele o nový odkaz.", damage.chars ?? 0);
+  if (reason === "password" && kind === "link" && damage?.chars) return tr("Nesprávné heslo – nebo je odkaz useknutý či změněný (šifrovaný obsah nejde rozlišit; část za #s= má {0} znaků).", damage.chars);
   switch (reason) {
     case "expired":
       return tr("Platnost sdíleného odkazu vypršela{0}. Požádejte odesílatele o nové sdílení.", exp ? ` (${new Date(exp).toLocaleDateString(cadLocale())})` : "");

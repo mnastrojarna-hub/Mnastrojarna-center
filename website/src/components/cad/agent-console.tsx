@@ -3,7 +3,10 @@
 import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isFinal, runStateText } from "@/cad/engine/run-queue";
-import { appRuns, consoleRuns } from "./run-host";
+import { appRuns, consoleRuns, type RunRecord } from "./run-host";
+import { entryDetail, entryLine, filterEntries, reportDocs, reportFileName, reportJson, runHeadline, summaryText, type LevelFilter } from "@/cad/engine/console-view";
+import { entryRef } from "@/cad/engine/entry-ids";
+import { writeSaved } from "@/lib/save-file";
 import { useRuns } from "./run-chip";
 import { AGENT_COMMANDS } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
@@ -22,15 +25,20 @@ let lastOutput = "";
  */
 let consoleRunId: string | null = null;
 let outputRunId: string | null = null;
-/** přepínač „Stručný protokol“ (MNCAD/1 jako CLI – engine/run-protocol.ts) – trvale v prohlížeči */
+/**
+ * přepínač „Stručný souhrn“ (vlna 22, bod 15): výchozí ZAPNUTO – konzole ukáže souhrn běhu (stručný protokol MNCAD/1 jako
+ * CLI, engine/console-view.ts), detail (dnešní plný text konzole) a záznamy s filtrem na vyžádání; vypnutý = detail.
+ * Uloženo trvale v prohlížeči; výchozí `window.mncad.run` (text konzole) se nemění – stručný protokol dá `protocol: "short"`.
+ */
 const SHORT_KEY = "mn-cad-console-short";
 const loadShort = () => {
   try {
-    return localStorage.getItem(SHORT_KEY) === "1";
+    return localStorage.getItem(SHORT_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 };
+type ConsoleView = "summary" | "detail" | "entries";
 
 const PLACEHOLDER = `Příkazy (jeden na řádek) nebo JSON dokumentu – například:
 nový díl Příruba DN50
@@ -75,6 +83,22 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
     if (done !== undefined && outRun !== runId) setOut(done, runId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, runId]);
+  // historie běhů, pohled a filtr (vlna 22, bod 15)
+  useSyncExternalStore(
+    (f) => consoleRuns.subscribe(f),
+    () => consoleRuns.version,
+    () => 0,
+  );
+  const history = consoleRuns.list("console");
+  const rec: RunRecord | undefined = consoleRuns.record(outRun);
+  const report = !running ? rec?.report : undefined;
+  const [view, setView] = useState<ConsoleView>(short ? "summary" : "detail");
+  const [level, setLevel] = useState<LevelFilter>("all");
+  const [docFilter, setDocFilter] = useState("");
+  const [q, setQ] = useState("");
+  const filtering = level !== "all" || !!docFilter || !!q.trim();
+  const shownView: ConsoleView = report ? (filtering && view === "summary" ? "entries" : view) : "detail";
+  const summary = report ? summaryText(report) : "";
   const [help, setHelp] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -92,7 +116,6 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
     let id: string | null = null;
     try {
       const log = await run(t, {
-        ...(short ? { protocol: "short" as const } : {}),
         source: "console",
         onQueued: (rid) => {
           id = rid;
@@ -223,12 +246,74 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
               </span>
             )}
           </p>
+          {report && (
+            // pohled na běh: souhrn (výchozí) · detail · záznamy s filtrem (vlna 22, bod 15)
+            <div className="mb-1 flex flex-wrap items-center gap-1 text-[11.5px]" role="tablist" data-console-views={shownView}>
+              {(
+                [
+                  ["summary", tr("Souhrn")],
+                  ["detail", tr("Detail")],
+                  ["entries", tr("Záznamy")],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={shownView === k}
+                  data-console-view={k}
+                  onClick={() => setView(k)}
+                  className={cn("rounded border px-1.5 py-0.5", shownView === k ? "border-brand bg-[#fdecea] text-brand" : "border-[#cfd6de] text-[#4a5664] hover:border-brand")}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="ml-auto text-[#6b7785]" data-console-counts>
+                {`✓${report.counts.ok} ⚠${report.counts.warnings} ✗${report.counts.errors}`}
+              </span>
+            </div>
+          )}
+          {report && (
+            <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[#4a5664]" data-console-filter>
+              <select aria-label={tr("Filtr úrovně")} data-console-filter-level value={level} onChange={(e) => setLevel(e.target.value as LevelFilter)} className="rounded border border-[#cfd6de] bg-white px-1 py-0.5">
+                <option value="all">{tr("vše")}</option>
+                <option value="problems">{tr("✗ chyby a ⚠ varování")}</option>
+                <option value="error">{tr("✗ chyby")}</option>
+                <option value="warn">{tr("⚠ varování")}</option>
+              </select>
+              <select aria-label={tr("Filtr dokumentu")} data-console-filter-doc value={docFilter} onChange={(e) => setDocFilter(e.target.value)} className="max-w-[10rem] rounded border border-[#cfd6de] bg-white px-1 py-0.5">
+                <option value="">{tr("všechny dokumenty")}</option>
+                {reportDocs(report).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={tr("díl, vazba, kód, id…")}
+                aria-label={tr("Filtr textu (díl, vazba, kód chyby, id záznamu)")}
+                data-console-filter-q
+                className="min-w-0 flex-1 rounded border border-[#cfd6de] bg-white px-1.5 py-0.5"
+              />
+            </div>
+          )}
+          {report && shownView === "summary" && (
+            <pre data-console-summary aria-label={tr("Souhrn běhu")} className="h-[calc(14*1.35em+2.5rem)] min-h-[200px] overflow-auto whitespace-pre-wrap break-words rounded border border-[#cfd6de] bg-[#1f2933] p-2 font-mono text-[11.5px] leading-[1.35] text-[#e6edf3]">
+              {summary}
+            </pre>
+          )}
+          {report && shownView === "entries" && <EntryList report={report} runId={outRun ?? undefined} level={level} doc={docFilter} q={q} />}
           <pre
             data-agent-output
             data-run-id={running ? entry!.id : (outRun ?? "")}
             data-run-state={running ? entry!.state : outRun ? (appRuns.get(outRun)?.state ?? "done") : ""}
             aria-label={tr("Protokol")}
             aria-live="polite"
+            // detail (plný text konzole) je vždy v DOM; při souhrnu / záznamech skrytý – na vyžádání záložkou Detail
+            hidden={!!report && shownView !== "detail"}
             className={cn("h-[calc(14*1.35em+2.5rem)] min-h-[200px] overflow-auto whitespace-pre-wrap break-words rounded border border-[#cfd6de] bg-[#1f2933] p-2 font-mono text-[11.5px] leading-[1.35] text-[#e6edf3]", (!out || running) && "text-[#8a95a3]")}
           >
             {running
@@ -244,13 +329,14 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
               <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-[#f3f5f8] p-1.5 font-mono text-[11px]">{out}</pre>
             </details>
           )}
-          <label className="mt-2 flex items-center gap-1.5 text-[12px] text-[#4a5664]" title={tr("Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB")}>
+          <label className="mt-2 flex items-center gap-1.5 text-[12px] text-[#4a5664]" title={tr("Po běhu ukázat souhrn – stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB; plný text konzole je v záložce Detail")}>
             <input
               type="checkbox"
               data-agent-short
               checked={short}
               onChange={(e) => {
                 setShort(e.target.checked);
+                setView(e.target.checked ? "summary" : "detail");
                 try {
                   localStorage.setItem(SHORT_KEY, e.target.checked ? "1" : "0");
                 } catch {
@@ -258,16 +344,49 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
                 }
               }}
             />
-            {tr("Stručný protokol")}
+            {tr("Stručný souhrn (výchozí)")}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Btn disabled={!out || running} onClick={() => void copyText(out).then((ok) => flash(ok ? tr("Protokol zkopírován.") : tr("Kopírování se nezdařilo.")))}>
+            <Btn disabled={!out || running} onClick={() => void copyText(report && shownView === "summary" ? summary : out).then((ok) => flash(ok ? tr("Protokol zkopírován.") : tr("Kopírování se nezdařilo.")))}>
               {tr("Kopírovat protokol")}
+            </Btn>
+            <Btn
+              disabled={!report || running}
+              title={tr("Stáhne strukturovaný protokol běhu (JSON jako mncad run --json: záznamy se stabilními id, dokumenty, soubory, odkazy, plný protokol)")}
+              onClick={() => {
+                if (!report) return;
+                void writeSaved({ name: reportFileName(outRun ?? undefined), handle: null }, reportJson(report), "application/json").then(() => flash(tr("JSON protokolu běhu {0} stažen.", outRun ?? "")));
+              }}
+            >
+              <span data-console-json>{tr("Stáhnout JSON")}</span>
             </Btn>
             <Btn disabled={!out || running} onClick={() => setOut("")}>
               {tr("Vymazat")}
             </Btn>
           </div>
+          {history.length > 0 && (
+            // historie běhů (vlna 22, bod 15): nový běh předchozí protokol nepřepíše – klik ukáže běh znovu
+            <details className="mt-2 text-[11.5px] text-[#4a5664]" open={history.length > 1} data-run-history={history.length}>
+              <summary className="cursor-pointer font-semibold">{tr("Historie běhů ({0})", history.length)}</summary>
+              <ul className="mt-1 max-h-32 space-y-0.5 overflow-y-auto">
+                {history.map((h) => (
+                  <li key={h.id}>
+                    <button
+                      type="button"
+                      data-run-history-item={h.id}
+                      aria-pressed={h.id === outRun}
+                      disabled={running}
+                      onClick={() => setOut(h.text, h.id)}
+                      className={cn("w-full truncate rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-[#eef2f6]", h.id === outRun && "bg-[#fdecea] text-brand")}
+                      title={h.input}
+                    >
+                      {runHeadline({ id: h.id, at: h.at, label: h.label ?? "", ...(h.report ? { report: h.report } : { state: appRuns.get(h.id)?.state ?? "" }) })}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-[#6b7785]">
             <CadIcon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
@@ -277,6 +396,25 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Záznamy běhu s filtrem (vlna 22, bod 15): každý záznam jeden řádek se stabilním id (`r3:L36.motion`), rozbalení ukáže
+ * celý text, detail a data – detail na vyžádání, souhrn zůstává krátký.
+ */
+function EntryList({ report, runId, level, doc, q }: { report: NonNullable<RunRecord["report"]>; runId?: string; level: LevelFilter; doc: string; q: string }) {
+  const list = filterEntries(report, { level, doc, q });
+  return (
+    <div data-console-entries={list.length} className="h-[calc(14*1.35em+2.5rem)] min-h-[200px] overflow-auto rounded border border-[#cfd6de] bg-[#1f2933] p-1.5 font-mono text-[11px] leading-[1.35] text-[#e6edf3]">
+      {!list.length && <p className="p-1 text-[#8a95a3]">{tr("Žádný záznam neodpovídá filtru.")}</p>}
+      {list.map((e) => (
+        <details key={e.id} data-entry-id={entryRef(runId, e.id)} data-entry-level={e.level} className="border-b border-[#2c3742] last:border-0">
+          <summary className={cn("cursor-pointer whitespace-pre-wrap break-words py-0.5", e.level === "error" ? "text-[#ff9b94]" : e.level === "warn" ? "text-[#f5c26b]" : "")}>{entryLine(e)}</summary>
+          <pre className="whitespace-pre-wrap break-words pb-1 pl-3 text-[#b8c4d0]">{entryDetail(e, runId)}</pre>
+        </details>
+      ))}
+    </div>
   );
 }
 
