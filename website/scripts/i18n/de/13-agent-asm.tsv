@@ -66,7 +66,6 @@
 ✓ zrcadlení „{0}“ podle {1}{2} → „{3}“ {4} (zrcadlí se poloha a natočení, geometrie dílu se nezrcadlí)	✓ Spiegelung von „{0}“ an {1}{2} → „{3}“ {4} (Lage und Drehung werden gespiegelt, die Teilgeometrie nicht)
 barva {0}	Farbe {0}
 barva: čekám #rrggbb (např. #e03930), ne „{0}“	Farbe: #rrggbb erwartet (z. B. #e03930), nicht „{0}“
-CSV (oddělovač ;):	CSV (Trennzeichen ;):
 číslo	Nummer
 číslo „{0}“	Nummer „{0}“
 číslo plochy začíná F1	Flächennummern beginnen bei F1

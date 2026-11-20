@@ -772,6 +772,17 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
 9. `kusovník [strukturovaně] [csv]` – tabulka `Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks`; `kolize` = průniky.
    Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
    řádek nerozdělí; jiné číslo výkresu (`číslo "…"`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.
+   **Druh položky** (vlna 22): vyráběný / normálie / nakupovaný – kusovník je v oddílech (`— Vyráběné díly —`, `— Normálie —`,
+   `— Nakupované díly —`), CSV má sloupce Druh, Norma, Rozměr, Třída / tolerance, Katalogové číslo, Výrobce a desetinný oddělovač
+   podle jazyka (čeština a němčina čárka, angličtina tečka). Výchozí druh: normálie z knihovny = normálie (materiál = pevnostní třída
+   12.9, kolík „dle normy“ a tolerance m6 v označení), importovaný STEP bez prvků = nakupovaný, vlastní díl = vyráběný. Zadání:
+   v dílu `druh nakupovaný katalog "SFJ8-30" výrobce "…"`, na komponentě `sestava komponenta "X" druh normálie|nakupovaný|vyráběný|auto
+   [katalog "…"] [výrobce "…"] [rozměr "…"] [třída "…"]`. Vyráběný díl bez čísla výkresu nebo bez označení materiálu (v kusovníku
+   `— (třída Ocel)`) = ⚠ `bom.make-incomplete`; výkresy (`--formats pdf`, `výkres export pdf dokument`) se přibalují jen u vyráběných dílů.
+   **Kopie dílu:** `vložit` uloží kopii dílu; číslo, materiál, geometrie nebo výkres změněné v záložce dílu PO vložení se do sestavy
+   samy nepromítnou – kusovník, list sestavy a `stav` to hlásí ⚠ `asm.stale-copy` s příkazem `sestava obnovit "Deska A"` (`vše`,
+   `údaje` = jen číslo, materiál a druh). Obnova zachová polohu, vazby (čísla ploch se převedou podle geometrie) a přezdívku; číslo
+   zadané na komponentě zůstane. GUI: panel komponenty → „Obnovit z dílu“, Kusovník → „Obnovit z dílů“ (týž příkaz).
 10. `rám formy 296 346 [deska-a 56] [deska-b 56] [upínací 27] [opěrná 36] [rozpěrky 96] [šířka-rozpěrek 56] [vyhazovací 22]
     [kotevní 17] [sloupky 24] [dutina 140 180 30 | bez dutiny] [materiál 1.2311]` – rám formy v nové záložce.
 11. `záložky` (výpis), `záložka "Čep"` / `záložka 2` (další řádky pracují s ní), `zavřít záložku ["…"]`.
@@ -1659,6 +1670,9 @@ je na jejich řádku.
 | `skica export dxf ["Skica 1"] [jako název]` (`sketch export dxf` · `skizze export dxf`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
 | `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku `URL: …`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
 | `odkaz` (`link`) | vypíše poslední sdílený odkaz znovu |
+| `exporty [vymazat]` (`exports [clear]` · `exporte [löschen]`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý `export …`, `výkres export …`, `skica export dxf` i export tlačítkem zapíše formát, soubor, revizi modelu `r·a1b2c3` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení) |
+| `výstupy [zastaralé]` (`outputs [stale]` · `ausgaben [veraltet]`) · `zastaralé` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
+| `přepočítat vše` (`recompute all` · `alles neu berechnen`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (`sestava obnovit vše` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, `kolize`, `pohyb spustit`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (`výkres vydat B`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz) |
 
 ```
 uložit
@@ -2143,6 +2157,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | `výkres razítko logo="firma.png"` · `… logo="data:image/png;base64,…"` · `… logo=ne` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek, DXF/DWG jako vyplněný obrys (SOLID) |
 | `výkres nepředepsané ISO 2768-mK` · `… mK` · `… f H` · `… desetinná` · `… desetinná ±0,1 ±0,1 ±0,01 ±0,005` · `… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005` · `… X.XX=±0,02` · `… ne` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); `ne` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | `výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]` · `výkres revize smazat B` | tabulka revizí; poslední revize se zapíše do razítka |
+| `výkres vydat [B] ["popis změny"] [datum …] [vše]` · `výkres vydat zrušit [vše]` (`drawing issue` · `zeichnung freigeben`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu `r·a1b2c3` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu je vydaný list **zastaralý**: `výkres stav` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), `stav`, konec běhu, řádek D (`stale=drawing`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ `drawing.stale`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani `přepočítat vše` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999 |
 | `výkres otočení 0|90|180|270` · `výkres řez XZ odsazení 0 poloviční|celý` · `výkres kusovník ano|ne` · `výkres balónky ano|ne` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | `výkres pružiny zjednodušeně|plně` | pružiny se na výkrese kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr přes volnou délku), osa a čerchované osy drátu na středním průměru jen tam, kde je obrys vidět; v řezu se obal nešrafuje (jen obrys a osy drátu). Pružina = prvek Pružina nebo Tažení po šroubovici s profilem Kruh, který je **prvním materiálem svého tělesa** (normálie pružin, `pružina …` jako první prvek dílu, `… nové těleso "Pružina"`, i jako komponenty sestavy); těleso pak smí už jen odebírat (zabroušené konce) nebo přidat jiný tvar (očka, ramena). Šroubovice přidaná na existující těleso (chod šneku, oblý závit na hřídeli, pružina přidaná do pouzdra) se kreslí vždy přesně, stejně jako šroubovicová drážka (odebrání) – samostatnou pružinu proto zakládejte jako `nové těleso`. Chytré kóty čtou skutečný tvar (obal pružiny nekótují jako díru). `plně` = skutečná šroubovice – skrytí hran trvá u každé pružiny desítky sekund (A1 sestava se 4 pružinami: minuty). Stav listu (`výkres stav`) uvádí ve Volbách, jak se pružiny kreslí, jen když list nějakou pružinu má. |
 | `kótovat základní` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
@@ -2362,9 +2377,10 @@ třídí. Nejčastější:
 | `select.fallback` ⚠ / `select.ambiguous` ⚠ | pravidlo plochy nenašlo plochu na obálce / našlo víc ploch | plochu číslem F3 |
 | `name.renamed` ⚠ / `name.renamed-auto` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
 | `material.density-assumed` ⚠ / `material.class` ℹ | `materiál X` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | `materiál hlinik` + označení |
-| `asm.stale-copy` ⚠ | díl změněný po `vložit` – komponenta je kopie, změna se do sestavy nepromítne | vložit znovu / `sestava upravit` |
+| `asm.stale-copy` ⚠ | díl změněný po `vložit` (prvek, číslo, materiál, druh, výkres) – komponenta je kopie, změna se do sestavy sama nepromítne; hlásí se na řádku změny i u `kusovník`, listu sestavy a `stav` | `sestava obnovit "X"` (`vše`, `údaje`) |
 | `mate.lost` ✗ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí | `sestava vazba N plocha b <plocha>` / `sestava vazba N smazat` |
 | `mate.renumbered` ℹ / `mate.restored` ℹ | táž plocha má po úpravě dílu jiné číslo / ztracená plocha je zpět (přesná shoda) | – |
+| `bom.make-incomplete` ⚠ / `bom.docs` ℹ | vyráběný díl bez čísla výkresu, výkresu nebo označení materiálu / souhrn dokumentace u výstupů sestavy („vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“) | `výkres razítko číslo=…` a `materiál …` v dílu, `sestava obnovit`, `druh nakupovaný` |
 | `clash.thread` ℹ, `clash.underhead` ℹ / `clash.real` ⚠ | `kolize`, `kontrola sestava` i `pohyb … kolize` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen `clash.real` řešit; `pohyb krok N` vypíše kolize kroku |
 | `clash.undetermined` ⚠ / `clash.hidden` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (`závit M10`) |
 | `feature.warning` ⚠ / `feature.failed` ✗ / `feature.unverified` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
@@ -2374,6 +2390,7 @@ třídí. Nejčastější:
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
 | `drawing.tolerance-missing` ⚠ | `výkres kontrola tolerancí`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | `výkres tolerance aN …` |
+| `drawing.stale` ⚠ | vydaný list (`výkres vydat`) neodpovídá nynější revizi modelu: `výkres stav`, `stav`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | `výkres vydat B` (nová revize), přehled `výstupy zastaralé` |
 | `param.clamped` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
 | `geom.approx` ℹ / `geom.volume-failed` ⚠ | objem ze sítě (velké těleso) / objem se nepodařilo změřit (0) | |
 | `tab.settle-timeout` ✗ | aplikace nepřepnula záložku do 5 s | zopakovat |
@@ -2802,6 +2819,10 @@ v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený st
 měření a porovnání provedené před poslední změnou. Výsledek bez `stale` (`✓ kolize: žádné`, `ok=1`, `mates=N/N`) tedy
 popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
 (`data-clash-state`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi `r·…` a polohu.
+Výstupy (vlna 22, bod 20): dokument s výkresy nebo záznamy exportů má v řádku `D` revizi modelu `rev=r·a1b2c3` (JSON
+`docs[].rev`) a `stale=` navíc `drawing` (vydaný list ze starší revize modelu – `výkres vydat`) a `export` (záznam exportu ze
+starší revize – `exporty`); `stav` pak má řádky „Revize modelu“, „Výkres: …“, „Exporty: …“ a strojově `drawing.stale=N
+export.stale=N`. Přehled a opravy: `výstupy zastaralé`, `přepočítat vše`.
 
 **`porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]`** (EN `compare`,
 DE `vergleichen`) porovná model se souborem reference (STEP, BREP, STL; sestava STEP jako jedno těleso) – stejný výpočet jako
@@ -3079,6 +3100,8 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
+  /** druh položky kusovníku dílu (vyráběný / normálie / nakupovaný) a údaje normálie / nakupované položky – cad/bom-model.ts */
+  supply?: SupplyInfo;
   /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
   kind?: "part" | "assembly" | "draft";
   /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
@@ -3089,6 +3112,8 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
+  outputs?: ExportRecord[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

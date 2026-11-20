@@ -1,0 +1,99 @@
+/**
+ * Vlna 22, balík D (etapa D1, body 22g a 19) – „žádné falešné zelené“: každý úspěšný / klidný text kusovníku se nesmí
+ * vypsat, když kontrola neproběhla, proběhla nad jiným stavem nebo nevyšla. Náhradní jádro (geometrie nerozhoduje).
+ *
+ * Inventář a podmínka, za které smějí být vidět:
+ *  1. `✓ komponenta „X“ už odpovídá dílu v záložce`  – jen když díl JE otevřený a kopie se od něj neliší
+ *  2. `✓ komponenta „X“ obnovena z dílu (…)`          – jen když se kopie opravdu převzala z dílu záložky
+ *  3. kusovník bez ⚠ asm.stale-copy                   – jen když žádná kopie není starší než díl v záložce
+ *  4. kusovník bez ⚠ bom.make-incomplete             – jen když vyráběné díly mají číslo i označení materiálu
+ *  5. ℹ `bom.docs` „vyráběné N“ bez „(bez výkresu …)“ – jen když všechny vyráběné díly mají výkres
+ *  6. `✓ druh dílu …`                                  – jen po přečteném druhu (neznámé slovo = ✗, druh se nezmění)
+ *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
+ *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
+ */
+import { describe, expect, it } from "vitest";
+import { partComponent, screwISO4762 } from "../assembly";
+import { asmDocNotes } from "../engine/files";
+import { memoryFileSink, memoryFileSource, type EngineHost } from "../engine/host";
+import type { KernelApi } from "../engine/kernel";
+import { MemoryWorkspace } from "../engine/memory-workspace";
+import { formatConsole } from "../engine/protocol";
+import type { RunReport } from "../engine/protocol-types";
+import { runScript } from "../engine/run";
+import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource } from "../types";
+
+const result = (d: CadDoc): BuildResult =>
+  ({ status: d.features.map((f) => ({ id: f.id, ok: true })), mesh: null, metrics: d.features.length ? { volume: 20000, area: 600, bbox: [[0, 0, 0], [10, 10, 10]], faces: 6, edges: 12, valid: true, solids: 1 } : null, ms: 1 }) as unknown as BuildResult;
+const kernel = {
+  generation: () => 1,
+  build: async (d: CadDoc) => result(d),
+  check: async (d: CadDoc) => ({ status: d.features.map((f) => ({ id: f.id, ok: true })), paramErrors: [], solid: true }),
+  asmParts: async (parts: { key: string; source: ComponentSource }[]) => parts.map((p) => ({ key: p.key, result: result(p.source.kind === "part" ? p.source.doc : emptyDoc()) })),
+  interference: async () => Object.assign([], { stats: { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 } }),
+  clashDetail: async () => [],
+  stepSplit: async () => null,
+} as unknown as KernelApi;
+const host = (): EngineHost => ({ kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+const run = (ws: MemoryWorkspace, t: string) => runScript(ws, t, host());
+const txt = (r: RunReport) => formatConsole(r);
+const has = (r: RunReport, code: string) => r.entries.some((e) => e.code === code);
+
+describe("greens D1 – kusovník a kopie dílu", () => {
+  it("1+2: „už odpovídá dílu“ ani „obnovena“ se nevypíše, když díl není otevřený (zavřená záložka) – jen ℹ se důvodem", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit');
+    await run(ws, 'zavřít záložku "Deska A"');
+    const r = await run(ws, 'sestava obnovit "Deska A"');
+    expect(txt(r)).not.toMatch(/už odpovídá dílu/);
+    expect(txt(r)).not.toMatch(/obnovena z dílu/);
+    expect(txt(r)).toMatch(/„Deska A“ se neobnovuje: díl „Deska A“ není otevřený v záložce/);
+  });
+
+  it("1: „už odpovídá dílu“ se nevypíše, když se díl od vložení změnil – místo toho obnova s výčtem polí", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit');
+    await run(ws, 'záložka "Deska A"\nmateriál 1.2379\nzáložka "Nástroj"');
+    const r = await run(ws, 'sestava obnovit "Deska A"');
+    expect(txt(r)).not.toMatch(/už odpovídá dílu/);
+    expect(txt(r)).toMatch(/✓ komponenta „Deska A“ obnovena z dílu \(materiál\)/);
+  });
+
+  it("3: kusovník nad zastaralou kopií nikdy bez ⚠ asm.stale-copy (dřív tiché prázdné číslo a „Ocel“)", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit');
+    const clean = await run(ws, "kusovník");
+    expect(has(clean, "asm.stale-copy")).toBe(false); // díl se nezměnil → nic se nehlásí (a nic se netvrdí navíc)
+    await run(ws, 'záložka "Deska A"\nmateriál 1.2379\nzáložka "Nástroj"');
+    const r = await run(ws, "kusovník");
+    expect(has(r, "asm.stale-copy")).toBe(true);
+  });
+
+  it("4: kusovník bez ⚠ bom.make-incomplete jen s číslem a označením materiálu vyráběného dílu", async () => {
+    const ws = new MemoryWorkspace();
+    const bad = await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit\nkusovník');
+    expect(bad.entries.filter((e) => e.code === "bom.make-incomplete").length).toBe(2); // bez čísla, bez označení
+    const ws2 = new MemoryWorkspace();
+    // normálie a nakupovaný díl se nehodnotí – samotné nevyvolají ⚠
+    const ok = await run(ws2, 'nový díl "Pouzdro"\nválec 10 20\ndruh nakupovaný katalog "K-1"\nnová sestava "Nástroj"\nvložit "Pouzdro"\nnormálie M8x20\nkusovník');
+    expect(has(ok, "bom.make-incomplete")).toBe(false);
+  });
+
+  it("5: souhrn dokumentace neříká „vyráběné 1“ bez dovětku, když vyráběnému dílu výkres chybí", () => {
+    const plate: CadDoc = { ...emptyDoc("Deska A"), kind: "part", props: { number: "DA-001" } };
+    const asm: CadDoc = { ...emptyDoc("Nástroj"), kind: "assembly", components: [partComponent(plate), partComponent(screwISO4762("M8", 20))] };
+    const n = asmDocNotes(asm);
+    expect(n[0].args).toEqual(["vyráběné 1 (bez výkresu 1), normálie 1, nakupované 0"]);
+    expect(n.some((x) => x.code === "bom.make-incomplete")).toBe(true);
+    const withSheet: CadDoc = { ...asm, components: [partComponent({ ...plate, drawings: [{ id: "s", name: "List 1" } as never] }), partComponent(screwISO4762("M8", 20))] };
+    expect(asmDocNotes(withSheet)).toEqual([{ code: "bom.docs", args: ["vyráběné 1, normálie 1, nakupované 0"] }]);
+  });
+
+  it("6: „✓ druh dílu“ jen po přečteném druhu – neznámé slovo = ✗ a dokument beze změny", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, 'nový díl "Pouzdro"\nválec 10 20\ndruh levný');
+    expect(txt(r)).not.toMatch(/✓ druh dílu/);
+    expect(txt(r)).toMatch(/druh: čekám vyráběný \| normálie \| nakupovaný \| auto, ne „levný“/);
+    expect(ws.present().supply).toBeUndefined();
+  });
+});

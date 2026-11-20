@@ -3,6 +3,7 @@
  * normálií a rámu vstřikovací formy. Čisté funkce – běží v prohlížeči i v testech.
  */
 import { groupKey, groupLabel } from "./asm-groups";
+import { bomCsvText, supplyOf, supplyRank, type BomLine } from "./bom-model";
 import { tr } from "./i18n";
 import { springEffective } from "./asm-spring-geom";
 import { emptyDoc, uid, type AsmComponent, type CadDoc, type ComponentSource, type Feature, type Placement, type Vec3 } from "./types";
@@ -142,8 +143,13 @@ export function hashPair(str: string): [number, number] {
 
 // ---------------- kusovník ----------------
 
-/** Řádek kusovníku. `level` = úroveň zanoření (0 = hlavní sestava) ve strukturovaném kusovníku. */
-export type BomRow = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; group?: string; ids: string[]; level?: number; assembly?: boolean };
+/**
+ * Řádek kusovníku. `level` = úroveň zanoření (0 = hlavní sestava) ve strukturovaném kusovníku. Druh (vyráběný / normálie /
+ * nakupovaný), norma, rozměr, třída, katalog a výrobce – cad/bom-model.ts `supplyOf` (vlna 22, bod 19).
+ */
+export type BomRow = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; group?: string; ids: string[]; level?: number; assembly?: boolean } & Pick<BomLine, "kind" | "standard" | "size" | "grade" | "catalog" | "vendor" | "noDesignation">;
+/** materiál a hmotnost komponenty do kusovníku (bom-model.ts `bomPartInfo`) */
+export type BomInfo = (c: AsmComponent) => { material?: string; massKg?: number; noDesignation?: boolean };
 
 const GROUP_ORDER = ["Podsestavy", "Desky", "Tvarové díly", "Vedení", "Vyhazování", "Normálie"];
 /** pořadí skupiny v kusovníku – skupina uložená přeloženě (starší dokument, ruční zápis) má stejné pořadí jako česká */
@@ -151,10 +157,11 @@ const groupRank = (g?: string) => {
   const i = g ? GROUP_ORDER.indexOf(groupKey(g)) : -1;
   return i < 0 ? 99 : i;
 };
-const byGroup = (a: BomRow, b: BomRow) => groupRank(a.group) - groupRank(b.group);
+/** oddíly podle druhu (vyráběné → normálie → nakupované), v oddílu podle skupiny */
+const byGroup = (a: BomRow, b: BomRow) => supplyRank(a.kind) - supplyRank(b.kind) || groupRank(a.group) - groupRank(b.group);
 
 /** Hmotnost a materiál komponenty; u podsestavy součet hmotností dílů. */
-function compInfo(c: AsmComponent, info: (c: AsmComponent) => { material?: string; massKg?: number }, depth = 0): { material?: string; massKg?: number } {
+function compInfo(c: AsmComponent, info: BomInfo, depth = 0): { material?: string; massKg?: number; noDesignation?: boolean } {
   if (c.source.kind !== "asm") return info(c);
   if (depth > MAX_DEPTH) return {};
   let m = 0;
@@ -216,14 +223,16 @@ export function sourceName(s: ComponentSource): string {
  * názvy a přezdívky instancí: přejmenovaná instance („… -1“) řádek nerozdělí (B15). Různá čísla výkresu (komponenta / vlastnosti
  * dílu) jsou různé položky. Název řádku = společný název instancí, jinak název zdroje (dílu).
  */
-function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmComponent) => { material?: string; massKg?: number }, level: number): BomRow[] {
+function aggregate(comps: { c: AsmComponent; n: number }[], info: BomInfo, level: number): BomRow[] {
   const rows = new Map<string, BomRow>();
   for (const { c, n } of comps) {
     // číslo výkresu: z komponenty, jinak z vlastností vloženého dílu (props.number) – ať se do kusovníku dostane
     const number = c.number?.trim() || (c.source.kind === "part" ? c.source.doc.props?.number?.trim() : undefined) || undefined;
     // zdroj = obsah dílu (sourceKey) + jeho název a materiál – dva různé díly se stejnou geometrií zůstanou dvě položky
     const mat = c.source.kind === "part" ? `${c.source.doc.material ?? ""}/${c.source.doc.materialName ?? ""}` : (c.material ?? "");
-    const key = `${sourceKey(c.source)}|${sourceName(c.source)}|${mat}|${number ?? ""}`;
+    // druh položky a údaje normálie / nákupu (bom-model.ts) – jiný druh nebo katalog = jiná položka
+    const s = supplyOf(c);
+    const key = `${sourceKey(c.source)}|${sourceName(c.source)}|${mat}|${number ?? ""}|${s.kind}|${s.catalog ?? ""}|${s.vendor ?? ""}`;
     const r = rows.get(key);
     if (r) {
       r.qty += n;
@@ -231,7 +240,8 @@ function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmCompone
       if (r.name !== c.name) r.name = sourceName(c.source) || r.name;
     } else {
       const i = compInfo(c, info);
-      rows.set(key, { pos: 0, name: c.name, number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined });
+      const sup: Partial<BomRow> = c.source.kind === "asm" ? {} : { kind: s.kind, ...(s.standard ? { standard: s.standard } : {}), ...(s.size ? { size: s.size } : {}), ...(s.grade ? { grade: s.grade } : {}), ...(s.catalog ? { catalog: s.catalog } : {}), ...(s.vendor ? { vendor: s.vendor } : {}) };
+      rows.set(key, { pos: 0, name: c.name, number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined, ...sup, ...(i.noDesignation ? { noDesignation: true } : {}) });
     }
   }
   return [...rows.values()].sort(byGroup);
@@ -242,7 +252,7 @@ function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmCompone
  * • výchozí (plochý): jen díly, podsestavy se rozloží a počty se násobí,
  * • `structured`: podsestavy jako samostatné řádky a pod nimi jejich díly (`level` 1, 2…, počty na 1 ks podsestavy).
  */
-export function computeBom(asm: CadDoc, info: (c: AsmComponent) => { material?: string; massKg?: number }, opts: { structured?: boolean } = {}): BomRow[] {
+export function computeBom(asm: CadDoc, info: BomInfo, opts: { structured?: boolean } = {}): BomRow[] {
   let list: BomRow[];
   if (!opts.structured) {
     const leafs: { c: AsmComponent; n: number }[] = [];
@@ -363,16 +373,9 @@ export function asmComponent(doc: CadDoc, placement: Partial<Placement> = {}, ex
   };
 }
 
+/** Kusovník sestavy jako CSV – společný zapisovač s kusovníkem výkresu (bom-model.ts `bomCsvText`: oddíly, druh, desetinný oddělovač jazyka). */
 export function bomCsv(rows: BomRow[]): string {
-  const esc = (s: string | number | undefined) => {
-    const t = s == null ? "" : String(s);
-    return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-  };
-  const head = [tr("Pozice"), tr("Název"), tr("Číslo výkresu / norma"), tr("Ks"), tr("Materiál"), tr("Hmotnost 1 ks [kg]"), tr("Hmotnost celkem [kg]"), tr("Skupina")];
-  const lines = rows.map((r) =>
-    [r.pos, r.name, r.number, r.qty, r.material, r.massKg != null ? r.massKg.toFixed(3).replace(".", ",") : "", r.massKg != null ? (r.massKg * r.qty).toFixed(3).replace(".", ",") : "", r.group ? groupLabel(r.group) : ""].map(esc).join(";"),
-  );
-  return "﻿" + [head.join(";"), ...lines].join("\r\n") + "\r\n";
+  return bomCsvText(rows, groupLabel);
 }
 
 // ---------------- sestava ----------------
@@ -401,6 +404,8 @@ export function explodeOffset(center: Vec3, compCenter: Vec3, factor: number, ax
 
 const sk = (id: string, name: string, plane: Extract<Feature, { type: "sketch" }>["plane"], entities: Extract<Feature, { type: "sketch" }>["entities"]): Feature => ({ id, name, type: "sketch", plane, entities });
 const part = (name: string, material: string, features: Feature[], number?: string): CadDoc => ({ ...emptyDoc(name), material, features, kind: "part", props: number ? { number } : undefined });
+/** normálie generátoru (šroub, podložka, matice, kolík, pružina, vodicí sloupek / pouzdro, vyhazovač, středicí kroužek) – druh v kusovníku */
+const stdPart = (name: string, material: string, features: Feature[], number?: string): CadDoc => ({ ...part(name, material, features, number), supply: { kind: "standard" } });
 
 /** Válcový imbusový šroub ISO 4762 (zjednodušený, bez závitu). */
 export const ISO4762: Record<string, { k: number; dk: number; s: number; t: number }> = {
@@ -421,7 +426,7 @@ export function screwISO4762(size: keyof typeof ISO4762 | string, length: number
   const c = Math.max(0.3, d * 0.08);
   // hlava se srazí dřív, než se přidá dřík: sražení všech hran by jinak srazilo i vydutou hranu dřík–hlava a pod hlavou by
   // vznikl prstenec (Ø d + 2c), který se v průchozí díře / podložce vždy protne se sevřeným dílem (rozhodnutí 15.9)
-  return part(tr("Šroub {0}×{1}", size, length), "ocel", [
+  return stdPart(tr("Šroub {0}×{1}", size, length), "ocel", [
     { id: uid(), name: "Hlava", type: "cylinder", radius: g.dk / 2, height: g.k, position: [0, 0, 0], axis: "Z", mode: "new" },
     sk(hex, tr("Šestihran"), { kind: "base", name: "XY", offset: g.k }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: g.s / Math.sqrt(3), sides: 6, angle: 0 }]),
     { id: uid(), name: "Imbus", type: "extrude", sketchId: hex, distance: g.t, symmetric: false, reverse: true, mode: "cut" },
@@ -453,7 +458,7 @@ export const ISO7089: Record<string, [number, number, number]> = {
 
 export function washerISO7089(size: string): CadDoc {
   const [d1, d2, h] = ISO7089[size] ?? ISO7089.M8;
-  return part(tr("Podložka {0}", size), "ocel", [{ id: uid(), name: "Podložka", type: "tube", outer: d2, inner: d1, height: h, position: [0, 0, 0], axis: "Z", mode: "new" }], tr("ISO 7089 – {0} – 200 HV", size));
+  return stdPart(tr("Podložka {0}", size), "ocel", [{ id: uid(), name: "Podložka", type: "tube", outer: d2, inner: d1, height: h, position: [0, 0, 0], axis: "Z", mode: "new" }], tr("ISO 7089 – {0} – 200 HV", size));
 }
 
 /** Šestihranná matice ISO 4032 – s (otvor klíče) / m (výška). */
@@ -474,7 +479,7 @@ export function nutISO4032(size: string): CadDoc {
   const [sw, m] = ISO4032[size] ?? ISO4032.M8;
   const d = Number(String(size).replace(/[^\d.]/g, "")) || 8;
   const hex = uid();
-  return part(tr("Matice {0}", size), "ocel", [
+  return stdPart(tr("Matice {0}", size), "ocel", [
     sk(hex, tr("Šestihran"), { kind: "base", name: "XY", offset: 0 }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: sw / Math.sqrt(3), sides: 6, angle: 0 }]),
     { id: uid(), name: "Tělo", type: "extrude", sketchId: hex, distance: m, symmetric: false, reverse: false, mode: "new" },
     { id: uid(), name: "Závit", type: "hole", position: [0, 0, m], axis: "Z", flip: false, diameter: d * 0.85, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "tapped", thread: size },
@@ -483,7 +488,7 @@ export function nutISO4032(size: string): CadDoc {
 
 /** Válcový kolík ISO 8734 (kalený). */
 export function dowelISO8734(d: number, length: number): CadDoc {
-  return part(tr("Kolík Ø{0}×{1}", d, length), "ocel", [
+  return stdPart(tr("Kolík Ø{0}×{1}", d, length), "ocel", [
     { id: uid(), name: "Kolík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.2, d * 0.1), edges: "all" },
   ], tr("ISO 8734 – Ø{0}×{1} – A", d, length));
@@ -491,14 +496,14 @@ export function dowelISO8734(d: number, length: number): CadDoc {
 
 /** Tlačná pružina (konce bez broušení) – průměr pružiny D, drát d, volná délka L0, počet činných závitů n. */
 export function compressionSpring(D: number, wire: number, freeLength: number, turns: number): CadDoc {
-  return part(tr("Pružina tlačná {0}×{1}×{2}", D, wire, freeLength), "ocel", [
+  return stdPart(tr("Pružina tlačná {0}×{1}×{2}", D, wire, freeLength), "ocel", [
     { id: uid(), name: "Pružina", type: "spring", radius: D / 2, pitch: freeLength / turns, turns, wire, position: [0, 0, 0], axis: "Z", mode: "new" },
   ], tr("Pružina tlačná D{0} d{1} L0={2}", D, wire, freeLength));
 }
 
 /** Vodicí sloupek (typ s osazením, jako HASCO Z00 / Meusburger E1000 – zjednodušeně). */
 export function guidePillar(d: number, length: number, collar = 8): CadDoc {
-  return part(tr("Vodicí sloupek Ø{0}×{1}", d, length), "1.7131", [
+  return stdPart(tr("Vodicí sloupek Ø{0}×{1}", d, length), "1.7131", [
     { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Límec", type: "cylinder", radius: d / 2 + 4, height: collar, position: [0, 0, 0], axis: "Z", mode: "add" },
     { id: uid(), name: "Náběh", type: "chamfer", distance: 1, edges: "all" },
@@ -507,7 +512,7 @@ export function guidePillar(d: number, length: number, collar = 8): CadDoc {
 
 /** Vodicí pouzdro s límcem. */
 export function guideBush(d: number, length: number, collar = 8): CadDoc {
-  return part(tr("Vodicí pouzdro Ø{0}×{1}", d, length), "1.7131", [
+  return stdPart(tr("Vodicí pouzdro Ø{0}×{1}", d, length), "1.7131", [
     { id: uid(), name: "Tělo", type: "tube", outer: d + 8, inner: d, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Límec", type: "tube", outer: d + 16, inner: d, height: collar, position: [0, 0, length - collar], axis: "Z", mode: "add" },
   ], tr("Vodicí pouzdro Ø{0}×{1}", d, length));
@@ -517,7 +522,7 @@ export function guideBush(d: number, length: number, collar = 8): CadDoc {
 export function ejectorPin(d: number, length: number): CadDoc {
   const dh = d <= 3 ? d + 3 : d <= 6 ? d + 4 : d + 6;
   const kh = d <= 6 ? 3 : 5;
-  return part(tr("Vyhazovač Ø{0}×{1}", d, length), "1.2516", [
+  return stdPart(tr("Vyhazovač Ø{0}×{1}", d, length), "1.2516", [
     { id: uid(), name: "Hlava", type: "cylinder", radius: dh / 2, height: kh, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, kh], axis: "Z", mode: "add" },
   ], tr("ISO 8694 – Ø{0}×{1}", d, length));
@@ -525,7 +530,7 @@ export function ejectorPin(d: number, length: number): CadDoc {
 
 /** Středicí kroužek. */
 export function locatingRing(d = 100, h = 10): CadDoc {
-  return part(tr("Středicí kroužek Ø{0}", d), "ocel", [
+  return stdPart(tr("Středicí kroužek Ø{0}", d), "ocel", [
     { id: uid(), name: "Kroužek", type: "tube", outer: d, inner: 36, height: h, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: 1, edges: "all" },
   ], tr("Středicí kroužek Ø{0}", d));

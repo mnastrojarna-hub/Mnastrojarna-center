@@ -15,8 +15,8 @@ Prvky:
 ✓ normálie „Ložisko 6204-2RS (20×47×14)“ vložena do sestavy jako komponenta
 Sestava „Normálie“: komponent 3 · vazby 0
  #1 Podložka · díl · poloha [0; 0; 0] · ukotvená ⚓
- #2 Šroub M8×30 ISO 4762 · díl · poloha [0; 0; 3] · č. ISO 4762 – M8×30 – 12.9 · skupina Normálie
- #3 Ložisko 6204-2RS · díl · poloha [50; 0; 0] · č. 6204-2RS – 20×47×14 · skupina Normálie
+ #2 Šroub M8×30 ISO 4762 · díl · poloha [0; 0; 3] · č. ISO 4762 – M8×30 – 12.9 · skupina Normálie · druh normálie
+ #3 Ložisko 6204-2RS · díl · poloha [50; 0; 0] · č. 6204-2RS – 20×47×14 · skupina Normálie · druh normálie
 
 Dokument: „Normálie“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Podložka [0; 0; 0] ⚓ · Šroub M8×30 ISO 4762 [0; 0; 3] · Ložisko 6204-2RS [50; 0; 0]

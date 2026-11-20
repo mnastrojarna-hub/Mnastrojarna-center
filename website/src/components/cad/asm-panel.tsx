@@ -34,6 +34,8 @@ import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
 import { AsmInstanceProps } from "./asm-spring-props";
+import { AsmSupplyFields } from "./asm-supply";
+import { kindsIn, supplySection, supplyWord } from "@/cad/bom-model";
 import { renameProblem } from "@/cad/agent-asm";
 import { KIN_SPEC, isKinMode, kinHasLimits, kinHasValue } from "@/cad/mate-spec";
 import { CadIcon } from "./cad-icons";
@@ -663,6 +665,7 @@ export function AsmProps({
   onBolt,
   bolting,
   onRun,
+  partOf,
 }: {
   c: AsmComponent;
   /** sestava (komponenty a vazby) – seznamy ploch pro vazby, vazba Ukotvit */
@@ -688,6 +691,8 @@ export function AsmProps({
   bolting?: boolean;
   /** textový příkaz z panelu (pružina mezi komponentami) – provede ho konzole aplikace */
   onRun?: (text: string) => void;
+  /** díl otevřený v záložce podle názvu – stav kopie dílu a Obnovit z dílu (asm-supply.tsx, bod 22g) */
+  partOf?: (name: string) => CadDoc | null;
 }) {
   const [pat, setPat] = useState<CompPattern>({ kind: "linear", count: 3, spacing: 50, direction: [1, 0, 0] });
   const [mirrorPlane, setMirrorPlane] = useState<PlaneName>("YZ");
@@ -715,6 +720,8 @@ export function AsmProps({
         <TextProp key={`${c.id}:number:${c.number ?? ""}`} label={tr("Číslo / norma")} value={c.number ?? ""} onCommit={(v) => onChange({ number: v || undefined })} />
         <TextProp key={`${c.id}:group:${c.group ?? ""}`} label={tr("Skupina")} value={c.group ? groupLabel(c.group) : ""} onCommit={(v) => onChange({ group: v.trim() ? groupKey(v) : undefined })} />
       </div>
+      {/* druh v kusovníku (vyráběný / normálie / nakupovaný) a stav kopie dílu – bod 19 a 22g */}
+      <AsmSupplyFields c={c} doc={doc} onChange={onChange} onRun={onRun} partOf={partOf} />
       <AsmInstanceProps key={`${c.id}:${JSON.stringify(c.spring ?? null)}`} c={c} doc={doc} onChange={onChange} onRun={onRun} />
       {/* ukotvená komponenta (příznak nebo vazba Ukotvit) se nepřesouvá – jako gizmo a klávesa G; poloha jde změnit po uvolnění */}
       <fieldset disabled={!!c.fixed || fixedByMate} data-placement-locked={!!c.fixed || fixedByMate || undefined} className="space-y-4 disabled:opacity-55">
@@ -881,11 +888,30 @@ export function AsmProps({
   );
 }
 
-/** Kusovník – tabulka + CSV. */
-export function BomTable({ rows, onCsv, onDrawing }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void }) {
+/**
+ * Kusovník – tabulka + CSV. Při více druzích položek oddíly Vyráběné díly / Normálie / Nakupované díly (bom-model.ts);
+ * upozornění (`notes`): kopie dílu starší než díl v záložce (s tlačítkem Obnovit z dílu) a co chybí vyráběným dílům.
+ */
+export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void }) {
   const total = rows.reduce((s, r) => s + (r.massKg ?? 0) * r.qty, 0);
+  const sections = kindsIn(rows).length > 1 && !rows.some((r) => (r.level ?? 0) > 0);
+  let cur: string | undefined;
   return (
     <div>
+      {notes.length > 0 && (
+        <div data-bom-notes={notes.length} className="mb-2 space-y-1 rounded border border-[#f0c36d] bg-[#fff8e6] p-2 text-[11.5px] leading-snug text-[#7a5300]">
+          {notes.map((n, i) => (
+            <p key={i} data-bom-note={n.stale ? "stale" : "missing"}>
+              ⚠ {n.text}
+            </p>
+          ))}
+          {onRefresh && notes.some((n) => n.stale) && (
+            <button type="button" data-refresh-btn="bom" onClick={onRefresh} className="mt-1 rounded bg-brand px-2 py-1 text-[11.5px] font-semibold text-white hover:bg-brand-600">
+              {tr("Obnovit z dílů")}
+            </button>
+          )}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[12px]">
           <thead>
@@ -893,22 +919,45 @@ export function BomTable({ rows, onCsv, onDrawing }: { rows: BomRow[]; onCsv: ()
               <th className="px-2 py-1.5">Poz.</th>
               <th className="px-2 py-1.5">{tr("Název")}</th>
               <th className="px-2 py-1.5">{tr("Číslo / norma")}</th>
+              <th className="px-2 py-1.5">{tr("Rozměr / kat. č.")}</th>
               <th className="px-2 py-1.5 text-right">{tr("Ks")}</th>
               <th className="px-2 py-1.5">{tr("Materiál")}</th>
+              <th className="px-2 py-1.5">{tr("Druh")}</th>
               <th className="px-2 py-1.5 text-right">kg/ks</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.pos} className="border-b border-[#edf1f5]">
-                <td className="px-2 py-1 font-mono">{r.pos}</td>
-                <td className="px-2 py-1">{r.name}</td>
-                <td className="px-2 py-1 text-[#5b6776]">{r.number ?? ""}</td>
-                <td className="px-2 py-1 text-right font-mono">{r.qty}</td>
-                <td className="px-2 py-1">{r.material ?? ""}</td>
-                <td className="px-2 py-1 text-right font-mono">{r.massKg != null ? fmtNum(r.massKg, 3) : "—"}</td>
-              </tr>
-            ))}
+            {rows.flatMap((r) => {
+              const k = r.kind ?? "make";
+              const head =
+                sections && k !== cur ? (
+                  <tr key={`s-${k}`} data-bom-section={k} className="bg-[#f6f8fa]">
+                    <td colSpan={8} className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#5b6776]">
+                      {supplySection(k)}
+                    </td>
+                  </tr>
+                ) : null;
+              cur = k;
+              const sizeCell = r.kind === "buy" ? (r.catalog ?? "") : r.kind === "standard" ? [r.size, r.grade].filter(Boolean).join(" – ") : "";
+              return [
+                ...(head ? [head] : []),
+                <tr key={r.pos} data-bom-row={r.pos} data-bom-kind={r.kind} className="border-b border-[#edf1f5]">
+                  <td className="px-2 py-1 font-mono">{r.pos}</td>
+                  <td className="px-2 py-1">
+                    {r.name}
+                    {r.vendor ? <span className="text-[#6b7785]"> ({r.vendor})</span> : null}
+                  </td>
+                  <td className="px-2 py-1 text-[#5b6776]">{r.kind === "standard" ? (r.standard ?? r.number ?? "") : (r.number ?? "")}</td>
+                  <td className="px-2 py-1 text-[#5b6776]">{sizeCell}</td>
+                  <td className="px-2 py-1 text-right font-mono">{r.qty}</td>
+                  <td className={cn("px-2 py-1", r.noDesignation && "text-[#a15c00]")} title={r.noDesignation ? tr("díl nemá označení materiálu – jen třídu (materiál 1.2379 v dílu)") : undefined}>
+                    {r.material ?? ""}
+                  </td>
+                  <td className="px-2 py-1 text-[#5b6776]">{r.assembly ? "" : supplyWord(k as "make" | "standard" | "buy")}</td>
+                  <td className="px-2 py-1 text-right font-mono">{r.massKg != null ? fmtNum(r.massKg, 3) : "—"}</td>
+                </tr>,
+              ];
+            })}
           </tbody>
         </table>
       </div>

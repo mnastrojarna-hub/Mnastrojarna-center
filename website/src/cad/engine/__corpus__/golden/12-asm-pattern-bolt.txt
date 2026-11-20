@@ -30,10 +30,10 @@ Sestava „Spoj“: komponent 8 · vazby 2 (2 ok)
  #2 Kolík · díl · poloha [60; 30; 10]
  #3 Kolík (2) · díl · poloha [60; 40; 10]
  #4 Kolík (3) · díl · poloha [60; 50; 15] · č. K-3
- #5 Podložka M8 · díl · poloha [20; 15; 10] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
- #6 Šroub M8×25 · díl · poloha [20; 15; 11,6] · č. ISO 4762 – M8×25 – 12.9 · skupina Normálie
- #7 Podložka M8 · díl · poloha [20; 15; 0] · natočení [-180; 0; -180] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
- #8 Matice M8 · díl · poloha [20; 15; -1,6] · natočení [-180; 0; -180] · č. ISO 4032 – M8 – 8 · skupina Normálie
+ #5 Podložka M8 · díl · poloha [20; 15; 10] · č. ISO 7089 – M8 – 200 HV · skupina Normálie · druh normálie
+ #6 Šroub M8×25 · díl · poloha [20; 15; 11,6] · č. ISO 4762 – M8×25 – 12.9 · skupina Normálie · druh normálie
+ #7 Podložka M8 · díl · poloha [20; 15; 0] · natočení [-180; 0; -180] · č. ISO 7089 – M8 – 200 HV · skupina Normálie · druh normálie
+ #8 Matice M8 · díl · poloha [20; 15; -1,6] · natočení [-180; 0; -180] · č. ISO 4032 – M8 – 8 · skupina Normálie · druh normálie
 
 Dokument: „Spoj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Kolík [60; 30; 10] · Kolík (2) [60; 40; 10] · Kolík (3) [60; 50; 15] · Podložka M8 [20; 15; 10] · Šroub M8×25 [20; 15; 11,6] · Podložka M8 [20; 15; 0] ∠[-180; 0; -180] · Matice M8 [20; 15; -1,6] ∠[-180; 0; -180]

@@ -35,13 +35,15 @@ export type DrawingIssueKind =
   | "overlap"
   /** nová / upravená poznámka listu přesahuje rámeček listu (`ann`) – engine ji ověří znovu na konci bloku */
   | "frame"
+  /** vydaný list ze starší revize modelu / vydání se stejným písmenem po změně modelu (vlna 22, bod 20 – cad/doc-outputs.ts) */
+  | "stale"
   /** ostatní varování jádra výkresu (text jako odznak) */
   | "other";
 
 export type DrawingIssue = {
   level: "error" | "warn";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing" | "drawing.stale";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;

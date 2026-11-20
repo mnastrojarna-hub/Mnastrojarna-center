@@ -13,13 +13,14 @@
  * Provedení (jádro, řešič vazeb, záložky): cad/asm-agent.ts.
  */
 import { getLang, tr } from "./i18n";
-import { MATERIALS, massKg } from "@/lib/mesh-metrics";
+import { supplyKindOf, supplyWord, supplyWordsHelp, supplyOf, supplySection, kindsIn, bomNotes } from "./bom-model";
+import { MATERIALS } from "@/lib/mesh-metrics";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "./assembly";
 import { MATE_LABEL, axisLabel, dirLabel, lostSides, mateLost, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
 import { isKinMate } from "./mates-kin";
 import { springStatusLine, type SpringCheck } from "./asm-spring";
 import type { MotionCmd } from "./agent-motion";
-import type { AsmComponent, BuildResult, CadDoc, LostRef, Mate, MateRef, Vec3 } from "./types";
+import type { AsmComponent, CadDoc, LostRef, Mate, MateRef, SupplyKind, Vec3 } from "./types";
 
 /* ───────────────────────── typy ───────────────────────── */
 
@@ -41,6 +42,8 @@ export type CompPatch = {
   material?: string;
   /** přezdívka instance („“ = zrušit) */
   alias?: string;
+  /** druh položky kusovníku a údaje normálie / nákupu (bom-model.ts); `kind: null` = zpět na výchozí druh */
+  supply?: { kind?: SupplyKind | null; catalog?: string; vendor?: string; size?: string; grade?: string };
 };
 export type AsmCmd =
   | { k: "list" }
@@ -80,6 +83,8 @@ export type AsmCmd =
   | { k: "done" }
   | { k: "open"; comp: string }
   | { k: "bom"; structured: boolean; csv: boolean }
+  /** obnova komponent z dílů záložek (asm-refresh.ts, bod 22g): `metaOnly` = jen číslo, materiál a druh */
+  | { k: "refresh"; comps: string[] | "all"; metaOnly: boolean }
   | { k: "moldbase"; params: MoldBaseParams; name?: string }
   | { k: "tabs" }
   | { k: "tab"; target: string | number }
@@ -142,8 +147,9 @@ const SUB: [AsmSub, Set<string>][] = [
   ["open", W("otevřít", "open", "öffnen", "oeffnen")],
   ["spring", W("pružina", "pružinu", "spring", "feder")],
   ["springs", W("pružiny", "springs", "federn")],
+  ["refresh", W("obnovit", "aktualizovat", "refresh", "update", "aktualisieren")],
 ];
-type AsmSub = "faces" | "mate" | "mates" | "comp" | "list" | "remove" | "duplicate" | "isolate" | "hide" | "show" | "fix" | "release" | "pattern" | "mirror" | "bolt" | "sub" | "dissolve" | "edit" | "done" | "open" | "spring" | "springs";
+type AsmSub = "faces" | "mate" | "mates" | "comp" | "list" | "remove" | "duplicate" | "isolate" | "hide" | "show" | "fix" | "release" | "pattern" | "mirror" | "bolt" | "sub" | "dissolve" | "edit" | "done" | "open" | "spring" | "springs" | "refresh";
 const ALL = W("vše", "všechny", "všechno", "all", "everything", "alle", "alles");
 
 const MATE_KIND: Record<string, MateKind> = Object.fromEntries(
@@ -192,6 +198,14 @@ const O = {
   group: W("skupina", "group", "gruppe"),
   material: W("materiál", "material", "werkstoff"),
   alias: W("přezdívka", "alias", "spitzname"),
+  /** druh položky kusovníku a údaje normálie / nákupu (vlna 22, bod 19) */
+  supply: W("druh", "kind", "supply", "art", "beschaffung"),
+  catalog: W("katalog", "katalogové", "catalog", "catalogue", "katalognummer", "bestellnummer"),
+  vendor: W("výrobce", "dodavatel", "vendor", "manufacturer", "supplier", "hersteller", "lieferant"),
+  size: W("rozměr", "size", "größe", "groesse", "abmessung"),
+  grade: W("třída", "class", "grade", "klasse", "festigkeitsklasse"),
+  /** `sestava obnovit … údaje` – jen vlastnosti do kusovníku */
+  metaOnly: W("údaje", "vlastnosti", "props", "properties", "meta", "daten", "eigenschaften"),
   spacing: W("rozteč", "krok", "spacing", "pitch", "step", "abstand", "teilung"),
   count: W("počet", "ks", "count", "anzahl"),
   direction: W("směr", "direction", "dir", "richtung"),
@@ -325,7 +339,7 @@ export { Cur as AsmCursor, W as asmWords, isNum as asmIsNum, num as asmNum };
 /** číslo nebo název (záložka, vazba) */
 const target = (t: Tok): string | number => (!t.q && /^#?\d+$/.test(t.t) ? Number(t.t.replace("#", "")) : t.t.trim());
 
-const SUB_HELP = () => tr("plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny");
+const SUB_HELP = () => tr("plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny, obnovit");
 
 /**
  * Rozbor příkazu sestavy. `cmd` = kanonický název příkazu z agent.ts (assembly, bom, moldbase, tabs, tab, closetab, closed),
@@ -445,7 +459,7 @@ const MOLD_LABEL = (): Record<MoldKey, string> => ({ aPlate: tr("Deska A (pevná
 
 /* ───────────────────────── sestava … ───────────────────────── */
 
-const COMP_HELP = () => tr("v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název \"…\", číslo \"…\", skupina \"…\", materiál …, přezdívka \"…\"");
+const COMP_HELP = () => tr("v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název \"…\", číslo \"…\", skupina \"…\", materiál …, přezdívka \"…\", druh vyráběný|normálie|nakupovaný|auto, katalog \"…\", výrobce \"…\", rozměr \"…\", třída \"…\"");
 
 function parseAssembly(c: Cur): AsmCmd {
   if (c.done) return { k: "list" };
@@ -566,6 +580,23 @@ function parseAssembly(c: Cur): AsmCmd {
       return { k: "springs" };
     case "spring":
       return c.done ? { k: "springs" } : parseSpring(c);
+    case "refresh": {
+      // sestava obnovit "Deska A" ["Čep" …] | vše [údaje] – kopie dílu z dílu v záložce (asm-refresh.ts, bod 22g)
+      const comps: string[] = [];
+      let all = false;
+      let metaOnly = false;
+      while (!c.done) {
+        if (!c.peek()!.q && ALL.has(c.word())) {
+          c.i++;
+          all = true;
+        } else if (!c.peek()!.q && O.metaOnly.has(c.word())) {
+          c.i++;
+          metaOnly = true;
+        } else comps.push(compArg(c, ""));
+      }
+      if (!all && !comps.length) throw new Error(tr("chybí název komponenty: sestava obnovit \"Deska A\" | vše [údaje]"));
+      return { k: "refresh", comps: all ? "all" : comps, metaOnly };
+    }
   }
 }
 
@@ -715,6 +746,19 @@ function parseComp(c: Cur): AsmCmd {
     } else if (c.is(O.material)) {
       c.i++;
       p.material = c.str(tr("materiál"));
+    } else if (c.is(O.supply)) {
+      c.i++;
+      const t = c.next();
+      const k = t ? supplyKindOf(t.t) : null;
+      if (!t || !k) throw new Error(tr("druh: čekám {0}, ne „{1}“", supplyWordsHelp(), t?.t ?? ""));
+      p.supply = { ...(p.supply ?? {}), kind: k === "auto" ? null : k };
+    } else if (c.is(O.catalog) || c.is(O.vendor) || c.is(O.size) || c.is(O.grade)) {
+      const key = c.is(O.catalog) ? "catalog" : c.is(O.vendor) ? "vendor" : c.is(O.size) ? "size" : "grade";
+      c.i++;
+      // `katalog ""` = údaj zrušit (jako přezdívka)
+      const t = c.peek();
+      const v = t && t.q && !t.t.trim() ? (c.i++, "") : c.str(key === "catalog" ? tr("katalog") : key === "vendor" ? tr("výrobce") : key === "size" ? tr("rozměr") : tr("třída"));
+      p.supply = { ...(p.supply ?? {}), [key]: v };
     } else if (c.is(O.alias) || c.is(O.as)) {
       c.i++;
       // `přezdívka ""` nebo `přezdívka` na konci řádku = zrušit
@@ -1290,7 +1334,10 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
   const comps = doc.components ?? [];
   const out = [tr("Sestava „{0}“: komponent {1} · vazby {2}", doc.name, comps.length, matesSummary(doc, status))];
   comps.forEach((c, i) => {
-    const flags = [isFixed(doc, c) ? tr("ukotvená ⚓") : "", c.hidden ? tr("skrytá") : "", c.number ? tr("č. {0}", c.number) : "", c.group ? tr("skupina {0}", c.group) : ""].filter(Boolean);
+    // druh položky kusovníku: normálie / nakupovaný vždy, vyráběný jen zadaný ručně (bom-model.ts, bod 19)
+    const sp = c.source.kind === "asm" ? null : supplyOf(c);
+    const kind = sp && (sp.kind !== "make" || sp.explicit) ? tr("druh {0}", supplyWord(sp.kind)) + (sp.catalog ? ` · ${tr("katalog {0}", sp.catalog)}` : "") + (sp.vendor ? ` · ${tr("výrobce {0}", sp.vendor)}` : "") : "";
+    const flags = [isFixed(doc, c) ? tr("ukotvená ⚓") : "", c.hidden ? tr("skrytá") : "", c.number ? tr("č. {0}", c.number) : "", c.group ? tr("skupina {0}", c.group) : "", kind].filter(Boolean);
     out.push(` #${i + 1} ${c.name}${c.alias ? ` [${c.alias}]` : ""} · ${srcText(c)} · ${tr("poloha {0}", pt(c.placement.position))}${rotText(c.placement.rotation) ? ` · ${tr("natočení {0}", pt(c.placement.rotation))}` : ""}${flags.length ? ` · ${flags.join(" · ")}` : ""}`);
   });
   if (!comps.length) out.push(tr(" (prázdná – vložit \"díl\" · normálie M8x30 · rám formy)"));
@@ -1312,15 +1359,13 @@ export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>,
   return out;
 }
 
-/** Materiál a hmotnost dílu do kusovníku – stejně jako kusovník v aplikaci (označení materiálu dílu, jinak třída). */
-export function bomPartInfo(c: AsmComponent, r: BuildResult | null | undefined): { material?: string; massKg?: number } {
-  const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
-  const mt = MATERIALS.find((x) => x.id === matId);
-  const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
-  return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
-}
+/** Materiál a hmotnost dílu do kusovníku – jedna funkce pro text, CLI i aplikaci (bom-model.ts, vlna 22 bod 22g/19). */
+export { bomPartInfo } from "./bom-model";
 
-/** Kusovník jako textová tabulka (do protokolu). */
+/**
+ * Kusovník jako textová tabulka (do protokolu). Plochý kusovník s více druhy položek je v oddílech (Vyráběné díly /
+ * Normálie / Nakupované díly – bom-model.ts); nakupovaná položka bez čísla ukáže katalogové číslo, výrobce v závorce.
+ */
 export function bomText(rows: BomRow[], docName: string, structured: boolean): string {
   const qty = rows.filter((r) => !structured || (r.level ?? 0) === 0).reduce((s, r) => s + r.qty, 0);
   const leafRows = structured ? rows.filter((r) => !r.assembly) : rows;
@@ -1328,8 +1373,29 @@ export function bomText(rows: BomRow[], docName: string, structured: boolean): s
   const unknown = rows.some((r) => r.massKg == null);
   const head = tr("Kusovník „{0}“ ({1}): položek {2}, kusů {3}, hmotnost Σ {4} kg{5}", docName, structured ? tr("strukturovaný") : tr("plochý"), rows.length, qty, fmt(total, 3), unknown ? tr(" (bez dílů, které se nepostavily)") : "");
   const lines = [head, tr("Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks")];
-  for (const r of rows) lines.push(`${"  ".repeat(r.level ?? 0)}${r.pos} | ${r.name} | ${r.number ?? ""} | ${r.qty} | ${r.material ?? ""} | ${r.massKg != null ? fmt(r.massKg, 3) : "–"}`);
+  const sections = !structured && kindsIn(rows).length > 1;
+  let cur: SupplyKind | undefined;
+  for (const r of rows) {
+    if (sections && (r.kind ?? "make") !== cur) {
+      cur = r.kind ?? "make";
+      lines.push(`— ${supplySection(cur)} —`);
+    }
+    const number = r.number ?? r.catalog ?? "";
+    lines.push(`${"  ".repeat(r.level ?? 0)}${r.pos} | ${r.name}${r.vendor ? ` (${r.vendor})` : ""} | ${number} | ${r.qty} | ${r.material ?? ""} | ${r.massKg != null ? fmt(r.massKg, 3) : "–"}`);
+  }
   return lines.join("\n");
+}
+
+/**
+ * Upozornění kusovníku jako řádky ⚠ (kód `bom.make-incomplete`): vyráběné díly bez čísla výkresu a bez označení materiálu.
+ * Prázdný seznam = nic nechybí v TĚCHTO řádcích – kusovník nic dalšího netvrdí (výkresy hlídá `docSupply`).
+ */
+export function bomWarnings(rows: BomRow[]): string[] {
+  const n = bomNotes(rows);
+  const out: string[] = [];
+  if (n.noNumber.length) out.push(tr("vyráběné díly bez čísla výkresu: {0} – číslo: výkres razítko číslo=\"…\" v dílu, nebo sestava komponenta \"…\" číslo \"…\"", n.noNumber.join(", ")));
+  if (n.noMaterial.length) out.push(tr("vyráběné díly bez označení materiálu (jen třída): {0} – materiál 1.2379 v dílu", n.noMaterial.join(", ")));
+  return out;
 }
 
 /** Otevřená záložka dokumentu (výpis `záložky`, `window.mncad.tabs()`). */

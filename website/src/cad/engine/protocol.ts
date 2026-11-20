@@ -416,6 +416,7 @@ export function docKv(d: DocSummary): string {
   if (d.kind === "part" && d.free) kv.push(`free=${d.free}`);
   if (d.features?.unchecked) kv.push(`unchecked=${d.features.unchecked}`);
   if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓
+  if (d.rev) kv.push(`rev=${d.rev}`); // revize modelu dokumentu s výkresy / exporty (vlna 22, bod 20 – před `stale=`)
   if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
   return `${kind} ${kv.join(" ") || "-"}`;
 }

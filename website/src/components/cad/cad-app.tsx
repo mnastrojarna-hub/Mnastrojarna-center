@@ -8,7 +8,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { clashSig } from "@/cad/clash-class";
-import { clashStateOf, dropResults, leavesSig, mateSig, mateSigOf, noteResult, resultId, resultIdOf, resultState, setMateStatus as stampMateStatus, stampResult, type ClashState, type ResultKind, type ResultState } from "@/cad/engine/result-key";
+import { clashStateOf, dropResults, leavesSig, mateSig, mateSigOf, noteResult, resultId, resultIdOf, resultState, setMateStatus as stampMateStatus, staleResults, stampResult, type ClashState, type ResultKind, type ResultState } from "@/cad/engine/result-key";
+import { recordExport } from "@/cad/doc-outputs";
+import { staleCopies, staleCopyText } from "@/cad/asm-refresh";
+import { OutputsPanel } from "./outputs-panel";
 import { apply3, boltStack, bomCsv, componentCopy, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, removeComponents, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import { groupKey } from "@/cad/asm-groups";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
@@ -80,6 +83,8 @@ import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect"
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4, subassemblyPick, treeSelAfterPick } from "./asm-flatten";
 import { measureApi } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
+import { bomNotesOf } from "./asm-supply";
+import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
 import { useSpringBetween } from "./springs/spring-between";
@@ -91,7 +96,7 @@ import { runScript } from "@/cad/engine/run";
 import { formatConsole } from "@/cad/engine/protocol";
 import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
-import { presentStatusText } from "@/cad/engine/asm-status";
+import { bomItemOf, presentStatusText } from "@/cad/engine/asm-status";
 import type { EngineHost } from "@/cad/engine/host";
 import type { Workspace } from "@/cad/engine/workspace";
 import { isAutomation } from "@/lib/automation";
@@ -1344,6 +1349,9 @@ export function CadApp() {
   const hasMates = isAsm && !!doc.mates?.length;
   const mateSigNow = useMemo(() => (hasMates ? mateSigOf(doc, docAsmSig) : ""), [hasMates, doc, docAsmSig]);
   const mateRec = hasMates ? engineRef.current!.ws.asm.mateStatus.get(docKeyNow) : undefined;
+  /** zastaralé výstupy pro panel „Zastaralé výstupy“ (vlna 22, bod 20): uložené analýzy (A1 `staleResults`) a kopie dílů (D1) */
+  const staleNow = useMemo(() => (doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc)), [doc, docKeyNow, clashEntry, mateRec, resVer]);
+  const copiesNow = useMemo(() => (isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : []), [isAsm, doc, asmVer]);
   const mateState: ResultState = mateRec ? resultState(mateRec, { doc: docKeyNow, sig: mateSigNow }) : "unchecked";
   const mateStatus = mateState === "ok" && mateRec ? mateRec : NO_MATES;
   /** otisk toho, co je teď v 3D okně k měření / mapě / dělicí rovině: díl = naposledy postavená geometrie, sestava = listy a polohy */
@@ -1436,14 +1444,8 @@ export function CadApp() {
   }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid]);
 
   const asmPartInfo = useCallback(
-    (c: AsmComponent) => {
-      const r = asmCache.current.get(sourceKey(c.source));
-      const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
-      const mt = MATERIALS.find((x) => x.id === matId);
-      // do kusovníku jde označení materiálu dílu (razítko, např. „TEST – 1.2311“), třída (Ocel) jen když označení chybí
-      const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
-      return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
-    },
+    // jedna funkce materiálu a hmotnosti pro aplikaci, text i CLI (bom-model.ts – označení, třída v jazyce, normálie = třída pevnosti)
+    (c: AsmComponent) => bomPartInfo(c, asmCache.current.get(sourceKey(c.source))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [asmVer],
   );
@@ -2599,6 +2601,7 @@ export function CadApp() {
       const bytes = r.data.byteLength;
       const check = r.check ? (r.check.ok ? " · ✓" : " · ⚠ " + r.check.line.replace(/^[✓⚠✗]\s*/, "")) : "";
       flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check);
+      liveWith((cur) => recordExport(cur, { what: "model", format, file: target.name }).doc); // záznam exportu s revizí modelu (bod 20)
       track("cad_export", { format });
     } catch (e) {
       if (isRunCancelled(e) || isCancelled(e)) flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
@@ -2997,7 +3000,7 @@ export function CadApp() {
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
   /** výkres pro textové příkazy a window.mncad.exportDrawing: hmotnost, kusovník a pozice jako ve výkresovém prostředí */
   const drawEnvRef = useRef<DrawingExtras>({});
-  drawEnvRef.current = isAsm ? { massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0), bom: bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })), balloons: balloonItems } : { massKg: result?.metrics ? massKg(result.metrics.volume, mat.density) : undefined };
+  drawEnvRef.current = isAsm ? { massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0), bom: bom.map(bomItemOf), balloons: balloonItems } : { massKg: result?.metrics ? massKg(result.metrics.volume, mat.density) : undefined };
   const m = result?.metrics;
   const errors = result?.status.filter((s) => !s.ok) ?? [];
   const warnings = result?.status.filter((s) => s.ok && s.warning) ?? [];
@@ -4169,6 +4172,7 @@ export function CadApp() {
               </div>
             )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
+            {!sketch && <OutputsPanel doc={doc} analyses={staleNow} copies={copiesNow} onRecompute={() => runAgentRef.current("přepočítat vše")} />}
 
             {!sketch && (
               <div className={cn("pointer-events-none absolute bottom-2 left-24 right-24 flex flex-wrap justify-center gap-1.5 font-mono text-[10.5px]", bg.dark ? "text-white/80" : "text-[#26303b]")}>
@@ -4253,6 +4257,7 @@ export function CadApp() {
                   }}
                   bolting={!!boltPick}
                   onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
+                  partOf={(n) => engineRef.current?.ws.findPart(n) ?? null}
                 />
               </div>
               <div className="flex gap-2 border-t border-[#d5dbe2] p-3">
@@ -4426,6 +4431,8 @@ export function CadApp() {
             </div>
             <BomTable
               rows={bom}
+              notes={bomNotesOf(doc, bom, (n) => engineRef.current?.ws.findPart(n) ?? null)}
+              onRefresh={() => void runAgentRef.current(`sestava obnovit vše`).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
               onCsv={() => download(`${safeName(doc.name)}_kusovnik.csv`, bomCsv(bom), "text/csv;charset=utf-8")}
               onDrawing={() => {
                 setBomOpen(false);
@@ -4576,12 +4583,14 @@ export function CadApp() {
             }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? tr("dle kusovníku") : doc.materialName?.trim() || mat.label}
-            bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
+            bom={isAsm ? bom.map(bomItemOf) : undefined}
             drawings={doc.drawings}
             balloons={balloonItems}
             docKey={docId.current}
             onDrawingsChange={(d, o) => writeDrawings(d, o)}
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
+            onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
+            onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => {
               const t = docTabs.find((x) => x.id === tabId);

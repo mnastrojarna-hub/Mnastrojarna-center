@@ -39,7 +39,7 @@ import { docSummaries, pickMain, summarize, workspaceDocs, type DocItem } from "
 import { verifyKeyOf } from "../engine/verify";
 import { hostAssets, setHostAssets } from "../host-assets";
 import { selfStoreBase } from "../share";
-import { hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
+import { asmDocNotes, hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
 import { shareInfo, shareWithPolicy } from "../engine/share-out";
 import type { DocSummary, Entry, OutFile, RunReport, ShareInfo } from "../engine/protocol-types";
 import type { Workspace } from "../engine/workspace";
@@ -313,6 +313,13 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
       }
       hooks.opEnd(null, `out:${fmt}`, Date.now() - t1);
     }
+    // sestava: úplnost výrobní dokumentace i bez výkresového výstupu (vlna 22, bod 19 – vyráběné bez výkresu / čísla)
+    if (formatsFor(it.doc, p.formats).length)
+      for (const n of asmDocNotes(it.doc)) {
+        // bez výkresového výstupu jen ℹ (přísný běh kvůli tomu nezastaví); výkres / kusovník ji hlásí jako ⚠ (writeDocFormat)
+        const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), level: "note" });
+        if (!rb.entries.some((x) => x.code === e.code && x.doc === e.doc && x.text === e.text)) rb.add(e);
+      }
   }
   if (strictStop(rb, rb.entries.slice(beforeOut), strict)) {
     staging?.discard();

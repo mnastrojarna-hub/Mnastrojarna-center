@@ -455,18 +455,19 @@ describe("provedení: podsestavy, úprava v kontextu, otevřít, kusovník, rám
     const d = (await run(asm(), 'sestava pole "Čep" 2 rozteč 30', env)).doc;
     const b = await bomData(d, env, false);
     // vlna 15 (B15): kopie z pole jsou tentýž díl → jeden řádek podle zdroje (dřív „Čep“ a „Čep (2)“ zvlášť)
+    // vlna 22 (bod 22g): díl bez označení materiálu už není tiché „Ocel“, ale „— (třída Ocel)“ (bom-model.ts bomPartInfo)
     expect(b.rows.map((x) => [x.name, x.qty, x.material])).toEqual([
-      ["Deska", 1, "Ocel"],
-      ["Čep", 2, "Ocel"],
+      ["Deska", 1, "— (třída Ocel)"],
+      ["Čep", 2, "— (třída Ocel)"],
     ]);
     expect(b.rows[0].massKg).toBeCloseTo(0.3611, 4);
     expect(b.text.split("\n")[0]).toBe("Kusovník „Sestava“ (plochý): položek 2, kusů 3, hmotnost Σ 0,408 kg");
-    expect(b.text.split("\n")[2]).toBe("1 | Deska |  | 1 | Ocel | 0,361");
+    expect(b.text.split("\n")[2]).toBe("1 | Deska |  | 1 | — (třída Ocel) | 0,361");
     expect(b.csv).toBe(bomCsv(b.rows));
     expect(b.csv).toMatch(/^﻿Pozice;Název;Číslo výkresu \/ norma;Ks;Materiál/);
     const r = await run(d, "kusovník csv", env);
     expect(r.log[0]).toMatch(/^Kusovník „Sestava“ \(plochý\)/);
-    expect(r.log[1]).toBe("CSV (oddělovač ;):");
+    expect(r.log[1]).toBe("CSV (oddělovač ;, desetinná čárka):"); // vlna 22: desetinný oddělovač podle jazyka (bom-model.ts csvCaption)
     const sub = (await run(d, 'sestava podsestava "Čep" "Čep (2)" jako "Kolíky"', env)).doc;
     const s = await bomData(sub, env, true);
     expect(s.rows.map((x) => [x.name, x.qty, x.level ?? 0])).toEqual([

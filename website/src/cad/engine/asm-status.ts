@@ -14,6 +14,7 @@ import type { DrawingExtras } from "../drawing-agent";
 import type { MateStatus } from "../mates";
 import type { AsmComponent, BuildResult, CadDoc, Vec3 } from "../types";
 import { fmtNum, MATERIALS, massKg } from "@/lib/mesh-metrics";
+import { bomPartInfo, type BomPartInfo } from "../bom-model";
 import { asmWorldBox } from "./asm-box";
 import { springCheck } from "./spring-fresh";
 import { makeAsmEnv, type AsmEnvOptions } from "./asm-env";
@@ -38,12 +39,9 @@ export async function ensureLeaves(ws: Workspace, kernel: KernelApi, doc: CadDoc
 }
 
 /** materiál a hmotnost komponenty pro kusovník (označení materiálu dílu, jinak třída; hustota třídy) */
-export function partInfo(cache: Map<string, BuildResult>, c: AsmComponent): { material: string; massKg?: number } {
-  const r = cache.get(sourceKey(c.source));
-  const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
-  const mt = MATERIALS.find((x) => x.id === matId);
-  const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
-  return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
+export function partInfo(cache: Map<string, BuildResult>, c: AsmComponent): BomPartInfo {
+  // jedna funkce materiálu a hmotnosti pro text, CLI i aplikaci (bom-model.ts, vlna 22 body 22g a 19)
+  return bomPartInfo(c, cache.get(sourceKey(c.source)));
 }
 
 /** světová obálka listů podle obálek dílů v mezipaměti */
@@ -168,6 +166,23 @@ export async function presentStatusText(ws: Workspace, kernel: KernelApi, o: Asm
   return docStatusText(d, res, asm, staleNotes(ws, d, ws.docKey()));
 }
 
+/** řádek kusovníku sestavy → položka kusovníku na listu (druh, norma, rozměr, třída, katalog, výrobce – bom-model.ts) */
+export const bomItemOf = (r: import("../assembly").BomRow): NonNullable<DrawingExtras["bom"]>[number] => ({
+  pos: r.pos,
+  name: r.name,
+  number: r.number,
+  qty: r.qty,
+  material: r.material,
+  massKg: r.massKg,
+  ...(r.kind ? { kind: r.kind } : {}),
+  ...(r.standard ? { standard: r.standard } : {}),
+  ...(r.size ? { size: r.size } : {}),
+  ...(r.grade ? { grade: r.grade } : {}),
+  ...(r.catalog ? { catalog: r.catalog } : {}),
+  ...(r.vendor ? { vendor: r.vendor } : {}),
+  ...(r.noDesignation ? { noDesignation: true } : {}),
+});
+
 /**
  * Doplňky razítka výkresu (hmotnost, kusovník, pozice komponent) jako ve výkresovém prostředí aplikace: sestava =
  * kusovník (plochý / strukturovaný podle `flat`) z postavených dílů a světové obálky komponent po řádcích kusovníku;
@@ -193,7 +208,7 @@ export async function drawExtras(ws: Workspace, kernel: KernelApi, doc: CadDoc, 
   }
   return {
     massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0),
-    bom: bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })),
+    bom: bom.map(bomItemOf),
     balloons,
   };
 }

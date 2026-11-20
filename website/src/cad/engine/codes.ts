@@ -103,6 +103,9 @@ export const CODES = [
   { code: "insert.name-ignored", level: "warn", key: "název instance „{0}“ se zatím neukládá" },
   // ── sestava, kolize, pohyb (5.2 č. 11, 19, 20, 29, 30, 40; kap. 6.3, 7, 9.2) ──
   { code: "asm.stale-copy", level: "warn", key: "komponenta je kopie dílu – pozdější změny dílu se nepromítnou" },
+  // kusovník a dokumentace podle druhu položky (vlna 22, bod 19 – cad/bom-model.ts)
+  { code: "bom.make-incomplete", level: "warn", key: "vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}" },
+  { code: "bom.docs", level: "note", key: "dokumentace: {0}" },
   { code: "asm.depth", level: "warn", key: "podsestavy hlubší než {0} úrovní se vynechají" },
   { code: "asm.faces-truncated", level: "warn", key: "díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}" },
   { code: "asm.kernel-restarted", level: "note", key: "jádro se restartovalo – mezipaměti sestavy vyprázdněny" },
@@ -150,6 +153,8 @@ export const CODES = [
   { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
+  // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
+  { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },
   // ── náhradní kódy pro hlášky bez vlastního kódu (do přiřazení v balíku B4) ──
   { code: "msg.error", level: "error", key: "chyba: {0}" },

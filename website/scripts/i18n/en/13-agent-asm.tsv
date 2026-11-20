@@ -66,7 +66,6 @@
 ✓ zrcadlení „{0}“ podle {1}{2} → „{3}“ {4} (zrcadlí se poloha a natočení, geometrie dílu se nezrcadlí)	✓ mirror of „{0}“ about {1}{2} → „{3}“ {4} (position and orientation are mirrored, the part geometry is not)
 barva {0}	colour {0}
 barva: čekám #rrggbb (např. #e03930), ne „{0}“	colour: #rrggbb expected (e.g. #e03930), not „{0}“
-CSV (oddělovač ;):	CSV (separator ;):
 číslo	number
 číslo „{0}“	number „{0}“
 číslo plochy začíná F1	face numbers start at F1

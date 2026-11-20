@@ -95,6 +95,8 @@ export function makeAsmEnv(ws: Workspace, kernel: KernelApi, o: AsmEnvOptions = 
     // výsledky pohybové studie: úložiště tohoto pracovního prostoru, klíč dokumentu (nový dokument běhu má svůj – run-doc.ts docKeyOf)
     motion: { key: o.docKey ?? ws.docKey(), store: motionStoreOf(asm) },
     ...(o.onFacesTruncated ? { onFacesTruncated: (key: string, limit: number) => o.onFacesTruncated!(sourceName(sources.get(key), key), limit) } : {}),
+    // díl záložky podle názvu: zastaralé kopie v kusovníku a `sestava obnovit` (cad/asm-refresh.ts, vlna 22 bod 22g)
+    partOf: (name) => ws.findPart(name),
     tabs: {
       list: () => ws.tabs(),
       activate: (id) => ws.activate(id),

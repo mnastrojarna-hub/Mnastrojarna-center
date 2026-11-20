@@ -34,6 +34,7 @@ import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
+import { emitIssue } from "./doc-outputs";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
@@ -211,6 +212,17 @@ const WORDS = {
   comp: ["komponenta", "component", "komponente"],
   number: ["číslo", "number", "nummer"],
   group: ["skupina", "group", "gruppe"],
+  // druh položky kusovníku (vlna 22, bod 19): komponenta `sestava komponenta #k druh …`, díl `druh …`
+  supplyComp: ["druh", "kind", "art"],
+  supplyPart: ["druh", "supply", "beschaffung"],
+  sMake: ["vyráběný", "make", "fertigung"],
+  sStandard: ["normálie", "standard", "norm"],
+  sBuy: ["nakupovaný", "buy", "kauf"],
+  sAuto: ["auto", "auto", "auto"],
+  catalog: ["katalog", "catalog", "katalog"],
+  vendor: ["výrobce", "vendor", "hersteller"],
+  size: ["rozměr", "size", "größe"],
+  grade: ["třída", "class", "klasse"],
   hide: ["skrýt", "hide", "ausblenden"],
   mate: ["vazba", "mate", "verknüpfung"],
   value: ["hodnota", "value", "wert"],
@@ -1687,6 +1699,7 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
     }
     // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
     emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
+    emitIssue(c.sheetOut, doc, s); // vydání listu (vlna 22, bod 20 – doc-outputs.ts)
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
       c.sum("editedDims", edited);
@@ -1720,6 +1733,18 @@ function emitDocMeta(c: Ctx, doc: CadDoc) {
     else c.note(tr("označení materiálu „{0}“ nejde zapsat příkazem materiál (čte se jako třída materiálu)", doc.materialName));
   }
   if (doc.color && /^#[0-9a-f]{6}$/i.test(doc.color)) c.line(`${c.w("color")} ${doc.color}`);
+  // druh položky kusovníku dílu (vlna 22, bod 19): `druh nakupovaný katalog "…" výrobce "…"`
+  if (doc.supply && doc.kind !== "assembly") {
+    const sp = doc.supply;
+    const parts = [`${c.w("supplyPart")} ${c.w(sp.kind === "make" ? "sMake" : sp.kind === "standard" ? "sStandard" : sp.kind === "buy" ? "sBuy" : "sAuto")}`];
+    for (const [k, v] of [["catalog", sp.catalog], ["vendor", sp.vendor], ["size", sp.size], ["grade", sp.grade]] as const) {
+      if (!v) continue;
+      const q = scriptQuote(v, true);
+      if (q) parts.push(`${c.w(k)} ${q}`);
+      else c.note(tr("údaj druhu dílu „{0}“ nejde zapsat na řádek skriptu", doc.name));
+    }
+    c.line(parts.join(" "));
+  }
 }
 /**
  * Proměnné dílu v uloženém pořadí. Proměnná, jejíž výraz odkazuje na proměnnou definovanou až za ní, dostane nejdřív svou
@@ -2011,6 +2036,15 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     // číslo dílu z popisových údajů (props.number) dílu bez výkresu: razítko ho nepřenese → jako číslo komponenty (kusovník stejný)
     qv("number", cp.number ?? (pt.doc.drawings?.length ? undefined : pt.doc.props?.number?.trim() || undefined));
     qv("group", cp.group);
+    // druh položky kusovníku na komponentě (přepis druhu dílu) a údaje normálie / nákupu
+    if (cp.supply) {
+      const sp = cp.supply;
+      patch.push(`${c.w("supplyComp")} ${c.w(sp.kind === "make" ? "sMake" : sp.kind === "standard" ? "sStandard" : sp.kind === "buy" ? "sBuy" : "sAuto")}`);
+      qv("catalog", sp.catalog);
+      qv("vendor", sp.vendor);
+      qv("size", sp.size);
+      qv("grade", sp.grade);
+    }
     if (cp.color && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cp.color)) patch.push(`${c.w("color")} ${cp.color.toLowerCase()}`);
     if (cp.hidden) patch.push(c.w("hide"));
     if (al.patch) patch.push(al.patch);

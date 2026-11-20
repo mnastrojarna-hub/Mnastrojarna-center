@@ -28,6 +28,7 @@ import { checkClashes, clashFindings } from "./ops/clash";
 import type { ReportBuilder } from "./protocol";
 import type { DocSummary } from "./protocol-types";
 import { staleResults } from "./result-key";
+import { modelId, staleOutputKinds } from "../doc-outputs";
 import { docOfTab, runDocKeySet } from "./runs";
 import type { Workspace } from "./workspace";
 
@@ -78,6 +79,8 @@ export type BuildOutcome = { summary: DocSummary; built: boolean };
 export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: ReportBuilder, build: boolean, ws?: Workspace, key?: string, o: { cached?: boolean } = {}): Promise<BuildOutcome> {
   const s: DocSummary = { ref: d.name, name: d.name, kind: docKind(d) };
   if (d.drawings?.length) s.sheets = d.drawings.length;
+  // revize modelu u dokumentu s výstupy (listy, záznamy exportů) – řádek D `rev=`, JSON `docs[].rev` (vlna 22, bod 20)
+  if (d.kind !== "draft" && (d.drawings?.length || d.outputs?.length)) s.rev = modelId(d).rev;
   if (s.kind === "assembly") {
     s.components = d.components?.length ?? 0;
     s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;
@@ -173,7 +176,8 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
  * neodpovídají (engine/result-key.ts). Kolize a stav vazeb se před tím přepočítají – zůstanou jen ty, které přepočítat nešly.
  */
 function markStale(s: DocSummary, ws: Workspace, key: string, d: CadDoc): void {
-  const stale = staleResults(ws, key, d);
+  // + vydané listy a záznamy exportů ze starší revize modelu (`drawing`, `export` – vlna 22, bod 20, cad/doc-outputs.ts)
+  const stale = [...staleResults(ws, key, d), ...staleOutputKinds(d)];
   if (stale.length) s.stale = stale;
 }
 

@@ -1,0 +1,26 @@
+# vlna 22, bod 19: druh položky kusovníku – vyráběný / normálie / nakupovaný; oddíly, norma, rozměr, třída, katalog;
+# materiál normálie = pevnostní třída (12.9), kolík si drží toleranci m6; vyráběný díl bez čísla = ⚠
+nový díl "Deska A"
+kvádr 100 60 20
+materiál 1.2379
+výkres razítko číslo="DA-001"
+nový díl "Přidržovač"
+kvádr 40 30 10
+nový díl "Pouzdro"
+válec 10 20
+druh nakupovaný katalog "SFJ8-30" výrobce "Katalog A"
+#--- run
+nová sestava "Nástroj"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 10 10 20
+vložit "Pouzdro" v 80 40 20
+normálie M12x40 v 50 30 20
+normálie kolík 8x30 v 80 10 20
+sestava
+kusovník csv
+#--- run
+# druh na komponentě (přepis): Přidržovač jako nakupovaný s katalogem, pak zpět na výchozí
+sestava komponenta "Přidržovač" druh nakupovaný katalog "PR-77"
+sestava
+sestava komponenta "Přidržovač" druh auto katalog ""
+kusovník

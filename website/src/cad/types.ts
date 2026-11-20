@@ -265,6 +265,8 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
+  /** druh položky kusovníku dílu (vyráběný / normálie / nakupovaný) a údaje normálie / nakupované položky – cad/bom-model.ts */
+  supply?: SupplyInfo;
   /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
   kind?: "part" | "assembly" | "draft";
   /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
@@ -275,6 +277,8 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
+  outputs?: ExportRecord[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
@@ -351,7 +355,18 @@ export type AsmComponent = {
   alias?: string;
   /** pružina mezi dvěma komponentami: délka podle vzdálenosti dosedacích ploch (cad/asm-spring.ts) */
   spring?: SpringDef;
+  /** druh položky kusovníku na komponentě (přepíše druh dílu) – cad/bom-model.ts `supplyOf` */
+  supply?: SupplyInfo;
+  /** otisk dílu záložky při vložení / `sestava obnovit` – pozdější změna dílu = kopie starší než díl (cad/asm-refresh.ts) */
+  origin?: CopyOrigin;
 };
+
+/** druh položky kusovníku: vyráběný díl (výkres, číslo), normálie (norma), nakupovaný díl (katalog) – vlna 22, bod 19 */
+export type SupplyKind = "make" | "standard" | "buy";
+/** druh a údaje položky kusovníku: norma, rozměr, pevnostní třída / tolerance (normálie), katalogové číslo a výrobce (nákup) */
+export type SupplyInfo = { kind?: SupplyKind; standard?: string; size?: string; grade?: string; catalog?: string; vendor?: string };
+/** stav dílu v okamžiku vložení / obnovení komponenty: název dílu, otisk geometrie (`sourceKey`) a vlastnosti do kusovníku */
+export type CopyOrigin = { part: string; sig: string; number?: string; material: string; materialName?: string; kind?: SupplyKind; /** otisk výkresů dílu */ drw?: string };
 
 /**
  * Pružina v sestavě (cad/asm-spring.ts): komponenta s prvkem Pružina (normálie DIN 2095 nebo vlastní díl) mezi dosedací plochou
@@ -472,6 +487,27 @@ export type DrawingDoc = {
   annotations: DrawingAnnotation[];
   /** název výkresu, ke kterému list patří (více výkresů jednoho dílu); chybí = první výkres (cad/drawing-sets.ts) */
   drawing?: string;
+  /** vydání listu (`výkres vydat`): písmeno revize, revize modelu, čas – po změně modelu je list zastaralý (cad/doc-outputs.ts) */
+  issued?: IssuedSheet;
+};
+
+/** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
+export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string };
+/**
+ * Záznam exportu v dokumentu (bod 20): co (3D model / výkres / skica), formát, název souboru, revize modelu a otisk, čas ISO;
+ * výkres navíc listy (id) a písmeno revize listu v době exportu. `job` = stav úlohy exportu (balík A3, RunTracker).
+ */
+export type ExportRecord = {
+  id: string;
+  what: "model" | "drawing" | "sketch";
+  format: string;
+  file: string;
+  modelRev: string;
+  sig: string;
+  at: string;
+  sheets?: string[];
+  rev?: string;
+  job?: { id?: string; state?: string };
 };
 
 // ---------------- vazby sestavy ----------------

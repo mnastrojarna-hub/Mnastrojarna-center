@@ -59,9 +59,12 @@ export type DocSummary = {
   valid?: boolean | null;
   /** díl: kterou kontrolou platnost vznikla – rychlá BRepCheck po stavbě, nebo přesná (řádek D `vcheck=exact`; vlna 22, bod 22a) */
   validCheck?: "fast" | "exact";
+  /** revize modelu `r·a1b2c3` (cad/doc-outputs.ts `modelId`) – u dokumentu s výkresy nebo záznamy exportů (vlna 22, bod 20) */
+  rev?: string;
   /**
    * druhy uložených výsledků dokumentu, které pro jeho konečný stav neplatí (řádek D `stale=clash,mates,motion,measure,compare`;
-   * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu
+   * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu; navíc
+   * `drawing` (vydaný list ze starší revize modelu) a `export` (záznam exportu ze starší revize) – cad/doc-outputs.ts
    */
   stale?: string[];
 };
