@@ -12,6 +12,8 @@
 import { fileLogLine, fmtBytes, formatLabel, FORMAT_EXT, outFileName, type OutCmd, type OutDelivery } from "../../agent-out";
 import { cadLocale, tr } from "../../i18n";
 import { groupShareCode, SHARE_DEFAULT_DAYS } from "../../share";
+import type { CadDoc } from "../../types";
+import { drawExtras } from "../asm-status";
 import type { Code, CodeEntryInit } from "../codes";
 import { assertDrawable, bytesToBase64, drawingOutput, hasDrawings, isEmptyDoc, modelBytes, OUT_BASE64_MAX, OUT_MIME, plainName, projectFile, sheetScope, sketchDxf, verifyExport, type DrawEnv } from "../files";
 import { sha256Hex } from "../host";
@@ -169,7 +171,9 @@ async function exportScript(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "s
   if (isEmptyDoc(d) && d.kind !== "draft") throw new Error(tr("export skript: dokument je prázdný – není co zapsat"));
   const [{ scriptOfDocWith }, { scriptCoverageText }] = await Promise.all([import("../../doc-script-fresh"), import("../../doc-script")]);
   const k = ctx.host.kernel;
-  const r = await scriptOfDocWith({ pickSigs: (before, f) => k.pickSigs(before, f), drawing: (doc, meta, o) => k.drawing(doc, meta, o) }, d, cmd.lang ? { lang: cmd.lang } : {});
+  // doplňky razítka (kusovník a pozice sestavy) pro ověření upravených vygenerovaných pozic – jako příkazy výkresu (drawing-cmd.ts)
+  const extras = (doc: CadDoc) => drawExtras(ctx.ws, k, doc, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
+  const r = await scriptOfDocWith({ pickSigs: (before, f) => k.pickSigs(before, f), drawing: (doc, meta, o) => k.drawing(doc, meta, o), extras }, d, cmd.lang ? { lang: cmd.lang } : {});
   const name = outFileName(cmd.name, plainName(d.name), ["mncad.txt", "txt"]);
   const data = new TextEncoder().encode(r.text);
   const f = await deliver(ctx, e, { name, mime: "text/plain", data, format: "script" }, tr("textový skript"), tr("textové příkazy, {0} řádků", r.stats.lines), cmd.deliver ?? "file");

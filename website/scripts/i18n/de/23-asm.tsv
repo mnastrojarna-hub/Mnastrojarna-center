@@ -39,7 +39,6 @@ Přezdívka instance (vazby místo #k)	Instanz-Alias (Verknüpfungen statt #k)
 přezdívka nesmí být prázdná	der Alias darf nicht leer sein
 přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako "K48"	der Alias darf nicht mit „#“ beginnen (das ist die Position der Komponente) – z. B. als "K48"
 přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou	die Komponente „{1}“ hat bereits den Alias „{0}“ – anderen wählen
-sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina "Pružina" odebrat · sestava pružiny	baugruppe feder "Feder" zwischen "Platte A" [F3] "Platte B" [F7] [frei L0] [block Ln] [steifigkeit c] · baugruppe feder "Feder" entfernen · baugruppe federn
 sestava pružina: {0} musí být kladná	baugruppe feder: {0} muss positiv sein
 sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm	baugruppe feder: die Blocklänge {0} mm muss kleiner als die freie Länge {1} mm sein
 sestava pružina: neznámá volba „{0}“ – {1}	baugruppe feder: unbekannte Option „{0}“ – {1}

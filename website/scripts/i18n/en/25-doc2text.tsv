@@ -29,7 +29,6 @@ razítko listu „{0}“ se nepodařilo zapsat	the title block of sheet “{0}�
 ruční kóty a značky výkresu se do skriptu nepřenášejí: {0} na {1} listech	manual drawing dimensions and marks are not carried into the script: {0} on {1} sheets
 skica na ploše / pomocné rovině: rovinu při přečtení znovu spočítá jádro z plochy F (číslo plochy tělesa před skicou)	sketch on a face / datum plane: when the script is read the kernel computes the plane again from face F (face number of the body before the sketch)
 skript se nepřečetl bez chyb ({0}): {1}	the script did not read back without errors ({0}): {1}
-tabulka revizí listu „{0}“ se do skriptu nepřenáší	the revision table of sheet “{0}” is not carried into the script
 textové příkazy, {0} řádků	text commands, {0} lines
 textový skript	text script
 Textový skript (.txt)	Text script (.txt)
@@ -38,7 +37,6 @@ Textový skript uložen: {0} ({1} řádků){2}	Text script saved: {0} ({1} lines
 údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek	title block field “{0}” of sheet “{1}” cannot be written on a line
 úpravy vygenerovaných kót (tolerance, vlastní text, revize) se do skriptu nepřenášejí: {0} na {1} listech – doplňte je příkazem výkres tolerance <kóta> <tolerance>	edits of generated dimensions (tolerance, custom text, revision) are not carried into the script: {0} on {1} sheets – add them with the command drawing tolerance <dimension> <tolerance>
 volby listu „{0}“ se nepodařilo zapsat příkazem výkres – list vznikne s výchozími volbami	the options of sheet “{0}” could not be written with the drawing command – the sheet is created with default options
-volby listu bez zápisu ve skriptu ({0}) – list „{1}“ dokumentu „{2}“	sheet options without a script notation ({0}) – sheet “{1}” of document “{2}”
 vygenerované kóty výkresů (Chytré kóty, {0}) se nezapisují jednotlivě – „kótovat chytře“ je při přečtení vygeneruje znovu (nová id, poloha podle generátoru)	generated drawing dimensions (Smart dimensions, {0}) are not written one by one – “dimension smart” generates them again when the script is read (new ids, position by the generator)
 # kontrola (nálezy): odkazy názvem, otisky výběru a čísla hran ověřená jádrem, proměnné, smazané kóty
 list „{0}“ dílu „{1}“: smazané vygenerované kóty se nepodařilo určit ({2}) – po přečtení skriptu se vrátí	sheet “{0}” of part “{1}”: the deleted generated dimensions could not be determined ({2}) – they come back when the script is run

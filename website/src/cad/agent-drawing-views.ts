@@ -7,18 +7,21 @@
  * - `výkres uložení <kóta> H7 [zobrazení odchylky|mezní|značka]` · `výkres uložení tabulka ano|ne` · `výkres uložení zobrazení …`
  *   · `výkres uložení dotaz 40 H7/g6`
  * - `výkres revize značka B na Ø40[, 25]` · `výkres revize značka smazat na Ø40` · `výkres revize B značky ano|ne` · `výkres zóny ano|ne`
- * Body jsou v mm modelu v rovině pohledu (y nahoru) jako u ostatních příkazů výkresu, umístění v mm listu od levého dolního rohu.
+ * Body jsou v mm modelu v rovině pohledu (y nahoru) jako u ostatních příkazů výkresu, umístění v mm listu od levého dolního rohu
+ * (`umístit x y odshora` = od levého horního rohu – nezávisí na výšce listu s automatickým formátem).
  * Česky, anglicky i německy. Provedení: cad/drawing-views-agent.ts.
  */
 import { tr } from "./i18n";
 import type { FitShow } from "./drawing-fits";
 import type { RawTok, ViewRef } from "./agent-drawing";
 import type { Vec2, Vec3 } from "./types";
+import { parseGenText, type GenCmd } from "./agent-drawing-gen";
 
 export type ViewsCmd =
-  | { op: "aux"; parent?: ViewRef; edge?: [Vec2, Vec2]; mode?: "normal" | "along"; face?: number; dir?: Vec3; flip?: boolean; place?: Vec2 }
+  /** `placeTop` = umístění od levého HORNÍHO rohu listu (`umístit x y odshora`), jinak od levého dolního */
+  | { op: "aux"; parent?: ViewRef; edge?: [Vec2, Vec2]; mode?: "normal" | "along"; face?: number; dir?: Vec3; flip?: boolean; place?: Vec2; placeTop?: boolean }
   | { op: "aux-del"; label: string }
-  | { op: "cut"; kind: "stepped" | "aligned"; parent: ViewRef; pts: Vec2[]; flip?: boolean; place?: Vec2 }
+  | { op: "cut"; kind: "stepped" | "aligned"; parent: ViewRef; pts: Vec2[]; flip?: boolean; place?: Vec2; placeTop?: boolean }
   | { op: "cut-del"; label: string }
   | { op: "bo"; view: ViewRef; pts: Vec2[]; depth: number; spline?: boolean }
   | { op: "bo-del"; which: number | "all" }
@@ -32,7 +35,9 @@ export type ViewsCmd =
   | { op: "rev-mark"; rev: string; targets: string[] }
   | { op: "rev-unmark"; targets: string[] }
   | { op: "rev-marks"; rev: string; on: boolean }
-  | { op: "zones"; on: boolean };
+  | { op: "zones"; on: boolean }
+  /** vygenerované kóty celkových rozměrů a pozice: skrýt, zobrazit, posunout, obnovit (cad/agent-drawing-gen.ts) */
+  | GenCmd;
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
 const W = (...w: string[]) => new Set(w);
@@ -61,6 +66,13 @@ const ALONG_W = W("podel", "along", "entlang");
 const NORMAL_W = W("kolmo", "normal", "senkrecht");
 const FLIP_W = W("otocit", "obratit", "flip", "reverse", "umkehren", "gegenuber", "opacne");
 const PLACE_W = W("umistit", "umisteni", "place", "platzieren", "position");
+/**
+ * `umístit x y odshora` (en `from-top`, de `von-oben`): bod od levého HORNÍHO rohu listu, y dolů – tak je umístění v dokumentu
+ * uložené. Nezávisí na výšce listu: u automatického formátu se výška mění s dalšími pohledy a `umístit x y` (od dolního rohu)
+ * by po přidání pohledu ukazovalo jinam. Tak umístění na listu s automatickým formátem zapisuje `export skript`.
+ */
+const PLACE_TOP_W = W("odshora", "fromtop", "from-top", "vonoben", "von-oben");
+export const isPlaceTop = (t: RawTok | undefined) => kw(t, PLACE_TOP_W);
 const POINTS_W = W("body", "points", "punkte", "bod", "point");
 const DEPTH_W = W("hloubka", "depth", "tiefe");
 const SPLINE_W = W("krivka", "spline", "hladka", "kurve", "smooth", "volne", "freihand");
@@ -136,6 +148,8 @@ export function parseDrawingViews(rt: RawTok[]): ViewsCmd | null {
   const h = rt[0];
   if (!h || h.q || h.key) return null;
   const f = fold(h.s);
+  const gen = parseGenText(rt);
+  if (gen) return gen;
   // výkres pohled pomocný … (výkres pohledy přední,horní = volba pohledů – zůstává)
   if (VIEW_W.has(f) && kw(rt[1], AUX_W)) return parseAux(rt.slice(2));
   if (AUX_W.has(f)) return parseAux(rt.slice(1));
@@ -203,6 +217,10 @@ function parseAux(rt: RawTok[]): ViewsCmd {
       if (n.length < 2) throw new Error(tr("umístit x y (mm listu od levého dolního rohu)"));
       cmd.place = [n[0], n[1]];
       i += 3;
+      if (isPlaceTop(rt[i])) {
+        cmd.placeTop = true;
+        i++;
+      }
     } else if (!cmd.parent) {
       const [v, k] = viewTok(rt, i, tr("pomocný pohled"));
       cmd.parent = v;
@@ -221,6 +239,7 @@ function parseCut(kind: "stepped" | "aligned", rt: RawTok[]): ViewsCmd {
   let pts: Vec2[] = [];
   let flip = false;
   let place: Vec2 | undefined;
+  let placeTop = false;
   for (let i = k; i < rt.length; ) {
     const t = rt[i];
     if (kw(t, POINTS_W) || isNum(t)) {
@@ -236,10 +255,14 @@ function parseCut(kind: "stepped" | "aligned", rt: RawTok[]): ViewsCmd {
       if (n.length < 2) throw new Error(tr("umístit x y (mm listu od levého dolního rohu)"));
       place = [n[0], n[1]];
       i += 3;
+      if (isPlaceTop(rt[i])) {
+        placeTop = true;
+        i++;
+      }
     } else throw new Error(tr("řez: nečekané „{0}“ – {1}", t.s, usage));
   }
   if (kind === "aligned" ? pts.length !== 3 : pts.length < 2) throw new Error(usage);
-  return { op: "cut", kind, parent, pts, ...(flip ? { flip } : {}), ...(place ? { place } : {}) };
+  return { op: "cut", kind, parent, pts, ...(flip ? { flip } : {}), ...(place ? { place } : {}), ...(place && placeTop ? { placeTop } : {}) };
 }
 
 function parseBrokenOut(rt: RawTok[]): ViewsCmd {

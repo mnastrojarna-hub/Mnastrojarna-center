@@ -139,7 +139,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `sestava` · `sestava plochy "Čep" [rovinné|válcové]` · `sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]` · `sestava vazby` · `sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
 | `sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]` · `pohyb motor rotační "Klika" 0..360 krok 5 [kolize]` · `pohyb stav|krok N|přehrát|export csv` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
 | `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …] [přezdívka "…"]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
-| `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
+| `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
 | `sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "A" Ø21 "B" horní [v x y z] [do děr vzoru] [název "P"]` · `sestava pružina "P" mezi "A" "B" do děr vzoru` | nová pružina z tabulky mezi díly (osa z díry / roviny, zámek k A) a kopie do všech děr vzoru (viz „Pružina v sestavě“) |
 | `pohyb dynamika [čas T] [krok dt] [gravitace -Z|vyp] [tlumení c] [odraz e]` · `pohyb hmotnost "X" kg` · `pohyb síla vazba N F` · `pohyb kinematika` | dynamická pohybová studie: síly pružin, gravitace a zadané síly hýbou díly, dorazy s odrazem (viz „Dynamika“) |
 | `sestava pole "X" N rozteč P [směr Y]` · `sestava pole "X" kruhové N [osa Z] [v cx cy cz]` · `sestava zrcadlit "X" YZ` · `sestava šroub "Deska" Ø9 [matice] [bez podložky]` | pole, zrcadlení, šroubový spoj do díry |
@@ -732,7 +732,8 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
 5. `sestava` (bez podpříkazu) vypíše komponenty `#1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓`; komponentu lze zadat
    názvem, pořadím `#2` nebo **přezdívkou**: `vložit "Šroub M6x20" v … jako "K48"` (EN `insert … as "K48"`, DE
    `einfügen … als "K48"`) nebo `sestava komponenta #25 přezdívka "K48"` (EN `alias`; prázdná `přezdívka ""` ji zruší) –
-   pak `sestava vazba zámek "K48" "Upínací deska"`. Přezdívka je jednoznačná (ne „#…“, ne název jiné komponenty; komponentu
+   pak `sestava vazba zámek "K48" "Upínací deska"`. Název záložky i přezdívka v uvozovkách jsou doslovné – jde i
+   `vložit "D" jako "H"` (bez uvozovek by se `D`, `H`, `V` četly jako volby průměr / výška / poloha). Přezdívka je jednoznačná (ne „#…“, ne název jiné komponenty; komponentu
    nejde přejmenovat na přezdívku jiné), ve výpisu, ve stromu a ve vazbách v hranatých závorkách `#25 Šroub M6x20 [K48]`,
    `Zámek „Šroub M6x20“ [K48] → „Upínací deska“`; kopie (`sestava duplikovat|pole|zrcadlit`, Duplikovat v panelu) přezdívku
    nepřebírají. Kusovník ji nepoužívá. `stav` u sestavy obsahuje řádky
@@ -840,6 +841,8 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (`vl
 - `sestava pružina "P" mezi "A" "B" volná 44 blok 20 tuhost 25` (EN `between … and … free 44 solid 20 rate 25`, DE
   `zwischen … und … frei 44 block 20 steifigkeit 25`) – `volná` = L0 (výchozí délka modelu), `blok` = délka na doraz Ln (výchozí
   (závity + 1) · drát), `tuhost` = c [N/mm]; `blok 0` / `tuhost 0` dřív zadanou hodnotu zruší (doraz z modelu, bez síly).
+  `vedená ano|ne` (EN `guided yes|no`, DE `geführt ja|nein`) = pružina vedená dírou / kapsou nebo trnem (vzpěr se pak
+  nehlásí; „Pružina mezi díly“ do díry ji nastaví sama) – řádek pružiny i `sestava pružiny` končí „· vedená“ / „· nevedená“.
   Stejný název = všechny instance (6 pružin jedním řádkem), `#k` / přezdívka = jedna. Protokol: stejné pružiny ve stejném
   stavu jeden řádek s počtem `(6×)`, stejný název v různém stavu řádek pro každý stav s `#k` / `[přezdívka]`
   (`✓ pružina „P“ #3: …`, `⚠ pružina „P“ [P2]: …`).
@@ -1606,6 +1609,22 @@ Data ▸ Export ▸ Textový skript (.txt).
   vlastními příkazy, výkresy), u sestavy pak `nová sestava "…"`, `vložit "díl" v x y z otočení rx ry rz [ukotvit]` pro každou
   komponentu (stejný díl se zapíše jednou a vloží N×), vazby `sestava vazba … #1 F3 #2 F7` (komponenty pořadím `#k`;
   závěs / šířka / drážka i s druhými plochami, symetricky s `rovina #1 F1`), pohybovou studii a listy výkresu.
+  Zapíše vše, co jde napsat textem (vlna E): přezdívky komponent (`vložit "Šroub" … jako "K48"`), pružiny mezi díly
+  (`sestava pružina #4 mezi #3 F9 #2 F6 volná 41 blok 16 tuhost 5.069 vedená ano` – i z „Pružiny mezi díly“ do děr vzoru),
+  dynamiku pohybu (`pohyb hmotnost`, `pohyb síla|moment`, `pohyb dynamika čas … krok … gravitace 0 -0.6 -0.8 …`, u kinematické
+  studie s nastavením dynamiky ještě `pohyb kinematika`), celé razítko (šablona, logo jako data URL, firma, zákazník,
+  projekt, kontroloval, schválil, polotovar, počet, tepelné, povrch, úhly, sražení, nepředepsané i tabulkou podle desetinných
+  míst), tabulku revizí (`výkres revize A "…" datum=… kreslil=…`, `výkres revize A značky ne`), funkční kóty a polohy děr
+  (`kótovat chytře funkční 80 díry tabulka`), `pružiny plně`, další modely, pomocné pohledy, řezy lomenou čarou a detaily
+  (nejdřív pohled, na který se odkazuje – pomocný pohled z řezu C až po řezu C; písmena jako v dokumentu, jde-li to, jinak
+  je protokol vypíše „C → B“; umístění na listu s pevným formátem `umístit x y` od levého dolního rohu, na listu
+  s automatickým formátem `umístit x y odshora` od levého horního – výška takového listu se při čtení mění s každým
+  dalším pohledem), částečné řezy, přerušení, `výkres uložení zobrazení … / tabulka ano` a upravené vygenerované kóty
+  celkových rozměrů a pozice (`výkres vygenerované skrýt dim:front:t`, `výkres vygenerované posun pos:1 5 -3` – jen ty,
+  které na listu jsou: klíče ověří jádro, úpravu objektu, který už na listu není, skript vynechá a ohlásí).
+  Razítko se píše proti stavu při čtení: `výkres list nový` převezme razítko aktivního listu, proto má další list jen
+  řádek s tím, co se liší – i vyprázdnění (`výkres razítko šablona=iso7200 číslo="" zákazník=""`, `logo=ne`); popisové
+  údaje dokumentu (číslo, kreslil, revize) se na konci dorovnají (`výkres list 1` · `výkres razítko číslo="…"` · `výkres list 2`).
 - **Přesnost:** každý řádek prvku se před zápisem přečte stejným rozborem jako konzole, doplní nad prvky tak, jak budou
   v dokumentu PO PŘEČTENÍ skriptu (nová id), a porovná s původním prvkem. Co vlastní příkaz neumí, zapíše se obecným
   `prvek <typ> klíč=hodnota`, a co ani ten, jako jednořádkový JSON – protokol napíše pokrytí („183 prvků: 183 vlastním
@@ -1630,10 +1649,30 @@ Data ▸ Export ▸ Textový skript (.txt).
 - **Kontrola tam a zpět (doporučený postup):** `const t = await window.mncad.script()` → `await window.mncad.run(t)` (nová
   záložka) → `měřit těleso` / `stav` v obou záložkách: objem a obálka každého dílu, počet komponent a „Vazby: N splněno“
   musí být stejné.
-- **Co se nepřenáší** (protokol to vypíše řádky ℹ): vygenerované kóty výkresu vznikají znovu příkazem `kótovat chytře`
+- **Co se nepřenáší** (protokol to vypíše řádky ℹ a skript totéž v komentářích `# ℹ …` za hlavičkou): volby listu bez
+  textového příkazu (`dimRoom`, `weldSymbols` – jen JSON), model na listu ze záložky (jiného dokumentu), pružina nebo
+  vazba s plochou v podsestavě; pohled, řez, detail, částečný řez a přerušení, jejichž základní pohled na listu není
+  (vypnutý pohled – aplikace je drží, ale nekreslí); vygenerované kóty výkresu vznikají znovu příkazem `kótovat chytře`
   (nová id; kóty, které jste smazali, smaže skript znovu – `výkres smazat a3 a8`), jejich ruční úpravy (tolerance)
   a ruční kóty / značky je třeba doplnit (`výkres tolerance …`); komponenty z importovaných souborů a podsestavy; barvy
   těles a ploch, podklady skic; 2D výkres se zapíše jako jeden řádek JSON.
+
+### Vygenerované kóty celkových rozměrů a pozice textem
+
+Kóty celkových rozměrů pohledů (`kótovat celkově` / `základní`) a pozice (balónky) sestavy, které jde ve výkresu vybrat
+myší (Delete skryje, tažení posune), jdou upravit i textem – klíč `dim:<pohled>:t` (kóta nahoře), `dim:<pohled>:l` (vlevo),
+`pos:<číslo>` (pozice):
+
+```
+výkres vygenerované                       # klíče listu a dosavadní úpravy
+výkres vygenerované skrýt dim:front:t pos:3
+výkres vygenerované zobrazit pos:3
+výkres vygenerované posun pos:1 5 -3      # mm listu, y nahoru; kóta se posouvá jen kolmo k sobě
+výkres vygenerované obnovit               # vše na výchozí místo (s klíči jen ty; klíč, který na listu ani mezi úpravami není = ✗)
+```
+
+EN `drawing generated hide|show|move|restore`, DE `zeichnung generiert ausblenden|einblenden|verschieben|wiederherstellen`.
+`výkres stav` vypíše řádek „Vygenerované kóty a pozice upravené: …“.
 
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 
@@ -2000,7 +2039,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | `výkres kóta průměr|poloměr pohled horní střed x y [r R] [úhel 45]` · `výkres kóta úhel pohled přední x1 y1 x2 y2 x3 y3 x4 y4` | kóta kružnice (dohledá se podle středu a poloměru) a úhlu dvou hran (mezi směry 1→2 a 3→4) |
 | `výkres upravit a3 odsazení=8 přípona="H7" text="(20)"` · `výkres upravit a5 posun="5 -3"` | úprava kóty / značky (také `hodnota=`, `základna=`, `výška=`; `posun` přesune popisek značky v mm listu); cíl id nebo popisek |
 | `výkres smazat a3 a5` · `výkres smazat "Ra 1,6"` · `výkres smazat vlastní` · `výkres smazat vše` | smazání; smazané vygenerované kóty se při přegenerování nevrátí |
-| `výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]` · `výkres detail A měřítko 5:1` · `výkres detail smazat A` | detailní pohled (střed v mm modelu, umístění středu v mm listu) |
+| `výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]` · `výkres detail A měřítko 5:1` · `výkres detail smazat A` | detailní pohled (střed v mm modelu, umístění středu v mm listu od levého dolního rohu; `umístit 330 97 odshora` = od levého horního rohu – nezávisí na výšce listu, která se u automatického formátu mění s dalšími pohledy; en `from-top`, de `von-oben`) |
 | `výkres model "Hřídel" [pohled horní] [měřítko 1:2]` · `výkres model smazat "Hřídel"` | další model na listu: komponenta sestavy nebo otevřená záložka |
 | `výkres stav list 2` · `výkres stav vše` | stav zvoleného / všech listů (přehled listů, souřadnice, id, razítko, revize) |
 
@@ -2052,7 +2091,7 @@ Body se zadávají jako u ostatních příkazů výkresu v **mm modelu v rovině
 | Příkaz | Význam |
 | --- | --- |
 | `výkres pohled pomocný přední hrana 40 50 100 15,36` | **pomocný pohled** (POHLED B, metoda šipky ISO 128-30) kolmo na šikmou plochu, která je v rodičovském pohledu vidět jako hrana – plocha ve skutečném tvaru; bod hrany se přichytí k hraně pohledu |
-| `… hrana … podél` · `… otočit` · `… umístit 330 120` | pohled podél hrany · z opačné strany · střed pohledu na zadané místo listu (jinak zarovnaně s rodičem: ISO E po šipce, A proti ní) |
+| `… hrana … podél` · `… otočit` · `… umístit 330 120` · `… umístit 330 177 odshora` | pohled podél hrany · z opačné strany · střed pohledu na zadané místo listu od levého dolního rohu, s `odshora` od levého horního (jinak zarovnaně s rodičem: ISO E po šipce, A proti ní) |
 | `výkres pohled pomocný plocha F7` · `výkres pohled pomocný směr 0,5 0 0,87` | směr podle rovinné plochy (číslo F z `měřit`) nebo vektoru k pozorovateli; rodič se vybere sám (pohled, ve kterém je plocha vidět z boku) |
 | `výkres řez zalomený horní body -70 -10 -20 -10 -20 10 70 10` | **zalomený řez** (ŘEZ B–B): rovnoběžné úseky spojené skoky; skoky se v řezu nekreslí, šrafy jen v rovinách úseků |
 | `výkres řez natočený horní body 60 0 0 0 -30 52` | **natočený řez**: konec hlavního ramena, vrchol (osa otočení), konec šikmého ramena – šikmé rameno se otočí do roviny hlavního (příruby, rozteče děr) |

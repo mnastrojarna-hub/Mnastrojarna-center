@@ -143,6 +143,8 @@ describe.skipIf(!PHP_OK)("smluvní test: php -S s public/cad/share/index.php", (
     const docroot = path.join(root, "www");
     fs.mkdirSync(path.join(docroot, "cad", "share"), { recursive: true });
     fs.copyFileSync(SCRIPT, path.join(docroot, "cad", "share", "index.php"));
+    // index.php je jen zavaděč – logika úložiště je ve store.php vedle (oprava úložiště sdílení na hlavní větvi)
+    fs.copyFileSync(path.join(path.dirname(SCRIPT), "store.php"), path.join(docroot, "cad", "share", "store.php"));
     const port = await freePort();
     const proc = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", docroot], { stdio: "ignore" });
     procs.push(proc);

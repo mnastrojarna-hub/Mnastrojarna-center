@@ -867,7 +867,7 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       const h = host();
       return saveProjectFile(h.doc(), name, h);
     },
-    script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
+    script: async (opts) => (await scriptOfDoc(host().doc(), opts, host().drawEnv?.())).text,
     reference: async (cmd) => {
       const c = (cmd ?? "").trim();
       // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha

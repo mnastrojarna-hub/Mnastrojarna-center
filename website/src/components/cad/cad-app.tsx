@@ -2213,7 +2213,7 @@ export function CadApp() {
   const exportScript = async () => {
     try {
       const { scriptOfDoc } = await import("./doc-script-host");
-      const r = await scriptOfDoc(doc); // čísla vybraných hran / ploch ověří jádro podle otisků
+      const r = await scriptOfDoc(doc, {}, drawEnvRef.current); // čísla vybraných hran / ploch a klíče vygenerovaných pozic ověří jádro
       const saved = await saveFile(`${safeName(doc.name)}.mncad.txt`, r.text, "text/plain");
       flash(saved ? tr("Textový skript uložen: {0} ({1} řádků){2}", saved.name, r.stats.lines, r.notes.length ? tr(" – poznámek {0}: vypíše je příkaz „export skript“ v konzoli", r.notes.length) : "") : tr("Export skriptu zrušen."));
     } catch (e) {

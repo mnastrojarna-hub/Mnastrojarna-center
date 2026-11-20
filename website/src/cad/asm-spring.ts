@@ -161,20 +161,24 @@ export function springSteps(doc: CadDoc, geo: GeoProvider): Record<string, Sprin
 
 const mark = (l: SpringLevel) => (l === "error" ? "✗" : l === "warn" ? "⚠" : "✓");
 
-/** Řádek protokolu pružiny: „✓ pružina „P1“: délka 38 mm (L0 44 · Ln 20 · zdvih 6 mm) · síla 150 N (c 25 N/mm)“; `ref` = „ #3“ za název. */
-export function springLine(s: SpringState, ref = ""): string {
+/**
+ * Řádek protokolu pružiny: „✓ pružina „P1“: délka 38 mm (L0 44 · Ln 20 · zdvih 6 mm) · síla 150 N (c 25 N/mm) · vedená“;
+ * `ref` = „ #3“ za název, `guided` = vedení dírou / kapsou z definice (`sestava pružina … vedená ano|ne`; nezadané se nepíše).
+ */
+export function springLine(s: SpringState, ref = "", guided?: boolean): string {
   const parts = [tr("délka {0} mm", fmt(s.length, 3)), `L0 ${fmt(s.free, 3)}`];
   if (s.solid !== undefined) parts.push(`Ln ${fmt(s.solid, 3)}`);
   parts.push(tr("stlačení {0} mm", fmt(s.free - s.length, 3)));
   const force = s.force !== undefined ? ` · ${tr("síla {0} N (c {1} N/mm)", fmt(s.force, 1), fmt(s.rate!, 3))}` : "";
-  return `${mark(s.level)} ${tr("pružina „{0}“", s.name)}${ref}: ${parts.join(" · ")}${force}${s.note ? ` – ${s.note}` : ""}`;
+  const guide = guided === undefined ? "" : ` · ${guided ? tr("vedená") : tr("nevedená")}`;
+  return `${mark(s.level)} ${tr("pružina „{0}“", s.name)}${ref}: ${parts.join(" · ")}${force}${guide}${s.note ? ` – ${s.note}` : ""}`;
 }
 
 /** Řádky protokolu pro stavy pružin (stejný název a stav jednou s „(6×)“, jinak s #k / přezdívkou); `indent` před řádkem. */
 export function springLines(doc: CadDoc, states: SpringState[], indent = ""): string[] {
   const items = states.flatMap((s) => {
     const c = (doc.components ?? []).find((x) => x.id === s.id);
-    return c ? [{ c, text: (ref: string) => `${indent}${springLine(s, ref)}` }] : [];
+    return c ? [{ c, text: (ref: string) => `${indent}${springLine(s, ref, c.spring?.guided)}` }] : [];
   });
   return instanceLines(doc, items);
 }
