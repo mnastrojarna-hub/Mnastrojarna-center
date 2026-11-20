@@ -7,7 +7,7 @@
  */
 import { parseAgentText } from "./agent";
 import { tr } from "./i18n";
-import type { AsmComponent, MotionStudy, Vec3 } from "./types";
+import type { AsmComponent, MotionMotor, MotionStudy, Vec3 } from "./types";
 
 type W3 = readonly [string, string, string];
 const L = (cs: string, en: string, de: string): W3 => [cs, en, de];
@@ -40,6 +40,20 @@ const WD = {
   damping: L("tlumení", "damping", "dämpfung"),
   restitution: L("odraz", "restitution", "stoßzahl"),
   frames: L("snímky", "frames", "bilder"),
+  // vlna 22, bod 3: úseky motoru, klíčové polohy, okno, fáze
+  from: L("od", "from", "von"),
+  then: L("pak", "then", "dann"),
+  dwell: L("prodleva", "dwell", "verweilen"),
+  keys: L("klíče", "keys", "schlüssel"),
+  window: L("okno", "window", "fenster"),
+  phase: L("fáze", "phase", "phase"),
+  speed: L("rychlost", "speed", "geschwindigkeit"),
+  rpm: L("ot/min", "rpm", "u/min"),
+  when: L("při", "when", "wenn"),
+  motor: L("motor", "motor", "antrieb"),
+  enable: L("zapnout", "enable", "aktivieren"),
+  suppress: L("potlačit", "suppress", "unterdrücken"),
+  edit: L("upravit", "edit", "bearbeiten"),
 };
 /** výchozí integrační krok dynamiky (motion-dynamic.ts defaultDyn – hlídá test; modul se nenačítá kvůli velikosti) */
 export const SCRIPT_DEFAULT_DT = 0.0005;
@@ -174,3 +188,70 @@ export function emitStudyExtras(o: AsmOut, mo: MotionStudy | undefined, mates: {
 
 /** dovětek motoru `na mezi chyba` (výchozí stop se nepíše) */
 export const motorLimitWords = (o: AsmOut, mo: { atLimit?: "stop" | "error" }): string => (mo.atLimit === "error" ? ` ${w(o, "atLimit")} ${w(o, "limitError")}` : "");
+
+/* ───────────────────────── fáze a úseky motorů (vlna 22, bod 3) ───────────────────────── */
+
+/** motor s víc úseky / klíčovými polohami / oknem / fází se zapisuje touto cestou (jinak dřívější tvar řádku) */
+export const motorIsPiecewise = (m: MotionMotor): boolean => !!(m.legs?.length || (m.keys?.length ?? 0) > 1);
+
+/**
+ * Průběh motoru s úseky do skriptu: `od A pak B čas T pak C rychlost V prodleva P …` (každý úsek se svým časem / rychlostí –
+ * rychlost u rotačního v ot/min), klíčové polohy `klíče 0:A 0,3:B …`; za tím okno `okno T0..T1` a fáze `fáze "Název"`.
+ */
+export function motorPieceWords(o: AsmOut, m: MotionMotor, phaseName?: string): string {
+  const per = m.kind === "rotary" ? 6 : 1;
+  let s = "";
+  if (m.keys && m.keys.length > 1) s = `${w(o, "keys")} ${m.keys.map((k) => `${o.n(k.t)}:${o.n(k.v)}`).join(" ")}`;
+  else {
+    s = `${w(o, "from")} ${o.n(m.from)}`;
+    let v = m.from;
+    for (const g of m.legs ?? []) {
+      if (g.to === v && g.time !== undefined) s += ` ${w(o, "dwell")} ${o.n(g.time)}`;
+      else {
+        s += ` ${w(o, "then")} ${o.n(g.to)}`;
+        if (g.time !== undefined) s += ` ${w(o, "time")} ${o.n(g.time)}`;
+        else if (g.speed !== undefined) s += ` ${w(o, m.kind === "rotary" ? "rpm" : "speed")} ${o.n(g.speed / per)}`;
+      }
+      v = g.to;
+    }
+  }
+  return s + windowWords(o, m, phaseName);
+}
+/** okno a fáze motoru (i u motoru s jedním rozsahem) */
+export function windowWords(o: AsmOut, m: MotionMotor, phaseName?: string): string {
+  let s = "";
+  if (m.window) s += ` ${w(o, "window")} ${m.window.t1 !== undefined ? `${o.n(m.window.t0 ?? 0)}..${o.n(m.window.t1)}` : o.n(m.window.t0 ?? 0)}`;
+  if (m.phase && phaseName !== undefined) s += ` ${w(o, "phase")} ${o.q(phaseName, true)}`;
+  return s;
+}
+
+/**
+ * Fáze studie do skriptu (před motory – motory se na fáze odkazují názvem): `pohyb fáze "Sevření" při vazba 7 <= 0 potlačit
+ * vazba 6 zapnout vazba 7 kvazistatika`. Podmínka na motor jde až za motory (`pohyb fáze N upravit při motor 1 >= 10` – vrací
+ * tyto řádky volajícímu). Vazba mimo skript = poznámka.
+ */
+export function emitPhases(o: AsmOut, mo: MotionStudy, mateNo: Map<string, number>): string[] {
+  const later: string[] = [];
+  (mo.phases ?? []).forEach((ph, i) => {
+    let l = `${w(o, "motion")} ${w(o, "phase")} ${o.q(ph.name, true)}`;
+    const c = ph.start;
+    if (c && "t" in c) l += ` ${w(o, "from")} ${o.n(c.t)} s`;
+    else if (c && "mate" in c) {
+      const no = mateNo.get(c.mate);
+      if (no === undefined) o.note(tr("podmínka fáze „{0}“ míří na vazbu, která ve skriptu není – fáze se zapíše bez podmínky", ph.name));
+      else l += ` ${w(o, "when")} ${w(o, "mate")} ${no} ${c.op} ${o.n(c.value)}`;
+    } else if (c && "motor" in c) {
+      const k = mo.motors.findIndex((m) => m.id === c.motor);
+      if (k >= 0) later.push(`${w(o, "motion")} ${w(o, "phase")} ${i + 1} ${w(o, "edit")} ${w(o, "when")} ${w(o, "motor")} ${k + 1} ${c.op} ${o.n(c.value)}`);
+    }
+    const refs = (ids?: string[]) => (ids ?? []).map((id) => mateNo.get(id)).filter((n): n is number => n !== undefined);
+    const en = refs(ph.enable);
+    const su = refs(ph.suppress);
+    if (en.length < (ph.enable?.length ?? 0) || su.length < (ph.suppress?.length ?? 0)) o.note(tr("fáze „{0}“ zapíná / potlačuje vazbu, která ve skriptu není – ve skriptu chybí", ph.name));
+    if (su.length) l += ` ${w(o, "suppress")} ${su.map((n) => `${w(o, "mate")} ${n}`).join(" ")}`;
+    if (en.length) l += ` ${w(o, "enable")} ${en.map((n) => `${w(o, "mate")} ${n}`).join(" ")}`;
+    if (ph.mode) l += ` ${w(o, ph.mode === "quasistatic" ? "quasistatic" : ph.mode === "kinematic" ? "kinematics" : "dynamics")}`;
+    o.line(l);
+  });
+  return later;
+}

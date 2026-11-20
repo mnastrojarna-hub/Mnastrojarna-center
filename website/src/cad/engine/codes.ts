@@ -140,6 +140,10 @@ export const CODES = [
   { code: "motion.motor-limit", level: "warn", key: "motor {0} stojí na mezi v krocích {1} – brání: {2}" },
   { code: "motion.invalid", level: "warn", key: "neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}); konflikt: {2}" },
   { code: "motion.undetermined", level: "warn", key: "poloha „{0}“ není vazbami určena (volná v mezi {1})" },
+  // vlna 22, body 3 a 10: fáze studie, motor nahrazený / v konfliktu už při definici
+  { code: "motion.phase-unreached", level: "warn", key: "fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2})" },
+  { code: "motion.motor-conflict", level: "warn", key: "motor {0} je v konfliktu s motorem {1} – pohánějí tentýž stupeň volnosti od stejného okamžiku" },
+  { code: "motion.motor-replaced", level: "note", key: "motor {0} na vazbě „{1}“ nahrazen novým zadáním" },
   { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },
   // pružina po načtení dokumentu (vlna 22, bod 7): délka se odvozuje z dosedacích ploch – cad/asm-spring.ts springDrift
   { code: "spring.stale", level: "warn", key: "pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch" },

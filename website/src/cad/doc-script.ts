@@ -33,7 +33,7 @@ import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
 import { stripLineComment } from "./agent-comment";
-import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
+import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords, emitPhases, motorIsPiecewise, motorPieceWords, windowWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { emitIssue } from "./doc-outputs";
@@ -2093,9 +2093,11 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pružiny mezi díly (dosedací plochy, L0, Ln, tuhost, vedení) – po vazbách, komponenty už stojí (doc-script-asm.ts)
   emitAsmSprings(c.sheetOut, comps, idx);
   const mo = doc.motion;
+  let phaseLater: string[] = [];
   if (mo?.motors.length) {
     c.comment(c.w("cMotion"));
-    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined);
+    phaseLater = emitPhases(c.sheetOut, mo, mateNo); // fáze před motory (motor se na fázi odkazuje názvem)
+    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined) || mo.motors.some(motorIsPiecewise);
     mo.motors.forEach((m, i) => {
       const no = mateNo.get(m.mate);
       if (no === undefined) {
@@ -2108,9 +2110,15 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       const end = open ? unusedEnd(m) : null;
       if (end !== null)
         c.note(tr("motor pohybové studie č. {0}: uložený konec {1} se nepoužíval (motor jede od začátku rychlostí bez konce) – skript ho nezapisuje; dojet na konec a stát = {2}..{1} s rychlostí (rozsah × rychlost)", i + 1, n(end), n(m.from)));
-      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
-      if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
+      // vlna 22, bod 3: úseky / klíčové polohy / okno / fáze motoru (doc-script-asm.ts)
+      const phName = mo.phases?.find((p) => p.id === m.phase)?.name;
+      const piece = motorIsPiecewise(m);
+      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${piece ? motorPieceWords(c.sheetOut, m, phName) : open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
+      if (piece) {
+        /* rychlosti a časy jsou u úseků */
+      } else if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
+      if (!piece) l += windowWords(c.sheetOut, m, phName);
       l += motorLimitWords(c.sheetOut, m); // vlna 22, bod 8: na mezi chyba
       if (i === 0) {
         // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
@@ -2124,6 +2132,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       c.line(l);
     });
     if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
+    for (const l of phaseLater) c.line(l);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
   // vlna 22, bod 2: preferované strany mezí a režim studie (kinematika / kvazistatika) bez nastavení dynamiky
