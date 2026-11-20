@@ -113,8 +113,6 @@ Analýza	Analysis
 Barva komponenty	Component colour
 Barva plochy	Face colour
 Barva tělesa	Body colour
-Bez kolizí ✓	No interferences ✓
-Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu	No interferences ✓ – the result is in the Interference panel and in the document status
 Bílý (tisk)	White (print)
 CAD jádro se nepodařilo načíst. Zkuste prosím aktuální Chrome, Edge, Firefox nebo Safari.	The CAD kernel could not be loaded. Please try a current Chrome, Edge, Firefox or Safari.
 Celá dokumentace jako PDF k tisku a offline čtení.	The whole documentation as a PDF for printing and offline reading.
@@ -556,7 +554,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) added – result after computation below
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} edges by rule “{3}” – result after computation below
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ document “{0}” ({1} features) – opens in a new tab
-✓ kolize: žádné ({0} komponent)	✓ interferences: none ({0} components)
 ✓ materiál = {0}	✓ material = {0}
 ✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ material “{0}” = designation for the title block; density stays by class “{1}” ({2} g/cm³) – for another density enter: material {3}
 ✓ odstraněn prvek „{0}“	✓ feature “{0}” removed

@@ -10,5 +10,4 @@ nová pružina z tabulky mezi díly (Sestava › Pružina mezi díly): osa z dí
 Tabulka i protokol pohybu počítají podle EN 13906-1 (výpočet pružiny z tabulky): tuhost R = G·d⁴ / (8·D³·n), délku na doraz Ln, nejmenší pracovní délku Ln + Sa (dotyk závitů), napětí τ vůči τzul = 0,5·Rm (statická kontrola; τk = k·τ přísnější rada pro opakované zatížení) a vzpěr (v díře vedená).	The table and the motion report calculate per EN 13906-1 (the spring table calculation): rate R = G·d⁴ / (8·D³·n), solid length Ln, minimum working length Ln + Sa (coils touching), stress τ against τzul = 0.5·Rm (static check; τk = k·τ is the stricter advice for repeated loading) and buckling (guided in a hole).
  kolize kontrolovány v {0} snímcích z {1} (každý {2}. a poslední) – hustotu určuje pohyb kroky N	 collisions checked in {0} of {1} frames (every {2}th and the last) – motion steps N sets the density
  kolize v tomto snímku nekontrolována (dynamika: každý {0}. snímek – pohyb kroky N)	 collisions not checked in this frame (dynamics: every {0}th frame – motion steps N)
-Kolize: žádné v kontrolovaných snímcích	Collisions: none in the checked frames
 nekontrolováno	not checked

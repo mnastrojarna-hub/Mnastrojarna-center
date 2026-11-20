@@ -13,6 +13,14 @@
 //  7) `stav` / `kolize seznam`: třídy a instance stejně jako v panelu (text = GUI)
 //  8) EN a DE: titulek a přepínače tříd přeložené
 //  9) totéž (1–2) v náhledu bez WebGL (majitel testoval bez WebGL)
+// Etapa C2 – bod 6 (vůle a spojitá kontrola v pohybu), s WebGL i bez něj:
+// 10) střižník Ø10 ve vedení Ø10,02 (korpus 74c): panel Kolize bez průniku = „Bez průniku · vůle nekontrolována“ (žádné ✓,
+//     data-clash-clearance=unchecked); `pohyb vůle … min 0,05` → sekce Vůle s dvojicí a limitem, výsledek 0,01 mm pod limitem
+//     (data-clearance-min / -below), graf vůle, „Na minimum“ → úsečka vůle ve 3D / v náhledu (data-gap-label „min 0,01 mm“,
+//     pod limitem červená; bez WebGL červené pixely v překryvné vrstvě)
+// 11) nůž přes kolík (korpus 74b): spojitě = tlačítko „Kolize mezi kroky 17 a 18“, window.mncad.motion(): between, sweep.mode
+//     continuous, collisions.between=1; odškrtnout „Kolize i mezi kroky“ + Vypočítat → data-motion-sweep=discrete a text
+//     „mezi polohami nekontrolováno“, žádný kontakt mezi kroky; přidání dvojice v GUI zapíše doc.motion.clearance
 // Spuštění: E2E_BASE=http://localhost:3535 node e2e/cad-w22-c.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -104,6 +112,82 @@ async function classesFlow(p, tag) {
   ok(/^Kolize: 5 – skutečné 2: Přidržovač × Šroub M12 \[S2\] \(365,2 mm³\) v místě \[50; 30; 28,5\]/m.test(st) && /šroub v závitu 3/.test(st), `[${tag}] stav: třídy a instance jako panel\n   ${(/^Kolize: .*$/m.exec(st) || [''])[0]}`);
 }
 
+/** 10–11 (C2, bod 6): vůle v pohybu, úsečka minima, spojitě × diskrétně – s WebGL i bez něj */
+async function clearanceFlow(p, tag, soft) {
+  const { run, idle, panel, waitState, kolizeBtn } = helpers(p);
+  const mp = p.locator('[data-motion-panel]');
+  const openMotion = async () => {
+    if (await mp.count()) return;
+    await p.locator('button', { hasText: /^Pohybová studie$/ }).first().click().catch(() => {});
+    await mp.waitFor({ timeout: 30000 }).catch(() => {});
+  };
+  const motionDone = () => p.waitForFunction(() => document.querySelector('[data-motion-panel]')?.getAttribute('data-motion-state') === 'ok', null, { timeout: 180000 }).then(() => true, () => false);
+  // ── 10. vedení 0,01 mm ──
+  const setup = corpus('74c-clearance-guide').split('\n').filter((l) => !/^(#|kolize|pohyb|stav)/.test(l)).join('\n');
+  ok(!/^✗/m.test(await run(setup)), `[${tag}] 74c: sestava 6b založena`);
+  await idle();
+  await kolizeBtn();
+  ok(await waitState('ok'), `[${tag}] kolize bez průniku → stav ok`);
+  const a = await panel();
+  ok(a && /Bez průniku · vůle nekontrolována/.test(a.text) && !/✓|Bez kolizí/.test(a.text), `[${tag}] panel Kolize: „Bez průniku · vůle nekontrolována“, žádné ✓\n   ${a && a.text.split('\n')[0]}`);
+  ok((await p.locator('[data-clash-clearance="unchecked"]').count()) === 1, `[${tag}] panel Kolize výslovně: vůle se tu nekontroluje`);
+  await run('pohyb motor lineární vazba 1 0..20 kroky 10 kolize\npohyb vůle "Střižník" "Vodítko" min 0,05');
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] studie s vůlí spočítána (data-motion-state=ok)`);
+  const pairs = await p.locator('[data-clearance-pair]').allTextContents();
+  ok(pairs.length === 1 && /Střižník/.test(pairs[0]) && /Vodítko/.test(pairs[0]), `[${tag}] sekce Vůle: sledovaná dvojice ${JSON.stringify(pairs)}`);
+  const min = await p.locator('[data-clearance-min]').getAttribute('data-clearance-min').catch(() => null);
+  const below = await p.locator('[data-clearance-min]').getAttribute('data-clearance-below').catch(() => null);
+  ok(min === '0,01' && below === '1', `[${tag}] nejmenší vůle 0,01 mm pod limitem (min=${min}, below=${below})`);
+  ok((await p.locator('[data-clearance-chart]').count()) === 1 && (await p.locator('[data-clearance-limit-line]').count()) === 1, `[${tag}] graf vůle po krocích s čarou limitu`);
+  ok((await p.locator('[data-motion-sweep="continuous"]').count()) === 1, `[${tag}] štítek kontroly: spojitě i mezi polohami`);
+  await p.locator('[data-clearance-jump]').click();
+  await p.waitForTimeout(800);
+  const gl = p.locator('[data-gap-label]').first();
+  ok(await gl.isVisible().catch(() => false), `[${tag}] úsečka vůle: popisek ve ${soft ? 'softwarovém náhledu' : '3D okně'}`);
+  ok(/min 0,01 mm/.test((await gl.textContent().catch(() => '')) || '') && (await gl.getAttribute('data-gap-below')) === '1', `[${tag}] popisek „min 0,01 mm“, pod limitem`);
+  if (soft) {
+    const red = await p.evaluate(() => {
+      const c = document.querySelector('[data-soft-overlay]');
+      const g = c && c.getContext('2d');
+      if (!g) return 0;
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && d[i] > 190 && d[i + 1] < 110 && d[i + 2] < 110) n++;
+      return n;
+    });
+    ok(red > 0, `[${tag}] úsečka vůle nakreslená v překryvné vrstvě náhledu bez WebGL (${red} px)`);
+  }
+  await p.screenshot({ path: `${S}w22c-${tag}-10-clearance.png` });
+  const api = await p.evaluate(() => window.mncad.motion());
+  ok(api.clearance && api.clearance.limit === 0.05 && Math.abs(api.clearance.min.d - 0.01) < 1e-6 && api.clearance.pairs[0].below.length === 11, `[${tag}] window.mncad.motion().clearance: limit, minimum, kroky pod limitem`);
+  // ── 11. nůž přes kolík: spojitě × diskrétně ──
+  const knife = corpus('74b-clearance-knife-pin').split('\n').filter((l) => !/^(#|pohyb)/.test(l)).join('\n');
+  ok(!/^✗/m.test(await run(knife + '\npohyb motor lineární vazba "POSUV" 12..192 kroky 36 kolize')), `[${tag}] 74b: sestava 6 a studie 36 kroků`);
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] studie nože spočítána`);
+  ok((await p.locator('[data-clearance-between="17-18"]').count()) === 1, `[${tag}] „Kolize mezi kroky 17 a 18“ v panelu (dřív „Kolize: žádné ve všech krocích“)`);
+  const m1 = await p.evaluate(() => window.mncad.motion());
+  ok(m1.sweep && m1.sweep.mode === 'continuous' && m1.between && m1.between[0].k0 === 17 && m1.collisions && m1.collisions.between === 1 && m1.collision && m1.collision.between, `[${tag}] API: sweep.mode=continuous, between[0].k0=17, collisions.between=1, collision mezi kroky`);
+  await p.locator('[data-motion-continuous]').uncheck();
+  await p.waitForTimeout(400);
+  await p.locator('[data-motion-run]').click();
+  ok(await motionDone(), `[${tag}] diskrétně přepočítáno`);
+  const sweepTxt = (await p.locator('[data-motion-sweep]').textContent().catch(() => '')) || '';
+  ok((await p.locator('[data-motion-sweep="discrete"]').count()) === 1 && /mezi polohami nekontrolováno/.test(sweepTxt) && (await p.locator('[data-clearance-between]').count()) === 0, `[${tag}] diskrétně: výslovně „mezi polohami nekontrolováno“, žádný kontakt mezi kroky\n   ${sweepTxt}`);
+  // přidání dvojice v GUI
+  await p.locator('[data-clearance-mode="pairs"]').click();
+  await p.locator('[data-clearance-comp="a"]').selectOption({ label: 'Nůž' });
+  await p.locator('[data-clearance-comp="b"]').selectOption({ label: 'Kolík' });
+  await p.locator('[data-clearance-add]').click().catch(() => {});
+  await p.waitForTimeout(600);
+  const st = await p.evaluate(() => JSON.stringify(window.mncad.doc ? window.mncad.doc().motion?.clearance ?? null : null));
+  const pairs2 = await p.locator('[data-clearance-pair]').allTextContents();
+  ok(pairs2.some((x) => /Nůž/.test(x) && /Kolík/.test(x)), `[${tag}] dvojice přidaná v GUI je ve studii (${pairs2.join(' | ')} ${st})`);
+}
+
 (async () => {
   const browsers = [];
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -183,6 +267,19 @@ async function classesFlow(p, tag) {
   ok(errs.length === 0, 'žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
   await ctx.close();
 
+  // ── 10–11. vůle a spojitá kontrola (C2, bod 6) s WebGL ──
+  {
+    const cx = await b.newContext({ viewport: { width: 1430, height: 900 } });
+    const pc = await cx.newPage();
+    const errs = [];
+    pc.on('pageerror', (e) => errs.push(e.message));
+    pc.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await start(pc, BASE + '/cad');
+    await clearanceFlow(pc, 'webgl', false);
+    ok(errs.length === 0, 'C2: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
+    await cx.close();
+  }
+
   // ── 8. EN / DE ──
   for (const [lang, title, cls] of [['en', /Interferences \(5\) · real 2 · screw in thread 3/, /screw in thread 3/], ['de', /Kollision\w* \(5\) · echte 2 · Schraube im Gewinde 3/, /Schraube im Gewinde 3/]]) {
     const cx = await b.newContext({ viewport: { width: 1430, height: 880 } });
@@ -210,6 +307,7 @@ async function classesFlow(p, tag) {
   const noGl = await p2.evaluate(() => { try { const c = document.createElement('canvas'); return !(c.getContext('webgl2') || c.getContext('webgl')); } catch { return true; } });
   ok(noGl, 'druhý průchod běží bez WebGL (softwarový náhled)');
   await classesFlow(p2, 'nowebgl');
+  await clearanceFlow(p2, 'nowebgl', true); // C2: úsečka vůle v softwarovém náhledu (majitel testoval bez WebGL)
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

@@ -1,0 +1,91 @@
+# Vlna 22, balík C2 (bod 6): vůle během pohybu, spojitá kontrola kolizí mezi kroky, poctivé formulace „bez průniku · vůle nekontrolována“
+ … a dalších {0} dvojic (pohyb vůle seznam)	 … und {0} weitere Paare (bewegung spiel liste)
+ · ⚠ pod limitem {0} mm v {1} z {2} poloh (kroky {3})	 · ⚠ unter dem Grenzwert {0} mm in {1} von {2} Stellungen (Schritte {3})
+ · limit {0} mm dodržen v {1} polohách (mezi polohami nepotvrzeno)	 · Grenzwert {0} mm in {1} Stellungen eingehalten (zwischen den Stellungen nicht bestätigt)
+ · limit {0} mm dodržen v celém pohybu (spojitě i mezi polohami)	 · Grenzwert {0} mm in der ganzen Bewegung eingehalten (stetig, auch zwischen den Stellungen)
+ · mezi kroky (zjemněno) {0}×	 · zwischen Schritten (verfeinert) {0}×
+ · mezi polohami	 · zwischen den Stellungen
+ „{0}“ × „{1}“: nejmenší {2} mm	 „{0}“ × „{1}“: kleinstes {2} mm
+ (jádro bez kontroly mezi polohami)	 (Kern ohne Prüfung zwischen den Stellungen)
+ (kolize v pohybu vypnuté – pohyb kolize)	 (Kollisionen in der Bewegung aus – bewegung kollision)
+ (spojitá kontrola vypnuta – pohyb kolize spojitě)	 (stetige Prüfung ausgeschaltet – bewegung kollision stetig)
+ ⚠ pod limitem {0} mm	 ⚠ unter dem Grenzwert {0} mm
+ studie zatím nemá motor – vůle se spočítá s pohybem (pohyb motor …)	 die Studie hat noch keinen Antrieb – das Spiel wird mit der Bewegung berechnet (bewegung antrieb …)
+ vůle {0}: {1} mm	 Spiel {0}: {1} mm
+ výsledek pro nynější stav sestavy není spočítán – pohyb spustit	 kein Ergebnis für den aktuellen Zustand der Baugruppe – bewegung starten
+, mezi sousedními snímky přímou dráhou	, gerade Bahn zwischen benachbarten Bildern
+{0} dvojic dílů jen mezi kroky (nalezeno zjemněním)	{0} Teilepaare nur zwischen Schritten (durch Verfeinerung gefunden)
+bez limitu	ohne Grenzwert
+bez posunu mezi polohami	ohne Weg zwischen den Stellungen
+Bez průniku · vůle nekontrolována	Keine Durchdringung · Spiel nicht geprüft
+Bez průniku těles (vůle nekontrolována) – výsledek je v panelu Kolize i ve stavu dokumentu	Keine Durchdringung der Körper (Spiel nicht geprüft) – das Ergebnis steht im Kollisionsfenster und im Dokumentstatus
+dotyk bez objemu v poloze {0}×	Berührung ohne Volumen in einer Stellung {0}×
+dráha posuvu {0}	Verschiebebahn {0}
+Dvojice	Paare
+jen v polohách kroků (diskrétně)	nur in den Schrittstellungen (diskret)
+Kolize i mezi kroky (spojitě – zjemnění u kontaktu)	Kollisionen auch zwischen Schritten (stetig – Verfeinerung am Kontakt)
+Kolize mezi kroky {0} a {1}: „{2}“ × „{3}“ (poloha {4}) – v krocích samotných není	Kollision zwischen Schritt {0} und {1}: „{2}“ × „{3}“ (Stellung {4}) – in den Schritten selbst nicht
+kolize mezi polohami nepotvrzeny v {0} úsecích (od kroku {1}) – tam jen v polohách; jemnější kroky: pohyb kroky N	Kollisionen zwischen den Stellungen in {0} Abschnitten nicht bestätigt (ab Schritt {1}) – dort nur in den Stellungen; feinere Schritte: bewegung schritte N
+kolize: žádný průnik (objem nad 0,001 mm³) – {0} komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)	Kollision: keine Durchdringung (Volumen über 0,001 mm³) – {0} Komponenten · Spiel nicht geprüft (bewegung spiel "A" "B" min 0,05)
+Kolize: žádný průnik v {0} polohách	Kollisionen: keine Durchdringung in {0} Stellungen
+Kolize: žádný průnik v kontrolovaných snímcích	Kollisionen: keine Durchdringung in den geprüften Bildern
+Komponenta A	Komponente A
+Komponenta B	Komponente B
+Kontrola kolizí:	Kollisionsprüfung:
+kontrolováno jen v {0} polohách (diskrétně, {1}) – mezi polohami nekontrolováno{2}	nur in {0} Stellungen geprüft (diskret, {1}) – zwischen den Stellungen nicht geprüft{2}
+kontrolováno spojitě i mezi polohami ({0} poloh + {1} mezipoloh ze zjemnění{2})	stetig geprüft, auch zwischen den Stellungen ({0} Stellungen + {1} Zwischenstellungen aus der Verfeinerung{2})
+Kontrolovat kolize v pohybu (pomalejší)	Kollisionen in der Bewegung prüfen (langsamer)
+limit {0} mm	Grenzwert {0} mm
+limit vůle [mm]	Grenzwert des Spiels [mm]
+limit vůle: 0 až 1000 mm (např. min 0,05)	Grenzwert des Spiels: 0 bis 1000 mm (z. B. min 0,05)
+mez posunu {0}	Wegschranke {0}
+mez zjemnění {0}×	Verfeinerungsgrenze {0}×
+mezi kroky	zwischen Schritten
+mezi kroky {0} a {1} (po přímé dráze)	zwischen Schritt {0} und {1} (entlang der geraden Bahn)
+mezi kroky {0} a {1} (zjemněno: poloha {2}, t = {3} s)	zwischen Schritt {0} und {1} (verfeinert: Stellung {2}, t = {3} s)
+min	min
+Na minimum (krok {0})	Zum Minimum (Schritt {0})
+nejméně {0} mm	mindestens {0} mm
+nejméně {0} mm (obálky)	mindestens {0} mm (Hüllquader)
+Nejmenší přípustná vůle (limit)	Kleinstes zulässiges Spiel (Grenzwert)
+nejmenší vůle {0} {1}	kleinstes Spiel {0} {1}
+Nesledovat	Nicht verfolgen
+Nesledovat dvojici	Paar nicht mehr verfolgen
+nesleduje se	nicht verfolgt
+Nulový průnik není důkaz, že nic nedře – vůli ve vedení nebo u střižníku sledujte zde (dvojice nebo pohyblivé díly s limitem).	Keine Durchdringung ist kein Beweis, dass nichts schleift – das Spiel in einer Führung oder am Stempel hier verfolgen (Paare oder bewegliche Teile mit Grenzwert).
+pohyb kolize spojitě|diskrétně: neznámá volba „{0}“	bewegung kollision stetig|diskret: unbekannte Option „{0}“
+pohyb vůle … smazat: zadejte dvojici – pohyb vůle "A" "B" smazat (nebo pohyb vůle smazat)	bewegung spiel … löschen: Paar angeben – bewegung spiel "A" "B" löschen (oder bewegung spiel löschen)
+pohyb vůle "A" "B" [min 0,05] [zjemnit | bez zjemnění] · pohyb vůle pohyblivé [min 0,1] · pohyb vůle [seznam | smazat] · pohyb vůle "A" "B" smazat · pohyb kolize spojitě | diskrétně	bewegung spiel "A" "B" [min 0,05] [verfeinern | ohne verfeinerung] · bewegung spiel bewegliche [min 0,1] · bewegung spiel [liste | löschen] · bewegung spiel "A" "B" löschen · bewegung kollision stetig | diskret
+pohyb vůle: buď dvojice komponent, nebo „pohyblivé“ – ne obojí	bewegung spiel: entweder ein Komponentenpaar oder „bewegliche“ – nicht beides
+pohyb vůle: dvojice „{0}“ × „{1}“ se nesleduje	bewegung spiel: das Paar „{0}“ × „{1}“ wird nicht verfolgt
+pohyb vůle: dvojice potřebuje dvě různé komponenty – „{0}“ je A i B	bewegung spiel: ein Paar braucht zwei verschiedene Komponenten – „{0}“ ist A und B
+pohyb vůle: neznámá volba „{0}“ – {1}	bewegung spiel: unbekannte Option „{0}“ – {1}
+pohyb vůle: nic k nastavení – {0}	bewegung spiel: nichts einzustellen – {0}
+pohyb vůle: zadejte dvojici komponent – {0}	bewegung spiel: ein Komponentenpaar angeben – {0}
+Pohyblivé díly	Bewegliche Teile
+pohyblivé díly vůči ostatním	bewegliche Teile gegenüber den anderen
+posun mezi polohami až {0}	Weg zwischen den Stellungen bis {0}
+průnik už v poloze {0}	Durchdringung schon in einer Stellung {0}
+Sledovaná vůle	Verfolgtes Spiel
+sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})	verfolgtes Spiel eines Paares mit einer Komponente außerhalb des Skripts wird nicht ins Skript übernommen ({0})
+spojitě – zjemnění u kontaktu a kontrola mezi polohami	stetig – Verfeinerung am Kontakt und Prüfung zwischen den Stellungen
+spojitě jen částečně: {0} poloh + {1} mezipoloh, mezi polohami nepotvrzeno v {2} úsecích (od kroku {3}; {4}) – tam jen v polohách	nur teilweise stetig: {0} Stellungen + {1} Zwischenstellungen, zwischen den Stellungen in {2} Abschnitten nicht bestätigt (ab Schritt {3}; {4}) – dort nur in den Stellungen
+úseky	Abschnitte
+v kroku {0} (t = {1} s)	in Schritt {0} (t = {1} s)
+v pohybu „{0}“ × „{1}“ mezi kroky {2} a {3} (zjemněno: poloha {4}, t = {5} s, motory {6}): průnik {7} mm³ – v krocích samotných není	in der Bewegung „{0}“ × „{1}“ zwischen Schritt {2} und {3} (verfeinert: Stellung {4}, t = {5} s, Antriebe {6}): Durchdringung {7} mm³ – in den Schritten selbst nicht
+vůle „{0}“ × „{1}“ {2} mm < {3} mm v krocích {4} (nejmenší {5})	Spiel „{0}“ × „{1}“ {2} mm < {3} mm in den Schritten {4} (kleinstes {5})
+Vůle (nejmenší vzdálenost dílů) se tu nekontroluje – průnik pod 0,001 mm³ a dotyk se nehlásí. Vůli s limitem sleduje pohybová studie: sekce Vůle, nebo pohyb vůle "A" "B" min 0,05.	Das Spiel (kleinster Abstand der Teile) wird hier nicht geprüft – Durchdringung unter 0,001 mm³ und Berührung werden nicht gemeldet. Das Spiel mit Grenzwert verfolgt die Bewegungsstudie: Abschnitt Spiel, oder bewegung spiel "A" "B" min 0,05.
+vůle {0} {1} < limit {2} mm (⚠ {3} dvojic)	Spiel {0} {1} < Grenzwert {2} mm (⚠ {3} Paare)
+Vůle {0} × {1} [mm]	Spiel {0} × {1} [mm]
+Vůle {0}: nejmenší {1} {2}	Spiel {0}: kleinstes {1} {2}
+Vůle = nejmenší vzdálenost dílů v každé poloze; u kontaktu se kroky zjemní (půlení, u posuvu přesná dráha). Pod limitem ⚠ s místem a krokem.	Spiel = kleinster Abstand der Teile in jeder Stellung; am Kontakt werden die Schritte verfeinert (Halbierung, bei Verschiebung exakte Bahn). Unter dem Grenzwert ⚠ mit Ort und Schritt.
+Vůle a spojitost kontroly	Spiel und Stetigkeit der Prüfung
+Vůle po krocích [mm]	Spiel je Schritt [mm]
+Vůle pohyblivých dílů: dvojic blíž než {0} mm: {1}	Spiel der beweglichen Teile: Paare näher als {0} mm: {1}
+Vůle pohyblivých dílů: žádná dvojice blíž než {0} mm v kontrolovaných polohách ({1} poloh)	Spiel der beweglichen Teile: kein Paar näher als {0} mm in den geprüften Stellungen ({1} Stellungen)
+Vůle: {0} · {1} · kontrola {2}{3}	Spiel: {0} · {1} · Prüfung {2}{3}
+Vůle: dvojice nejde změřit (komponenta bez tělesa nebo skrytá)	Spiel: das Paar kann nicht gemessen werden (Komponente ohne Körper oder ausgeblendet)
+vyčerpán rozpočet zjemnění	Verfeinerungsbudget aufgebraucht
+žádný průnik · vůle nekontrolována	keine Durchdringung · Spiel nicht geprüft
+vůle v pohybové studii: nejmenší vzdálenost sledovaných dvojic (nebo pohyblivých dílů vůči ostatním) v každé poloze se zjemněním mezi polohami, limit → ⚠ clash.clearance s místem a kroky; kolize se kontrolují i mezi kroky (mez posunu, přesná dráha posuvu, půlení) – kontakt mezi kroky ⚠ clash.real „mezi kroky 17 a 18“; diskrétně = jen v polohách, výslovně „mezi polohami nekontrolováno“; strojová pole clash.mode= clear.min= clear.below=	Spiel in einer Bewegungsstudie: kleinster Abstand der verfolgten Paare (oder der beweglichen Teile gegenüber den anderen) in jeder Stellung mit Verfeinerung zwischen den Stellungen, Grenzwert → ⚠ clash.clearance mit Ort und Schritten; Kollisionen werden auch zwischen den Schritten geprüft (Wegschranke, exakte Verschiebebahn, Halbierung) – Kontakt zwischen Schritten ⚠ clash.real „zwischen Schritt 17 und 18“; diskret = nur in den Stellungen, ausdrücklich „zwischen den Stellungen nicht geprüft“; Maschinenfelder clash.mode= clear.min= clear.below=
+průnik těles mezi kroky ({0}×, nalezeno zjemněním)	Durchdringung der Körper zwischen Schritten ({0}×, durch Verfeinerung gefunden)

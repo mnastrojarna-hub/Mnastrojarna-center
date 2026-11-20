@@ -15,6 +15,7 @@ import type { Feature, MeshData, Vec3 } from "@/cad/types";
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { drawSurfOverlay } from "./viewport-surf-overlay";
 import type { SurfOverlay } from "./surf-overlay";
+import type { GapGfx } from "@/cad/clearance-report";
 import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge";
 import type { BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
@@ -107,6 +108,8 @@ type Props = {
   onContext?: (x: number, y: number, item: SelItem | null) => void;
   onCursor?: (p: Vec3 | null) => void;
   measure?: MeasureGfx | null;
+  /** úsečka nejbližších bodů sledované vůle pohybové studie v zobrazeném kroku (vlna 22, bod 6) */
+  gap?: GapGfx | null;
   assembly?: AsmView[];
   faceColors?: Record<number, string>;
   /** barvy vrcholů (RGB po trojicích, délka = vertices.length) – např. analýza úkosů; přebije barvy ploch */
@@ -233,6 +236,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const cubeRef = useRef<HTMLDivElement>(null);
   const triadRef = useRef<SVGSVGElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
+  const gapLabelRef = useRef<HTMLDivElement>(null);
   const S = useRef<St | null>(null);
   const boxApi = useRef<ViewportHandle["boxPick"]>(undefined);
   const propsRef = useRef(props);
@@ -504,6 +508,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         d.style.display = hidden ? "none" : "block";
         d.style.transform = `translate(${((v3.x + 1) / 2) * w}px, ${((1 - v3.y) / 2) * h}px) translate(-50%, -50%)`;
       });
+      // popisek úsečky vůle (vlna 22, bod 6) uprostřed mezi nejbližšími body
+      const gp = propsRef.current.gap;
+      const gd = gapLabelRef.current;
+      if (gp && gd) {
+        v3.set((gp.p1[0] + gp.p2[0]) / 2, (gp.p1[1] + gp.p2[1]) / 2, (gp.p1[2] + gp.p2[2]) / 2).project(cam);
+        gd.style.display = v3.z > 1 || v3.z < -1 ? "none" : "block";
+        gd.style.transform = `translate(${((v3.x + 1) / 2) * w}px, ${((1 - v3.y) / 2) * h}px) translate(-50%, -140%)`;
+      }
     };
     const syncCube = (cam: THREE.Camera) => {
       cam.updateMatrixWorld();
@@ -1422,8 +1434,22 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       line.renderOrder = 21;
       s.overlay.add(line);
     }
+    // úsečka vůle pohybové studie (vlna 22, bod 6): pod limitem červená, jinak zelená; body na obou dílech
+    const gp = props.gap;
+    if (gp) {
+      const col = gp.below ? 0xe03930 : 0x16a34a;
+      for (const p of [gp.p1, gp.p2]) {
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(r * 0.8, 12, 8), new THREE.MeshBasicMaterial({ color: col, depthTest: false }));
+        dot.position.set(...p);
+        dot.renderOrder = 22;
+        s.overlay.add(dot);
+      }
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...gp.p1), new THREE.Vector3(...gp.p2)]), new THREE.LineBasicMaterial({ color: col, depthTest: false }));
+      line.renderOrder = 22;
+      s.overlay.add(line);
+    }
     s.render();
-  }, [props.measure]);
+  }, [props.measure, props.gap]);
 
   // ---------- analýza ploch: návaznost hran, hřebeny křivosti, řídicí body ----------
   useEffect(() => {
@@ -1714,6 +1740,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
           </div>
         ))}
       </div>
+      {/* popisek úsečky vůle pohybové studie (vlna 22, bod 6) */}
+      {props.gap && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div ref={gapLabelRef} data-gap-label data-gap-below={props.gap.below ? "1" : "0"} className={`absolute left-0 top-0 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[11px] font-semibold shadow ${props.gap.below ? "border-brand/50 bg-white/95 text-brand-600" : "border-[#16a34a]/50 bg-white/95 text-[#166534]"}`}>
+            {props.gap.label}
+          </div>
+        </div>
+      )}
       {/* popisky entit pro výběr bez trefování (klik na střed popisku = klik na entitu; pointer-events: none) */}
       {props.hints && hintList.length > 0 && (
         <div data-hints className="pointer-events-none absolute inset-0 overflow-hidden">

@@ -87,6 +87,8 @@ export function makeAsmEnv(ws: Workspace, kernel: KernelApi, o: AsmEnvOptions = 
     mateEnt: (key, i, e) => retrying(key, i, () => kernel.mateEnt(key, i, e)),
     interference: (d) => kernel.interference(d),
     clashDetail: (d, pairs) => kernel.clashDetail(d, pairs),
+    // vůle a spojitá kontrola pohybu (vlna 22, bod 6); jádro bez operace (zkušební náhrada) = bez kontroly mezi kroky
+    ...(typeof kernel.clearance === "function" ? { clearance: (req: Parameters<KernelApi["clearance"]>[0]) => kernel.clearance(req) } : {}),
     cylFace: (key, r) => kernel.cylFace(key, r),
     isCone: (key, i) => kernel.inspect({ kind: "comp", key, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }, { kind: "face", index: i }).then((e) => e.surface === "CONE", () => false),
     geo: asm.geo,

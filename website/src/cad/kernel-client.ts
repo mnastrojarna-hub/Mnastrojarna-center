@@ -11,6 +11,7 @@ import type { BuildProgress } from "./build";
 import type { DrawingMeta, DrawingOptions } from "./drawing";
 import type { CompareOptions, ReferenceFile } from "./compare";
 import type { ClashPair } from "./clash-class";
+import type { ClrReq } from "./clearance-types";
 import type { EntRef, ShapeSrc } from "./inspect";
 import type { MeasureQuery } from "./measure";
 import type { SurfQuery } from "./surf-query";
@@ -59,7 +60,7 @@ export type KernelTransport = {
  */
 export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
 /** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
-export const LONG_OPS: ReadonlySet<string> = new Set(["build", "check", "topology", "measure", "export", "exportStats", "drawing", "interference", "clashDetail", "asmParts", "compare", "stepSplit"]);
+export const LONG_OPS: ReadonlySet<string> = new Set(["build", "check", "topology", "measure", "export", "exportStats", "drawing", "interference", "clashDetail", "clearance", "asmParts", "compare", "stepSplit"]);
 
 /** Výpočet zrušený uživatelem (tlačítko Zrušit) – volající ho nemá hlásit jako chybu jádra. */
 export class CadCancelled extends Error {
@@ -258,6 +259,8 @@ export function makeKernelClient(t: KernelTransport) {
     asmEnvelope: (doc: CadDoc) => call({ op: "asmEnvelope", doc }),
     /** zařazení dvojic kolizí (šroub v závitu / pod hlavou / skutečná / nevyhodnotitelná) – clash-class.ts, clash-detail.ts */
     clashDetail: (doc: CadDoc, pairs: ClashPair[]) => call({ op: "clashDetail", doc, pairs }),
+    /** vůle mezi komponentami a spojitá kontrola úseku pohybu (vlna 22, bod 6 – clearance-kernel.ts) */
+    clearance: (req: ClrReq) => call({ op: "clearance", req }),
     /** porovnání dílu s referenčním modelem (STEP / BREP / STL): objemy, rozdílová tělesa, mapa odchylek – viz compare.ts */
     compare: (doc: CadDoc, file: ReferenceFile, opts?: CompareOptions) => call({ op: "compare", doc, file, opts }),
     mateFace: (key: string, index: number) => call({ op: "mateFace", key, index }),

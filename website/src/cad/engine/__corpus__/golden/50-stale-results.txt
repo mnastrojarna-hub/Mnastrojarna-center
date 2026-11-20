@@ -16,14 +16,14 @@ Prvky:
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
 ✓ komponenta „Přidržovač“ vložena do sestavy
 ✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska“ F6 · 20 mm: ok · poloha beze změny
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 Deska:F6 (rovina) ↔ Přidržovač:F5 (rovina): vzdálenost 20 mm · ΔX 0 · ΔY 0 · ΔZ 20 · nejbližší body [40; 20; 10] a [40; 20; 30] · úhel normál 180° (rovnoběžné) · vzdálenost rovin 20 mm
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Vazby: 1 (1 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 3 ===
 ✓ nová sestava „Sestava B“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
@@ -43,7 +43,7 @@ Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 5] ⚓
 Vazby: 1 (1 konflikt)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
 Měření: výsledek L6 je pro revizi r·? – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz
 === run 5 ===
 ✓ zpět o 1 krok(ů) (zbývá zpět 0, znovu 1)
@@ -52,13 +52,13 @@ Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Vazby: 1 (1 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 6 ===
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 Deska:F6 (rovina) ↔ Přidržovač:F5 (rovina): vzdálenost 20 mm · ΔX 0 · ΔY 0 · ΔZ 20 · nejbližší body [40; 20; 10] a [40; 20; 30] · úhel normál 180° (rovnoběžné) · vzdálenost rovin 20 mm
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Vazby: 1 (1 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)

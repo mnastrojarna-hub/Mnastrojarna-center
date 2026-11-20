@@ -12,6 +12,7 @@
 import { tr } from "./i18n";
 import { AsmCursor, asmIsNum, asmNum, asmTokens, asmWords as W } from "./agent-asm";
 import { backArg, parseDynText, type DynCmd } from "./agent-motion-dyn";
+import { parseClearanceText, type ClearanceCmd } from "./agent-clearance";
 import type { Vec3 } from "./types";
 
 export type MotionCmd =
@@ -43,6 +44,8 @@ export type MotionCmd =
       back?: boolean;
     }
   | { op: "dyn"; cmd: DynCmd }
+  /** vůle a spojitost kontroly kolizí (vlna 22, bod 6 – cad/agent-clearance.ts) */
+  | { op: "clearance"; cmd: ClearanceCmd }
   | { op: "set"; steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }
   | { op: "run" }
   | { op: "play"; loop?: boolean }
@@ -160,6 +163,9 @@ export function parseMotionText(line: string): MotionCmd {
   // dynamika, hmotnost, síla / moment na vazbě (cad/agent-motion-dyn.ts)
   const dyn = parseDynText(c);
   if (dyn) return { op: "dyn", cmd: dyn };
+  // vůle, `kolize spojitě|diskrétně` (cad/agent-clearance.ts)
+  const clr = parseClearanceText(c);
+  if (clr) return { op: "clearance", cmd: clr };
   if (c.is(K.motor)) {
     c.i++;
     if (c.is(K.del)) {

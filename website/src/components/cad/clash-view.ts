@@ -1,7 +1,8 @@
 /**
  * Texty panelu Kolize podle stavu výsledku (vlna 22, bod 1) – bez Reactu, aby je hlídal test „žádné falešné zelené“
- * (src/cad/w22/greens-a.test.ts). Zelený titulek „Bez kolizí ✓“ existuje jen pro stav `ok` = záznam kontroly aktivního
- * dokumentu se shodným otiskem zobrazeného stavu sestavy (cad/engine/result-key.ts `clashStateOf`).
+ * (src/cad/w22/greens-a.test.ts). Titulek bez průniku „Bez průniku · vůle nekontrolována“ (vlna 22, bod 6 – dřív „Bez kolizí ✓“)
+ * existuje jen pro stav `ok` = záznam kontroly aktivního dokumentu se shodným otiskem zobrazeného stavu sestavy
+ * (cad/engine/result-key.ts `clashStateOf`).
  */
 import type { Interference } from "@/cad/asm-kernel";
 import type { ClashCounts, ClashDetail } from "@/cad/clash-class";
@@ -14,7 +15,8 @@ export type ClashPanelEntry = { res: Interference[]; at: string; comps?: number;
 
 /** titulek panelu podle stavu */
 export function clashTitle(state: ClashState, count: number): string {
-  if (state === "ok") return tr("Bez kolizí ✓");
+  // bez průniku ≠ bez kolizí: vůle se statickou kontrolou nehodnotí (vlna 22, bod 6) – žádné ✓
+  if (state === "ok") return tr("Bez průniku · vůle nekontrolována");
   if (state === "clash") return tr("Kolize ({0})", count);
   if (state === "stale") return tr("Kolize: neplatí");
   return tr("Kolize: nezkontrolováno");

@@ -15,6 +15,8 @@ import { getLang, tr } from "./i18n";
 import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
 import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
 import { motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
+import type { PoseAt } from "./motion-clearance";
+import { clearanceCsvCells, clearanceCsvHead, clearanceSummaryLines } from "./clearance-report";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách, místo průniku, třída – clash-rules.ts) */
@@ -121,7 +123,13 @@ export async function runMotion(
   doc: CadDoc,
   geo: GeoProvider,
   study: MotionStudy,
-  opts: { collide?: (d: CadDoc) => Promise<MotionClashes>; onStep?: (k: number, n: number, info?: { ms: number; solveMs: number; collideMs: number }) => void; cancel?: () => boolean } = {},
+  opts: {
+    collide?: (d: CadDoc) => Promise<MotionClashes>;
+    onStep?: (k: number, n: number, info?: { ms: number; solveMs: number; collideMs: number }) => void;
+    cancel?: () => boolean;
+    /** po každém kroku: vůle a spojitá kontrola úseku (předchozí krok → tento) s mezipolohami z řešiče (vlna 22, bod 6 – motion-clearance.ts) */
+    between?: (row: MotionStep, prev: MotionStep | null, poseAt: PoseAt) => Promise<void>;
+  } = {},
 ): Promise<MotionResult> {
   const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
   const tStart = now();
@@ -188,6 +196,32 @@ export async function runMotion(
   let conflictSteps = 0;
   const trace = study.trace && poses.has(study.trace.compId) ? study.trace : undefined;
   const hasSprings = springComps(doc).length > 0;
+  /**
+   * mezipoloha v čase `tm` pro zjemnění úseku (vlna 22, bod 6): řešič z polohy `seed` (předchozí krok) s motory v čase `tm`, úhly
+   * se rozbalují vůči stavu posledního kroku; stav řešiče (polohy, cíle motorů) se pak obnoví. Nesplněné vazby → null.
+   */
+  const solveAt = (tm: number, seed: Record<string, Placement>): ReturnType<PoseAt> => {
+    const keep = new Map(poses);
+    const targets = motors.map((x) => x.target);
+    try {
+      for (const [id, pl] of Object.entries(seed)) if (poses.has(id)) poses.set(id, poseOf(pl));
+      const vals = motors.map((x) => profileAt(x.prof, tm, { k: (tm / duration) * n, n }));
+      motors.forEach((x, i) => (x.target = vals[i]));
+      const ms = active().filter((m) => !groups.tree.has(m.id));
+      solvePoses(poses, vars, () => [...ms.flatMap((m) => kinResidual(m, ctx) ?? []), ...driveRes()], { maxIter: 60, groups });
+      if (ms.some((m) => m.type !== "fixed" && resNorm(kinResidual(m, ctx)) > 1e-3) || driveRes().some((r) => Math.abs(r) > 1e-3)) return null;
+      const place: Record<string, Placement> = {};
+      for (const c of comps) {
+        const P = poses.get(c.id);
+        if (P) place[c.id] = placementOf(P);
+      }
+      return { place, motors: vals, t: tm };
+    } finally {
+      poses.clear();
+      for (const [id, P] of keep) poses.set(id, P);
+      motors.forEach((x, i) => (x.target = targets[i]));
+    }
+  };
   for (let k = 0; k <= n; k++) {
     if (opts.cancel?.()) break;
     const t = (duration * k) / n;
@@ -231,6 +265,11 @@ export async function runMotion(
       row.clashes = clashes.map((c) => ({ ...c })); // i cesty listů (podsestavy), místo a třída (vlna 22, bod 5)
       const hit = row.clashes.find((c) => isFault(c.cls)); // první SKUTEČNÁ kolize (šroub v závitu není kolize)
       if (hit && !collision) collision = { ...hit, step: k, t };
+    }
+    // vůle a spojitá kontrola úseku (k−1, k) – mezipolohy řešičem (vlna 22, bod 6)
+    if (opts.between) {
+      const prev = steps[steps.length - 1] ?? null;
+      await opts.between(row, prev, (tm) => solveAt(tm, prev?.place ?? place));
     }
     steps.push(row);
     const stepMs = now() - tStep;
@@ -307,6 +346,8 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
   // pružiny na konci řádku (dřívější sloupce zůstávají na svých místech): délka a síla
   const springIds = [...new Set(res.steps.flatMap((s) => Object.keys(s.springs ?? {})))];
   for (const id of springIds) head.push(`${key(id, id)} L [mm]`, `${key(id, id)} F [N]`);
+  const clrHead = clearanceCsvHead(res, doc); // vůle sledovaných dvojic na konci řádku (vlna 22, bod 6)
+  head.push(...clrHead);
   const lines = res.steps.map((s) => {
     const row = [String(s.i), num(s.t, 6), ...s.motors.map((v) => num(v, 6))];
     for (const c of res.comps) {
@@ -321,6 +362,7 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
       const sp = s.springs?.[id];
       row.push(sp ? num(sp.length, 6) : "", sp?.force !== undefined ? num(sp.force, 3) : "");
     }
+    if (clrHead.length) row.push(...clearanceCsvCells(res, s.i));
     return row.map(esc).join(";");
   });
   return "﻿" + [head.map(esc).join(";"), ...lines].join("\r\n") + "\r\n";
@@ -366,6 +408,7 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
   if (res.collisionsChecked && o.collisionLines) out.push(...o.collisionLines);
   // bez řádků od volajícího (panel pohybu): kolize podle tříd z výsledku (dvojice zařazené při výpočtu – clash-motion.ts)
   else if (res.collisionsChecked) out.push(...motionClashSummary(res, doc, { every: (res as { dynamic?: { clashEvery?: number } }).dynamic?.clashEvery }).lines);
+  out.push(...clearanceSummaryLines(res, doc)); // vůle sledovaných dvojic (vlna 22, bod 6 – clearance-report.ts)
   out.push(res.conflictSteps ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps) : tr("Vazby splněny ve všech krocích"));
   if (res.steps.some((s) => s.springs)) out.push(...springMotionLines(doc, res.steps).map((l) => ` ${l}`)); // pružiny: délka, síla, doraz
   const issues = motionIssues(res, doc);

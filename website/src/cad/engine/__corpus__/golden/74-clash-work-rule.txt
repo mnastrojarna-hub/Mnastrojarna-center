@@ -34,6 +34,7 @@ kolize po pravidlech: skutečné 1
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
  Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
 Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (5 poloh + 4 mezipoloh ze zjemnění; úseky: mez posunu 4, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ⚠ řádek 9: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
 ℹ řádek 9: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³
@@ -48,6 +49,7 @@ Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
  Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
 Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (5 poloh + 4 mezipoloh ze zjemnění; úseky: mez posunu 4, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ⚠ řádek 13: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
 ℹ řádek 13: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³

@@ -1,0 +1,62 @@
+=== run 1 ===
+✓ nový díl „Vodítko“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Střižník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nová sestava „Sestava 6b“ – nová záložka
+✓ komponenta „Vodítko“ vložena do sestavy (ukotvená)
+✓ komponenta „Střižník“ vložena do sestavy
+✓ vazba Souosost „Střižník“ F1 → „Vodítko“ F7: ok · poloha beze změny
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
+✓ motor 1: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+ Střižník: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [20; 20; -30]
+Kolize: žádný průnik v 11 polohách
+ kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
+Vazby splněny ve všech krocích
+Vůle: „Střižník“ × „Vodítko“ · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+ Střižník: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [20; 20; -30]
+Kolize: žádný průnik v 11 polohách
+ kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
+Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25; 20; 10] ↔ [25,01; 20; 10] · ⚠ pod limitem 0,05 mm v 11 z 11 poloh (kroky 0–10)
+Vazby splněny ve všech krocích
+⚠ řádek 15: vůle „Střižník“ × „Vodítko“ 0,01 mm < 0,05 mm v krocích 0–10 (nejmenší v kroku 0 (t = 0 s)) – místo [25; 20; 10] ↔ [25,01; 20; 10]
+Krok 4 (t = 0,8 s, motory 8):
+ Vodítko [0; 0; 0]
+ Střižník [20; 20; -18]
+ vůle „Střižník“ × „Vodítko“: 0,01 mm ⚠ pod limitem 0,05 mm – [25; 20; 10] ↔ [25,01; 20; 10]
+Vůle: „Střižník“ × „Vodítko“ · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25; 20; 10] ↔ [25,01; 20; 10] · ⚠ pod limitem 0,05 mm v 11 z 11 poloh (kroky 0–10)
+Dokument: „Sestava 6b“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Vodítko [0; 0; 0] ⚓ · Střižník [20; 20; -10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 10 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 18,35 cm³ · hmotnost Σ 0,144 kg
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
+Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle „Střižník“ × „Vodítko“ 0,01 mm < limit 0,05 mm (⚠ 1 dvojic) (podrobně pohyb stav)
+Vůle: „Střižník“ × „Vodítko“ · limit 0,005 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+ Střižník: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [20; 20; -30]
+Kolize: žádný průnik v 11 polohách
+ kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
+Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25; 20; 10] ↔ [25,01; 20; 10] · limit 0,005 mm dodržen v celém pohybu (spojitě i mezi polohami)
+Vazby splněny ve všech krocích
+Vůle: nesleduje se · bez limitu · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+ Střižník: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [20; 20; -30]
+Kolize: žádný průnik v 11 polohách
+ kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
+Vazby splněny ve všech krocích
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Válec 1 (cylinder)
+
+Dokument: „Sestava 6b“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Vodítko [0; 0; 0] ⚓ · Střižník [20; 20; -10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 10 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 18,35 cm³ · hmotnost Σ 0,144 kg
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
+Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)

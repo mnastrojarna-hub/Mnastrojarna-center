@@ -113,8 +113,6 @@ Analýza	Analyse
 Barva komponenty	Komponentenfarbe
 Barva plochy	Flächenfarbe
 Barva tělesa	Körperfarbe
-Bez kolizí ✓	Keine Kollisionen ✓
-Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu	Keine Kollisionen ✓ – das Ergebnis steht im Kollisionsfenster und im Dokumentstatus
 Bílý (tisk)	Weiß (Druck)
 CAD jádro se nepodařilo načíst. Zkuste prosím aktuální Chrome, Edge, Firefox nebo Safari.	Der CAD-Kern konnte nicht geladen werden. Bitte versuchen Sie ein aktuelles Chrome, Edge, Firefox oder Safari.
 Celá dokumentace jako PDF k tisku a offline čtení.	Die gesamte Dokumentation als PDF zum Drucken und Offline-Lesen.
@@ -556,7 +554,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) hinzugefügt – Ergebnis nach der Berechnung unten
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} Kanten nach Regel „{3}“ – Ergebnis nach der Berechnung unten
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ Dokument „{0}“ ({1} Features) – öffnet sich in einem neuen Tab
-✓ kolize: žádné ({0} komponent)	✓ Kollisionen: keine ({0} Komponenten)
 ✓ materiál = {0}	✓ Werkstoff = {0}
 ✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ Werkstoff „{0}“ = Bezeichnung für das Schriftfeld; die Dichte bleibt nach Klasse „{1}“ ({2} g/cm³) – für eine andere Dichte eingeben: materiál {3}
 ✓ odstraněn prvek „{0}“	✓ Feature „{0}“ entfernt

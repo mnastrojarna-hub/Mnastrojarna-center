@@ -14,6 +14,7 @@
  */
 import { flattenAssembly } from "./assembly";
 import { stepHasFault } from "./clash-report";
+import { betweenFaultCount, clearanceStatusText } from "./clearance-report";
 import { tr } from "./i18n";
 import type { MotionResult } from "./motion";
 import type { CadDoc, MotionStudy } from "./types";
@@ -205,8 +206,11 @@ export function motionStatusOf(store: MotionStore, key: string, d: CadDoc): Moti
   const steps = Math.max(0, r.steps.length - 1);
   // jen kroky se SKUTEČNOU kolizí (vlna 22, bod 5 – clash-report.ts); šroub v závitu / dotyk / pracovní kontakt kolizí nejsou
   const hit = r.steps.filter((x) => stepHasFault(d, x)).length;
+  // kolize nalezené zjemněním MEZI kroky (vlna 22, bod 6) – jinak by `stav` hlásil „bez průniku“ při průchodu mezi kroky
+  const mid = betweenFaultCount(r, d);
   const other = !hit && r.steps.some((x) => x.clashes?.length);
   const mates = r.conflictSteps ? tr("nesplněné vazby v {0} krocích", r.conflictSteps) : tr("vazby splněny");
-  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : hit ? tr("průnik těles v {0} krocích", hit) : other ? tr("bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)") : tr("bez průniku těles v kontrolovaných krocích");
-  return { state: r.conflictSteps ? "conflict" : hit ? "clash" : "ok", line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, clash) };
+  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : hit ? tr("průnik těles v {0} krocích", hit) : mid ? tr("průnik těles mezi kroky ({0}×, nalezeno zjemněním)", mid) : other ? tr("bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)") : tr("bez průniku těles v kontrolovaných krocích");
+  const clr = clearanceStatusText(r, d); // vůle sledovaných dvojic (vlna 22, bod 6)
+  return { state: r.conflictSteps ? "conflict" : hit || mid ? "clash" : "ok", line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, clr ? `${clash}, ${clr}` : clash) };
 }
