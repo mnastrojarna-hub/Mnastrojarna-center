@@ -199,7 +199,7 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   });
   const [qid, number, status, total, valid, leadDays, createdBy, approvedBy, revision, archived, note] = row;
   st.q1 = { id: qid, number };
-  expect(/^NAB-\d{4}-\d+$/.test(number), `číslo NAB-RRRR-NNN (${number})`);
+  expect(/^N\d{4}\/\d+-V1$/.test(number), `číslo N + číslo zakázky, V1 (${number})`);
   expect(status === "ke_schvaleni" && approvedBy === "-", `stav ke_schvaleni, neschváleno (${status}, ${approvedBy})`);
   // #25: nabídku kohokoli kromě super admina musí schválit super admin → Neschválená
   const qs = sql(`select state || '|' || approval_required || '|' || admin_approval_required || '|' || coalesce(state_changed_by::text, '-') from quotes where id = ${lit(qid)}`);
@@ -292,7 +292,7 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
   const chip = dlg.locator('a[href^="/api/jobs/files/"]');
   await chip.waitFor({ timeout: 30_000 });
   const chipText = norm(await chip.innerText());
-  expect(chipText.includes(".pdf") && chipText.includes(st.q1.number.replace(/^NAB-/, "")), `příloha PDF s číslem nabídky (${chipText})`);
+  expect(chipText.includes(".pdf") && chipText.includes(st.q1.number.replace(/\//g, "-")), `příloha PDF s číslem nabídky (${chipText})`);
   const to = await recipients(dlg, "Komu");
   const subject = await dlg.getByLabel("Předmět").inputValue();
   const body = await dlg.getByLabel("Text e-mailu").inputValue();
@@ -360,7 +360,7 @@ await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší 
   await openJob(page, USERS.obchod, Q1, "nabidky");
   await quoteMenu(page, quoteCard(page, st.q1.number), "Nová verze (stará se archivuje)");
   await waitToast(page, /Vytvořena nová verze nabídky/);
-  const r2 = `${st.q1.number}-R2`;
+  const r2 = st.q1.number.replace(/-V1$/, "-V2"); // nová verze = další číslo V
   const card = quoteCard(page, r2);
   await card.waitFor({ timeout: 10_000 });
   const t = norm(await card.innerText());
@@ -735,9 +735,9 @@ await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“
   await li.getByLabel("Dodací lhůta (dní)").fill("15");
   await li.getByLabel("Platnost nabídky (dní)").fill("45");
   await li.getByRole("button", { name: "Vytvořit nabídku z ceny" }).click();
-  const status = li.locator('[role="status"]').filter({ hasText: /Nabídka NAB-\S+ je vytvořená/ });
+  const status = li.locator('[role="status"]').filter({ hasText: /Nabídka (?:NAB-|N\d{4}\/)\S+ je vytvořená/ });
   await status.waitFor({ timeout: 20_000 });
-  const nab = /NAB-[\w-]+/.exec(await status.innerText())[0];
+  const nab = /(?:NAB-|N\d{4}\/)[\w-]+/.exec(await status.innerText())[0];
   st.p1Quote = nab;
   expect((await status.getByRole("link", { name: "Otevřít nabídku" }).getAttribute("href")) === `/orders/${P1.id}?tab=nabidky`, "odkaz na nabídku v kartě");
   expect((await status.getByRole("link", { name: /Další krok v Nabídkách/ }).getAttribute("href")) === "/quotes", "odkaz na /quotes");
