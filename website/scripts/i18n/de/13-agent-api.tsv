@@ -119,7 +119,6 @@ porovnání: díl nemá těleso	Vergleich: das Bauteil hat keinen Körper
 Prázdný dokument nelze sdílet – nejdřív vytvořte nebo otevřete díl.	Ein leeres Dokument kann nicht geteilt werden – erstellen oder öffnen Sie zuerst ein Bauteil.
 prvek „{0}“ v historii není – prvky: {1}	Element „{0}“ ist nicht im Verlauf – Elemente: {1}
 řez má jednu polohu – {0}	ein Schnitt hat eine Lage – {0}
-řez modelem rovinou kolmou na osu v poloze (mm, bez polohy střed modelu); obráceně = druhá strana; protokol vypíše rozsah modelu v ose	Modellschnitt mit einer Ebene senkrecht zur Achse an einer Lage (mm, ohne Lage die Modellmitte); umkehren = die andere Seite; das Protokoll nennt den Modellbereich entlang der Achse
 řez potřebuje osu, na kterou je rovina kolmá: {0}	schnitt braucht die Achse, zu der die Ebene senkrecht ist: {0}
 řez vyp nemá další volby – {0}	schnitt aus hat keine weiteren Optionen – {0}
 řez X|Y|Z [poloha] [obráceně] · řez vyp	schnitt X|Y|Z [versatz] [umkehren] · schnitt aus
