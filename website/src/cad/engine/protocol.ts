@@ -374,7 +374,7 @@ function bboxSize(b: DocSummary["bbox"]): string {
   return s.every((x) => Number.isFinite(x)) ? s.map((x) => fmtNum(x, 2)).join("x") : "-";
 }
 function matesStr(m: NonNullable<DocSummary["mates"]>): string {
-  const extra = (["conflict", "missing", "suppressed"] as const).filter((k) => m[k] > 0).map((k) => `${k}=${m[k]}`);
+  const extra = (["conflict", "missing", "suppressed", "lost"] as const).filter((k) => (m[k] ?? 0) > 0).map((k) => `${k}=${m[k]}`);
   return `${m.ok}/${m.total}${extra.length ? `(${extra.join(",")})` : ""}`;
 }
 const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""})`;

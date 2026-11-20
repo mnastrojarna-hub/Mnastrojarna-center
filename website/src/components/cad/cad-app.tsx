@@ -80,6 +80,7 @@ import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, typ
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
 import { useSpringBetween } from "./springs/spring-between";
+import { useMateRepick } from "./mate-repick";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
 import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } from "./engine-port";
@@ -1150,6 +1151,8 @@ export function CadApp() {
   const leaves = useMemo(() => (isAsm ? flattenLeaves(doc) : []), [isAsm, doc]);
   // Sestava › Pružina mezi díly: výběr dosedacích ploch a tabulka (components/cad/springs/spring-between.tsx)
   const springPick = useSpringBetween({ doc, isAsm, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
+  // ztracená reference vazby (vlna 22, bod 20): nový výběr plochy klikem v modelu nebo ze seznamu ploch (mate-repick.tsx)
+  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
   const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
@@ -1329,17 +1332,39 @@ export function CadApp() {
   };
   /** podsestava jako samostatný dokument v nové záložce (kopie – jako „sestava otevřít“; úprava v sestavě = editPartInContext) */
   const openSubCopy = (c: AsmComponent) => c.source.kind === "asm" && (openDocInTab({ ...structuredClone(c.source.doc), name: c.name, kind: "assembly" }), flash(tr("Podsestava „{0}“ otevřena v nové záložce jako kopie – změny se do sestavy nepropíší (úprava v sestavě: Upravit v kontextu).", c.name)));
-  const backToAssembly = () => {
-    if (!parentAsm) return;
-    const sub = doc.kind === "assembly";
-    const comps = (parentAsm.asm.components ?? []).map((c) =>
-      c.source.kind !== "file" && sourceKey(c.source) === parentAsm.key ? { ...c, source: sub ? { kind: "asm" as const, doc: { ...doc } } : { kind: "part" as const, doc: { ...doc, kind: "part" as const } } } : c,
-    );
-    commit({ ...parentAsm.asm, components: comps });
-    setAsmStack((st) => st.slice(0, -1));
-    setActiveId(null);
-    setSketchId(null);
-    setTab("asm");
+  /**
+   * „← Zpět do sestavy“: táž funkce jako text `sestava hotovo` (cad/asm-agent.ts `finishContextEdit`, vlna 22 bod 20) – změna dílu
+   * do všech stejných komponent, reference vazeb ověřené podle geometrie (ztracená = vazba mimo řešení, komponenta stojí, seznam
+   * vazeb ji ukáže červeně s opravou), vazby vyřešené; stav vazeb s razítkem vrácené sestavy. Hláška bez ✓ při ztrátě / konfliktu.
+   */
+  const backBusy = useRef(false);
+  const backToAssembly = async () => {
+    if (!parentAsm || backBusy.current) return;
+    backBusy.current = true;
+    const top = parentAsm;
+    const d = doc;
+    const key = docId.current;
+    const rest = asmStack.slice(0, -1);
+    try {
+      const A = await import("@/cad/asm-agent");
+      const r = await A.finishContextEdit(top, d, asmEnvRef.current(rest));
+      // mezitím jiná záložka nebo další úprava dílu: nic nezapisovat (uživatel klikne znovu)
+      if (docId.current !== key || histRef.current.present !== d) return void flash(tr("Díl se mezitím změnil – klikněte znovu na Zpět do sestavy."));
+      commit(r.doc);
+      setAsmStack(rest);
+      setActiveId(null);
+      setSketchId(null);
+      setTab("asm");
+      const ws = engineRef.current?.ws;
+      if (ws && r.doc.mates?.length) stampMateStatus(ws, key, r.doc, r.status);
+      const t = A.contextEditLines(r, d, top.asm.name);
+      const lost = t.codes.filter((c) => c.code === "mate.lost").length;
+      flash(lost ? tr("Díl vrácen do sestavy – POZOR: ztracené reference vazeb: {0}. Vazby jsou mimo řešení a komponenty se kvůli nim nehýbou – opravte je v seznamu vazeb (Vybrat plochu znovu / Smazat vazbu).", lost) : t.log[0].replace(/^[✓→]\s*/, ""));
+    } catch (e) {
+      flash(tr("Návrat do sestavy selhal: {0}", e instanceof Error ? e.message : String(e)));
+    } finally {
+      backBusy.current = false;
+    }
   };
   const compMenu = (c: AsmComponent): RMenuEntry[] => [
     // podsestava: úprava v kontextu, kopie v nové záložce, rozpuštění (stejně ve stromu i ve 3D okně); jinak díl
@@ -1380,7 +1405,7 @@ export function CadApp() {
   /** geometrie plochy v souřadnicích komponenty nejvyšší úrovně (nezávislá na jejím umístění) */
   const geoProvider = (d: CadDoc) => (ref: MateRef): FaceGeo | null => {
     const leaf = leafOf(ref, d);
-    if (!leaf || ref.face < 0) return null;
+    if (!leaf || ref.face < 0 || ref.lost) return null; // ztracená reference (cad/mate-remap.ts): žádná geometrie
     const top = d.components?.find((c) => c.id === ref.compId);
     if (!top) return null;
     // plochy, hrany, vrcholy i síť vačky (cad/mate-geo.ts) v souřadnicích komponenty nejvyšší úrovně
@@ -1748,6 +1773,10 @@ export function CadApp() {
     }
     if (springPick.active) {
       if (it?.kind === "face" && it.compId) void springPick.onFace(it.compId, it.index, it.point);
+      return;
+    }
+    if (repick.active) {
+      if (it?.kind === "face" && it.compId) void repick.choose(it.compId, it.index);
       return;
     }
     if (mate) {
@@ -2282,7 +2311,7 @@ export function CadApp() {
   const pickMode: PickMode = refPick
     ? "select"
     : isAsm
-    ? mate || boltPick || springPick.active
+    ? mate || boltPick || springPick.active || repick.active
       ? "asmFace"
       : "select"
     : planePick
@@ -3640,7 +3669,10 @@ export function CadApp() {
           {/* Správce */}
           <aside className={cn("absolute inset-y-0 left-0 z-20 w-[270px] shrink-0 flex-col border-r border-[#d5dbe2] bg-white shadow-xl lg:static lg:flex lg:shadow-none", panels ? "flex" : "hidden")}>
             {isAsm ? (
-              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} />
+              <>
+              {repick.panel}
+              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} />
+              </>
             ) : (
               <Manager doc={doc} status={result?.status} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
             )}
@@ -3833,7 +3865,7 @@ export function CadApp() {
                 <span>
                   {doc.kind === "assembly" ? tr("Úprava podsestavy") : tr("Úprava dílu")} {tr("v sestavě „")}{parentAsm.asm.name}“{asmStack.length > 1 ? tr(" (úroveň {0})", asmStack.length) : ""}
                 </span>
-                <button type="button" onClick={backToAssembly} className="rounded bg-white px-2.5 py-0.5 text-[12px] font-semibold text-[#2563eb] hover:bg-blue-50">
+                <button type="button" data-back-to-asm onClick={() => void backToAssembly()} className="rounded bg-white px-2.5 py-0.5 text-[12px] font-semibold text-[#2563eb] hover:bg-blue-50">
                   {tr("← Zpět do sestavy")}
                 </button>
               </div>

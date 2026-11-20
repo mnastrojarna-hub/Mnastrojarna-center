@@ -1,5 +1,4 @@
 # Sestava textem pro AI agenty: plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky (balík asm)
-  plochy vazeb přečíslovány podle geometrie: {0}	  Flächen der Verknüpfungen nach Geometrie neu nummeriert: {0}
   pohnuto: {0}	  bewegt: {0}
   vazby pohnuly: {0}	  von Verknüpfungen bewegt: {0}
  – vypsány {0}	 – aufgeführt: {0}
@@ -44,7 +43,6 @@
 {0}plocha {1} komponenty „{2}“ je {3} – vazba potřebuje {4} plochu; {5}	{0}Fläche {1} der Komponente „{2}“ ist {3} – die Verknüpfung braucht eine {4} Fläche; {5}
 ⚠ díl se nepostavil (bez ploch): {0}	⚠ Teil wurde nicht aufgebaut (keine Flächen): {0}
 ⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Fläche der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen berechnet sie nach dem Aufbau der Teile neu
-⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby	⚠ Flächen von Verknüpfungen, die nach der Teiländerung nicht gefunden werden: {0} – baugruppe verknüpfungen
 ⚠ v sestavě je konflikt vazeb – sestava vazby	⚠ in der Baugruppe gibt es einen Verknüpfungskonflikt – baugruppe verknüpfungen
 ⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně	⚠ die Verknüpfung ist mit den anderen nicht erfüllbar – baugruppe verknüpfungen (Liste), baugruppe verknüpfung {0} unterdrücken|löschen|umkehren
 ✓ „{0}“ už má vazbu Ukotvit – beze změny	✓ „{0}“ hat bereits eine Verknüpfung Fixiert – unverändert
@@ -178,8 +176,6 @@ válcové	zylindrisch
 válcové plochy: {0}	zylindrische Flächen: {0}
 vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	Verknüpfung „{0}“ ist {1}× in der Baugruppe – Nummer angeben: {2}
 vazba „{0}“ v sestavě není – vazby: {1}	Verknüpfung „{0}“ ist nicht in der Baugruppe – Verknüpfungen: {1}
-vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	Verknüpfung „{0}“: was tun? wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…"
-vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	Verknüpfung „{0}“: unbekannte Änderung „{1}“ – wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" (neue Verknüpfung mit der Art beginnen: kontakt, bündig, zentrieren, konzentrisch, abstand, winkel, parallel, fixiert)
 vazba {0} v sestavě není – vazby: {1}	Verknüpfung {0} ist nicht in der Baugruppe – Verknüpfungen: {1}
 vazba {0}: chybí cílová komponenta B – {1}	Verknüpfung {0}: Zielkomponente B fehlt – {1}
 vazba {0}: chybí komponenta A – {1}	Verknüpfung {0}: Komponente A fehlt – {1}

@@ -10,7 +10,7 @@ import type { InterferenceStats } from "./asm-kernel";
 import { instanceKey, rotMatrix } from "./assembly";
 import { springComps, springMotionLines, springSteps, type SpringStep } from "./asm-spring";
 import { getLang, tr } from "./i18n";
-import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
+import { kinCluster, kinCtx, mateLost, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
 import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
 import { motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
@@ -94,6 +94,7 @@ export function motorProblem(mo: Pick<MotionMotor, "kind" | "mate">, mates: Mate
   const m = mates.find((x) => x.id === mo.mate);
   if (!m) return tr("vazba motoru v sestavě není");
   if (m.suppressed) return tr("vazba motoru je potlačená");
+  if (mateLost(m)) return tr("vazba motoru má ztracenou referenci plochy (díl se změnil) – vyberte plochu znovu: sestava vazby");
   const ok = mo.kind === "rotary" ? ROTARY_MOTOR_TYPES.has(m.type) : LINEAR_MOTOR_TYPES.has(m.type);
   if (!ok)
     return mo.kind === "rotary"
@@ -128,9 +129,9 @@ export async function runMotion(
   const duration = study.duration > 0 ? study.duration : 1;
   // 1) výchozí stav: vyřešená sestava (zachytí i výchozí stav mechanických vazeb)
   const s0 = solveMates(doc, geo);
-  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed);
+  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed && !mateLost(m)); // ztracená reference = mimo pohyb (bod 20)
   for (const mo of study.motors) {
-    const p = motorProblem(mo, mates);
+    const p = motorProblem(mo, s0.mates ?? doc.mates ?? []);
     if (p) throw new Error(tr("motor {0}: {1}", study.motors.indexOf(mo) + 1, p));
   }
   if (!study.motors.length) throw new Error(tr("pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor"));

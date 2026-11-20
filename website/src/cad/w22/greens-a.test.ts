@@ -14,6 +14,11 @@
  *  7. `= … measure …` (čísla měření)             – po změně dokumentu `stav` „Měření … NEPLATÍ“ + `measure.stale=1` + D `stale=measure`
  *  8. `= … compare … ok=1`                       – po změně dokumentu `stav` „Porovnání … NEPLATÍ“ + `compare.stale=1` + D `stale=compare`
  * (GUI: zelená tečka vazby, řádky měření a barevná mapa porovnání – tatáž pravidla, hlídá je e2e cad-w22-a.e2e.cjs.)
+ *
+ * Etapa A2 (bod 20 – reference vazeb po změně dílu, 22i – souhrn `sestava hotovo`):
+ *  9. `✓ „…“ vrácen do sestavy … · vazby N/N ok` – jen když se žádná reference neztratila, všechny vazby platí a díl se postavil;
+ *     ztracená plocha = „→ … – stav vazeb níže“ + ✗ mate.lost, `sestava vazby` „ztracená reference“ (nikdy „– ok“),
+ *     `mates=0/1(lost=1)` ve `stav` i v řádku D, komponenta stojí (GUI „Zpět do sestavy“ = táž funkce – e2e cad-w22-a2.e2e.cjs)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -252,6 +257,33 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
       expect(kv[1]).toBe(kv[0]);
       expect(kv[2]).toBe(kv[0]);
       expect(kv[0]).toMatch(/ measure\.stale=1$/);
+    } finally {
+      setLang("cs");
+    }
+  }, 240_000);
+  it("9. sestava hotovo se ztracenou plochou vazby: žádné ✓ ani „vazby 1/1 ok“, ✗ mate.lost, mates=0/1(lost=1), komponenta stojí (cs/en/de)", async () => {
+    const script = `nový díl "Deska A"\nkvádr 60 40 10\nkvádr 20 40 5 v 0 0 5 odebrat\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 40 10 30\nsestava vazba kontakt "Přidržovač" spodní "Deska A" F3\nsestava upravit "Deska A"\nsmazat "Kvádr 2"\nsestava hotovo\nsestava vazby\nstav`;
+    const out = await short(new MemoryWorkspace(), script);
+    expect(out).not.toMatch(/^✓ L12 /m);
+    expect(out).not.toMatch(/vazby 1\/1 ok|vazby pohnuly/);
+    expect(out).toMatch(/^✗ L12 mate\.lost "Sestava A": vazba 1 Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference B F3 dílu „Deska A“ \(rovinná \+Z · střed \[10; 20; 5\] · 800 mm²\) po úpravě dílu neexistuje/m);
+    expect(con).toMatch(/^→ „Deska A“ vrácen do sestavy „Sestava A“ .* · vazby 0\/1 ok · ztracené reference: 1 – stav vazeb níže$/m);
+    expect(con).toMatch(/1\. Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference: B F3/);
+    expect(con).not.toMatch(/F3 – ok$/m);
+    expect(con).toMatch(/Komponenty: Deska A \[0; 0; 0\] ⚓ · Přidržovač \[40; 10; 5\]$/m); // dřív [40; 0; 5] ∠[90; 0; 0]
+    expect(statusLines(out)[0]).toMatch(/ mates=0\/1\(lost=1\) /);
+    expect(dLine(out, "Sestava A")).toMatch(/ mates=0\/1\(lost=1\) /);
+    // strojová část stejná v en / de (texty přeložené)
+    try {
+      for (const [lang, word] of [["en", "lost reference"], ["de", "verlorene Referenz"]] as const) {
+        setLang(lang);
+        const r = await runReport(new MemoryWorkspace(), script.replace('smazat "Kvádr 2"', lang === "en" ? 'smazat "Box 2"' : 'smazat "Quader 2"'), hostOf());
+        const text = formatShort(r, { budget: Infinity });
+        expect(text).toMatch(/^✗ L12 mate\.lost /m);
+        expect(text).not.toMatch(/^✓ L12 /m);
+        expect(dLine(text, "Sestava A")).toMatch(/ mates=0\/1\(lost=1\) /);
+        expect(formatConsole(r)).toContain(word);
+      }
     } finally {
       setLang("cs");
     }

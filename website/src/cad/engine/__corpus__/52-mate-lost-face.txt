@@ -1,0 +1,36 @@
+# vlna 22, bod 20 (reference vazeb po změně historie dílu) a 22i (souhrn `sestava hotovo`): plocha vazby, která po úpravě dílu
+# v kontextu zmizela, je ✗ mate.lost – vazba je mimo řešení, Přidržovač stojí, žádné „✓ … vazby 2/2 ok“ (dřív se vazba tiše
+# přichytila na boční plochu −Y se starým číslem F3 a Přidržovač se otočil o 90°). Táž rovina jiné velikosti = ℹ mate.renumbered,
+# vrácený schod referenci obnoví (ℹ mate.restored), oprava textem `sestava vazba 1 plocha b F6`; kolize po změně dílu NEPLATÍ.
+nový díl "Deska A"
+kvádr 60 40 10
+kvádr 20 40 5 v 0 0 5 odebrat
+nový díl "Přidržovač"
+kvádr 10 10 10
+#--- run
+nová sestava "Sestava A"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 5 10 30
+sestava vazba kontakt "Přidržovač" spodní "Deska A" F3
+sestava vazba zarovnat "Přidržovač" -Y "Deska A" F2
+kolize
+stav
+#--- run
+sestava upravit "Deska A"
+smazat "Kvádr 2"
+sestava hotovo
+sestava vazby
+sestava
+stav
+#--- run
+sestava upravit "Deska A"
+kvádr 20 40 5 v 0 0 5 odebrat
+sestava hotovo
+sestava vazby
+#--- run
+sestava upravit "Deska A"
+smazat "Kvádr 2"
+sestava hotovo
+sestava vazba 1 plocha b F6
+sestava vazby
+stav

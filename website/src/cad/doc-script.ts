@@ -43,6 +43,7 @@ import type { SectionOpt } from "./drawing";
 import { sectionToSketchConvention } from "./drawing-section";
 import { dictOf, getLang, setLang, tr } from "./i18n";
 import { KIN_SPEC } from "./mate-spec";
+import { mateLost } from "./mates";
 import { exprRefs, resolveVariables, VAR_NAME } from "./params";
 import { pickFieldsOf } from "./pick-fields";
 import type { Direction, Ref } from "./refs";
@@ -2018,6 +2019,11 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   let mk = 0;
   const suppressed: number[] = [];
   for (const m of mates) {
+    // ztracená reference (vlna 22, bod 20): F-číslo už patří jiné ploše – do skriptu by se tiše přichytila jinam
+    if (mateLost(m)) {
+      c.note(tr("vazba sestavy č. {0} má ztracenou referenci plochy (po úpravě dílu) – do skriptu se nezapisuje; vyberte plochu znovu (sestava vazba {0} plocha …) a export zopakujte", mates.indexOf(m) + 1));
+      continue;
+    }
     const ml = mateLine(c, m, idx);
     if (!ml || !lineSafe(ml.line) || !mateLineOk(ml.line, ml.expect)) {
       c.note(tr("vazbu sestavy č. {0} ({1}) nejde zapsat textem (plocha v podsestavě, odkaz na komponentu mimo skript nebo název) – doplňte ji ručně", mates.indexOf(m) + 1, m.type));

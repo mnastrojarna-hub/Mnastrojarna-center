@@ -43,7 +43,9 @@ import {
   fmt,
   materialId,
   mateLines,
+  mateLostArgs,
   mateText,
+  refEntText,
   pickFace,
   pt,
   resolveTab,
@@ -59,6 +61,7 @@ import { applySpringNew, applySpringPattern, springHelpLines } from "./asm-sprin
 import { springEffective } from "./asm-spring-geom";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
+import { entPrint, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
 import { isKinMate } from "./mates-kin";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import {
@@ -66,7 +69,9 @@ import {
   faceAreas,
   faceRow,
   hasFixedMate,
+  lostSides,
   mateFromPending,
+  mateLost,
   mateNeedsValue,
   measureMateIn,
   patchMate,
@@ -80,7 +85,7 @@ import {
   type MateStatus,
   type PartFace,
 } from "./mates";
-import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type Mate, type MateRef, type Vec3 } from "./types";
+import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
 import type { ClashDetail, ClashPair } from "./clash-class";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
@@ -181,36 +186,13 @@ export async function faceInfo(env: AsmEnv, key: string, index: number): Promise
 }
 
 /**
- * Táž plocha v upraveném dílu (po přečíslování): rovina se stejnou normálou ve stejné rovině, válec se stejným poloměrem
- * na stejné ose; z více kandidátů nejbližší střed. null = plocha zmizela.
+ * Táž plocha v upraveném dílu (po přečíslování) – jen při skutečné geometrické shodě (cad/mate-remap.ts `matchFace`): přesná shoda,
+ * nebo jediná plocha na téže rovině / ose; žádná nebo víc možností = null (ztracená reference – nikdy „nejbližší“ jiná plocha).
  */
-export function sameFace(old: PartFace, faces: PartFaces["faces"], tol = 1e-4): number | null {
-  const dot3 = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const sub3 = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]) || 1;
-  const nOld: Vec3 = old.normal.map((x) => x / len(old.normal)) as Vec3;
-  let best: number | null = null;
-  let bestD = Infinity;
-  for (const f of faces) {
-    const g = f.info;
-    if (g.kind !== old.kind) continue;
-    const n: Vec3 = g.normal.map((x) => x / len(g.normal)) as Vec3;
-    const c = dot3(n, nOld);
-    const rel = sub3(g.origin, old.origin);
-    if (old.kind === "plane") {
-      if (c < 1 - 1e-6 || Math.abs(dot3(rel, nOld)) > tol * 100) continue;
-    } else {
-      if (Math.abs(c) < 1 - 1e-6 || Math.abs((g.radius ?? 0) - (old.radius ?? 0)) > tol * 100) continue;
-      const perp = sub3(rel, nOld.map((x) => x * dot3(rel, nOld)) as Vec3);
-      if (Math.hypot(...perp) > tol * 100) continue;
-    }
-    const dist = Math.hypot(...rel);
-    if (dist < bestD) {
-      bestD = dist;
-      best = f.face;
-    }
-  }
-  return best;
+export function sameFace(old: PartFace, faces: PartFaces["faces"], _tol = 1e-4, oldIndex = -1): number | null {
+  void _tol;
+  const m = matchFace(facePrint(old), faces, oldIndex);
+  return m.state === "lost" ? null : m.face;
 }
 
 /** nejvýš tolik ploch jednoho dílu se načte (jako seznam ploch v panelu) */
@@ -259,12 +241,188 @@ export async function compFaces(doc: CadDoc, compId: string, env: AsmEnv): Promi
   return { rows, truncated, failed };
 }
 
+/* ───────────────────────── reference vazeb po změně dílu (vlna 22, bod 20) ───────────────────────── */
+
+type Side = "a" | "b" | "c" | "d";
+/** Změna jednoho odkazu vazby (nebo dosedací plochy pružiny) při návratu upraveného dílu – cad/mate-remap.ts. */
+export type RefChange = { mate?: string; spring?: string; side: Side; from: number; to?: number; ent?: MateRef["ent"]; how?: "exact" | "surface"; lost?: LostRef };
+export type RemapReport = { renumbered: RefChange[]; lost: RefChange[]; restored: RefChange[] };
+
+/** geometrie hrany / vrcholu dílu (souřadnice dílu) přes mezipaměť `env.geo` */
+async function entInfo(env: AsmEnv, key: string, index: number, ent: "edge" | "vertex"): Promise<PartFace | null> {
+  const k = entKey(key, { face: index, ent });
+  const hit = env.geo.get(k);
+  if (hit) return hit;
+  const f = env.mateEnt ? await env.mateEnt(key, index, ent).catch(() => null) : null;
+  if (f) env.geo.set(k, f);
+  return f;
+}
+
+/** hrany / vrcholy dílu po úpravě (jen když je potřebuje odkaz vazby) – nejvýš FACE_LIMIT, vrcholů nejvýš 2× hran */
+async function entList(env: AsmEnv, key: string, res: BuildResult | null | undefined, ent: "edge" | "vertex"): Promise<EntCand[]> {
+  const edges = res?.metrics?.edges ?? 0;
+  const n = Math.min(FACE_LIMIT, ent === "edge" ? edges : edges * 2);
+  const out: EntCand[] = [];
+  for (let start = 0; start < n; start += 25) {
+    const idx = Array.from({ length: Math.min(25, n - start) }, (_, k) => start + k);
+    const infos = await Promise.all(idx.map((i) => entInfo(env, key, i, ent)));
+    infos.forEach((info, k) => info && out.push({ index: idx[k], info }));
+  }
+  return out;
+}
+
+/**
+ * Prověří reference vazeb a dosedacích ploch pružin sestavy `next` do listových dílů, které se oproti `prev` změnily (jiný klíč
+ * dílu = jiná historie, nebo list zmizel): každá se porovná podle geometrie (cad/mate-remap.ts) – skutečná shoda = přečíslováno,
+ * jinak ztracená reference (`MateRef.lost` s otiskem, vazba mimo řešení). Dříve ztracená reference se obnoví jen při přesné shodě.
+ * Společné pro text `sestava hotovo` a GUI „Zpět do sestavy“ (`finishContextEdit`); nic jiného v sestavě nemění.
+ */
+export async function remapAsmRefs(prev: CadDoc, next: CadDoc, env: AsmEnv): Promise<{ doc: CadDoc; report: RemapReport }> {
+  const report: RemapReport = { renumbered: [], lost: [], restored: [] };
+  const before = new Map(flattenAssembly(prev).map((l) => [leafId(l), l]));
+  const after = new Map(flattenAssembly(next).map((l) => [leafId(l), l]));
+  type Job = { ref: MateRef; set: (r: MateRef) => void; side: Side; mate?: string; spring?: string; was: FlatComponent; now?: FlatComponent };
+  const jobs: Job[] = [];
+  const consider = (ref: MateRef | undefined, set: (r: MateRef) => void, side: Side, owner: { mate?: string; spring?: string }) => {
+    if (!ref || (ref.face < 0 && !ref.lost)) return; // −1 = doplní se podle poloměru (normálie) / vazba Ukotvit
+    const id = ref.leaf ?? ref.compId;
+    const was = before.get(id);
+    const now = after.get(id);
+    if (!was || (now && now.key === was.key)) return; // díl beze změny
+    jobs.push({ ref, set, side, ...owner, was, now });
+  };
+  const mates: Mate[] = (next.mates ?? []).map((m) => ({ ...m }));
+  for (const m of mates) for (const k of ["a", "b", "c", "d"] as const) consider(m[k], (r) => (m[k] = r), k, { mate: m.id });
+  const comps: AsmComponent[] = (next.components ?? []).map((c) => (c.spring ? { ...c, spring: { ...c.spring } } : c));
+  for (const c of comps) if (c.spring) for (const k of ["a", "b"] as const) consider(c.spring[k], (r) => (c.spring![k] = r), k, { spring: c.id });
+  if (!jobs.length) return { doc: next, report };
+  const need = new Map<string, FlatComponent>();
+  for (const j of jobs) for (const l of [j.was, j.now]) if (l) need.set(l.key, l);
+  const built = await ensureBuilt(env, [...need.values()]);
+  const ents = new Map<string, Promise<EntCand[]>>();
+  const entsOf = (key: string, ent: "edge" | "vertex") => {
+    const k = `${key}|${ent}`;
+    if (!ents.has(k)) ents.set(k, entList(env, key, built.get(key), ent));
+    return ents.get(k)!;
+  };
+  for (const j of jobs) {
+    const { ref } = j;
+    const change: RefChange = { side: j.side, from: ref.face, ...(ref.ent ? { ent: ref.ent } : {}), ...(j.mate ? { mate: j.mate } : {}), ...(j.spring ? { spring: j.spring } : {}) };
+    // otisk původní entity: uložený u dříve ztracené reference, jinak z dílu před úpravou
+    let print: RefPrint | null = null;
+    if (!ref.lost) {
+      if (ref.ent) {
+        const info = await entInfo(env, j.was.key, ref.face, ref.ent);
+        print = info ? entPrint(info) : null;
+      } else {
+        const info = await faceInfo(env, j.was.key, ref.face);
+        const area = info ? (await partFaces(env, j.was.key, built.get(j.was.key))).faces.find((f) => f.face === ref.face)?.area : undefined;
+        print = info ? facePrint(info, area) : null;
+      }
+    }
+    if (!j.now) {
+      const r = ref.lost ? ref : markLost(ref, print, "gone");
+      j.set(r);
+      report.lost.push({ ...change, lost: r.lost });
+      continue;
+    }
+    const faces = ref.ent ? [] : (await partFaces(env, j.now.key, built.get(j.now.key))).faces;
+    const list = ref.ent ? await entsOf(j.now.key, ref.ent) : null;
+    const m = ref.lost ? matchLost(ref.lost, faces, list, ref.face, ref.ent) : !print ? null : ref.ent ? matchEnt(print, list!, ref.face) : matchFace(print, faces, ref.face);
+    if (m && m.state !== "lost") {
+      j.set(withFace(ref, m.face));
+      if (ref.lost) report.restored.push({ ...change, to: m.face, how: m.how });
+      else if (m.state === "renumbered") report.renumbered.push({ ...change, to: m.face, how: m.how });
+      continue;
+    }
+    if (ref.lost) {
+      report.lost.push({ ...change, lost: ref.lost }); // zůstává ztracená
+      continue;
+    }
+    const r = markLost(ref, print, m?.state === "lost" ? m.why : "unknown");
+    j.set(r);
+    report.lost.push({ ...change, lost: r.lost });
+  }
+  return { doc: { ...next, mates: next.mates ? mates : next.mates, components: comps }, report };
+}
+
+/** Výsledek návratu dílu / podsestavy upravené v kontextu do sestavy (text `sestava hotovo`, GUI „Zpět do sestavy“). */
+export type ContextEditResult = {
+  doc: CadDoc;
+  status: Record<string, MateStatus>;
+  moved: string[];
+  /** komponent, které změnu převzaly */
+  count: number;
+  result: BuildResult | null;
+  report: RemapReport;
+  failures: { doc: string; name: string; error: string }[];
+};
+
+/**
+ * Vrátí upravený díl `d` do sestavy `top.asm` (všechny komponenty se stejným zdrojem `top.key`), prověří reference vazeb
+ * podle geometrie (`remapAsmRefs`) a vyřeší vazby – ztracená reference komponentou nepohne. Jedna funkce pro text i GUI.
+ */
+export async function finishContextEdit(top: { asm: CadDoc; key: string }, d: CadDoc, env: AsmEnv): Promise<ContextEditResult> {
+  const sub = d.kind === "assembly";
+  const src: ComponentSource = sub ? { kind: "asm", doc: { ...d } } : { kind: "part", doc: { ...d, kind: "part" } };
+  let count = 0;
+  const comps = (top.asm.components ?? []).map((c) => {
+    if (c.source.kind === "file" || sourceKey(c.source) !== top.key) return c;
+    count++;
+    return { ...c, source: src };
+  });
+  // upravený díl: stavba (objem, chyby prvků); reference vazeb podle geometrie (úprava mohla plochy přečíslovat nebo odstranit)
+  const newKey = sourceKey(src);
+  const result = (await env.parts([{ key: newKey, source: src }]))[0]?.result ?? null;
+  const { doc: next, report } = await remapAsmRefs(top.asm, { ...top.asm, components: comps }, env);
+  const s = await solveAsm(next, env);
+  const failures = (result?.status ?? []).filter((x) => x.ok === false).map((f) => ({ doc: d.name, name: d.features.find((x) => x.id === f.id)?.name ?? f.id, error: f.error ?? "?" }));
+  return { doc: s.doc, status: s.status, moved: s.moved, count, result, report, failures };
+}
+
+/**
+ * Text návratu do sestavy (protokol `sestava hotovo` i hláška GUI): souhrn s ✓ jen když jsou všechny vazby splněné, žádná reference
+ * se neztratila a díl se postavil celý – jinak „→“ (přijato, stav níže); záznamy s kódem `mate.lost` (✗) / `mate.renumbered` /
+ * `mate.restored` (ℹ) za každou dotčenou vazbu. Pružiny se ztracenou dosedací plochou: ✗ `mate.lost` s názvem pružiny.
+ */
+export function contextEditLines(r: ContextEditResult, d: CadDoc, asmName: string): { log: string[]; codes: { code: string; args?: unknown[]; text?: string }[] } {
+  const doc = r.doc;
+  const mates = doc.mates ?? [];
+  const okN = mates.filter((m) => r.status[m.id] === "ok").length;
+  const problem = mates.some((m) => mateLost(m) || r.status[m.id] === "conflict" || r.status[m.id] === "missing");
+  const lostMates = mates.filter(mateLost);
+  // ztracené reference v sestavě (i dřívější, které úprava neobnovila) + dosedací plochy pružin ztracené touto úpravou
+  const lostN = lostMates.reduce((n, m) => n + lostSides(m).length, 0) + r.report.lost.filter((x) => x.spring).length;
+  const clean = !problem && !lostN && !r.failures.length;
+  const vol = r.result?.metrics ? tr(" · objem dílu {0} cm³", fmt(r.result.metrics.volume / 1000, 2)) : "";
+  const mv = mates.length ? tr(" · vazby {0}", `${okN}/${mates.length} ok`) : "";
+  const log = [
+    clean
+      ? tr("✓ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}", d.name, asmName, r.count, vol, mv)
+      : tr("→ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}{5} – stav vazeb níže", d.name, asmName, r.count, vol, mv, lostN ? tr(" · ztracené reference: {0}", lostN) : ""),
+  ];
+  if (mates.some((m) => r.status[m.id] === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
+  if (r.moved.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, r.moved)));
+  const codes: { code: string; args?: unknown[]; text?: string }[] = [];
+  const no = (id?: string) => mates.findIndex((m) => m.id === id) + 1;
+  for (const m of lostMates) codes.push({ code: "mate.lost", args: mateLostArgs(doc, m) });
+  for (const c of r.report.lost.filter((x) => x.spring)) {
+    // dosedací plocha pružiny: délka pružiny se z ní nepočítá (geometrie ztracené reference se nenačítá); oprava = nové dosedací plochy
+    const name = doc.components?.find((x) => x.id === c.spring)?.name ?? "?";
+    codes.push({ code: "mate.lost", text: tr("pružina „{0}“ – ztracená dosedací plocha {1} {2}: délka pružiny se z ní nepočítá; zadejte dosedací plochy znovu (sestava pružina \"{0}\" mezi \"A\" <plocha> \"B\" <plocha>)", name, c.side.toUpperCase(), refEntText({ compId: "", face: c.from, ...(c.ent ? { ent: c.ent } : {}) })) });
+  }
+  const ent = (c: RefChange, f: number) => refEntText({ compId: "", face: f, ...(c.ent ? { ent: c.ent } : {}) });
+  for (const c of r.report.renumbered) codes.push({ code: "mate.renumbered", args: [c.mate ? no(c.mate) : tr("pružina „{0}“", doc.components?.find((x) => x.id === c.spring)?.name ?? "?"), `${c.side.toUpperCase()} ${ent(c, c.from)} → ${ent(c, c.to!)}`, c.how === "exact" ? tr("táž plocha, nové číslo") : tr("táž rovina / osa, plocha změnila velikost")] });
+  for (const c of r.report.restored) codes.push({ code: "mate.restored", args: [c.mate ? no(c.mate) : tr("pružina „{0}“", doc.components?.find((x) => x.id === c.spring)?.name ?? "?"), `${c.side.toUpperCase()} ${ent(c, c.from)}`, ent(c, c.to!)] });
+  return { log, codes };
+}
+
 /** Geometrie ploch vazeb v souřadnicích komponenty nejvyšší úrovně (nezávislá na jejím umístění) – jako `geoProvider` v aplikaci. */
 export function geoProvider(doc: CadDoc, env: AsmEnv): GeoProvider {
   const leaves = new Map(flattenAssembly(doc).map((l) => [leafId(l), l]));
   return (ref) => {
     const l = leaves.get(ref.leaf ?? ref.compId);
-    if (!l || ref.face < 0) return null;
+    if (!l || ref.face < 0 || ref.lost) return null; // ztracená reference: žádná geometrie – nikdy jiná plocha se starým číslem
     const top = doc.components?.find((c) => c.id === ref.compId);
     if (!top) return null;
     return refGeo(env.geo.get(entKey(l.key, ref)), composePlacement(invertPlacement(top.placement), l.placement));
@@ -300,7 +458,36 @@ export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | nul
 
 /* ───────────────────────── provedení ───────────────────────── */
 
-export const STATUS_WORD = (s?: MateStatus) => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : "?");
+export const STATUS_WORD = (s?: MateStatus) => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : s === "lost" ? tr("ztracená reference") : "?");
+
+/**
+ * `sestava vazba N plocha [a|b] <plocha>`: nová plocha strany vazby (oprava ztracené reference – vlna 22, bod 20). Bez strany =
+ * ztracená strana. Plocha se vybírá jako u nové vazby (F-číslo, pravidlo, válcová Ø…); hrana / vrchol číslem E3 / V2.
+ */
+async function repickMateRef(d: CadDoc, m: Mate, no: number, face: NonNullable<Extract<AsmCmd, { k: "mateEdit" }>["face"]>, env: AsmEnv, what: string[]): Promise<CadDoc> {
+  const side = face.side ?? lostSides(m)[0];
+  if (!side) throw new Error(tr("vazba {0}: žádná ztracená reference – zadejte stranu: sestava vazba {0} plocha a|b <plocha>", no));
+  const old = m[side];
+  if (!old || m.type === "fixed") throw new Error(tr("vazba {0} nemá stranu {1}", no, side.toUpperCase()));
+  const comp = d.components?.find((c) => c.id === old.compId);
+  if (!comp) throw new Error(tr("vazba {0}: komponenta strany {1} v sestavě není", no, side.toUpperCase()));
+  let ref: MateRef;
+  if (face.spec.ent || old.ent) {
+    if (face.spec.index === undefined || face.spec.ent !== old.ent) throw new Error(tr("vazba {0}: strana {1} je {2} – zadejte ji číslem {3}", no, side.toUpperCase(), old.ent === "vertex" ? tr("vrchol") : old.ent === "edge" ? tr("hrana") : tr("plocha"), old.ent === "vertex" ? "V3" : old.ent === "edge" ? "E3" : "F3"));
+    const leaf = flattenAssembly(d).find((l) => leafId(l) === (old.leaf ?? old.compId));
+    const info = leaf ? await entInfo(env, leaf.key, face.spec.index, old.ent!) : null;
+    if (!info) throw new Error(tr("vazba {0}: komponenta „{1}“ nemá {2}", no, comp.name, face.spec.raw));
+    ref = { compId: old.compId, ...(old.leaf ? { leaf: old.leaf } : {}), face: face.spec.index, ent: old.ent };
+  } else {
+    const k = old.lost?.kind;
+    const need = k === "cylinder" || k === "cone" || (!k && m.type === "concentric") ? "cylinder" : k === "plane" || (!k && !isKinMate(m.type)) ? "plane" : null;
+    const rows = (await compFaces(d, comp.id, env)).rows;
+    const pick = pickFace(face.spec, rows, need, comp.name, `${side.toUpperCase()}: `);
+    ref = { compId: comp.id, ...(pick.row.leafId !== comp.id ? { leaf: pick.row.leafId } : {}), face: pick.row.face };
+  }
+  what.push(tr("plocha {0} → {1}", `${side.toUpperCase()} ${refEntText(old)}`, refEntText(ref)));
+  return { ...d, mates: (d.mates ?? []).map((x) => (x.id === m.id ? { ...x, [side]: ref } : x)) };
+}
 const posText = (c: AsmComponent) => `${tr("poloha {0}", pt(c.placement.position))}${c.placement.rotation.some((x) => Math.abs(x) > 1e-9) ? ` · ${tr("natočení {0}", pt(c.placement.rotation))}` : ""}`;
 /** „„Čep“ poloha […] · „Deska“ …“ pro pohnuté komponenty */
 export const movedText = (doc: CadDoc, ids: string[]) =>
@@ -430,10 +617,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           what.push(tr("název „{0}“", cmd.name));
         }
         next = patchMate(d, m.id, patch);
+        if (cmd.face) next = await repickMateRef(next, m, no, cmd.face, env, what);
       }
       const s = await resolve(next);
       const after = s.doc.mates?.find((x) => x.id === m.id);
-      log.push(tr("✓ vazba {0} ({1}): {2}{3}", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
+      // ✓ jen pro vazbu, která po změně platí (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i)
+      const okNow = !after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed";
+      const args = [no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""] as const;
+      log.push(okNow ? tr("✓ vazba {0} ({1}): {2}{3}", ...args) : tr("⚠ vazba {0} ({1}): {2}{3}", ...args));
       if (s.moved.length) log.push(tr("  pohnuto: {0}", movedText(s.doc, s.moved)));
       if (Object.values(s.status).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
       return done(s.doc, true, { mateStatus: s.status });
@@ -684,45 +875,12 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       const top = env.stack?.[env.stack.length - 1];
       if (!top || !env.stack) throw new Error(tr("sestava hotovo: žádná rozpracovaná úprava dílu v kontextu – začněte příkazem sestava upravit \"…\""));
       env.stack.pop();
-      const sub = d.kind === "assembly";
-      const src: ComponentSource = sub ? { kind: "asm", doc: { ...d } } : { kind: "part", doc: { ...d, kind: "part" } };
-      let n = 0;
-      const comps = (top.asm.components ?? []).map((c) => {
-        if (c.source.kind === "file" || sourceKey(c.source) !== top.key) return c;
-        n++;
-        return { ...c, source: src };
-      });
-      // upravený díl: stavba (objem, chyby prvků) a převod čísel ploch vazeb podle geometrie (úprava může plochy přečíslovat)
-      const newKey = sourceKey(src);
-      const res = (await env.parts([{ key: newKey, source: src }]))[0]?.result ?? null;
-      const oldLeaves = new Map(flattenAssembly(top.asm).map((l) => [leafId(l), l.key]));
-      const mates = (top.asm.mates ?? []).map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b } }));
-      let renumbered = 0;
-      let lost = 0;
-      if (!sub && mates.length) {
-        const fresh = await partFaces(env, newKey, res);
-        for (const m of mates)
-          for (const ref of [m.a, m.b]) {
-            if (ref.face < 0 || oldLeaves.get(ref.leaf ?? ref.compId) !== top.key) continue;
-            const old = await faceInfo(env, top.key, ref.face);
-            const hit = old ? sameFace(old, fresh.faces) : null;
-            if (hit == null) lost++;
-            else if (hit !== ref.face) {
-              ref.face = hit;
-              renumbered++;
-            }
-          }
-      }
-      const s = await resolve({ ...top.asm, components: comps, mates });
-      const failed = (res?.status ?? []).filter((x) => x.ok === false);
-      log.push(
-        tr("✓ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}", d.name, top.asm.name, n, res?.metrics ? tr(" · objem dílu {0} cm³", fmt(res.metrics.volume / 1000, 2)) : "", s.doc.mates?.length ? tr(" · vazby {0}", Object.values(s.status).filter((x) => x === "ok").length + "/" + s.doc.mates.length + " ok") : ""),
-      );
-      const failures = failed.map((f) => ({ doc: d.name, name: d.features.find((x) => x.id === f.id)?.name ?? f.id, error: f.error ?? "?" }));
-      if (renumbered) log.push(tr("  plochy vazeb přečíslovány podle geometrie: {0}", renumbered));
-      if (lost) log.push(tr("⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby", lost));
-      if (s.moved.length) log.push(tr("  vazby pohnuly: {0}", movedText(s.doc, s.moved)));
-      return done(s.doc, true, { stackChanged: true, ...(s.doc.mates?.length ? { mateStatus: s.status } : {}), ...(failures.length ? { failures } : {}) });
+      // návrat + prověření referencí vazeb podle geometrie (vlna 22, bod 20) – táž funkce jako GUI „Zpět do sestavy“
+      const r = await finishContextEdit(top, d, env);
+      const t = contextEditLines(r, d, top.asm.name);
+      log.push(...t.log);
+      const mateStatus = r.doc.mates?.length ? { mateStatus: r.status } : {};
+      return done(r.doc, true, { stackChanged: true, ...mateStatus, ...(r.failures.length ? { failures: r.failures } : {}), ...(t.codes.length ? { codes: t.codes } : {}) });
     }
     case "open": {
       asmOnly();

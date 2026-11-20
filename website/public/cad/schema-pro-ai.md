@@ -136,7 +136,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `prvek <typ|rozšíření> klíč=hodnota …` | kterýkoli typ prvku i prvek rozšíření bez JSON (viz níže) |
 | `normálie <označení> [v x y z]` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
 | `vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit] [jako "K48"]` | sestava: vloží díl z otevřené záložky jako komponentu; `jako` (EN `as`, DE `als`) = přezdívka instance pro vazby místo #k |
-| `sestava` · `sestava plochy "Čep" [rovinné|válcové]` · `sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]` · `sestava vazby` · `sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
+| `sestava` · `sestava plochy "Čep" [rovinné|válcové]` · `sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]` · `sestava vazby` · `sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat` · `sestava vazba 2 plocha b F6` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
 | `sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]` · `pohyb motor rotační "Klika" 0..360 krok 5 [kolize]` · `pohyb stav|krok N|přehrát|export csv` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
 | `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …] [přezdívka "…"]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
 | `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
@@ -750,6 +750,13 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
 8. `sestava podsestava "A" "B" [jako "Vedení"]` (vazby se převedou), `sestava rozpustit "Vedení"`;
    `sestava upravit "Čep"` → další řádky pracují s dílem (`díra 3 skrz v 0 0`…) → `sestava hotovo` vrátí díl do sestavy
    (změna platí pro všechny stejné komponenty); `sestava otevřít "Čep"` = kopie v nové záložce.
+   **Reference vazeb po změně dílu:** `sestava hotovo` (i tlačítko „← Zpět do sestavy“ – stejná kontrola) ověří každou plochu /
+   hranu vazeb do změněného dílu podle geometrie: táž plocha s jiným číslem = ℹ `mate.renumbered` (F3 → F5), plocha, která
+   zmizela nebo po změně odpovídá víc plochám = ✗ `mate.lost` – **nikdy se tiše nepřipojí jinam**: vazba je mimo řešení,
+   komponenta se kvůli ní nehýbe, stav „ztracená reference“, `mates=0/1(lost=1)`, souhrn `sestava hotovo` je bez ✓
+   („→ … vrácen … – stav vazeb níže“). Oprava: `sestava vazba 1 plocha b F6` (nová plocha strany B, F-číslo nebo pravidlo
+   jako u nové vazby; bez strany = ztracená strana) nebo `sestava vazba 1 smazat`; vrátí-li další úprava tutéž plochu,
+   reference se obnoví (ℹ `mate.restored`).
 9. `kusovník [strukturovaně] [csv]` – tabulka `Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks`; `kolize` = průniky.
    Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
    řádek nerozdělí; jiné číslo výkresu (`číslo "…"`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.
@@ -2265,6 +2272,8 @@ třídí. Nejčastější:
 | `name.renamed` ⚠ / `name.renamed-auto` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
 | `material.density-assumed` ⚠ / `material.class` ℹ | `materiál X` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | `materiál hlinik` + označení |
 | `asm.stale-copy` ⚠ | díl změněný po `vložit` – komponenta je kopie, změna se do sestavy nepromítne | vložit znovu / `sestava upravit` |
+| `mate.lost` ✗ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí | `sestava vazba N plocha b <plocha>` / `sestava vazba N smazat` |
+| `mate.renumbered` ℹ / `mate.restored` ℹ | táž plocha má po úpravě dílu jiné číslo / ztracená plocha je zpět (přesná shoda) | – |
 | `clash.thread` ℹ, `clash.underhead` ℹ / `clash.real` ⚠ | `kolize`, `kontrola sestava` i `pohyb … kolize` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen `clash.real` řešit; `pohyb krok N` vypíše kolize kroku |
 | `clash.undetermined` ⚠ / `clash.hidden` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (`závit M10`) |
 | `feature.warning` ⚠ / `feature.failed` ✗ / `feature.unverified` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |

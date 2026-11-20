@@ -32,7 +32,7 @@ import { springComps, springSteps, solidOf } from "./asm-spring";
 import { springRateOf } from "./asm-spring-check";
 import { springGeom, type SpringGeom } from "./asm-spring-geom";
 import { getLang, tr } from "./i18n";
-import { kinCluster, kinCtx, MATE_LABEL, memoGeo, solveMates, type GeoProvider } from "./mates";
+import { kinCluster, kinCtx, MATE_LABEL, mateLost, memoGeo, solveMates, type GeoProvider } from "./mates";
 import { DEG, L, add, cross, dot, expRot, kinResidual, len, pivotOf, placementOf, poseOf, resNorm, rigidGroups, scale, solvePoses, sub, syncGroups, unit, wrap, worldOf, dofValue, type Pose } from "./mates-kin";
 import type { CompInertia, M3, MassSource } from "./motion-mass";
 import { motorProblem, poseDoc, type MotionClashes, type MotionResult, type MotionStep, type MotionTiming } from "./motion";
@@ -179,9 +179,9 @@ export async function runDynamic(
 
   // 1) výchozí stav: vyřešená sestava (jako kinematická studie)
   const s0 = solveMates(doc, geo);
-  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed);
+  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed && !mateLost(m)); // ztracená reference = mimo pohyb (bod 20)
   for (const mo of study.motors) {
-    const p = motorProblem(mo, mates);
+    const p = motorProblem(mo, s0.mates ?? doc.mates ?? []); // ztracená reference: vlastní hláška (bod 20)
     if (p) throw new Error(tr("motor {0}: {1}", study.motors.indexOf(mo) + 1, p));
   }
   for (const ld of D.loads ?? []) if (!mates.some((m) => m.id === ld.mate)) throw new Error(tr("síla na vazbě: vazba v sestavě není (smazaná nebo potlačená)"));

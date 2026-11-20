@@ -9,6 +9,7 @@
  */
 import type { AsmStatus, StaleNote } from "../agent";
 import { sourceKey } from "../assembly";
+import { mateLost } from "../mates";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -138,8 +139,10 @@ export function measureKv(rep: MeasureReport, comp?: string): string {
 export function matesCount(doc: CadDoc, st: AsmStatus["mates"]): DocSummary["mates"] {
   const mates = doc.mates ?? [];
   if (!mates.length || !st) return undefined;
-  const n = (k: string) => mates.filter((m) => (st[m.id] ?? (m.suppressed ? "suppressed" : undefined)) === k).length;
-  return { total: mates.length, ok: n("ok"), conflict: n("conflict"), missing: n("missing"), suppressed: n("suppressed") };
+  // ztracená reference (vlna 22, bod 20) je vlastnost dokumentu – počítá se i bez stavu řešiče a nikdy jako „ok“
+  const n = (k: string) => mates.filter((m) => (m.suppressed ? "suppressed" : mateLost(m) ? "lost" : st[m.id]) === k).length;
+  const lost = n("lost");
+  return { total: mates.length, ok: n("ok"), conflict: n("conflict"), missing: n("missing"), suppressed: n("suppressed"), ...(lost ? { lost } : {}) };
 }
 
 /**

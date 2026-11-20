@@ -86,6 +86,10 @@ export const CODES = [
   { code: "asm.faces-truncated", level: "warn", key: "díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}" },
   { code: "asm.kernel-restarted", level: "note", key: "jádro se restartovalo – mezipaměti sestavy vyprázdněny" },
   { code: "asm.face-missing", level: "error", key: "plocha F{0} dílu „{1}“ není k dispozici" },
+  // reference vazeb po změně historie dílu (vlna 22, bod 20 – cad/mate-remap.ts): ztracená = mimo řešení, nikdy tiché připojení jinam
+  { code: "mate.lost", level: "error", key: "vazba {0} – ztracená reference {1}: vazba je mimo řešení a komponenty se kvůli ní nehýbou; {2}" },
+  { code: "mate.renumbered", level: "note", key: "vazba {0}: {1} po úpravě dílu ({2})" },
+  { code: "mate.restored", level: "note", key: "vazba {0}: ztracená reference {1} znovu nalezena jako {2} – vazba se zase řeší" },
   { code: "asm.instance-duplicate", level: "warn", key: "instance „{0}“ už v sestavě je" },
   { code: "clash.real", level: "warn", key: "kolize „{0}“ × „{1}“ ({2} mm³)" },
   { code: "clash.thread", level: "note", key: "šroub v závitu „{0}“ × „{1}“" },

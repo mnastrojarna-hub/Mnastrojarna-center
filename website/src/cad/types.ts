@@ -473,7 +473,14 @@ export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | 
  * Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`).
  * `ent` = druh entity: bez hodnoty plocha, „edge“ = hrana (index hrany), „vertex“ = vrchol (index vrcholu).
  */
-export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex" };
+export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex"; lost?: LostRef };
+/**
+ * Ztracená reference vazby (vlna 22, bod 20): plocha / hrana / vrchol, který po změně historie dílu v dílu není, nebo odpovídá víc
+ * entitám – otisk původní entity v souřadnicích dílu (`why`: none = nic, ambiguous = víc kandidátů, unknown = původní geometrie
+ * není známa, gone = díl v podsestavě zmizel). Vazba s ní se neřeší (komponenta se nehýbe, stav „lost“), dokud uživatel entitu
+ * nevybere znovu (`sestava vazba N plocha …`, panel Vazby); `face` drží původní číslo jen pro text. cad/mate-remap.ts
+ */
+export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: number; area?: number; length?: number; pts?: Vec3[]; why: "none" | "ambiguous" | "unknown" | "gone" };
 /**
  * Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl.
  * `c`, `d` = další odkazy (Symetricky: rovina souměrnosti; Šířka: druhá plocha jazýčku / drážky; Drážka: druhý konec; Závěs: dosedací roviny).
