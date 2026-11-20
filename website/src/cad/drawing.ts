@@ -16,6 +16,8 @@ import { weldSymbolsOnSheet, type WeldMark } from "./drawing-welds";
 import { absoluteSection, sectionCoord, sectionMiss, sectionOffsetRange } from "./drawing-section";
 import type { DrawingIssue } from "./drawing-issues";
 import { holeTableColumns, holeTableCounts, holeTableRows } from "./drawing-holetable";
+import { drawGearTables, gearTableHeight, gearTableWidth } from "./drawing-geartable";
+import type { GearTable } from "./gears/data";
 import type { SpringMark } from "./drawing-doc";
 import { inSpringEnvelope, springWireLines } from "./drawing-springs";
 import { drawSpringTables, springTableHeight, type SpringDrawTable } from "./drawing-springtable";
@@ -72,6 +74,8 @@ export type DrawingMeta = {
   /** údaje pružin z tabulky (drawing-springtable.ts – `springDrawTables`), kreslí se při volbě springTable
    *  (pole `springs` níže jsou osy drátu zjednodušených pružin ISO 2162-1 – jiná věc) */
   springData?: SpringDrawTable[];
+  /** tabulky ozubení kol dílu (`gearTablesOf`, worker je doplní při volbě `gearTable`) – drawing-geartable.ts */
+  gears?: GearTable[];
   // ---- razítko (cad/title-block.ts): šablona, logo a další pole – vše volitelné, prázdné = na výkrese se neuvádí
   /** šablona razítka: iso7200 (výchozí, 180 × 38), compact (180 × 27), toolmaker (nástrojářská, 180 × 64 – všechna pole) */
   template?: TitleTemplate;
@@ -182,6 +186,8 @@ export type DrawingOptions = {
   bomTable?: boolean;
   /** tabulka děr (souřadnice a průměry děr v půdorysu) */
   holeTable?: boolean;
+  /** tabulka ozubení kol dílu nad razítkem (meta.gears; drawing-geartable.ts) */
+  gearTable?: boolean;
   /** pohled tabulky děr (výchozí horní, jinak přední) – Chytré kóty s polohami děr v tabulce (kótovat … díry tabulka) */
   holeTableView?: ViewKey;
   /** tabulka údajů pružiny EN ISO 2162-2 nad razítkem (meta.springData – prvky spring.* dílu, cad/drawing-springtable.ts) */
@@ -1498,7 +1504,10 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // výška pásu nad spodním okrajem: razítko + kusovník + tabulka děr (dlouhá ve dvou sloupcích – výšku dá první)
   // tabulka údajů pružin leží nad tabulkou děr – její výška patří do pásu i do odsazení patičky razítka („Rozměry v mm“, List)
   const springH = opts.springTable ? springTableHeight(meta.springData) : 0;
-  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]) + springH;
+  // tabulky ozubení nad tabulkou děr (a nad tabulkou pružiny, drawing-geartable.ts): nejvýš dvě vedle sebe, šířka 110 mm na kolo
+  const gearTabs = opts.gearTable ? (meta.gears ?? []) : [];
+  const gearH = gearTableHeight(gearTabs);
+  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]) + springH + gearH;
 
   // --- projekce
   const keys = ISO_KEYS.filter((k) => opts.views[k]);
@@ -1632,6 +1641,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const area: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M - TBH - 4 };
     const bounds: Rect = { x: M_LEFT + 4, y: M + 4, w: W - M_LEFT - M - 8, h: H - 2 * M - 8 };
     const fixed: Rect[] = [{ x: W - M - TB.w - 3, y: H - M - TBH - 12, w: TB.w + 3, h: TBH + 12 }];
+    if (gearTableWidth(gearTabs) > TB.w) fixed.push({ x: W - M - gearTableWidth(gearTabs) - 3, y: H - M - TBH - 12, w: gearTableWidth(gearTabs) + 3, h: gearH + 12 });
     if (meta.revisions?.length) fixed.push({ x: W - M - 124 - 3, y: M, w: 127, h: 6 + (meta.revisions.length + 1) * 6 + 3 });
     const frame: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M };
     /** mřížka s mezerou 24 + room a okrajem DIM_ROOM + room; `loose` = pohledy smí i vedle razítka (jen ne do něj) */
@@ -1936,7 +1946,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // rám, centrovací značky, zóny, razítko
   frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
-  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]) + springH);
+  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]) + springH + gearH);
   let yTop = SH - M - TB.h;
   if (meta.bom?.length) {
     partsList(SW - M - TB.w, yTop, meta.bom, polys, texts);
@@ -1956,6 +1966,17 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   // tabulka údajů pružiny (EN ISO 2162-2) nad tabulkou děr / kusovníkem – místo je v TBH
   if (opts.springTable && meta.springData?.length) drawSpringTables(SW - M - TB.w, yTop - holeTableHeight(holeTableColumns(holeRows)[0]), TB.w, meta.springData, polys, texts);
+  if (gearTabs.length) {
+    // nad tabulkou děr (yTop = horní hrana kusovníku / razítka), překryv s pohledy = varování jako u tabulky děr
+    const g = drawGearTables(SW - M, yTop - holeTableHeight(holeTableColumns(holeRows)[0]) - (opts.springTable && meta.springData?.length ? springH : 0), gearTabs, polys, texts);
+    warnings.push(...g.warnings);
+    const hit = ownViews().filter((p) => overlaps({ x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s }, g));
+    if (hit.length) {
+      const t = tr("Tabulka ozubení překrývá pohled {0} – zvolte větší list nebo menší měřítko.", hit.map((p) => viewName(p.key)).join(", "));
+      warnings.push(t);
+      issues.push({ level: "warn", code: "drawing.warning", kind: "gear-table-overlap", text: t, data: { tables: gearTabs.length, views: hit.map((p) => p.key) } });
+    }
+  }
   const revZoneAt = meta.revisions?.length ? revisionTable(SW, meta.revisions, polys, texts, !!zones) : [];
 
   return {

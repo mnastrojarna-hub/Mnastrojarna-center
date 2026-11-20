@@ -117,6 +117,11 @@ export type ExtDef = {
   build?: (data: Record<string, unknown>, ctx: ExtBuildCtx) => Promise<Shape | null> | Shape | null;
   /** místo prvku spustí akci v UI (registrovanou v UI registru pod stejným id) – např. export rozvinu */
   action?: boolean;
+  /**
+   * Akce s čistým textovým výstupem (bez UI): engine ji provede sám nad aktivním dokumentem – stejný výpis v aplikaci i v CLI
+   * (`kolo tabulka`). `arg` = argument z textového příkazu; chyba = ✗ řádku.
+   */
+  report?: (doc: CadDoc, arg?: string) => string[];
   /** jen pro sestavy / jen pro díly (výchozí: díly) */
   scope?: "part" | "assembly" | "both";
   /**

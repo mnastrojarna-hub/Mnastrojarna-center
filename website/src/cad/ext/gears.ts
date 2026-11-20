@@ -12,6 +12,7 @@
  * průnik „objem zubů ∩ polotovar“ z návrhu trval 4,9 / 13,8 / 89 s, proto se nepoužívá.
  */
 import * as r from "replicad";
+import { gearTableReport } from "../agent-gears-table";
 import { noteFeatureWarning } from "../feature-notes";
 import { cutAll, fuseAll } from "../fastbool";
 import { coneSection, type BevelC, type BevelIn } from "../gears/bevel";
@@ -459,4 +460,4 @@ for (const kind of GEAR_KINDS) {
 }
 
 /** Akce „Tabulka ozubení“ (vypíše tabulky všech kol dílu) – její obsluhu v UI doplňuje balík text (components/cad/ext/gears-text-ui.ts). */
-registerExt({ ext: "gear.table", label: tr("Tabulka ozubení"), icon: "gear", tone: "tool", tab: "tools", group: "Kola a ozubení", hidden: true, action: true, scope: "part", hint: tr("vypíše tabulku ozubení všech kol dílu (modul, počet zubů, průměry, rozměr přes zuby a přes kuličky)"), make: () => ({}) });
+registerExt({ ext: "gear.table", label: tr("Tabulka ozubení"), icon: "gear", tone: "tool", tab: "tools", group: "Kola a ozubení", hidden: true, action: true, scope: "part", hint: tr("vypíše tabulku ozubení všech kol dílu (modul, počet zubů, průměry, rozměr přes zuby a přes kuličky)"), make: () => ({}), report: (doc, arg) => gearTableReport(doc, arg ?? "*") });

@@ -30,6 +30,7 @@ import { perfMark } from "./perf-log";
 import { formNotesOfDoc, springMarksOf } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
 import { springDrawTables } from "./drawing-springtable";
+import { gearTablesOf } from "./gears/data";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 import { exportStats } from "./export-verify";
@@ -384,6 +385,8 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         // tabulka údajů pružin (EN ISO 2162-2) z prvků spring.* – drawing-springtable.ts; z dokumentu, ne z kopie pro výkres
         // (tam je tlačná pružina z tabulky nahrazená obalem vinutí ISO 2162-1)
         if (m.opts?.springTable && !meta.springData) meta = { ...meta, springData: springDrawTables(m.doc) };
+        // tabulka ozubení kol dílu (čistá data z tabulek kol, bez jádra) – drawing-geartable.ts
+        if (!meta.gears && m.opts?.gearTable && dd.kind !== "assembly") meta = { ...meta, gears: gearTablesOf(m.doc) };
         // osy drátu zjednodušených pružin (poloha odkazem je známá ze stavby výše)
         if (!meta.springs && springs === "simple") {
           const marks = springMarksOf(dd);

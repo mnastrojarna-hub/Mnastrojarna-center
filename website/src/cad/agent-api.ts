@@ -35,7 +35,7 @@ export type ApiCmd =
   | { kind: "fit" }
   /** barva ploch: čísla (0…) nebo pravidlo jako u skořepiny; `color` null = výchozí barva tělesa */
   | { kind: "faceColor"; faces: number[]; rule: string[]; color: string | null }
-  /** akce rozšíření (id z registru) nebo „sketch.dxf“ (export skici); prázdné id = seznam akcí; `arg` = údaj z textu příkazu (název pružiny…) */
+  /** akce rozšíření (id z registru) nebo „sketch.dxf“ (export skici); prázdné id = seznam akcí; `arg` = údaj z textu příkazu (název pružiny…) nebo argument akce s textovým výstupem (`report`) */
   | { kind: "action"; id: string; arg?: string }
   | { kind: "analyze"; what: "draft"; dir: Vec3; min: number; show: boolean }
   | { kind: "analyze"; what: "thickness"; limit: number; show: boolean }

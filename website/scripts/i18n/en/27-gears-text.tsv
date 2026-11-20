@@ -1,0 +1,56 @@
+# EN – Kola a ozubení textem (vlna 19, balík text): agent-gears.ts, agent-gears-table.ts, drawing-geartable.ts, výkres, gears-text-ui.ts
+  ⚠ sestava vznikla bez vazby ozubení – spojte kola vazbou ručně (sestava vazba ozubení …)	  ⚠ the assembly has no gear mate – connect the wheels by a mate yourself (assembly mate gear …)
+(v dílu je {0} kol – všechna: kolo tabulka vše)	(the part has {0} wheels – all of them: gear table all)
+, nejméně {0}	, at least {0}
+, povinné	, required
+, rozsah {0} až {1}	, range {0} to {1}
+; příznaky: {0}	; flags: {0}
+Kola a ozubení – jedna tabulka na druh (stejná jako průvodce „Kola a ozubení“ a obecný příkaz prvek gear.*):	Gears and gearing – one table per kind (the same as the “Gears and gearing” wizard and the generic command feature gear.*):
+Příklad: {0}	Example: {0}
+Složené zápisy:	Compound phrases:
+Soukolí (dva díly + sestava s vazbou): {0} <druh> …; druhy: {1}	Gear pair (two parts + assembly with a mate): {0} <kind> …; kinds: {1}
+Soukolí – {0}: řádky tabulky (slovo, význam, výchozí hodnota):	Gear pair – {0}: table rows (word, meaning, default):
+Soukolí „{0}“: {1}	Gear pair “{0}”: {1}
+Tabulka ozubení (modul, z, průměry, W, M)	Gear data table (module, z, diameters, W, M)
+Tabulka ozubení překrývá pohled {0} – zvolte větší list nebo menší měřítko.	The gear data table overlaps view {0} – choose a larger sheet or a smaller scale.
+Tabulka ozubení – {0}	Gear data – {0}
+Tabulka ozubení: v dílu je {0} kol, na list se vejdou tabulky prvních {1} – další vypište příkazem kolo tabulka vše.	Gear data table: the part has {0} wheels, the sheet holds the tables of the first {1} – list the others with gear table all.
+Tabulka ozubení: v dílu není žádné kolo – tabulka se nekreslí	Gear data table: the part has no wheel – no table is drawn
+Tabulka ozubení: {0} {1} [vše | "název"] · popis druhu: {0} {2} <druh> · soukolí: {3} {2} <druh>	Gear data: {0} {1} [all | "name"] · kind description: {0} {2} <kind> · gear pair: {3} {2} <kind>
+Tabulka ozubení: {0} – {1}	Gear data table: {0} – {1}
+Volné slovo za druhem: {0}	Free word after the kind: {0}
+bez tabulky ozubení	no gear data table
+další druhy: šikmé kolo (β, smysl stoupání), hřeben (lineární ozubení, h = výška celkem), řetězové kolo ISO 606 (08B…24B, ANSI 35–80, 1–3 řady, náboj B/C), cykloidní (hodinové kolo / pastorek), hypoidní (člen pastorek | talířové, přesazení E; tvar zubů je přibližný)	more kinds: helical gear (β, hand of helix), rack (linear gearing, h = overall height), chain sprocket ISO 606 (08B…24B, ANSI 35–80, 1–3 strands, hub B/C), cycloidal (clock wheel / pinion), hypoid (member pinion | ring gear, offset E; tooth form is approximate)
+jen prvek gear.* {0}=…	only feature gear.* {0}=…
+kolo: neznámý druh „{0}“ – druhy: {1}	gear: unknown kind “{0}” – kinds: {1}
+nezadáno, použita výchozí hodnota: {0}	not entered, default used: {0}
+neznámé slovo „{0}“ – řádky: {1}; popis: {2}	unknown word “{0}” – rows: {1}; description: {2}
+ozubené kolo z tabulky (jeden prvek „Ozubené kolo …“, úprava = stejná tabulka): čelní, šikmé (beta 15 pravé|levé), šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, šnekové, cykloidní, cyklodisk, řetězové, řemenice, rohatka; polotovar = jen soustružené tělo, zuby = zubové mezery do aktivního tělesa; slova řádků: kolo nápověda <druh>	gear wheel from a table (one feature “Gear …”, editing = the same table): spur, helical (beta 15 right|left), herringbone, internal, rack, bevel, hypoid, worm, wormwheel, cycloidal, cyclodisc, sprocket, pulley, ratchet; blank = turned body only, toothcut = tooth spaces cut into the active body; row words: gear help <kind>
+soukolí se nepodařilo vyřešit	the gear pair could not be solved
+soukolí: neznámý druh „{0}“ – druhy: {1}	gear pair: unknown kind “{0}” – kinds: {1}
+soukolí: oba díly s koly, nová sestava, vložení ve správném záběru a vazba ozubení / hřeben; zadaná osová vzdálenost a → posunutí x1/x2 se dopočítá a rozdělí (DIN 3992); protokol vypíše převod, a_w, ε_α a varování (podřezání, špičatý zub, interference); druhy: čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, cyklodisk, řetězové, řemenice	gear pair: both parts with their wheels, a new assembly, insertion in correct mesh and a gear / rack mate; a given centre distance a → profile shifts x1/x2 are computed and split (DIN 3992); the log shows ratio, a_w, ε_α and warnings (undercut, pointed tooth, interference); kinds: spur, helical, herringbone, internal, rack, bevel, hypoid, worm, cycloidal, cyclodisc, sprocket, pulley
+tabulka děr ano|ne · tabulka ozubení ano|ne	holetable yes|no · gear table yes|no
+tabulka ozubení	gear data table
+tabulka ozubení ano|ne	gear table yes|no
+tabulka ozubení posledního (všech / pojmenovaného) kola aktivního dílu: modul, z, α, β, x, průměry d / dₐ / d_f / d_b, rozměr přes zuby W_k, přes kuličky M_dK, osová vzdálenost; nápověda = řádky tabulky druhu se slovy, jednotkami, výchozími hodnotami a příkladem; na výkres: výkres tabulka ozubení ano	gear data of the last (all / named) wheel of the active part: module, z, α, β, x, diameters d / dₐ / d_f / d_b, span measurement W_k, dimension over balls M_dK, centre distance; help = the kind's table rows with words, units, defaults and an example; on the drawing: drawing gear table yes
+tabulka ozubení: kola v dílu „{0}“ mají neplatné zadání – opravte je (stav prvku)	gear data: the wheels in part “{0}” have invalid input – fix them (feature status)
+tabulka ozubení: kolo „{0}“ v dílu není – kola: {1}	gear data: wheel “{0}” is not in the part – wheels: {1}
+tabulka ozubení: v dílu „{0}“ není žádné kolo – vytvořte ho příkazem kolo <druh> …	gear data: part “{0}” has no wheel – create one with gear <kind> …
+tabulka ozubení: „{0}“ není díl – přepněte na záložku dílu s kolem	gear data: “{0}” is not a part – switch to the tab of the part with the wheel
+výchozí	default
+za „{0}“ chybí hodnota	a value is missing after “{0}”
+za „{0}“ chybí souřadnice: {0} x y [z]	coordinates are missing after “{0}”: {0} x y [z]
+za „{0}“ chybí číslo ({1})	a number is missing after “{0}” ({1})
+{0} [ano|ne]	{0} [yes|no]
+{0} potřebuje druh: {0} <druh> m 2 z1 20 z2 60 [a 81] – druhy: {1}; popis: {0} {2} <druh>	{0} needs a kind: {0} <kind> m 2 z1 20 z2 60 [a 81] – kinds: {1}; description: {0} {2} <kind>
+{0} potřebuje druh: {0} <druh> … – druhy: {1}; také {0} {2}, {0} {3} [druh]	{0} needs a kind: {0} <kind> … – kinds: {1}; also {0} {2}, {0} {3} [kind]
+{0} {1} [druh] – jen jeden druh	{0} {1} [kind] – one kind only
+{0} {1} [vše | "název"] – nic dalšího	{0} {1} [all | "name"] – nothing else
+{0}: neznámý druh „{1}“ – druhy: {2}	{0}: unknown kind “{1}” – kinds: {2}
+{0}: neznámý druh „{1}“ – druhy: {2} (popis: {0} {3})	{0}: unknown kind “{1}” – kinds: {2} (description: {0} {3})
+číslo {0} bez slova řádku – napište např. „m 2“, „z 24“ (řádky: {1})	number {0} without a row word – write e.g. “m 2”, “z 24” (rows: {1})
+Řádky tabulky (slovo, význam, výchozí hodnota, rozsah):	Table rows (word, meaning, default, range):
+„{0}“ (odkaz na bod) jde zadat jen obecným příkazem: prvek {1} {2}=…	“{0}” (point reference) can only be entered by the generic command: feature {1} {2}=…
+„{0}“ je celé číslo, ne {1}	“{0}” is a whole number, not {1}
+„{0}“ je směr: X | Y | Z | -Z | tři čísla	“{0}” is a direction: X | Y | Z | -Z | three numbers
+„{0}“ má hodnoty {1}	“{0}” takes the values {1}

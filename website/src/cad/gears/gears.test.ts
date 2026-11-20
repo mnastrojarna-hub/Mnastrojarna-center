@@ -467,7 +467,7 @@ describe("tabulka ozubení, souhrn, seznam kol dílu", () => {
 });
 
 describe("dokument → textový skript (obecný prvek gear.*)", () => {
-  it("kola s volbami se přepíšou na `prvek gear.*` a rozbor skriptu dá stejná data (zbytek zápisu `kolo …` doplní balík text)", () => {
+  it("kola s volbami se přepíšou na `kolo …` / `prvek gear.*` a rozbor skriptu dá stejná data", () => {
     const feats: [string, GearData][] = [
       ["gear.spur", { m: 2.5, z: 31, b: 18, x: 0.25, bore: 20, keyway: true, hubD: 40, hubL: 12, hubSide: "both", setScrew: "M6", out: "wheel" }],
       ["gear.helical", { z: 41, beta: 12.5, hand: "left", position: [10, 0, 5], axis: { kind: "axis", axis: "X" }, turn: 4 }],
@@ -477,7 +477,10 @@ describe("dokument → textový skript (obecný prvek gear.*)", () => {
     ];
     const doc = { ...emptyDoc("Kola"), features: feats.map(([ext, d], k) => ({ id: `f${k}`, name: `Kolo ${k}`, type: "ext", ext, data: { ...KINDS[ext.slice(5) as keyof typeof KINDS].defaults(), ...d } }) as unknown as Feature) };
     const sc = docToScript(doc);
-    expect(sc.stats.generic, sc.text).toBe(feats.length);
+    // první kolo vlastním příkazem `kolo …` (balík text); další mají operaci „nové“ bez tělesa (= sloučit s aktivním tělesem),
+    // což `kolo …` nevyjádří (v dílu s tělesem zakládá nové těleso) – zůstanou obecným příkazem
+    expect(sc.stats.dedicated + sc.stats.generic, sc.text).toBe(feats.length);
+    expect(sc.stats.dedicated, sc.text).toBeGreaterThanOrEqual(1);
     const p = parseAgentText(sc.text);
     expect(p.errors).toEqual([]);
     const got = p.ops.filter((o) => o.k === "feature").map((o) => (o as unknown as { feature: { ext: string; data: GearData } }).feature);

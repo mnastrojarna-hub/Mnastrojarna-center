@@ -13,6 +13,7 @@ import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
+import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
 import { dimCheck } from "@/cad/dim-check";
@@ -185,6 +186,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
   /** pružiny (i v komponentách sestavy) se kreslí zjednodušeně podle ISO 2162-1 – volba „plným tvarem“ je jen u výkresu s pružinou */
   const hasSprings = useMemo(() => hasDrawnSprings(doc), [doc]);
+  // kola a ozubení v dílu → přepínač „Tabulka ozubení“ (drawing-geartable.ts)
+  const hasGears = useMemo(() => doc.kind !== "assembly" && gearTablesOf(doc).length > 0, [doc]);
   const [repeatTool, setRepeatTool] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
@@ -1471,6 +1474,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Check checked={!!opts.springTable} onChange={(v) => set("springTable", v)}>
               {tr("Tabulka údajů pružiny (EN ISO 2162-2)")}
             </Check>
+            {hasGears && (
+              <Check checked={!!opts.gearTable} onChange={(v) => set("gearTable", v)}>
+                {tr("Tabulka ozubení (modul, z, průměry, W, M)")}
+              </Check>
+            )}
           </Section>
 
           <Section title={tr("Detailní pohledy")}>

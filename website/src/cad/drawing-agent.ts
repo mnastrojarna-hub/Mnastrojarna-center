@@ -11,6 +11,8 @@ import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLab
 import { linMeaning, type SmartDims, type SmartReport } from "./drawing-dims";
 import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type RefTolDim, type TolDim } from "./drawing-functional";
 import { hasDrawnSprings, threadsOfDoc } from "./drawing-doc";
+import { gearTableStatus } from "./drawing-geartable";
+import { gearTablesOf } from "./gears/data";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
@@ -351,7 +353,9 @@ function titleLines(doc: CadDoc, s: DrawingDoc): string[] {
 
 /** příkazy, u kterých protokol ukáže hlášení výpočtu listu řádkem ✗ / ⚠ (ostatní je vrací jen v `issues`) */
 const ISSUE_LINES = new Set<DrawingCmd["k"]>(["set", "dim", "views"]);
-const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-legacy", "sheet-fit", "view-lost", "hole-table-overlap"]);
+/** kola dílu pro stav výkresu (sestava = žádná) */
+const gearsOf = (doc: CadDoc) => (doc.kind === "assembly" ? [] : gearTablesOf(doc));
+const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-legacy", "sheet-fit", "view-lost", "hole-table-overlap", "gear-table-overlap"]);
 
 /**
  * Provede příkaz výkresu nad dokumentem – nad aktivním listem (`výkres list N`; chybí-li list, založí se první).
@@ -1004,6 +1008,8 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // tabulka děr: zapnutá volbou listu, nebo ji zapnuly Chytré kóty (polohy děr tabulkou – B12)
   if (o.holeTable || res.holes?.length) L.push(holeTableLine(res, o));
   if (o.springTable) L.push(res.springTables ? tr("Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)", res.springTables) : tr("Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)"));
+  // tabulka ozubení (drawing-geartable.ts): co je na listu, nebo proč tam není
+  if (o.gearTable) L.push(...(gearsOf(doc).length ? gearTableStatus(gearsOf(doc)) : [tr("Tabulka ozubení: v dílu není žádné kolo – tabulka se nekreslí")]));
   // funkční rozměry, polohy děr a kontrola tolerancí (B8, B12, 5.3)
   const hm = Object.entries(res.smart?.report.holeMode ?? {});
   if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")));
