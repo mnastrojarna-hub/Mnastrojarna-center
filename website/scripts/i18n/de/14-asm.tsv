@@ -22,7 +22,6 @@
 ▶ přehrávání {0} kroků ({1} s){2}	▶ Wiedergabe von {0} Schritten ({1} s){2}
 ⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Geometrie der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen rechnet sie nach dem Aufbau der Teile neu
 ⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)	⚠ nicht erfüllte Verknüpfungen in {0} Schritten (Mechanismus blockiert oder Antrieb über eine Grenze hinaus)
-⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)	⚠ erste Kollision in Schritt {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)
 ⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně	⚠ Verknüpfung {0} lässt sich nicht zusammen mit den anderen erfüllen – baugruppe verknüpfungen, baugruppe verknüpfung {1} unterdrücken|löschen|umkehren
 ✓ motor {0} odebrán	✓ Antrieb {0} entfernt
 ✓ motor {0}: {1}{2}	✓ Antrieb {0}: {1}{2}
@@ -81,7 +80,6 @@ motor: vazba číslem nebo názvem – pohyb motor rotační vazba 3 0..360	Antr
 Motory	Antriebe
 motory na vazbách, kroky, kolize, přehrání a export	Antriebe an Verknüpfungen, Schritte, Kollisionen, Wiedergabe und Export
 Načítám plochy, hrany a vrcholy komponenty…	Lade Flächen, Kanten und Eckpunkte der Komponente…
-Nahrávám video…	Nehme Video auf…
 Nesplněné vazby	Nicht erfüllte Verknüpfungen
 nesplněno {0}	nicht erfüllt {0}
 Odebrat motor	Antrieb entfernen
@@ -94,7 +92,6 @@ počet zubů musí být kladný	die Zähnezahl muss positiv sein
 Počítám krok {0} z {1}…	Berechne Schritt {0} von {1}…
 Pohyb	Bewegung
 pohyb export: csv | png | webm	bewegung export: csv | png | webm
-pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung status|starten|abspielen|stop|schritt N|export csv|png|webm|löschen
 pohyb motor: neznámá volba „{0}“ – {1}	bewegung antrieb: unbekannte Option „{0}“ – {1}
 pohyb: neznámý podpříkaz „{0}“ – {1}	bewegung: unbekannter Unterbefehl „{0}“ – {1}
 pohyb: otevřený dokument „{0}“ není sestava	bewegung: das geöffnete Dokument „{0}“ ist keine Baugruppe
@@ -110,7 +107,6 @@ Pokročilé vazby	Erweiterte Verknüpfungen
 pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max	erweiterte Verknüpfungen wie im Baugruppenpanel: Entität = F12 (Fläche), E5 (Kante), V3 (Eckpunkt) oder Regel (+Z, zylindrisch Ø8, kugel, kreis Ø40); Breite und Scharnier nehmen zwei Flächen je Seite, Langloch zwei Enden; Grenzen min / max
 poloha {0} mm	Lage {0} mm
 poměr {0}	Übersetzung {0}
-Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG.	Der Browser kann kein Video aus dem 3D-Fenster aufnehmen – verwenden Sie PNG-Bilder.
 Přehrát	Abspielen
 Přeskočit	Überspringen
 Přidat motor	Antrieb hinzufügen
@@ -121,13 +117,10 @@ rovina souměrnosti: chybí komponenta	Symmetrieebene: Komponente fehlt
 rovina souměrnosti: zadejte rovinnou plochu (F12, +X…) – rovina "Rám" F3, nebo rovina F3 (plocha komponenty B)	Symmetrieebene: ebene Fläche angeben (F12, +X…) – um "Rahmen" F3, oder um F3 (Fläche der Komponente B)
 rychlost	Geschwindigkeit
 Rychlost	Geschwindigkeit
-Rychlost (mm/s) místo rozsahu	Geschwindigkeit (mm/s) statt Bereich
-Rychlost (ot/min) místo rozsahu	Geschwindigkeit (U/min) statt Bereich
 Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube.
 Sestava nemá vazbu Závěs, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube.
 sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	baugruppe verknüpfung senkrecht|tangential|koinzident|symmetrisch|breite|pfad|langloch|scharnier|sperren|abstandsgrenze|winkelgrenze|zahnrad|zahnstange|schraube|nocken|kardangelenk "A" <Fläche|E5|V3> [2. Fläche] "B" <Fläche> [2. Fläche] [um "C" <Fläche>] [übersetzung N | zähne z1 z2 | steigung P | weg mm/U | modul m zähne z] [min N] [max N] [lage N] [umkehren|links|innen] [name "…"]
 Smyčka	Schleife
-Snímek 3D okna se nepodařilo pořídit.	Das 3D-Fenster konnte nicht aufgenommen werden.
 Snímky PNG	PNG-Bilder
 Snímky PNG ({0}) se uloží z 3D okna (jen v aplikaci)	PNG-Bilder ({0}) werden aus dem 3D-Fenster gespeichert (nur in der Anwendung)
 stejný smysl otáčení	gleicher Drehsinn
@@ -138,7 +131,6 @@ Stopa Z	Spur Z
 stopa: zadejte komponentu – stopa "Ojnice" [bod x y z] (bod v souřadnicích komponenty)	Spur: Komponente angeben – spur "Pleuel" [punkt x y z] (Punkt in Komponentenkoordinaten)
 stoupání {0} mm	Steigung {0} mm
 Tabulka CSV	CSV-Tabelle
-Uloženo {0} snímků PNG (ZIP) a tabulka CSV.	{0} PNG-Bilder (ZIP) und eine CSV-Tabelle gespeichert.
 vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)	Verknüpfung {0} ({1}) hat keinen Wert – Werte haben Abstand, Winkel, Zahnräder (Übersetzung), Schraube (Steigung), Zahnstange (mm/U) und Langloch (Lage)
 vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu	Verknüpfung {0} ({1}) hat keine Grenzen – Grenzen haben Abstandsgrenze und Winkelgrenze
 Vazba {0}: {1} – klikněte na plochu v modelu nebo vyberte ze seznamu · Esc zruší	Verknüpfung {0}: {1} – Fläche im Modell anklicken oder aus der Liste wählen · Esc bricht ab
@@ -157,7 +149,6 @@ Vazby splněny ve všech krocích	Verknüpfungen in allen Schritten erfüllt
 vhodné: {0}{1}	geeignet: {0}{1}
 Video WebM	WebM-Video
 Video WebM se nahraje z 3D okna (jen v aplikaci)	WebM-Video wird aus dem 3D-Fenster aufgenommen (nur in der Anwendung)
-Video WebM uloženo ({0} snímků, {1} fps).	WebM-Video gespeichert ({0} Bilder, {1} fps).
 vnitřní dotyk	Innenberührung
 Všechny entity vazby jsou vybrané – potvrďte vazbu v panelu komponenty.	Alle Entitäten der Verknüpfung sind gewählt – Verknüpfung im Komponentenpanel bestätigen.
 Vypočítat pohyb	Bewegung berechnen

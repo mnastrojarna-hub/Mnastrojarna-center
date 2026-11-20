@@ -1,0 +1,40 @@
+# vlna 22, bod 22i zprávy majitele: přijetí úpravy ≠ geometrický úspěch. Úprava je jen přijatá (→ … výsledek po výpočtu níže),
+# ✓ / ⚠ / ✗ přijde až po stavbě a patří řádku ÚPRAVY; řádek s ✗ nemá žádné ✓ (ani za jiný prvek)
+nový díl Deska A
+kvádr 20 20 10
+zaoblit 15 hrany vše
+nový díl Plech
+kvádr 20 20 10
+zaoblit 1 hrany svislé
+upravit "Zaoblení 2" radius=15
+stav
+#--- run
+# druhý běh nad týmž dokumentem (vzor ze zprávy: dřív „✓ Zaoblení“ a hned „✗ Zaoblení nelze provést“)
+upravit "Zaoblení 2" radius=30
+#--- run
+# úprava zpět na proveditelný poloměr: přijetí a ✓ s čísly; přejmenování model nemění – hotový výsledek ✓
+upravit "Zaoblení 2" radius=2
+přejmenovat "Zaoblení 2" na "Rohy"
+stav
+#--- run
+# úprava jiného prvku, která zaoblení rozbije: ✗ zaoblení na řádku úpravy kvádru, kvádr sám jen ℹ (řádek není zelený)
+upravit "Kvádr 2" size=3;3;10
+stav
+#--- run
+# smazání rozbitého prvku: přijetí, po stavbě už žádné ✗ (stav kvádru se nezměnil – znovu se nehlásí)
+smazat "Rohy"
+stav
+#--- run
+# prvek potlačený aktivní konfigurací se nestavěl: ℹ feature.suppressed („potlačen – nestaví se“), ve stavu „ℹ (potlačen)“, ne ✓
+nový díl Deska K
+kvádr 60 40 10
+kvádr 10 10 30 v 40 10 10
+konfigurace "Bez výstupku" potlačit "Kvádr 2"
+konfigurace aktivní "Bez výstupku"
+stav
+#--- run
+# přijatá úprava bez nového prvku v dokumentu, ze kterého běh odejde (záložka → konfigurace → nový díl): výsledek na řádku úpravy
+záložka "Deska K"
+konfigurace aktivní žádná
+nový díl Jiný
+kvádr 5 5 5

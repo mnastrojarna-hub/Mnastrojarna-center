@@ -42,7 +42,7 @@ describe("pravidlo zařazení (bez jádra)", () => {
     expect(worstClass(["thread", "underhead"])).toBe("underhead");
     expect(worstClass(["thread", "real", "undetermined"])).toBe("real");
     expect(worstClass(["thread"])).toBe("thread");
-    expect(countClasses([{ cls: "thread" }, { cls: "thread" }, { cls: "real" }])).toEqual({ total: 3, thread: 2, underhead: 0, real: 1, undetermined: 0 });
+    expect(countClasses([{ cls: "thread" }, { cls: "thread" }, { cls: "real" }])).toEqual({ total: 3, thread: 2, underhead: 0, real: 1, undetermined: 0, touch: 0, work: 0 }); // vlna 22, bod 5: i dotyk a pracovní kontakt
   });
 
   it("závitové prvky dílu a jejich díry: poloha souřadnicemi = bod na ose, poloha odkazem / polem = průměr vrtáku", () => {

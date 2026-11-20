@@ -1,0 +1,29 @@
+# vlna 22, bod 1 (pohyb): výsledek pohybové studie platí jen pro stav sestavy, pro který vznikl. Po změně geometrie dílu
+# (polohy, vazby i studie beze změny) `stav` a `pohyb stav` hlásí NEPLATÍ a `pohyb spustit` přepočítá – dřív se vracel starý
+# výsledek s kolizí 500 mm³, i když pod přidržovačem už žádný materiál nebyl
+nový díl "Deska A"
+kvádr 60 40 10
+nový díl "Přidržovač"
+kvádr 10 10 10
+#--- run
+nová sestava "Sestava A"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 40 10 30
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20
+pohyb motor lineární vazba 1 20..-5 kroky 5 kolize
+stav
+#--- run
+sestava upravit "Deska A"
+upravit "Kvádr 1" size=30;40;10
+sestava hotovo
+stav
+pohyb stav
+pohyb spustit
+pohyb krok 5
+kolize
+pohyb stav
+#--- run
+# změna studie a polohy: stav studie zase neplatí, krok se nejdřív přepočítá
+sestava vazba 1 hodnota=25
+pohyb stav
+pohyb krok 0

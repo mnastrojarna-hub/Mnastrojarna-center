@@ -6,5 +6,6 @@ import "./advanced-ui";
 import "./weld-ui";
 import "./sheetmetal-form-ui";
 import "../springs/register";
+import "./gears-ui";
 export * from "./registry";
 export { EXTRA_ICONS, registerIcon } from "./icons";

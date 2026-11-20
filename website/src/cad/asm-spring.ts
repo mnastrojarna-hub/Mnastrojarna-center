@@ -152,6 +152,39 @@ export function applySpringStates(doc: CadDoc, states: Pick<SpringState, "id" | 
 /** Sestava s délkami pružin podle poloh komponent v dokumentu (po přepočtu vazeb v aplikaci). */
 export const withSprings = (doc: CadDoc, geo: GeoProvider): CadDoc => (springComps(doc).length ? applySpringStates(doc, springStates(doc, geo)) : doc);
 
+/**
+ * Rozpor uložené (odvozené) délky pružiny s dosedacími plochami (vlna 22, bod 7): ŘÍDÍ polohy komponent a plochy, `length` /
+ * `offset` / `seat` jsou jen mezipaměť posledního přepočtu. `stored` = uložená délka, `derived` = délka z ploch v nynějších
+ * polohách; nad 0,01 mm (délka nebo poloha začátku) je to rozpor – po načtení dokumentu se ohlásí ⚠ `spring.stale` a délka se
+ * odvodí znovu. Pružina bez uložené délky (ještě nepřepočtená) rozpor nemá.
+ */
+export type SpringDrift = { id: string; name: string; stored: number; derived: number; seat: number; offset: number };
+export const SPRING_DRIFT_EPS = 0.01;
+/** Rozpor mezi dokumentem `before` a týmž dokumentem s délkami pružin z ploch `after` (applySpringStates / refreshSprings). */
+export function springDriftBetween(before: CadDoc, after: CadDoc): SpringDrift[] {
+  const out: SpringDrift[] = [];
+  const by = new Map((after.components ?? []).map((c) => [c.id, c] as const));
+  for (const c of springComps(before)) {
+    const s = c.spring!;
+    const a = by.get(c.id)?.spring;
+    if (!a || s.length === undefined || a.length === undefined) continue;
+    const dl = Math.abs(s.length - a.length);
+    const doff = Math.abs((s.offset ?? 0) - (a.offset ?? 0));
+    if (dl > SPRING_DRIFT_EPS || doff > SPRING_DRIFT_EPS) out.push({ id: c.id, name: c.name, stored: s.length, derived: a.length, seat: a.seat ?? a.length, offset: (a.offset ?? 0) - (s.offset ?? 0) });
+  }
+  return out;
+}
+/** Rozpor uložené délky pružin s dosedacími plochami v polohách dokumentu (čistá funkce – geometrie ploch od volajícího). */
+export const springDrift = (doc: CadDoc, geo: GeoProvider): SpringDrift[] => springDriftBetween(doc, withSprings(doc, geo));
+/** Věta hlášení ⚠ spring.stale (stejná v protokolu, konzoli i v aplikaci). */
+export function springDriftText(d: SpringDrift): string {
+  if (Math.abs(d.stored - d.derived) <= SPRING_DRIFT_EPS)
+    return tr("pružina „{0}“: uložená poloha začátku neodpovídá dosedací ploše (posun {1} mm, délka {2} mm) – odvozeno z ploch", d.name, fmt(d.offset, 3), fmt(d.derived, 3));
+  return tr("pružina „{0}“: uložená délka {1} mm neodpovídá dosedacím plochám ({2} mm) – délka odvozena z ploch; řídí polohy komponent, uložená délka je jen odvozená hodnota", d.name, fmt(d.stored, 3), fmt(d.derived, 3));
+}
+/** argumenty krátkého textu kódu `spring.stale` (registr kódů) */
+export const springDriftArgs = (d: SpringDrift): string[] => [d.name, `${fmt(d.stored, 3)} mm`, `${fmt(d.derived, 3)} mm`];
+
 /** Stav kroku pohybové studie (MotionStep.springs). */
 export function springSteps(doc: CadDoc, geo: GeoProvider): Record<string, SpringStep> {
   const out: Record<string, SpringStep> = {};
@@ -161,26 +194,49 @@ export function springSteps(doc: CadDoc, geo: GeoProvider): Record<string, Sprin
 
 const mark = (l: SpringLevel) => (l === "error" ? "✗" : l === "warn" ? "⚠" : "✓");
 
-/** Řádek protokolu pružiny: „✓ pružina „P1“: délka 38 mm (L0 44 · Ln 20 · zdvih 6 mm) · síla 150 N (c 25 N/mm)“; `ref` = „ #3“ za název. */
-export function springLine(s: SpringState, ref = ""): string {
+/**
+ * Řádek protokolu pružiny: „✓ pružina „P1“: délka 38 mm (L0 44 · Ln 20 · zdvih 6 mm) · síla 150 N (c 25 N/mm) · vedená“;
+ * `ref` = „ #3“ za název, `guided` = vedení dírou / kapsou z definice (`sestava pružina … vedená ano|ne`; nezadané se nepíše).
+ */
+export function springLine(s: SpringState, ref = "", guided?: boolean): string {
   const parts = [tr("délka {0} mm", fmt(s.length, 3)), `L0 ${fmt(s.free, 3)}`];
   if (s.solid !== undefined) parts.push(`Ln ${fmt(s.solid, 3)}`);
   parts.push(tr("stlačení {0} mm", fmt(s.free - s.length, 3)));
   const force = s.force !== undefined ? ` · ${tr("síla {0} N (c {1} N/mm)", fmt(s.force, 1), fmt(s.rate!, 3))}` : "";
-  return `${mark(s.level)} ${tr("pružina „{0}“", s.name)}${ref}: ${parts.join(" · ")}${force}${s.note ? ` – ${s.note}` : ""}`;
+  const guide = guided === undefined ? "" : ` · ${guided ? tr("vedená") : tr("nevedená")}`;
+  return `${mark(s.level)} ${tr("pružina „{0}“", s.name)}${ref}: ${parts.join(" · ")}${force}${guide}${s.note ? ` – ${s.note}` : ""}`;
 }
 
 /** Řádky protokolu pro stavy pružin (stejný název a stav jednou s „(6×)“, jinak s #k / přezdívkou); `indent` před řádkem. */
 export function springLines(doc: CadDoc, states: SpringState[], indent = ""): string[] {
   const items = states.flatMap((s) => {
     const c = (doc.components ?? []).find((x) => x.id === s.id);
-    return c ? [{ c, text: (ref: string) => `${indent}${springLine(s, ref)}` }] : [];
+    return c ? [{ c, text: (ref: string) => `${indent}${springLine(s, ref, c.spring?.guided)}` }] : [];
   });
   return instanceLines(doc, items);
 }
 
-/** Řádky stavu dokumentu z uložené délky (bez geometrie): „Pružiny: „P1“ 38 mm (L0 44) · F 150 N ✓ · …“. */
-export function springStatusLine(doc: CadDoc): string | null {
+/**
+ * Kontrola pružin pro `stav` (vlna 22, bod 7): `checked` = délka každé pružiny ověřena proti dosedacím plochám v nynějších polohách,
+ * `stale` = pružiny, jejichž uložená délka plochám neodpovídá (ty se vypíšou ⚠ s délkou z ploch).
+ */
+export type SpringCheck = { checked: boolean; stale: SpringDrift[] };
+
+/**
+ * Řádky stavu dokumentu: „Pružiny: „P1“ 38 mm (L0 44) · F 150 N ✓ · …“. Bez `check` jen z uložené délky (dosavadní tvar); s kontrolou
+ * proti plochám dovětek „délka z dosedacích ploch“ (řídí polohy komponent), rozpor ⚠ s odvozenou délkou, a když kontrola neproběhla
+ * (chybí geometrie), bez ✓ s dovětkem „uložená délka, nezkontrolováno“.
+ */
+export function springStatusLine(doc: CadDoc, check?: SpringCheck): string | null {
+  const base = springStatusLine0(doc);
+  if (!base || !check) return base;
+  if (check.stale.length) return `${base} – ⚠ ${check.stale.map(springDriftText).join("; ")}`;
+  if (!check.checked) return `${base.replace(/ ✓/g, "")} – ${tr("uložená délka, s dosedacími plochami nezkontrolováno")}`;
+  return `${base} – ${tr("délka odvozená z dosedacích ploch (řídí polohy komponent)")}`;
+}
+
+/** dosavadní řádek z uložené délky (bez geometrie) */
+function springStatusLine0(doc: CadDoc): string | null {
   const list = springComps(doc);
   if (!list.length) return null;
   const items = list.map((c) => ({

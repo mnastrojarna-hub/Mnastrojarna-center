@@ -31,7 +31,6 @@ nadbytečný argument „{0}“	unexpected argument “{0}”
 neznámá adresa {0}	unknown address {0}
 neznámá volba „{0}“ příkazu {1} – mncad help	unknown option “{0}” of command {1} – mncad help
 neznámé pole „{0}“	unknown field “{0}”
-neznámé téma nápovědy „{0}“ – guide, commands	unknown help topic “{0}” – guide, commands
 neznámý formát „{0}“ – {1}	unknown format “{0}” – {1}
 neznámý jazyk „{0}“ – cs, en, de	unknown language “{0}” – cs, en, de
 neznámý příkaz „{0}“ – run, serve, help, version, selftest	unknown command “{0}” – run, serve, help, version, selftest

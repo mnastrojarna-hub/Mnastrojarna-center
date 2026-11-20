@@ -1,0 +1,131 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Vodítko“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 28800 mm³ · těleso platné
+✓ Díra 2 (hole) · úběr 2513,3 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 37699,1 mm³ · těleso platné
+
+Dokument: „Vodítko“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 120 mm (X -10…10, Y -10…10, Z 0…120) · objem 37,70 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 37699,1 mm³ · těleso platné – Ø20 × 120 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „S1“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Vodítko“ vložena do sestavy
+✓ vazba Souosost „Vodítko“ F1 → „Deska A“ F7: ok · poloha beze změny
+✓ vazba Ukotvit „Vodítko“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba VEDENÍ „Přidržovač“ F7 → „Vodítko“ F1: ok · poloha beze změny
+✓ vazba ZDVIH „Přidržovač“ F5 → „Deska A“ F3 · 57,5 mm: ok · poloha beze změny
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [50; 50; -20] ⚓ · Přidržovač [20; 20; 67,5]
+Vazby: 4 (4 ok)
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 160,78 cm³ · hmotnost Σ 1,262 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+Vazby splněny ve všech krocích
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+Vazby splněny ve všech krocích
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+Vazby splněny ve všech krocích
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+Vazby splněny ve všech krocích
+Krok 2 (t = 2 s, motory 27,15):
+ Deska A [0; 0; 0]
+ Vodítko [50; 50; -20]
+ Přidržovač [20; 20; 37,15]
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [50; 50; -20] ⚓ · Přidržovač [20; 20; 67,5]
+Vazby: 4 (4 ok)
+Pohybová studie: motorů 1 · kroků 2 · 2 s – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 160,78 cm³ · hmotnost Σ 1,262 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 4 ===
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 0 → 30,35 mm ↑ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 0 → 30,35 mm ↑ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 40,35]
+Vazby splněny ve všech krocích
+⚠ řádek 2: motor 1: začátek 0 mm se liší od aktuální hodnoty vazby „ZDVIH“ 57,5 mm – v kroku 0 díl přeskočí o 57,5 mm; zdvih od aktuální hodnoty: pohyb motor … zdvih Δ
+Krok 0 (t = 0 s, motory 0):
+ Deska A [0; 0; 0]
+ Vodítko [50; 50; -20]
+ Přidržovač [20; 20; 10]
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [50; 50; -20] ⚓ · Přidržovač [20; 20; 67,5]
+Vazby: 4 (4 ok)
+Pohybová studie: motorů 1 · kroků 2 · 2 s – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 160,78 cm³ · hmotnost Σ 1,262 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)
+=== run 5 ===
+✓ motor 1 odebrán
+✓ vazba 4 (ZDVIH „Přidržovač“ F5 → „Deska A“ F3 · 57,5 mm · potlačeno): potlačena · potlačeno
+✓ motor 1: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 94,65]
+Vazby splněny ve všech krocích
+⚠ řádek 4: motor 1: začátek 57,5 mm není 0 – u vazby „VEDENÍ“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o 57,5 mm; bez skoku: 0..Δ nebo zdvih Δ
+✓ motor 1: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 0 → -30,35 mm ↓ zdvih 30,35 mm
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 0 → -30,35 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+Vazby splněny ve všech krocích
+Krok 2 (t = 2 s, motory -30,35):
+ Deska A [0; 0; 0]
+ Vodítko [50; 50; -20]
+ Přidržovač [20; 20; 37,15]
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [50; 50; -20] ⚓ · Přidržovač [20; 20; 67,5]
+Vazby: 4 (3 ok, 1 potlačeno)
+Pohybová studie: motorů 1 · kroků 2 · 2 s – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 160,78 cm³ · hmotnost Σ 1,262 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 6 ===
+✓ nová sestava „S2“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Deska A“ F3 → „Přidržovač“ F5 · 57,5 mm: ok · poloha beze změny
+✓ vazba Zarovnat „Přidržovač“ F6 → „Deska A“ F6: ok · „Přidržovač“ poloha [40; 20; 67,5]
+✓ vazba Zarovnat „Přidržovač“ F4 → „Deska A“ F4: ok · „Přidržovač“ poloha [40; 40; 67,5]
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Přidržovač“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)
+Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Přidržovač“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [40; 40; 37,15]
+Vazby splněny ve všech krocích
+Krok 0 (t = 0 s, motory 57,5):
+ Deska A [0; 0; 0]
+ Přidržovač [40; 40; 67,5]
+Krok 2 (t = 2 s, motory 27,15):
+ Deska A [0; 0; 0]
+ Přidržovač [40; 40; 37,15]
+
+Dokument: „S2“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 40; 67,5]
+Vazby: 3 (3 ok)
+Pohybová studie: motorů 1 · kroků 2 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 75,5 mm · objem Σ 123,08 cm³ · hmotnost Σ 0,966 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

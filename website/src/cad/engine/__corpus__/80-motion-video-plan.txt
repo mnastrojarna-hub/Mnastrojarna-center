@@ -1,0 +1,24 @@
+# vlna 22, bod 13: časový plán videa pohybové studie. Studie 0,65 s / 112 kroků dala dřív video 2,9–3,8 s (záznam obrazovky v reálném
+# čase). Plán: snímky s pevnou časovou značkou i/fps, délka videa = délka studie / rychlost ± 1 snímek, nezávisle na počtu kroků;
+# protokol uvádí délku videa a její poměr ke studii. Volby: rychlost (1×, 0,25×), ruční délka, FPS.
+nový díl "Deska A"
+kvádr 200 100 10
+nový díl "Přidržovač"
+kvádr 200 100 10
+#--- run
+nová sestava "Studie V"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 0 0 67,5
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 57,5 název "ZDVIH"
+sestava vazba rovnoběžně "Přidržovač" +X "Deska A" +X
+sestava vazba rovnoběžně "Přidržovač" +Y "Deska A" +Y
+pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 112 čas 0,65
+pohyb video
+pohyb video rychlost 0,25
+pohyb video 0,5×
+pohyb video délka 5 fps 60
+#--- run
+# tentýž plán při 12 krocích studie (čas videa nezávisí na počtu výpočetních kroků)
+pohyb kroky 12
+pohyb video rychlost 1 fps 30
+pohyb video rychlost -1

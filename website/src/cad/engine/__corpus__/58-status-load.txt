@@ -1,0 +1,12 @@
+# vlna 22, bod 22i: načtení dokumentu (JSON na řádku) je jen přijetí (→ … výsledek po výpočtu níže) – výsledek dá ověřovací
+# stavba na řádku načtení: ✗ / ⚠ vadného prvku (dřív „✓ dokument …“ a hned ✗), nebo ✓ „dokument … postaven: prvků N, bez ⚠ a ✗“
+{"app":"mnastrojarna-cad","version":2,"name":"Deska A","material":"ocel","features":[{"id":"k1","type":"box","name":"Kvádr 1","size":[20,20,10],"position":[0,0,0],"centered":false,"mode":"new"},{"id":"z1","type":"fillet","name":"Zaoblení 1","radius":15}]}
+stav
+#--- run
+# týž dokument s proveditelným zaoblením a s odebráním, které těleso nezmění (⚠ na řádku načtení, žádné ✓ „postaven“)
+{"app":"mnastrojarna-cad","version":2,"name":"Deska B","material":"ocel","features":[{"id":"k1","type":"box","name":"Kvádr 1","size":[20,20,10],"position":[0,0,0],"centered":false,"mode":"new"},{"id":"z1","type":"fillet","name":"Zaoblení 1","radius":2},{"id":"k2","type":"box","name":"Kvádr 2","size":[5,5,5],"position":[0,0,10],"centered":false,"mode":"cut"}]}
+#--- run
+# dokument bez vady: ✓ až po stavbě; úprava načteného prvku pak jde na řádek úpravy
+{"app":"mnastrojarna-cad","version":2,"name":"Deska C","material":"ocel","features":[{"id":"k1","type":"box","name":"Kvádr 1","size":[20,20,10],"position":[0,0,0],"centered":false,"mode":"new"},{"id":"z1","type":"fillet","name":"Zaoblení 1","radius":2}]}
+upravit "Zaoblení 1" radius=30
+stav

@@ -27,6 +27,8 @@ export type DrawingIssueKind =
   | "view-lost"
   /** tabulka děr (dlouhá, na plném listu) překrývá pohledy (`data`: rows, views) */
   | "hole-table-overlap"
+  /** tabulka ozubení překrývá pohledy (`data`: tables, views) – drawing-geartable.ts */
+  | "gear-table-overlap"
   /** Chytré kóty: co se nepodařilo umístit nebo okótovat */
   | "dims-skipped"
   /** kontrola tolerancí: funkční / předlohou tolerovaný rozměr bez tolerance */
@@ -35,13 +37,15 @@ export type DrawingIssueKind =
   | "overlap"
   /** nová / upravená poznámka listu přesahuje rámeček listu (`ann`) – engine ji ověří znovu na konci bloku */
   | "frame"
+  /** vydaný list ze starší revize modelu / vydání se stejným písmenem po změně modelu (vlna 22, bod 20 – cad/doc-outputs.ts) */
+  | "stale"
   /** ostatní varování jádra výkresu (text jako odznak) */
   | "other";
 
 export type DrawingIssue = {
   level: "error" | "warn";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing" | "drawing.stale";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;

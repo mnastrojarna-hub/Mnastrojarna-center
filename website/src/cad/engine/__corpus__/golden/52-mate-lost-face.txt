@@ -1,0 +1,79 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Kvádr 3 (box)
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 10 mm (X 0…10, Y 0…10, Z 0…10) · objem 1 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Sestava A“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba Kontakt „Přidržovač“ F5 → „Deska A“ F3: ok · „Přidržovač“ poloha [5; 10; 5]
+✓ vazba Zarovnat „Přidržovač“ F3 → „Deska A“ F2: ok · „Přidržovač“ poloha [5; 0; 5]
+✓ kolize: žádné (2 komponent)
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 21 cm³ · hmotnost Σ 0,165 kg
+Kolize: žádné (zkontrolováno ?)
+=== run 3 ===
+✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
+✓ smazáno: Kvádr 2
+→ „Deska A“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 24 cm³ · vazby 1/2 ok · ztracené reference: 1 – stav vazeb níže
+✗ řádek 3: vazba 1 Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference B F3 dílu „Deska A“ (rovinná +Z · střed [10; 20; 5] · 800 mm²) po úpravě dílu neexistuje: vazba je mimo řešení a komponenty se kvůli ní nehýbou; vyberte plochu znovu (sestava vazba 1 plocha b …), nebo vazbu smažte (sestava vazba 1 smazat)
+ℹ řádek 3: vazba 2: B F2 → F3 po úpravě dílu (táž rovina / osa, plocha změnila velikost)
+Vazby sestavy „Sestava A“: 2 (1 ztracená reference, 1 ok)
+ 1. Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference: B F3 dílu „Deska A“ (rovinná +Z · střed [10; 20; 5] · 800 mm²) po úpravě dílu neexistuje – sestava vazba 1 plocha b <plocha> | smazat
+ 2. Zarovnat „Přidržovač“ F3 → „Deska A“ F3 – ok
+Sestava „Sestava A“: komponent 2 · vazby 2 (1 ztracená reference, 1 ok)
+ #1 Deska A · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Přidržovač · díl · poloha [5; 0; 5]
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
+Vazby: 2 (1 ztracená reference, 1 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+=== run 4 ===
+✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ „Deska A“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 20 cm³ · vazby 2/2 ok
+ℹ řádek 3: vazba 2: B F3 → F2 po úpravě dílu (táž rovina / osa, plocha změnila velikost)
+ℹ řádek 3: vazba 1: ztracená reference B F3 znovu nalezena jako F3 – vazba se zase řeší
+Vazby sestavy „Sestava A“: 2 (2 ok)
+ 1. Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ok
+ 2. Zarovnat „Přidržovač“ F3 → „Deska A“ F2 – ok
+✓ Kvádr 2 (box)
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 21 cm³ · hmotnost Σ 0,165 kg
+Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+=== run 5 ===
+✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
+✓ smazáno: Kvádr 2
+→ „Deska A“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 24 cm³ · vazby 1/2 ok · ztracené reference: 1 – stav vazeb níže
+✗ řádek 3: vazba 1 Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference B F3 dílu „Deska A“ (rovinná +Z · střed [10; 20; 5] · 800 mm²) po úpravě dílu neexistuje: vazba je mimo řešení a komponenty se kvůli ní nehýbou; vyberte plochu znovu (sestava vazba 1 plocha b …), nebo vazbu smažte (sestava vazba 1 smazat)
+ℹ řádek 3: vazba 2: B F2 → F3 po úpravě dílu (táž rovina / osa, plocha změnila velikost)
+✓ vazba 1 (Kontakt „Přidržovač“ F5 → „Deska A“ F6): plocha B F3 → F6 · ok
+  pohnuto: „Přidržovač“ poloha [5; 0; 10]
+Vazby sestavy „Sestava A“: 2 (2 ok)
+ 1. Kontakt „Přidržovač“ F5 → „Deska A“ F6 – ok
+ 2. Zarovnat „Přidržovač“ F3 → „Deska A“ F3 – ok
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 10]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 20 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu

@@ -86,7 +86,7 @@ export const primUsage = (t: PrimType): string => {
     cone: tr("kužel D1 D2 H"),
     tube: tr("trubka D d H"),
     spring: tr("pružina D stoupání P (závity N | délka L) drát d"),
-    thread: tr("závit M18×1,5 délka L [vnitřní] [modelovat]"),
+    thread: tr("závit M18×1,5 délka L [vnitřní] [modelovat | šroubovice]"),
   };
   return t === "sphere" ? head.sphere : `${head[t]} ${primPlaceUsage(t !== "thread")}`;
 };
@@ -278,7 +278,7 @@ const FLAGS_OK: Record<PrimType, string[]> = {
   cone: ["reverse", "cut", "add", "intersect", "newbody"],
   tube: ["reverse", "cut", "add", "intersect", "newbody"],
   spring: ["reverse", "cut", "add", "intersect", "newbody"],
-  thread: ["reverse", "internal", "modeled"],
+  thread: ["reverse", "internal", "modeled", "helix"],
 };
 const NUMS_OK: Record<PrimType, string[]> = { box: ["at"], cylinder: ["at"], sphere: ["at"], cone: ["at"], tube: ["at"], spring: ["at", "length", "diameter"], thread: ["at", "length"] };
 const FREE: Record<PrimType, number> = { box: 3, cylinder: 2, sphere: 1, cone: 3, tube: 3, spring: 1, thread: 1 };
@@ -379,8 +379,11 @@ export function parsePrimLine(cmd: string, tokens: string[], opts: PrimParse, na
       if (!t) throw new Error(tr("závit potřebuje označení M2 až M48 (hrubé nebo jemné stoupání, např. M18×1,5): závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]{0}", des ? ` – „${des}“ není metrický závit` : ""));
       const L = o.nums.length?.[0] ?? o.free[0];
       if (!(L > 0)) throw new Error(tr("závit potřebuje délku: závit M18×1,5 délka 20"));
-      f = { ...base, type, designation: t.name, position, length: L, modeled: o.flags.has("modeled"), ...axisPart(), ...ref };
+      // „šroubovice“ = skutečná šroubovice z označení (vlna 22, bod 22d); sama o sobě znamená modelovaný závit
+      const helix = o.flags.has("helix");
+      f = { ...base, type, designation: t.name, position, length: L, modeled: helix || o.flags.has("modeled"), ...axisPart(), ...ref };
       if (o.flags.has("internal")) f.internal = true;
+      if (helix) f.helix = true;
       break;
     }
   }
@@ -462,7 +465,7 @@ export function primSummary(f: Feature, fmt0: (n: number, d?: number) => string,
     case "spring":
       return tr("Ø{0}, stoupání {1}, závitů {2}, drát Ø{3} (délka {4} mm), {5}, začátek {6}, osa {7}", fmt(2 * g.radius), fmt(g.pitch, 2), fmt(g.turns, 2), fmt(g.wire, 2), fmt(g.pitch * g.turns), g.mode, pos, ax);
     case "thread":
-      return tr("{0} délka {1} mm, {2}, {3}, začátek {4}, osa {5}", threadLabel(g.designation), fmt(g.length), g.internal ? tr("vnitřní (v díře)") : tr("vnější (na válci)"), g.modeled ? tr("modelované drážky") : tr("kosmetický (jen výkres)"), pos, ax);
+      return tr("{0} délka {1} mm, {2}, {3}, začátek {4}, osa {5}", threadLabel(g.designation), fmt(g.length), g.internal ? tr("vnitřní (v díře)") : tr("vnější (na válci)"), g.modeled ? (g.helix ? tr("skutečná šroubovice") : tr("modelované drážky")) : tr("kosmetický (jen výkres)"), pos, ax);
   }
 }
 

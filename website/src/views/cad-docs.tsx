@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CtaBand, FaqList, SectionHeading } from "@/components/blocks";
+import { DocsSearch, DocsSearchBar } from "@/components/docs-search";
 import { JsonLd } from "@/components/json-ld";
 import { CAD_DOCS, CAD_DOCS_META, CAD_FAQ, CAD_FEATURES, CAD_HOWTO, type DocBlock } from "@/content/cad-docs";
 import { SITE } from "@/content/site";
@@ -168,7 +169,13 @@ export function cadDocsJsonLd() {
 export function CadDocsView() {
   return (
     <>
-      <section className="paper relative overflow-hidden pb-14 pt-32 md:pb-20 md:pt-40">
+      {/* obal stránky dokumentace (úvod + kapitoly): pole hledání se v něm lepí pod hlavičkou od začátku stránky */}
+      <div data-docs-page>
+      {/* hledání v dokumentaci (jen v prohlížeči, components/docs-search.tsx) – vidět hned po načtení i hluboko v textu */}
+      <DocsSearchBar>
+        <DocsSearch locale="cs" toc="[data-docs-toc]" />
+      </DocsSearchBar>
+      <section className="paper relative overflow-hidden pb-14 pt-40 md:pb-20 md:pt-44">
         <div className="bg-grid-light absolute inset-0" />
         <div className="container relative">
           <nav aria-label="Drobečková navigace" className="mb-6 flex flex-wrap items-center gap-2 text-[13px] text-ink-700/60">
@@ -204,9 +211,9 @@ export function CadDocsView() {
 
       <section className="section">
         <div className="container grid gap-12 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="lg:sticky lg:top-28 lg:self-start">
+          <aside className="lg:sticky lg:top-44 lg:max-h-[calc(100vh-12rem)] lg:self-start lg:overflow-y-auto">
             <p className="eyebrow">Obsah</p>
-            <ol className="mt-4 space-y-1.5 text-[14px] leading-snug">
+            <ol className="mt-4 space-y-1.5 text-[14px] leading-snug" data-docs-toc>
               {CAD_DOCS.map((s) => (
                 <li key={s.id}>
                   <a href={`#${s.id}`} className="text-ink-700/75 hover:text-brand">
@@ -240,6 +247,7 @@ export function CadDocsView() {
           </article>
         </div>
       </section>
+      </div>
       <CtaBand locale="cs" title="Vymodelováno? Vyrobíme to." lead="Prototypy, náhradní díly, nástroje a přípravky od 1 kusu. Pošlete STEP tlačítkem Poptat výrobu přímo z CADu." />
       <JsonLd data={cadDocsJsonLd()} />
     </>

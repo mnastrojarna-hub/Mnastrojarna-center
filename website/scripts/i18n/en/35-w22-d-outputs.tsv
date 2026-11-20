@@ -1,0 +1,89 @@
+# vlna 22, balík D, etapa D2 – vydání listu, revize modelu na výkresech a exportech, záznamy exportů, zastaralé výstupy (bod 20)
+ – varování: {0}	 – warnings: {0}
+ · do tabulky revizí přidána revize {0} „{1}“	 · revision {0} “{1}” added to the revision table
+ (přepočítat vše)	 (recompute all)
+→ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny	→ sheet “{0}” is already issued as rev. {1} from model {2} – unchanged
+→ list „{0}“ vydaný není – není co zrušit	→ sheet “{0}” is not issued – nothing to cancel
+⚠ Vydání: rev. {0} z modelu {1} ({2}) – model je teď {3}: list je ZASTARALÝ – vydejte novou revizi: výkres vydat {4}	⚠ Issue: rev. {0} from model {1} ({2}) – the model is now {3}: the sheet is OUTDATED – issue a new revision: drawing issue {4}
+✓ list „{0}“ vydán jako rev. {1} z modelu {2} ({3}){4}	✓ sheet “{0}” issued as rev. {1} from model {2} ({3}){4}
+✓ vydání listu „{0}“ (rev. {1} z modelu {2}) zrušeno – list je rozpracovaný	✓ issue of sheet “{0}” (rev. {1} from model {2}) cancelled – the sheet is work in progress
+✓ záznamy exportů vymazány ({0}) – soubory na disku zůstaly	✓ export records cleared ({0}) – the files on disk are kept
+exportováno z modelu {0} ({1}), model je teď {2}	exported from model {0} ({1}), the model is now {2}
+Exporty ({0}, zastaralých {1}) · model je teď {2}:	Exports ({0}, outdated {1}) · the model is now {2}:
+Exporty ({0})	Exports ({0})
+exporty [vymazat] · výstupy [zastaralé] · přepočítat vše	exports [clear] · outputs [stale] · recompute all
+Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exports: {0} – all from the current model revision (list: exports)
+Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exports: {0} of {1} from an older model revision – {2} (list: exports)
+exporty: neznámé „{0}“ – {1}	exports: unknown “{0}” – {1}
+Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model {0}	Exports: no records – an export from this document writes them (export step, drawing export pdf…) · model {0}
+kontrola	check
+kontrola kolizí	clash check
+kontrola kolizí znovu (kolize)	clash check repeated (clash)
+kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)	part copies in the assembly refreshed from the parts (assembly refresh all)
+list „{0}“ byl vydán jako rev. {1} z modelu {2}, který už neodpovídá – vydání se do skriptu nezapisuje (vydejte znovu: výkres vydat {3})	sheet “{0}” was issued as rev. {1} from model {2}, which no longer matches – the issue is not written to the script (issue again: drawing issue {3})
+list „{0}“ přepočten z modelu {1}{2}	sheet “{0}” recomputed from model {1}{2}
+list „{0}“ rev. {1}	sheet “{0}” rev. {1}
+list „{0}“ se exportuje s revizí {1}, ale rev. {1} byla vydána z modelu {2} a model je teď {3} – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat {4}	sheet “{0}” is exported with revision {1}, but rev. {1} was issued from model {2} and the model is now {3} – the file has different content under the same letter; issue a new revision first: drawing issue {4}
+list „{0}“ vydán jako rev. {1} z modelu {2} ({3}), model je teď {4} – vydejte novou revizi: výkres vydat {5}	sheet “{0}” issued as rev. {1} from model {2} ({3}), the model is now {4} – issue a new revision: drawing issue {5}
+list „{0}“: rev. {1} už byla vydána z modelu {2} a znovu se vydává ze změněného modelu {3} se stejným písmenem – změnu označte novou revizí (výkres vydat {4})	sheet “{0}”: rev. {1} was already issued from model {2} and is issued again from the changed model {3} with the same letter – mark the change with a new revision (drawing issue {4})
+List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.	The sheet was issued from model {0} ({1}), the model is now {2}. The sheet shows the current model – a file with letter {3} would differ from the issued paper.
+List už je vydán jako rev. {0} z modelu {1}	The sheet is already issued as rev. {0} from model {1}
+List vydán jako rev. {0} z modelu {1}	Sheet issued as rev. {0} from model {1}
+Listy ({0}):	Sheets ({0}):
+listy {0}	sheets {0}
+Listy: žádné	Sheets: none
+měření	measurement
+model {0}	model {0}
+Model {0}	Model {0}
+Model se změnil po vydání rev. {0}	The model changed after rev. {0} was issued
+odpovídá modelu	matches the model
+pohybová studie	motion study
+pohybová studie znovu (pohyb spustit)	motion study repeated (motion run)
+porovnání s referencí	comparison with the reference
+první vydání	first issue
+překryv s předlohou	overlay with the template
+přepočítá „Přepočítat vše“	“Recompute all” recomputes it
+Přepočítat	Recompute
+Přepočítat vše	Recompute all
+Přepočítat vše – dokument „{0}“, revize modelu {1}:	Recompute all – document “{0}”, model revision {1}:
+Přepočteno	Recomputed
+Přepočteno ({0}):	Recomputed ({0}):
+Přepočteno: nic – nebylo co přepočítat	Recomputed: nothing – there was nothing to recompute
+rev. {0}	rev. {0}
+Revize modelu: {0}	Model revision: {0}
+ručně	manually
+stav vazeb	mate status
+stav vazeb přepočítán	mate status recomputed
+úloha {0}	job {0}
+vydán z modelu {0}, model je teď {1}	issued from model {0}, the model is now {1}
+Vydané listy ({0})	Issued sheets ({0})
+Vydání listu zrušeno – list je rozpracovaný	Sheet issue cancelled – the sheet is work in progress
+Vydání: nevydáno · list z modelu {0} (vydat: výkres vydat {1})	Issue: not issued · sheet from model {0} (issue: drawing issue {1})
+Vydání: rev. {0} z modelu {1} ({2}) – odpovídá modelu	Issue: rev. {0} from model {1} ({2}) – matches the model
+Vydáno jako rev. {0} z modelu {1} ({2}) – model je teď {3}: list je zastaralý	Issued as rev. {0} from model {1} ({2}) – the model is now {3}: the sheet is outdated
+Vydáno jako rev. {0} z modelu {1} ({2}) – odpovídá modelu	Issued as rev. {0} from model {1} ({2}) – matches the model
+Vydat list jako rev. {0}	Issue the sheet as rev. {0}
+Vydat novou revizi {0}	Issue new revision {0}
+výkres vydat [<revize>] ["popis změny"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše] – neznámé „{0}=“	drawing issue [<revision>] ["change note"] [date 20.11.2026] [all] · drawing issue cancel [all] – unknown “{0}=”
+Výkres: {0}	Drawing: {0}
+Výkres: list „{0}“ vydán jako rev. {1} z modelu {2} ({3}) – odpovídá modelu	Drawing: sheet “{0}” issued as rev. {1} from model {2} ({3}) – matches the model
+výsledek je ze starší revize modelu	the result is from an older model revision
+Výstupy · model {0}	Outputs · model {0}
+Výstupy dokumentu	Document outputs
+Výstupy dokumentu „{0}“ · revize modelu {1}	Outputs of document “{0}” · model revision {1}
+výstupy: neznámé „{0}“ – {1}	outputs: unknown “{0}” – {1}
+z modelu {0} ({1})	from model {0} ({1})
+Zastaralé ({0})	Outdated ({0})
+Zastaralé výstupy ({0}) · model je teď {1}:	Outdated outputs ({0}) · the model is now {1}:
+Zastaralé výstupy: {0}	Outdated outputs: {0}
+Zastaralé výstupy: žádné – vydané listy, exporty a uložené analýzy odpovídají modelu {0}	Outdated outputs: none – issued sheets, exports and stored analyses match model {0}
+Zastaralé: žádné	Outdated: none
+ZASTARALÝ: model je teď {0}, exportujte znovu: {1}	OUTDATED: the model is now {0}, export again: {1}
+Zbývá udělat ručně ({0}) – program to sám neudělá:	Left to do by hand ({0}) – the program does not do it on its own:
+Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu {0}	Left: nothing – issued sheets, exports and stored analyses match model {0}
+změna modelu {0} → {1}	model change {0} → {1}
+Zrušit vydání	Cancel issue
+vydání listu: písmeno revize + revize modelu r·… + datum (chybí-li revize v tabulce, přidá se); po změně modelu je vydaný list zastaralý – ⚠ drawing.stale ve výkres stav, stav, na konci běhu, při exportu se stejným písmenem (přísně ✗), řádek D stale=drawing; vydejte novou revizi	sheet issue: revision letter + model revision r·… + date (a revision missing in the table is added); after a model change the issued sheet is outdated – ⚠ drawing.stale in drawing status, status, at the end of the run, on export with the same letter (strict ✗), D line stale=drawing; issue a new revision
+záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)	export records in the document (format, file, model revision r·…, time; after a model change ⚠ outdated with the command that repeats the export); list of outdated outputs (issued sheets, exports, analyses, part copies in the assembly); recompute all = refreshes part copies, mate status, clashes, motion and sheets and lists what a person must do (new sheet revision, new export)
+#!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+vydaný výkres neodpovídá modelu: {0}	issued drawing does not match the model: {0}

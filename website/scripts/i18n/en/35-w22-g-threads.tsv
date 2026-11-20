@@ -1,0 +1,51 @@
+# Vlna 22 G2 – závity (22a tečná špička / drážka nezasahuje / obrácená strana, 22d jedna cesta k závitu, ISO 261) a přesná kontrola platnosti
+drážka závitu nezasahuje do válcové plochy díry ani válce – leží celá v materiálu (skrytý kanál, ústí jen do čel). {0}	the thread groove does not reach the cylindrical face of the hole or the cylinder – it lies entirely in the material (a hidden channel, open only at the end faces). {0}
+drážka závitu odebrala celý nástroj – leží celá v materiálu a nezasahuje do válcové plochy díry ani válce (skrytý kanál, ne závit); poloměr = povrch, na kterém závit začíná (válec u vnějšího, díra u vnitřního).	the thread groove removed the whole tool – it lies entirely in the material and does not reach the cylindrical face of the hole or the cylinder (a hidden channel, not a thread); radius = the surface where the thread starts (cylinder for external, hole for internal).
+drážka závitu ústí do povrchu Ø{0} jen špičkou ({1} mm z hloubky {2} mm), zbytek leží v materiálu – profil míří na opačnou stranu. {3}	the thread groove opens onto the surface Ø{0} only with its tip ({1} mm of the depth {2} mm), the rest lies in the material – the profile points to the wrong side. {3}
+Drážky	Grooves
+jen Závit 60°: označení M18×1,5 / M8 – poloměr, stoupání a hloubku doplní katalog podle strany (vnější: válec Ø d; vnitřní: díra vrtaná vrtákem závitu); prázdné = čísla níže	Thread 60° only: designation M18×1.5 / M8 – radius, pitch and depth come from the catalogue by side (external: cylinder Ø d; internal: hole drilled with the tap drill); empty = the numbers below
+kontrola [díl "A" | sestava | vše] [díry] [polohy] [přesně]	check [part "A" | assembly | all] [holes] [positions] [exact]
+Kosmetický	Cosmetic
+na válci	on a cylinder
+NEPLATNÉ · přesná kontrola ({0} ploch)	INVALID · exact check ({0} faces)
+NEPLATNÉ · rychlá kontrola	INVALID · fast check
+platné · přesná kontrola	valid · exact check
+platné · rychlá kontrola	valid · fast check
+platnost tělesa přesnou metodou BRepCheck (odchylka křivek hran od ploch počítaná přesně, ne v několika bodech) – výpis „platné (přesná kontrola)“ nebo „NEPLATNÉ (přesná kontrola: N z M ploch s vadou)“, strojově valid=1|0 vcheck=exact bad=N; výsledek platí pro tuto geometrii: řádek Geometrie ve stav končí „· přesná kontrola“, řádek D nese vcheck=exact, JSON docs[].validCheck = exact (jinak „· rychlá kontrola“ a fast); nad 5000 ploch se přesná kontrola neprovede (ℹ s důvodem). Před exportem STEP / BREP proběhne sama do 400 ploch	body validity by the exact BRepCheck method (edge-curve-to-face deviation computed exactly, not at a few points) – output “valid (exact check)” or “INVALID (exact check: N of M faces defective)”, machine valid=1|0 vcheck=exact bad=N; the result holds for this geometry: the Geometry line of status ends “· exact check”, the D line carries vcheck=exact, JSON docs[].validCheck = exact (otherwise “· fast check” and fast); above 5000 faces the exact check is not run (ℹ with the reason). Before a STEP / BREP export it runs by itself up to 400 faces
+Po stavbě proběhla rychlá kontrola platnosti (BRepCheck). Kliknutím spustíte přesnou kontrolu (odchylka hran od ploch počítaná přesně) – totéž jako „kontrola přesně“ v konzoli.	After the build a fast validity check (BRepCheck) ran. Click to run the exact check (edge-to-face deviation computed exactly) – the same as “check exact” in the console.
+Poloměr musí být poloměr povrchu, na kterém závit začíná (válec u side=external, díra u side=internal); hloubka jde do materiálu.	The radius must be the radius of the surface where the thread starts (cylinder for side=external, hole for side=internal); the depth goes into the material.
+Provedení	Execution
+přesná kontrola	exact check
+přesná kontrola neprovedena	exact check not run
+přesná kontrola platnosti (BRepCheck přesnou metodou) – NEPLATNÉ: {0} z {1} ploch má vadu (křivka hrany mimo plochu v toleranci, drát nebo orientace) – jiný CAD může těleso odmítnout; opravte prvek, po kterém vada vznikla	exact validity check (BRepCheck exact method) – INVALID: {0} of {1} faces are defective (edge curve off the face beyond tolerance, wire or orientation) – another CAD may reject the body; fix the feature after which the defect appeared
+přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch {0} · {1} s	exact validity check (BRepCheck exact method) – valid, {0} faces · {1} s
+přesná kontrola platnosti neprovedena – model nemá těleso	exact validity check not run – the model has no body
+přesná kontrola platnosti neprovedena ({0} ploch > {1}) – {2}	exact validity check not run ({0} faces > {1}) – {2}
+Přesná kontrola platnosti…	Exact validity check…
+přesná kontrola selhala	exact check failed
+přesná kontrola: {0} z {1} ploch s vadou	exact check: {0} of {1} faces defective
+rychlá kontrola	fast check
+rychlá kontrola neproběhla	fast check did not run
+rychlá kontrola: NEPLATNÉ	fast check: INVALID
+rychlá kontrola: platné	fast check: valid
+skutečná šroubovice	real helix
+Skutečná šroubovice (profil 60°) z označení – stejné jádro a čísla jako Tažení po šroubovici se závitem z katalogu. Program ověří, že drážka řeže povrch válce / díry (jinak ⚠).	A real helix (60° profile) from the designation – the same core and numbers as Helix sweep with a catalogue thread. The program checks that the groove cuts the cylinder / hole surface (otherwise ⚠).
+skutečná šroubovice z označení – jedna cesta k závitu: příkaz závit i Tažení po šroubovici s thread= berou poloměr, stoupání a hloubku z téhož katalogu (vnější: válec Ø d, hloubka 0,6134·P; vnitřní: povrch D1/2, špička na d/2); označení i s mezerami (m18 x 1,5, M18 X 1.5); stoupání mimo ISO 261 (M18×3) = ⚠ thread.pitch-nonstandard; drážka, která povrch neřeže, = ⚠ thread.tip-tangent / thread.no-reach / thread.wrong-side	a real helix from the designation – one way to a thread: the thread command and Helix sweep with thread= take radius, pitch and depth from the same catalogue (external: cylinder Ø d, depth 0.6134·P; internal: surface D1/2, tip at d/2); designation also with spaces (m18 x 1.5, M18 X 1.5); a pitch outside ISO 261 (M18×3) = ⚠ thread.pitch-nonstandard; a groove that does not cut the surface = ⚠ thread.tip-tangent / thread.no-reach / thread.wrong-side
+skutečná šroubovice z označení (s modelovat; jinak soustružené drážky)	a real helix from the designation (with modeled; otherwise turned grooves)
+stoupání {0} mm není pro M{1} v ISO 261 (řada: {2}) – závit {3} se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné).	pitch {0} mm is not in ISO 261 for M{1} (series: {2}) – the thread {3} is built, but it is non-standard (tool, gauge and mating part are not common).
+špička profilu závitu je tečná k povrchu Ø{0} – drážka do materiálu nezasahuje, vznikne skrytý kanál, ne závit. {1}	the tip of the thread profile is tangent to the surface Ø{0} – the groove does not cut into the material, a hidden channel results, not a thread. {1}
+šroubovice	helix
+těleso: {0}	body: {0}
+těleso: {0} – přesně: „kontrola přesně“	body: {0} – exactly: “check exact”
+v díře	in a hole
+Vnější závit {0} patří na válec Ø{1} – zkontrolujte průměr válce a polohu závitu.	The external thread {0} belongs on a cylinder Ø{1} – check the cylinder diameter and the thread position.
+Vnitřní závit {0} potřebuje díru vrtanou na Ø{1} (vrták závitu) – zkontrolujte průměr díry a polohu závitu.	The internal thread {0} needs a hole drilled to Ø{1} (tap drill) – check the hole diameter and the thread position.
+Závit {0} je kratší než jeden profil ({1} mm) – zadejte delší závit.	The thread {0} is shorter than one profile ({1} mm) – enter a longer thread.
+Závit {0} Ø{1}: zadejte side={2} a radius={3} (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu).	Thread {0} Ø{1}: enter side={2} and radius={3} (the radius of the surface where the thread starts; the depth goes into the material).
+závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat | šroubovice]	thread M18×1.5 length L [at x y z | at …] [axis …] [internal] [modeled | helix]
+závit M18×1,5 délka L [vnitřní] [modelovat | šroubovice]	thread M18×1.5 length L [internal] [modeled | helix]
+Závit se vymodeluje jako soustružené drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dá volba Šroubovice.	The thread is modelled as turned grooves (simplified, without pitch) – suitable for visualisation and 3D printing. A real helix is given by the Helix option.
+Závit z katalogu	Catalogue thread
+Šroubovice	Helix
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+těleso „{0}“ neprošlo přesnou kontrolou platnosti: {1}	body “{0}” failed the exact validity check: {1}

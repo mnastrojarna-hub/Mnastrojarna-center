@@ -1,0 +1,46 @@
+# Vlna E, balík export: převodník dokument → skript zapisuje vše, co agent píše textem (razítko, revize, funkční kóty, díry, pohledy navíc, detaily, řezy, přerušení, uložení, vygenerované kóty, přezdívky, pružiny, dynamika); co nepřenese, ohlásí ℹ a komentářem
+co skript nepřenese ({0}):	what the script does not carry ({0}):
+volby listu bez textového příkazu ({0}) – nastavují se jen v JSON dokumentu, skript je nepřenese – list „{1}“ dokumentu „{2}“	sheet options without a text command ({0}) – they are set only in the JSON document, the script does not carry them – sheet “{1}” of document “{2}”
+funkční rozměry / polohy děr Chytrých kót listu „{0}“ nejde zapsat příkazem kótovat	the functional dimensions / hole positions of Smart dimensions of sheet “{0}” cannot be written with the dimension command
+revizi „{0}“ listu „{1}“ nejde zapsat příkazem výkres revize (znak 1–4 písmena / číslice velkými, text na jeden řádek)	revision “{0}” of sheet “{1}” cannot be written with drawing revision (sign of 1–4 capital letters / digits, text on one line)
+skrytí trojúhelníků revize „{0}“ listu „{1}“ nejde zapsat	hiding the triangles of revision “{0}” of sheet “{1}” cannot be written
+šablonu razítka „{0}“ listu „{1}“ nejde zapsat	the title block template “{0}” of sheet “{1}” cannot be written
+logo razítka „{0}“ listu „{1}“ je ve skriptu jako data URL – název souboru se nepřenáší	the title block logo “{0}” of sheet “{1}” is in the script as a data URL – the file name is not carried
+logo razítka listu „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres razítko logo="soubor.png"	the title block logo of sheet “{0}” cannot be written on a script line (data URL over {1} kB) – insert it again: drawing titleblock logo="file.png"
+model „{0}“	model “{0}”
+model „{0}“ na listu „{1}“ je ze záložky (jiný dokument) – skript ho nepřenese; otevřete dokument a napište výkres model "{0}"	model “{0}” on sheet “{1}” comes from a tab (another document) – the script does not carry it; open the document and write drawing model "{0}"
+model „{0}“ na listu „{1}“: komponenta s tímto názvem je v sestavě víckrát nebo chybí – skript vloží první z nich	model “{0}” on sheet “{1}”: the assembly has this component name several times or not at all – the script inserts the first one
+pomocný pohled {0}	auxiliary view {0}
+zobrazení uložení	fit display
+Tabulka uložení	Fit table
+{0} listu „{1}“ nejde zapsat textem – doplňte ho ručně	{0} of sheet “{1}” cannot be written as text – add it by hand
+písmena pomocných pohledů, řezů a detailů listu „{0}“ dostane po přečtení skriptu aplikace znovu – po smazání některých se mohou lišit: {1}	the letters of auxiliary views, sections and details of sheet “{0}” are assigned again when the script is read – after some were deleted they may differ: {1}
+úprava vygenerovaných kót a pozic	edit of generated dimensions and balloons
+přezdívku „{0}“ komponenty „{1}“ nejde zapsat na řádek skriptu	the alias “{0}” of component “{1}” cannot be written on a script line
+pružinu „{0}“	spring “{0}”
+{0} sestavy nejde zapsat textem (komponenta mimo skript nebo dosedací plocha v podsestavě) – doplňte ji: sestava pružina	{0} of the assembly cannot be written as text (component outside the script or seat face in a subassembly) – add it: assembly spring
+nastavení dynamiky pohybové studie nejde zapsat příkazem pohyb dynamika (čas, krok, gravitace, tlumení, odraz, snímky mimo rozsah příkazu)	the dynamics settings of the motion study cannot be written with motion dynamics (time, step, gravity, damping, restitution, frames outside the command range)
+ruční hmotnost komponenty mimo skript (podsestava / import) se do skriptu nepřenáší	a manual mass of a component outside the script (subassembly / import) is not carried into the script
+síla / moment na vazbě, která ve skriptu není, se do skriptu nepřenáší	a force / torque on a mate that is not in the script is not carried into the script
+# výkres vygenerované … (skrytí / posun kót celkových rozměrů a pozic textem)
+výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	drawing generated · drawing generated hide|show <key…> · drawing generated move <key> dx dy · drawing generated restore [<key…>] – keys: dim:<view>:t|l (overall dimension at the top / on the left), pos:<number> (balloon)
+výkres vygenerované posun <klíč> dx dy – jeden klíč a posun v mm listu (y nahoru), např. výkres vygenerované posun pos:3 5 -3	drawing generated move <key> dx dy – one key and a shift in sheet mm (y up), e.g. drawing generated move pos:3 5 -3
+výkres vygenerované: „{0}“ není klíč vygenerovaného objektu – {1}	drawing generated: “{0}” is not a key of a generated object – {1}
+výkres vygenerované: neznámé „{0}“ – {1}	drawing generated: unknown “{0}” – {1}
+„{0}“ na listu není – vygenerované objekty listu: {1}	“{0}” is not on the sheet – generated objects of the sheet: {1}
+žádné (kóty celkových rozměrů jen u voleb kótovat celkově / základní, pozice jen u sestavy s balónky)	none (overall dimensions only with dimension overall / basic, balloons only in an assembly with balloons)
+{0} (kóta celkového rozměru {1})	{0} (overall dimension {1})
+{0} (pozice)	{0} (balloon)
+nahoře	at the top
+skryté {0}	hidden {0}
+posunuté {0}	moved {0}
+Vygenerované objekty listu: {0}	Generated objects of the sheet: {0}
+Upravené: {0}	Edited: {0}
+✓ vygenerované skryté: {0}	✓ generated hidden: {0}
+✓ vygenerované zobrazené: {0}	✓ generated shown: {0}
+✓ vygenerované {0} posunuto: celkem [{1}; {2}] mm listu{3}	✓ generated {0} moved: total [{1}; {2}] sheet mm{3}
+ (kóta jen kolmo k sobě)	 (a dimension only perpendicular to itself)
+✓ vygenerované objekty na výchozím místě ({0} obnoveno)	✓ generated objects at their default place ({0} restored)
+✓ vygenerované obnoveno: {0}	✓ generated restored: {0}
+Vygenerované kóty a pozice upravené: {0} – výkres vygenerované obnovit	Generated dimensions and balloons edited: {0} – drawing generated restore
+vygenerované kóty celkových rozměrů (dim:<pohled>:t nahoře, :l vlevo) a pozice sestavy (pos:<číslo>) – skrýt, zobrazit, posunout (mm listu, y nahoru; kóta jen kolmo k sobě), obnovit; totéž jako výběr a Delete / tažení ve výkresu (volba listu genEdit)	generated overall dimensions (dim:<view>:t at the top, :l on the left) and assembly balloons (pos:<number>) – hide, show, move (sheet mm, y up; a dimension only perpendicular to itself), restore; the same as selecting and Delete / dragging in the drawing (sheet option genEdit)

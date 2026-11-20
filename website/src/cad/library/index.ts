@@ -21,7 +21,8 @@
  *  - profily HEM, IPN, T; nerovnoramenné L v obou orientacích
  *  - import vlastních tabulek (CSV/JSON) a oblíbené sestavy („šroub + podložka + matice“ jedním klikem)
  */
-import type { CadDoc } from "../types";
+import type { CadDoc, SupplyKind } from "../types";
+import { isStandardDesignation } from "../bom-model";
 import { ALU_PROFILES } from "./alu-profiles";
 import { BEARING_FAMILIES } from "./bearings";
 import { BEARINGS2 } from "./bearings2";
@@ -88,11 +89,42 @@ export function search(query: string, limit = 12): SearchResult[] {
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
+/**
+ * Druh položky kusovníku podle skupiny knihovny (vlna 22, bod 19): spojovací materiál, kolíky, kroužky, pružiny, ložiska
+ * a normálie forem = normálie; lineární technika, pneumatika a potrubí = nakupované (katalog); ozubení, řemenice a profily
+ * (polotovar dělený na míru) = vyráběné.
+ */
+export function librarySupply(f: Family): SupplyKind {
+  if (f.group === "Lineární technika" || f.group === "Pneumatika a hydraulika" || f.group === "Potrubí a příruby") return "buy";
+  if (f.group === "Ozubení a řetězy" || f.group === "Řemenice" || f.group === "Ocelové profily a trubky" || f.group === "Hliníkové profily") return "make";
+  return "standard";
+}
+
+/**
+ * Díl z knihovny s druhem do kusovníku: normálie a nakupované položky dostanou číslo = celé označení z knihovny
+ * (`ISO 8734 – 8×30 – m6` – tolerance kolíku se neztratí) a druh; nakupované i katalogové číslo. Vyráběné díly jen druh.
+ */
+export function makeStandard(f: Family, v: Values): CadDoc {
+  const doc = f.make(v);
+  const kind = librarySupply(f);
+  if (kind === "make") return { ...doc, supply: { kind } }; // výslovně – skupina „Normálie“ při vložení z ní normálii neudělá
+  let designation = "";
+  try {
+    designation = f.describe(v).trim();
+  } catch {
+    /* neúplné hodnoty – číslo z generátoru */
+  }
+  // celé označení podle normy (kolík ISO 8734 – 8×30 – m6) nahradí zkrácené číslo generátoru; jiný popis (ložisko
+  // „Ložisko 6204-2RS (20×47×14)“) ne – číslo generátoru zůstane, označení jde jen tam, kde generátor číslo nemá
+  const number = designation && (isStandardDesignation(designation) || !doc.props?.number?.trim()) ? designation : doc.props?.number;
+  return { ...doc, ...(number ? { props: { ...(doc.props ?? {}), number } } : {}), supply: { kind, ...(kind === "buy" && number ? { catalog: number } : {}) } };
+}
+
 /** Nejlepší shoda → hotový díl (nebo null). */
 export function makeFromText(query: string): { doc: CadDoc; result: SearchResult } | null {
   const r = search(query, 1)[0];
   if (!r || r.score < 0.3) return null;
-  return { doc: r.family.make(r.values), result: r };
+  return { doc: makeStandard(r.family, r.values), result: r };
 }
 
 // ---------------- oblíbené a nedávné ----------------

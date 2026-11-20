@@ -1,0 +1,37 @@
+# Vlna 22 G1 – úrovně stavu prvku (přijato → vznik → účinek → konečné těleso), přijetí úprav a příkazů výkresu
+{0} ({1} % nástroje)	{0} ({1} % des Werkzeugs)
+{0} (celý nástroj)	{0} (ganzes Werkzeug)
+{0} ploch > {1}	{0} Flächen > {1}
+{0} ploch > {1} – platnost se ověří na konci stavby	{0} Flächen > {1} – Gültigkeit wird am Ende des Aufbaus geprüft
+{0} těles, NEPLATNÁ geometrie	{0} Körper, UNGÜLTIGE Geometrie
+{0} těles, platná	{0} Körper, gültig
+{0} těles, platnost nezkontrolována ({1})	{0} Körper, Gültigkeit nicht geprüft ({1})
+{0} volných ploch	{0} freie Flächen
+1 volná plocha	1 freie Fläche
+kontrola se neprovedla	die Prüfung wurde nicht ausgeführt
+nezkontrolováno	nicht geprüft
+nezkontrolováno ({0})	nicht geprüft ({0})
+objem beze změny	Volumen unverändert
+Platnost tělesa po tomto prvku nebyla zkontrolována ({0}).	Die Gültigkeit des Körpers nach diesem Feature wurde nicht geprüft ({0}).
+po tomto prvku se platnost nekontroluje – ověří se na konci stavby	nach diesem Feature wird die Gültigkeit nicht geprüft – sie wird am Ende des Aufbaus geprüft
+Prvek má dát objemové těleso, ale vedle tělesa zůstaly volné plochy ({0} navíc) – výsledek není uzavřený; zkontrolujte profil, dráhu a parametry.	Das Feature soll einen Volumenkörper ergeben, aber neben dem Körper blieben freie Flächen ({0} zusätzlich) – das Ergebnis ist nicht geschlossen; Profil, Bahn und Parameter prüfen.
+Prvek má dát objemové těleso, ale výsledek je jen plocha / plášť ({0}, žádné těleso) – uzavřete profil nebo dráhu, zkontrolujte parametry; plochy uzavře Plochy → Uzavřít do tělesa.	Das Feature soll einen Volumenkörper ergeben, aber das Ergebnis ist nur eine Fläche / Schale ({0}, kein Körper) – Profil oder Bahn schließen, Parameter prüfen; Flächen schließt Flächen → Zu Körper schließen.
+přidáno {0} mm³	hinzugefügt {0} mm³
+těleso NEPLATNÉ	Körper UNGÜLTIG
+těleso nezkontrolováno ({0})	Körper nicht geprüft ({0})
+těleso platné	Körper gültig
+úběr {0} mm³	Abtrag {0} mm³
+výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)	Zeichnung: Blatt „{0}“ ohne Befund ausgewertet (Ansichten, Schnitte, Smarte Maße)
+výsledek po vyhodnocení listu níže	Ergebnis nach der Auswertung des Blatts unten
+výsledek po výpočtu níže	Ergebnis nach der Berechnung unten
+velké těleso, {0} ploch – měřeno ze sítě, platnost se nekontroluje	großer Körper, {0} Flächen – aus dem Netz gemessen, Gültigkeit wird nicht geprüft
+dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗{2}	Dokument „{0}“ aufgebaut: {1} Features, ohne ⚠ und ✗{2}
+platnost nezkontrolována	Gültigkeit nicht geprüft
+potlačen – nestaví se	unterdrückt – wird nicht aufgebaut
+Prvek je potlačený – nestaví se a nemá výsledek.	Das Feature ist unterdrückt – es wird nicht aufgebaut und hat kein Ergebnis.
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗ – {2}	Dokument „{0}“ aufgebaut: {1} Features, ohne ⚠ und ✗ – {2}
+příkaz přijat: {0}	Befehl angenommen: {0}
+prvek „{0}“ vznikl ({1}) – týž příkaz má ⚠/✗ jiného prvku	Feature „{0}“ wurde erstellt ({1}) – derselbe Befehl hat ⚠/✗ eines anderen Features
+stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku {0}	der Modellstand nach diesem Befehl wurde nicht eigens aufgebaut (eine weitere Änderung folgte) – geprüft ist erst der Stand nach Zeile {0}
+prvek „{0}“ je potlačený – nestaví se (bez výsledku)	Feature „{0}“ ist unterdrückt – wird nicht aufgebaut (kein Ergebnis)

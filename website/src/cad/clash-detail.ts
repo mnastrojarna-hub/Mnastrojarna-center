@@ -33,6 +33,7 @@ const SIDE_MAX = 20000;
 export function clearClashDetailCache(): void {
   holeCache.clear();
   sideCache.clear();
+  plainCache.clear();
 }
 
 type Side = { cls: ClashClass; why: ClashWhy; hole?: TapHole; band?: number; rest?: number; restDepth?: number; note?: string };
@@ -199,7 +200,125 @@ function classifyPiece(x: Shape, holes: TapHole[]): Side {
   }
   return best!;
 }
-const rank = (c: ClashClass) => ({ thread: 0, underhead: 1, undetermined: 2, real: 3 })[c];
+const rank = (c: ClashClass) => ({ thread: 0, underhead: 1, touch: 2, work: 2, undetermined: 2, real: 3 })[c];
+
+/** (díl A, díl B, vzájemná poloha) → zařazení dvojice bez závitového prvku (šroub v hladké jádrové díře?) */
+const plainCache = new Map<string, PlainSide | null>();
+type PlainSide = { band: number; rest: number; r: number; R: number; length: number; bandCls: "thread" | "underhead" | "real" };
+/** poměr poloměru jádrové díry a jmenovitého poloměru šroubu (M3 2,5/3 … M10×1 9/10): uvnitř = jádrová díra pro závit */
+const CORE_RATIO: [number, number] = [0.74, 0.95];
+
+/**
+ * Šroub v jádrové díře BEZ prvku závitu (vlna 22, bod 5 – hladká díra Ø10,2 nebo importovaný díl): kus průniku má dvě souosé
+ * válcové plochy – stěnu díry r a plášť dříku R – s poměrem r/R typickým pro jádrovou díru (0,74–0,95). Pásmo [r − ε, R + ε]
+ * podél osy (celá délka kusu) rozhodne, zda je mimo pásmo jen šum / prstenec pod hlavou (`bandCls` thread / underhead), nebo
+ * i hlava či konec dříku v plném materiálu (`real`). null = průnik takový tvar nemá (skutečná kolize).
+ */
+function plainScrewSide(ka: string, ba: Shape, kb: string, bb: Shape, rel: { key: string; m: number[] }): PlainSide | null {
+  const key = `${ka}|${kb}|${rel.key}`;
+  if (plainCache.has(key)) return plainCache.get(key)!;
+  let out: PlainSide | null = null;
+  const x = pairIntersection(ba, bb, rel.m);
+  if (x)
+    try {
+      const raw = subShapes(x, "SOLID") as { delete(): void }[];
+      const pieces = raw.map((q) => r.cast(q as never) as Shape);
+      try {
+        let band = 0;
+        let rest = 0;
+        let found: { r: number; R: number; length: number } | null = null;
+        for (const p of pieces.length ? pieces : [x]) {
+          const v = volumeOf(p);
+          if (!(v > 1e-6)) continue;
+          const cyls = cylindersOf(p);
+          // souosé válce kusu: nejmenší = stěna díry, největší = plášť dříku
+          const ax = cyls[0];
+          const coax = ax ? cyls.every((c) => axisAngle(c.d, ax.d) <= CLASH_RULE.maxAngle && lineDist(c.o, ax.o, unit(ax.d)) <= CLASH_RULE.maxAxisDist) : false;
+          const rMin = coax ? Math.min(...cyls.map((c) => c.r)) : 0;
+          const rMax = coax ? Math.max(...cyls.map((c) => c.r)) : 0;
+          if (!coax || !(rMax > rMin) || rMin / rMax < CORE_RATIO[0] || rMin / rMax > CORE_RATIO[1]) {
+            rest += v; // kus bez tvaru závitového záběru (např. hlava v plném materiálu) = mimo pásmo
+            continue;
+          }
+          const d = unit(ax.d);
+          const len = Math.max(1, diagOf(p)) * 2;
+          // střed kusu promítnutý na osu → mezikruží pásma symetricky kolem něj
+          const ctr = centerOf(p);
+          const t0 = dot(sub(ctr, ax.o), d);
+          const base = sub(ax.o, mul(d, len / 2 - t0));
+          const tube = annulus(base, d, rMin - CLASH_RULE.eps, rMax + CLASH_RULE.eps, len);
+          if (!tube) continue;
+          try {
+            const inBand = boolOp("common", p, tube);
+            const bv = inBand ? volumeOf(inBand) : 0;
+            inBand?.delete();
+            band += bv;
+            rest += Math.max(0, v - bv);
+          } finally {
+            tube.delete();
+          }
+          found = found ?? { r: rMin, R: rMax, length: lengthAlong(p, ax.o, d) };
+        }
+        if (found && band > 1e-3) {
+          const dcd = decideBand({ volume: band + rest, band, rest, restDepth: 0, D: 2 * found.R });
+          out = { band, rest, ...found, bandCls: dcd.cls };
+        }
+      } finally {
+        for (const p of pieces) p.delete();
+        for (const q of raw) q.delete();
+      }
+    } finally {
+      x.delete();
+    }
+  if (plainCache.size >= SIDE_MAX) plainCache.delete(plainCache.keys().next().value!);
+  plainCache.set(key, out);
+  return out;
+}
+const unit = (v: Vec3): Vec3 => {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
+function diagOf(s: Shape): number {
+  const b = s.boundingBox;
+  try {
+    const [lo, hi] = b.bounds as [Vec3, Vec3];
+    return Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+  } finally {
+    b.delete();
+  }
+}
+function centerOf(s: Shape): Vec3 {
+  const b = s.boundingBox;
+  try {
+    const [lo, hi] = b.bounds as [Vec3, Vec3];
+    return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+  } finally {
+    b.delete();
+  }
+}
+/** délka kusu podél osy (z vrcholů sítě) */
+function lengthAlong(s: Shape, o: Vec3, d: Vec3): number {
+  const m = s.mesh({ tolerance: 0.05, angularTolerance: 0.2 });
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let k = 0; k + 2 < m.vertices.length; k += 3) {
+    const t = dot(sub([m.vertices[k], m.vertices[k + 1], m.vertices[k + 2]], o), d);
+    lo = Math.min(lo, t);
+    hi = Math.max(hi, t);
+  }
+  return Number.isFinite(hi) ? hi - lo : 0;
+}
+/** mezikruží [ri, ro] podél osy `d` od bodu `base` délky `len` */
+function annulus(base: Vec3, d: Vec3, ri: number, ro: number, len: number): Shape | null {
+  const outer = r.makeCylinder(ro, len, base as never, d as never) as Shape;
+  const inner = r.makeCylinder(Math.max(0.01, ri), len, base as never, d as never) as Shape;
+  try {
+    return boolOp("cut", outer, inner);
+  } finally {
+    outer.delete();
+    inner.delete();
+  }
+}
 
 /**
  * Strana dvojice: díry se závitem v dílu `hole` (list `hk`), druhý díl `other` (list `ok`), vzájemná poloha z umístění listů.
@@ -287,7 +406,13 @@ export async function clashDetail(doc: CadDoc, pairs: readonly ClashPair[]): Pro
         if (sa) sides.push({ s: sa, holeIn: "a" });
       }
       if (!sides.length) {
-        out.push({ ...base, cls: "real", why: "no-thread" });
+        // díra bez prvku závitu: šroub v jádrové díře (hladká díra, import) se nedá rozhodnout – ⚠ nevyhodnotitelné s nápovědou,
+        // ne „skutečná kolize“; hlava nebo konec dříku v plném materiálu zůstanou skutečnou kolizí (vlna 22, bod 5)
+        const ps = plainScrewSide(A.key, ba, B.key, bb, relOf(rtOf(A.placement), rtOf(B.placement)));
+        if (ps && ps.bandCls !== "real") {
+          const D = round(2 * ps.R);
+          out.push({ ...base, cls: "undetermined", why: "no-thread-feature", bandCls: ps.bandCls, hole: { designation: `M${fmtD(D)}`, D, r: round(ps.r), depth: round(ps.length), through: false }, band: round(ps.band), rest: round(ps.rest) });
+        } else out.push({ ...base, cls: "real", why: ps ? "rest-large" : "no-thread", ...(ps ? { band: round(ps.band), rest: round(ps.rest) } : {}) });
         continue;
       }
       const best = sides.reduce((x, y) => (rank(y.s.cls) < rank(x.s.cls) ? y : x));
@@ -311,3 +436,5 @@ export async function clashDetail(doc: CadDoc, pairs: readonly ClashPair[]): Pro
 }
 
 const round = (v: number) => Math.round(v * 1e4) / 1e4 + 0;
+/** jmenovitý průměr šroubu z pláště dříku (12 → „12“, 11,98 → „12“, 7,94 → „7,94“) */
+const fmtD = (D: number) => (Math.abs(D - Math.round(D)) < 0.05 ? String(Math.round(D)) : String(Math.round(D * 100) / 100));

@@ -82,7 +82,9 @@ describe("výkres", () => {
     expect(d.dxf).toContain("ISO 4762");
     const csv = bomToCsv(bom);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
-    expect(csv).toContain("1;Deska;MN-001;1;S235;0,5;\r\n2;Šroub M8×20;ISO 4762;4;8.8;;");
+    // vlna 22 (bod 19, 22g): kusovník výkresu = týž zapisovač jako kusovník sestavy (hmotnost 1 ks i celkem, druh, norma …)
+    expect(csv).toContain("1;Deska;MN-001;1;S235;0,500;0,500;");
+    expect(csv).toContain("\r\n2;Šroub M8×20;ISO 4762;4;8.8;;;");
   });
 
   it("šrafy uvnitř čtverce", () => {

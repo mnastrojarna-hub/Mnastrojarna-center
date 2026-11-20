@@ -5,6 +5,11 @@
  */
 export const AGENT_GUIDE = `# Mnástrojárna CAD – rozhraní pro AI agenty a automatizaci
 
+> **Začněte tahákem (≤ 5 kB):** https://www.mnastrojarna.cz/cad/tahak.md (EN tahak.en.md, DE tahak.de.md), v konzoli
+> \`nápověda tahák\` (EN \`help cheatsheet\`, DE \`hilfe spickzettel\`), v CLI \`mncad help cheat\`. **Hledání v tomto návodu,
+> v tabulce příkazů a v příručce:** \`nápověda hledat záložky\` (EN \`help search tabs\`, DE \`hilfe suchen registerkarten\`;
+> také \`nápověda <slova>\`), v CLI \`mncad help search <slova>\` – 5–8 nejlepších oddílů s příkazy, bez diakritiky i s překlepem.
+
 Mnástrojárna CAD (https://www.mnastrojarna.cz/cad) je parametrický 3D/2D CAD v prohlížeči. Kromě myši ho lze
 kompletně ovládat **textem** – to je určeno pro AI agenty (ChatGPT Agent, Claude, vlastní skripty) i pro lidi, kteří
 raději píší. Vše, co jde udělat myší, jde udělat textem; textem navíc jde zadat i to, co by vyžadovalo přesné klikání
@@ -20,7 +25,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    Otevřít, nebo přetažený do okna. Dává přístup ke **všem 36 typům prvků** včetně těch, které nemají textový příkaz
    (tažení, šablonování, úkos, plochy, plech, sestavy…).
 3. **JavaScript API \`window.mncad\`** (pro Playwright, Selenium, rozšíření prohlížeče, Claude in Chrome…):
-   \`await window.mncad.run(text)\` provede příkazy / JSON a vrátí protokol; \`window.mncad.getDocument()\` vrátí
+   \`await window.mncad.run(text)\` provede příkazy / JSON a vrátí protokol (\`{ protocol: "short" }\` = stručný protokol
+   MNCAD/1 jako CLI); \`window.mncad.getDocument()\` vrátí
    dokument; \`await window.mncad.setDocument(docOrJson)\` ho otevře v nové záložce (\`{ inPlace: true }\` = nahradí otevřený
    dokument jako jeden krok historie); \`await window.mncad.undo(n)\` / \`redo(n)\` / \`history()\` = historie Zpět / Znovu;
    \`await window.mncad.status()\` vrátí stav
@@ -31,13 +37,23 @@ do 3D okna (výběr hran a ploch pravidlem).
    \`{ name, mime, bytes, format, log }\`;
    \`await window.mncad.measure("F3", "F7")\` změří jako příkaz \`měřit\` a vrátí řádky + čísla (viz „Měření“);
    \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
-   \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
+   \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem). **Běhy:** \`run\` se řadí do fronty (nikdy
+   dva běhy najednou), \`window.mncad.runs()\` vrátí běhy a úlohy exportu (\`{ id: "r12", kind, state, inputRev, phase,
+   phases, ms, result }\`, stav \`queued | running | done | cancelled | error\`), \`window.mncad.cancelRun(id?)\` běh zruší,
+   \`run(text, { signal })\` přijme \`AbortSignal\`, \`await window.mncad.idle()\` počká na dokončený stav. Každé volání
+   \`window.mncad\` nejdřív zapíše rozepsané pole a list výkresu; \`save\`, \`exportFile\`, \`exportDrawing\`, \`share\` počkají
+   na doběhnutí běhů a stavby (viz „Průběh a zrušení výpočtu“).
 
 **Když textový příkaz něco neumí, \`prvek nápověda <typ>\` ukáže všechna pole pro \`prvek <typ> …\`** (EN \`feature help\`,
 DE \`element hilfe\`; typ i slovem příkazu – \`nápověda díra\`, \`nápověda kužel\`, u rozšíření id: \`prvek nápověda sheet.bend\`):
 název, druh hodnoty a ukázka zápisu, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem
 („jen prvek / upravit / JSON“ = vlastní zápis nemá). \`prvek nápověda\` bez typu vypíše přehled všech typů a polí, která jdou
-zadat jen přes \`prvek\` / \`upravit\`.
+zadat jen přes \`prvek\` / \`upravit\`. **Hledání:** \`nápověda hledat <slova>\` (i \`nápověda <slova>\`, když slovo není typ prvku)
+prohledá tento návod, tabulku příkazů i příručku /cad/dokumentace a vypíše 5–8 nejlepších oddílů (název + příkazy + věta,
+≤ 1,5 kB; ve stručném protokolu \`= L3 help hits=6 q="záložky"\` a výsledky na pokračovacích řádcích – stejný řádek je
+i na začátku výpisu v konzoli prohlížeče). Víc hledání v jednom běhu si stručný protokol dělí: každé má svůj řádek
+\`= L<n> help hits=3 of=8 q="…"\` s méně výsledky (všechny jsou v plném protokolu); dlouhý dotaz je v \`q\` zkrácený na 80 B.
+\`nápověda tahák\` vypíše tahák nejčastějších příkazů – jeho příkazy jdou za sebou jako jeden skript.
 
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.
@@ -46,7 +62,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 
 | Příkaz | Význam |
 | --- | --- |
-| \`nový díl [název]\` / \`nová sestava [název]\` | nový dokument v nové záložce |
+| \`nový díl [název] [znovu\|nový]\` / \`nová sestava [název] [znovu\|nový]\` | nový dokument v nové záložce; opakovaný běh použije záložku stejného názvu, kterou založil dřívější běh (ℹ \`doc.reused\`; otevřený soubor / JSON téhož názvu ne – ℹ \`doc.name-taken\`), \`nový\` = vždy nová záložka, \`znovu\` = převzít i otevřenou |
 | \`název …\`, \`materiál …\`, \`barva #hex\` | popis dokumentu |
 | \`kvádr X Y Z [střed] [v x y z] [osa …] [odebrat|průnik|nové]\` | kvádr; roh v poloze, „střed“ = poloha je střed kvádru; \`osa\` natočí osu Z kvádru |
 | \`válec D H [v x y z] [osa X|Y|Z|-Z|x y z|hrana E3|plocha F2|"Osa 1"] [odebrat|průnik|nové]\` | válec průměr × výška; poloha = střed podstavy, roste ve směru osy |
@@ -85,12 +101,13 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`prvek <typ|rozšíření> klíč=hodnota …\` | kterýkoli typ prvku i prvek rozšíření bez JSON (viz níže) |
 | \`normálie <označení> [v x y z]\` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
 | \`vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit] [jako "K48"]\` | sestava: vloží díl z otevřené záložky jako komponentu; \`jako\` (EN \`as\`, DE \`als\`) = přezdívka instance pro vazby místo #k |
-| \`sestava\` · \`sestava plochy "Čep" [rovinné|válcové]\` · \`sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]\` · \`sestava vazby\` · \`sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat\` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
+| \`sestava\` · \`sestava plochy "Čep" [rovinné|válcové]\` · \`sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]\` · \`sestava vazby\` · \`sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat\` · \`sestava vazba 2 plocha b F6\` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
 | \`sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]\` · \`pohyb motor rotační "Klika" 0..360 krok 5 [kolize]\` · \`pohyb stav|krok N|přehrát|export csv\` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
 | \`sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …] [přezdívka "…"]\` · \`sestava odebrat|duplikovat|izolovat "X"\` · \`sestava zobrazit vše\` | vlastnosti komponenty jako v panelu |
-| \`sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c]\` · \`sestava pružina "P" odebrat\` · \`sestava pružiny\` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
+| \`sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne]\` · \`sestava pružina "P" odebrat\` · \`sestava pružiny\` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
 | \`sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "A" Ø21 "B" horní [v x y z] [do děr vzoru] [název "P"]\` · \`sestava pružina "P" mezi "A" "B" do děr vzoru\` | nová pružina z tabulky mezi díly (osa z díry / roviny, zámek k A) a kopie do všech děr vzoru (viz „Pružina v sestavě“) |
 | \`pohyb dynamika [čas T] [krok dt] [gravitace -Z\|vyp] [tlumení c] [odraz e]\` · \`pohyb hmotnost "X" kg\` · \`pohyb síla vazba N F\` · \`pohyb kinematika\` | dynamická pohybová studie: síly pružin, gravitace a zadané síly hýbou díly, dorazy s odrazem (viz „Dynamika“) |
+| \`pohyb kvazistatika\` · \`pohyb kinematika\` · \`pohyb automaticky\` · \`pohyb motor … na mezi stop\|chyba\` · \`sestava vazba N preferovat min\|max\|ne\` | režim a úroveň studie, motor na mezi, preferovaná strana meze (viz „Režim studie, priorita podmínek“) |
 | \`sestava pole "X" N rozteč P [směr Y]\` · \`sestava pole "X" kruhové N [osa Z] [v cx cy cz]\` · \`sestava zrcadlit "X" YZ\` · \`sestava šroub "Deska" Ø9 [matice] [bez podložky]\` | pole, zrcadlení, šroubový spoj do díry |
 | \`sestava podsestava "A" "B" [jako "…"]\` · \`sestava rozpustit "P"\` · \`sestava upravit "X"\` … \`sestava hotovo\` · \`sestava otevřít "X"\` | podsestavy, úprava dílu v kontextu sestavy |
 | \`kusovník [strukturovaně] [csv]\` · \`rám formy [šířka délka] [dutina X Y H] …\` · \`záložky\` · \`záložka "název"|N\` · \`zavřít záložku\` | kusovník do protokolu, rám vstřikovací formy, záložky dokumentů |
@@ -106,7 +123,9 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`výkres razítko číslo="MN-1" kreslil="AI" …\` · \`výkres revize B "popis"\` · \`výkres otočení 90\` · \`výkres řez XZ poloviční\` · \`výkres kusovník ano\` · \`výkres balónky ne\` · \`kótovat základní\` | razítko, revize a další volby listu |
 | \`výkres pohled pomocný přední hrana x1 y1 x2 y2\` · \`výkres řez zalomený|natočený|částečný …\` · \`výkres přerušení přední x od 50 do 250\` · \`výkres uložení Ø40 H7\` · \`výkres revize značka B na Ø40\` · \`výkres zóny ano\` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | \`výkres značka drsnost Ra 1,6 na Ø40\` · \`výkres kóta vodorovně pohled přední x1 y1 x2 y2\` · \`výkres upravit a3 odsazení=8\` · \`výkres smazat a3\` · \`výkres detail přední v x y poloměr r\` · \`výkres model "Hřídel"\` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export \`window.mncad.exportDrawing("pdf")\` |
-| \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` | správa; kolize = kontrola průniků komponent sestavy |
+| \`kolo čelní|šikmé|šípové|vnitřní|hřeben|kuželové|hypoidní|šnek|šnekové|cykloidní|cyklodisk|řetězové|řemenice|rohatka m 2 z 24 … [díra 20 pero] [náboj 40 15] [polotovar|zuby]\` · \`kolo tabulka [vše|"název"]\` · \`kolo nápověda [druh]\` | ozubené kolo z tabulky (jeden prvek „Ozubené kolo …“), tabulka ozubení do protokolu, řádky tabulky druhu (viz „Kola a ozubení“) |
+| \`soukolí čelní m 2 z1 20 z2 60 [a 81] [x1 …] [x2 …] [vůle 0,05] [díra1 12] [díra2 20]\` · \`výkres tabulka ozubení ano|ne\` | soukolí: dva díly + sestava s vazbou ozubení ve správném záběru, posunutí z osové vzdálenosti; tabulka ozubení na výkrese |
+| \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` · \`kolize seznam [třída]\` · \`kolize pravidlo pracovní "A" "B" [kroky 10..20]\` · \`kolize tolerance 0,01\` | správa; kolize = kontrola průniků komponent sestavy po třídách (viz „Třídy, místo a pravidla kolizí“) |
 | \`uložit [název]\` · \`export step|stl|brep|obj|glb|3mf|wrl|mncad [název]\` · \`výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]\` · \`skica export dxf ["Skica 1"]\` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
 | \`sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]\` · \`odkaz\` | sdílený odkaz – adresa se vypíše do protokolu na řádek \`URL: …\`; \`odkaz\` ji vypíše znovu |
 | \`upravit\` · \`potlačit\` / \`zapnout\` · \`smazat <prvek>\` · \`přejmenovat\` · \`přesunout\` · \`duplikovat\` · \`zpět\` / \`znovu\` · \`proměnná\` · \`konfigurace\` · \`skica "Skica 1"\` · \`entita\` · \`kóta k1\` · \`odsadit\` · \`promítnout hrany\` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
@@ -626,8 +645,14 @@ JSON → \`setDocument()\`. Prvek se zadává názvem v uvozovkách (\`"Díra 1"
 | \`konfigurace "Krátká" t=10 [potlačit "Díra 1";"Pole 1"]\` · \`konfigurace aktivní "Krátká"|žádná\` · \`konfigurace smazat "Krátká"\` · \`konfigurace\` (EN \`config … suppress\`, \`config active\`, \`config delete\`; DE \`konfiguration … unterdrücken\`, \`konfiguration aktiv\`, \`konfiguration löschen\`; také \`varianta\`) | stavy dílu (varianty): hodnoty proměnných a potlačené prvky; založení konfiguraci neaktivuje |
 
 \`stav\` vypíše navíc řádky \`Vazby parametrů: Vysunutí 1.distance = h*2 (= 40)\` a \`Konfigurace: Krátká (aktivní), Dlouhá\`.
-Protokol úpravy: \`✓ Díra 1: diameter 8,5 → 10, depth 0 → 12\` a po výpočtu ✓ / ⚠ / ✗ upraveného prvku i prvků, které na
-něm závisejí. Neznámý klíč skončí chybou s výčtem parametrů prvku (\`„diametr“ není parametr prvku „Díra 1“ (hole) – parametry: …\`).
+Protokol úpravy: \`→ Díra 1: diameter 8,5 → 10, depth 0 → 12 – výsledek po výpočtu níže\` (ℹ \`op.accepted\` = příkaz
+přijat, to ještě není výsledek) a po výpočtu ✓ / ⚠ / ✗ upraveného prvku **na řádku úpravy**. ⚠ / ✗ prvků, které úprava
+(smazání, přesun, proměnná, konfigurace, entita nebo kóta skici, zpět) rozbila, jdou také na řádek té úpravy; řádek, který
+má ⚠ / ✗, nedostane žádné ✓ (prvek, který je sám v pořádku, je tam ℹ \`feature.built\`). Poslední úprava běhu, po které
+žádný prvek nezměnil stav (smazání, proměnná, konfigurace, zpět), dostane na svém řádku výsledek přepočtu celého
+dokumentu: \`✓ dokument „Deska“ postaven: prvků 4, bez ⚠ a ✗ · těleso platné\`; dřívější úpravy bez vlastního výsledku
+mají ℹ \`op.superseded\` (jejich mezistav se nestavěl). Příkaz, po kterém se nic nepřepočítává
+(přejmenování, smazání posledního prvku, proměnná v dílu bez prvků, zpět o právě přidaný prvek), je hned ✓. Neznámý klíč skončí chybou s výčtem parametrů prvku (\`„diametr“ není parametr prvku „Díra 1“ (hole) – parametry: …\`).
 
 **Úprava existující skici.** \`skica "Skica 1"\` (EN \`sketch "…"\`, DE \`skizze "…"\`; bez roviny, jen název v uvozovkách) znovu
 otevře hotovou skicu jako cíl dalších řádků – entity, \`vazba\`, \`kóta\` i níže uvedené úpravy jdou do ní (i na jednom řádku:
@@ -681,7 +706,8 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \
 5. \`sestava\` (bez podpříkazu) vypíše komponenty \`#1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓\`; komponentu lze zadat
    názvem, pořadím \`#2\` nebo **přezdívkou**: \`vložit "Šroub M6x20" v … jako "K48"\` (EN \`insert … as "K48"\`, DE
    \`einfügen … als "K48"\`) nebo \`sestava komponenta #25 přezdívka "K48"\` (EN \`alias\`; prázdná \`přezdívka ""\` ji zruší) –
-   pak \`sestava vazba zámek "K48" "Upínací deska"\`. Přezdívka je jednoznačná (ne „#…“, ne název jiné komponenty; komponentu
+   pak \`sestava vazba zámek "K48" "Upínací deska"\`. Název záložky i přezdívka v uvozovkách jsou doslovné – jde i
+   \`vložit "D" jako "H"\` (bez uvozovek by se \`D\`, \`H\`, \`V\` četly jako volby průměr / výška / poloha). Přezdívka je jednoznačná (ne „#…“, ne název jiné komponenty; komponentu
    nejde přejmenovat na přezdívku jiné), ve výpisu, ve stromu a ve vazbách v hranatých závorkách \`#25 Šroub M6x20 [K48]\`,
    \`Zámek „Šroub M6x20“ [K48] → „Upínací deska“\`; kopie (\`sestava duplikovat|pole|zrcadlit\`, Duplikovat v panelu) přezdívku
    nepřebírají. Kusovník ji nepoužívá. \`stav\` u sestavy obsahuje řádky
@@ -698,9 +724,27 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \
 8. \`sestava podsestava "A" "B" [jako "Vedení"]\` (vazby se převedou), \`sestava rozpustit "Vedení"\`;
    \`sestava upravit "Čep"\` → další řádky pracují s dílem (\`díra 3 skrz v 0 0\`…) → \`sestava hotovo\` vrátí díl do sestavy
    (změna platí pro všechny stejné komponenty); \`sestava otevřít "Čep"\` = kopie v nové záložce.
+   **Reference vazeb po změně dílu:** \`sestava hotovo\` (i tlačítko „← Zpět do sestavy“ – stejná kontrola) ověří každou plochu /
+   hranu vazeb do změněného dílu podle geometrie: táž plocha s jiným číslem = ℹ \`mate.renumbered\` (F3 → F5), plocha, která
+   zmizela nebo po změně odpovídá víc plochám = ✗ \`mate.lost\` – **nikdy se tiše nepřipojí jinam**: vazba je mimo řešení,
+   komponenta se kvůli ní nehýbe, stav „ztracená reference“, \`mates=0/1(lost=1)\`, souhrn \`sestava hotovo\` je bez ✓
+   („→ … vrácen … – stav vazeb níže“). Oprava: \`sestava vazba 1 plocha b F6\` (nová plocha strany B, F-číslo nebo pravidlo
+   jako u nové vazby; bez strany = ztracená strana) nebo \`sestava vazba 1 smazat\`; vrátí-li další úprava tutéž plochu,
+   reference se obnoví (ℹ \`mate.restored\`).
 9. \`kusovník [strukturovaně] [csv]\` – tabulka \`Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks\`; \`kolize\` = průniky.
    Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
    řádek nerozdělí; jiné číslo výkresu (\`číslo "…"\`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.
+   **Druh položky** (vlna 22): vyráběný / normálie / nakupovaný – kusovník je v oddílech (\`— Vyráběné díly —\`, \`— Normálie —\`,
+   \`— Nakupované díly —\`), CSV má sloupce Druh, Norma, Rozměr, Třída / tolerance, Katalogové číslo, Výrobce a desetinný oddělovač
+   podle jazyka (čeština a němčina čárka, angličtina tečka). Výchozí druh: normálie z knihovny = normálie (materiál = pevnostní třída
+   12.9, kolík „dle normy“ a tolerance m6 v označení), importovaný STEP bez prvků = nakupovaný, vlastní díl = vyráběný. Zadání:
+   v dílu \`druh nakupovaný katalog "SFJ8-30" výrobce "…"\`, na komponentě \`sestava komponenta "X" druh normálie|nakupovaný|vyráběný|auto
+   [katalog "…"] [výrobce "…"] [rozměr "…"] [třída "…"]\`. Vyráběný díl bez čísla výkresu nebo bez označení materiálu (v kusovníku
+   \`— (třída Ocel)\`) = ⚠ \`bom.make-incomplete\`; výkresy (\`--formats pdf\`, \`výkres export pdf dokument\`) se přibalují jen u vyráběných dílů.
+   **Kopie dílu:** \`vložit\` uloží kopii dílu; číslo, materiál, geometrie nebo výkres změněné v záložce dílu PO vložení se do sestavy
+   samy nepromítnou – kusovník, list sestavy a \`stav\` to hlásí ⚠ \`asm.stale-copy\` s příkazem \`sestava obnovit "Deska A"\` (\`vše\`,
+   \`údaje\` = jen číslo, materiál a druh). Obnova zachová polohu, vazby (čísla ploch se převedou podle geometrie) a přezdívku; číslo
+   zadané na komponentě zůstane. GUI: panel komponenty → „Obnovit z dílu“, Kusovník → „Obnovit z dílů“ (týž příkaz).
 10. \`rám formy 296 346 [deska-a 56] [deska-b 56] [upínací 27] [opěrná 36] [rozpěrky 96] [šířka-rozpěrek 56] [vyhazovací 22]
     [kotevní 17] [sloupky 24] [dutina 140 180 30 | bez dutiny] [materiál 1.2311]\` – rám formy v nové záložce.
 11. \`záložky\` (výpis), \`záložka "Čep"\` / \`záložka 2\` (další řádky pracují s ní), \`zavřít záložku ["…"]\`.
@@ -761,11 +805,57 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
 **Pohybová studie** (\`pohyb\`, EN \`motion\`, DE \`bewegung\`): motor na vazbě, kroky, výpočet poloh všech komponent v každém kroku.
 
 - \`pohyb motor rotační "Klika" 0..360 krok 5 [kolize] [stopa "Ojnice" bod 60 0 0]\` – rotační motor na vazbě Závěs / Souosost /
-  Šroub komponenty (vztaženo k protějšku vazby, ukotvený má přednost; motor na komponentě B vazby obrátí znaménko). \`krok 5\` =
-  73 kroků po 5°, \`kroky N\` = počet, \`čas T\` = délka [s], \`ot/min 60\` místo rozsahu = rychlost.
-- \`pohyb motor lineární vazba 3 10..40\` – lineární motor: Vzdálenost (absolutní hodnota mezery), Drážka / Dráha / Souosost / Šroub
-  (posuv od výchozí polohy, mm); \`rychlost 5\` = mm/s.
-- \`pohyb\` / \`pohyb stav\` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); \`pohyb krok 12\` – polohy
+  Šroub komponenty (vztaženo k protějšku vazby, ukotvený má přednost; motor na komponentě B vazby obrátí znaménko natočení /
+  posuvu, protokol to napíše). \`krok 5\` = 73 kroků po 5°, \`kroky N\` = počet, \`čas T\` = délka [s].
+- \`pohyb motor lineární vazba 3 10..40\` – lineární motor. **Význam hodnot podle vazby** (protokol i panel ho vždy píšou):
+  Vzdálenost a Drážka s polohou = **hodnota vazby** (absolutní mezera / poloha – \`57,5..27,15\` = z mezery 57,5 na 27,15, zdvih
+  30,35; znaménko se neobrací, ani když je motor zadán komponentou B vazby); Souosost / Dráha / Šroub / Drážka bez polohy a každý
+  rotační motor = **posuv / natočení od výchozí polohy** (0 = jak díl stojí; \`0..-30,35\` = o 30,35 mm proti směru osy).
+- **Zdvih místo konce:** \`pohyb motor lineární vazba "ZDVIH" zdvih -30,35\` (EN \`stroke\`, DE \`hub\`; rotační i \`otočení 90\`) = konec
+  o Δ od začátku; bez \`od A\` začíná motor na aktuální hodnotě vazby (Vzdálenost) / na 0 (posuv). \`od 57,5 zdvih -30,35\` = totéž
+  s výslovným začátkem. Zdvih není „konec“: \`0..30,35\` na vazbě s mezerou 57,5 znamená skok na mezeru 0 → ⚠ \`motion.start-jump\`.
+- **Rozsah × rychlost:** \`pohyb motor lineární vazba 1 57,5..27,15 rychlost 15,175\` (rotační \`0..720 ot/min 60\`) = z 57,5 na 27,15
+  rychlostí 15,175 mm/s, **na konci motor stojí**; délka studie = |do − od| / rychlost (2 s). Rychlost je velikost – směr dává
+  rozsah (\`27..57 rychlost -5\` je chyba). Se zadaným \`čas T\`: kratší než jízda = chyba s vysvětlením, delší = motor po dojetí
+  stojí. Později zkrácená studie = ⚠ \`motion.motor-short\`; druhý motor s delší jízdou studii prodlouží (⚠
+  \`motion.duration-extended\`); jediný motor bez \`čas\` změní dřív zadanou délku studie jen s ℹ \`motion.duration-set\` a dynamickou
+  studii nezkracuje. **Jen rychlost** (\`rychlost 5\`, \`od 40 rychlost -5\`, \`ot/min 60\`) = od začátku bez konce,
+  znaménko = směr. Popis motoru: \`hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s\` (↓ hodnota klesá, ↑ roste,
+  ↺ / ↻ natočení). Mezera Vzdálenosti pod nulou bez kontroly kolizí = ⚠ \`motion.gap-negative\` (plochy se prostoupí).
+- **Starší dokumenty a skripty:** zápis \`A..B rychlost V\` dřív znamenal jízdu od A bez konce (B se nepoužilo); dnes je to rozsah ×
+  rychlost. Dřívější význam zapíšete \`od A rychlost V\`. Uložený motor s rychlostí a nepoužitým koncem (dokument starší verze) dá
+  ⚠ \`motion.end-unused\` při načtení i při výpočtu (kam motor opravdu dojede, i opačným směrem); převod na rozsah × rychlost =
+  znovu zadat \`pohyb motor … A..B rychlost V\` (v panelu tlačítko „Převést na rozsah × rychlost“), převod do skriptu to uvede v poznámce.
+- **Motory na strojovém řádku** (i ve stručném protokolu): na konci \`= … motion …\` jedno pole na motor
+  \`m<i>=<průběh>:<začátek>><konec>:<směr>\` – průběh \`range\` | \`back\` (\`55>25>55\`) | \`ranged\` | \`open\` (konec = hodnota na konci
+  studie), směr \`+\` roste / \`-\` klesá / \`+-\` \`-+\` tam a zpět; např. \`m1=ranged:57.5>27.15:-\`.
+- **Režim studie a úroveň simulace (vlna 22, bod 2):** \`pohyb kinematika\` = polohy jen z vazeb a motorů (pružiny se měří, netlačí);
+  díl, kterého polohu vazby neurčují (volný v mezi – stírací deska, přidržovač), zůstává, kde byl, a posune ho jen doraz meze → ⚠
+  \`motion.undetermined\` a souhrn místo „Vazby splněny ve všech krocích“ napíše „⚠ vazby splněny …, ale polohu „X“ neurčují“.
+  \`pohyb kvazistatika\` = v každém kroku **rovnováha** pružin (energie ½·c·(L0 − L)², pružina jen tlačí) a jednostranných kontaktů
+  (meze vazeb, délka pružiny na doraz Ln) – nezávisle na předchozím kroku, směru přehrávání i historii úprav (přidržovač s předpětím
+  na horní mezi, dokud nedosedne: Z = max(10; Z_deska − 33)). \`pohyb dynamika\` = přechodový děj. \`pohyb automaticky\` (výchozí) =
+  kvazistatika, když na pohyblivou komponentu dosedá pružina, jinak kinematika. Každý protokol studie má řádek \`Úroveň simulace:
+  kvazistatika – … (zvoleno automaticky: …)\` a strojový řádek končí \`level=kin|quasi|dyn\` (\`anim\`, \`+geo\` doplní fáze / procesní
+  vrstva). JSON: \`motion.mode: "kinematic" | "quasistatic" | "dynamic"\` (chybí = automaticky).
+- **Priorita podmínek a motor na mezi (bod 8):** tvrdé podmínky (ukotvení, zámky, kontakty, zarovnání, souosost, pevné vzdálenosti,
+  meze, Ln pružin) > hodnota motoru > preference. Nesplnitelný krok se nikdy nevyřeší kompromisem (ujetí a naklopení desek):
+  \`na mezi stop\` (výchozí; EN \`at limit stop\`, DE \`an grenze stopp\`) = motor stojí na poslední dosažitelné hodnotě, krok má
+  fyzikální polohu → ⚠ \`motion.motor-limit\` „motor 1 stojí na mezi v krocích 8–12: žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm –
+  brání: „Mez“ 5 mm – na mezi min 5 mm (doraz); „PEVNÁ“ 24,5 mm (splněno); příčina: …“; \`na mezi chyba\` (EN \`error\`, DE
+  \`fehler\`; JSON motoru \`atLimit: "error"\`) = kroky neplatné, \`place\` = poslední platný krok, ⚠ \`motion.invalid\`. Vazby, které si
+  odporují i bez motoru = neplatné kroky s příčinou „vazby si odporují“. Kód \`motion.conflict\` po vazbách a úsecích zůstává; souhrn
+  vypíše nejvýš tři odchylky, \`pohyb krok N\` všechny („konflikt: …“). Strojově \`stopped=N invalid=N undetermined=N\` před \`level=\`.
+  Panel: krok „motor stojí na mezi“ / „NEŘEŠITELNÝ krok – zobrazen krok 7“, 3D okno neplatného kroku červeně orámované
+  (\`data-motion-invalid\`). Délka pružiny na doraz Ln je doraz i v kinematice (dřív pružina „prošla“ a jen řádek pružiny byl ✗).
+- **Preferovaná strana meze:** \`sestava vazba "Mez" preferovat max\` (EN \`prefer\`, DE \`bevorzugen\`; \`ne\` = zrušit; JSON
+  \`prefer: "min" | "max"\`) u Meze vzdálenosti / úhlu a Drážky bez polohy: kinematika i přepočet vazeb drží díl u této meze, když ho
+  ostatní vazby neurčují; pevnou vazbu, ukotvení, kontakt ani motor nepřebije. Výpis vazby končí „· preferuje max“.
+- **Statický přepočet (úpravy vazeb a poloh):** díly volné v mezi se posunou do rovnováhy pružin a preferovaných stran (stejný
+  dokument nezávisle na historii – ZDVIH 27,15 a zpět 57,5 = výchozí poloha; řádek „rovnováha pružin … posunula: …“); při načtení
+  a zjišťování stavu se dokument nehýbe. Úprava, kterou nelze splnit, **nezapíše kompromis**: polohy zůstanou, řádek začíná ⚠ (ne ✓)
+  a ⚠ \`mate.conflict\` uvede „nejbližší dosažitelná hodnota 37,5 mm (zadáno 37,15 mm) – brání: …“.
+- \`pohyb\` / \`pohyb stav\` – definice a souhrn (rozsah pohybu komponent, kolize po třídách – první skutečná, nesplněné vazby); \`pohyb krok 12\` – polohy
   v kroku; \`pohyb export csv\` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   \`pohyb přehrát [smyčka]\`, \`pohyb zastavit\`, \`pohyb export png|webm\` (snímky ZIP / video z 3D okna, jen v aplikaci);
   \`pohyb kroky 48 čas 2 kolize vyp\`, \`pohyb motor smazat 1\`, \`pohyb smazat\`.
@@ -773,7 +863,18 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   \`{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }\`;
   klíč v \`comps\` = instance: název, u stejně pojmenovaných komponent \`"Šroub #12"\` (pořadí) nebo \`"Šroub [K48]"\` (přezdívka) –
   každá komponenta má svůj záznam (stejně sloupce CSV).
-- Studie se ukládá do sestavy (\`motion\` v JSON) a v \`stav\` je řádek „Pohybová studie: …“.
+- Studie se ukládá do sestavy (\`motion\` v JSON; rozsah × rychlost má u motoru \`ranged: true\`) a v \`stav\` je řádek
+  „Pohybová studie: …“.
+- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy, i komponent uvnitř
+  podsestav + vazby + studie; u dynamiky i materiál dílů). Po změně čehokoli z toho: \`stav\` píše „Pohyb: výsledek NEPLATÍ – od
+  výpočtu se změnilo: geometrie dílu „Deska A““ (strojově \`motion=stale motion.stale=1\`, nespočítáno \`motion=-\`), \`pohyb stav\` dá
+  ⚠ \`motion.stale\` bez souhrnu (řádek \`= … motion steps=5 t=2 motors=1 motion.stale=1 m1=…\`) a nepřepočítává; \`pohyb spustit\`,
+  \`pohyb krok N\`, \`pohyb export\`, \`pohyb přehrát\` a \`window.mncad.motion()\` přepočítají (ℹ \`motion.recomputed\` řekne, co se
+  změnilo) – starý výsledek se nikdy nevrací jako platný. Platný výsledek: \`motion=ok\` JEN když se kolize v krocích opravdu
+  kontrolovaly bez průniku a k motorům není upozornění; \`motion=mates-ok\` = vazby splněny, kolize nekontrolovány; \`warn\` = ⚠ k motorům
+  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec); \`conflict\` / \`clash\` = nesplněné vazby / průnik. Dva výpočty
+  téhož stavu (panel + text, dvakrát API) se spojí v jeden. Panel studie má stav \`data-motion-state="ok|stale|unchecked|running"\` a
+  verdikt \`data-motion-verdict\`.
 - Natočení v souhrnu (\` · natáčí se 30°\`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
   matice, ne Eulerovy úhly: komponenta vložená s \`otočení 180 0 0\`, která se jen posouvá, „natáčí se“ nehlásí.
 
@@ -789,6 +890,8 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (\`v
 - \`sestava pružina "P" mezi "A" "B" volná 44 blok 20 tuhost 25\` (EN \`between … and … free 44 solid 20 rate 25\`, DE
   \`zwischen … und … frei 44 block 20 steifigkeit 25\`) – \`volná\` = L0 (výchozí délka modelu), \`blok\` = délka na doraz Ln (výchozí
   (závity + 1) · drát), \`tuhost\` = c [N/mm]; \`blok 0\` / \`tuhost 0\` dřív zadanou hodnotu zruší (doraz z modelu, bez síly).
+  \`vedená ano|ne\` (EN \`guided yes|no\`, DE \`geführt ja|nein\`) = pružina vedená dírou / kapsou nebo trnem (vzpěr se pak
+  nehlásí; „Pružina mezi díly“ do díry ji nastaví sama) – řádek pružiny i \`sestava pružiny\` končí „· vedená“ / „· nevedená“.
   Stejný název = všechny instance (6 pružin jedním řádkem), \`#k\` / přezdívka = jedna. Protokol: stejné pružiny ve stejném
   stavu jeden řádek s počtem \`(6×)\`, stejný název v různém stavu řádek pro každý stav s \`#k\` / \`[přezdívka]\`
   (\`✓ pružina „P“ #3: …\`, \`⚠ pružina „P“ [P2]: …\`).
@@ -801,6 +904,13 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (\`v
   \`pohyb export csv\` přidá sloupce \`<pružina> L [mm]\` a \`<pružina> F [N]\`, \`window.mncad.motion()\` vrátí v kroku
   \`springs: { "<pružina>": { length, seat, force, level } }\`. Klíče \`springs\` i \`comps\` jsou podle **instance**: název, u
   stejných názvů \`"P #3"\` (pořadí) nebo \`"P [P2]"\` (přezdívka). Kolize v kroku počítají s pružinou v délce kroku.
+- **Řídicí × odvozené (vlna 22, bod 7):** ŘÍDÍ polohy komponent, dosedací plochy A/B a L0 / Ln / tuhost; \`length\`, \`offset\` a
+  \`seat\` v JSON jsou jen odvozená mezipaměť. Po načtení dokumentu (řádek JSON, \`otevřít\`, CLI \`--open\`, \`window.mncad.setDocument\`,
+  Soubor › Otevřít v aplikaci) se délka odvodí z ploch v nynějších polohách; rozpor nad 0,01 mm = ⚠ \`spring.stale\` „pružina „P“:
+  uložená délka 25 mm neodpovídá dosedacím plochám (15 mm) – délka odvozena z ploch“ a oprava jedním krokem historie (zpět ji vrátí).
+  \`stav\` ověří délku proti plochám: \`Pružiny: „P“ 15 mm (L0 32 · Ln 14) · F 340 N ✓ – délka odvozená z dosedacích ploch (řídí
+  polohy komponent)\`, rozpor ⚠ s oběma délkami, bez geometrie „uložená délka, s dosedacími plochami nezkontrolováno“ (bez ✓).
+  Kolize, STEP, výkres i 3D pracují s délkou z ploch.
 - \`sestava pružiny\` – stav všech pružin; \`stav\` má řádek \`Pružiny: „P“ 38 mm (L0 44 · Ln 20) · F 150 N ✓ (6×)\`;
   \`sestava pružina "P" odebrat\` – definice pryč, tvar ve volné délce. \`sestava odebrat "A"\` (dosedací komponenta) odebere i
   definice pružin, které na ní dosedaly (\`pružiny bez dosedací komponenty …\`).
@@ -855,7 +965,7 @@ rychlost do dorazu se nahradí odrazem −e·v (\`odraz e\`, 0 = zůstane ležet
 hustota materiálu, těžiště a setrvačnost ze sítě (\`pohyb hmotnost "X" 2,4\` přepíše, \`auto\` vrátí). Integrace: rychlostní Verlet
 s projekcí na vazby (RATTLE), pevný krok \`krok dt\` [s]; záznam ≤ 400 snímků (\`snímky N\`). S \`kolize\` se kolize kontrolují
 jen v \`kroky\` rovnoměrně rozložených snímcích (+ poslední; výchozí 36 jako kinematika, \`pohyb kroky N\` zhustí) – souhrn
-\`Kolize v pohybu: kroků s kolizí K z N\` a \` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)\`, \`clash.steps=K/N\`;
+\`Kolize v pohybu: kroků s kolizí K z N\` (jen kroky se skutečnou kolizí) a \` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)\`, \`clash.steps=K/N\`;
 ostatní snímky \`pohyb krok\` / CSV označí „nekontrolováno“. Kinematická studie zůstává výchozí –
 \`pohyb kinematika\` přepne zpět (nastavení dynamiky zůstane).
 
@@ -885,6 +995,17 @@ ostatní snímky \`pohyb krok\` / CSV označí „nekontrolováno“. Kinematick
   \`= … motion … mode=dyn bodies=2 spring.max=107N@0.24s stops=2 return=0.375s [drift=…%]\`, \`pohyb export csv\` zapíše soubor se
   sloupci dynamiky a STEP sestavy obsahuje pružiny jako skutečná tělesa v aktuální délce. Jen v aplikaci zůstává panel s grafem,
   přehrání a snímky (\`pohyb přehrát\` ℹ \`ui.no-view\`, \`pohyb export png|webm\` ✗ \`host.app-only\`).
+- Pohledy studie a video s pevným časováním (vlna 22): \`pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední\` uloží do studie
+  pohled (kamera: pojmenovaný pohled, nebo \`směr dx dy dz cíl x y z výška H\`; řez osou, \`řez normála …\`, nebo \`bez řezu\`),
+  \`pohyb pohled "Řez pružinami"\` ho zvolí pro přehrávání a export (v CLI ℹ \`ui.no-view\`, dokument si volbu pamatuje),
+  \`pohyb pohledy\` vypíše uložené. \`pohyb video rychlost 0,25 fps 30\` (nebo \`délka 5\`, \`pohled "A" "B"\` = synchronní dlaždice,
+  \`anotace vyp\`) uloží volby a vypíše plán \`video 2,6 s = 4 × délka studie 0,65 s · rychlost 0,25× · 30 fps · 78 snímků
+  (tolerance ±1 snímek = ±0,033 s)\` se strojovým řádkem \`= … video seconds=2.6 study=0.65 fps=30 frames=78 speed=0.25 ratio=4\`.
+  \`pohyb export webm|png [tytéž volby]\` exportuje snímky s časovou značkou i/fps (žádný záznam obrazovky): délka videa = délka
+  studie / rychlost ± 1 snímek nezávisle na počtu kroků a rychlosti vykreslení; aplikace soubor zpětně přečte a obraz zkontroluje
+  (✗ když se nemění, ⚠ část snímků). PNG bez voleb = snímek na každý vypočtený krok. Anotace (čas, krok, motory, vůle z kontroly
+  vůle) jsou v okně i vypálené v obraze; \`pohyb anotace vyp\` je vypne. \`window.mncad.motion().video\` vrátí plán
+  \`{ seconds, study, fps, frames, speed, ratio, tol, views, annot, text }\`.
 
 Příklad 1 – střižník: horní deska se 4 kapsami Ø21 hl. 10 dolů 30 mm a zpět, stírací deska na 4 pružinách dosedne na matrici:
 
@@ -1015,6 +1136,29 @@ Během delšího výpočtu ukazuje program u spodního okraje „Počítám prve
 vrací \`window.mncad.progress()\` a \`window.mncad.cancel()\`. Zrušený běh konzole dokument nezmění. Po výpočtu je
 v protokolu u delších prvků čas (\`✓ Pole 1 (pattern) · 7,9 s\`) a celkový čas. Jádro si pamatuje stav po prvcích:
 další příkaz přidaný na konec historie přepočítá jen nový prvek.
+
+**Běhy mají id a stav (vlna 22).** Každý běh textových příkazů (konzole, \`window.mncad.run\`, \`mncad run\`, \`POST /run\`)
+a každý export je běh s **id** (\`r12\`, serve \`j3\`) a **revizí vstupu** (\`<klíč dokumentu>@r·a1b2c3\`); stavy
+**čeká → počítá → dokončeno | zrušeno | chyba** (\`queued | running | done | cancelled | error\`). Běhy se řadí do jedné
+fronty – druhý \`run\` počká na první, nikdy neběží souběžně. Id je v JSON (\`run: { id, inputRev, state }\`), v HTTP
+hlavičce \`x-mncad-run\` a na konci řádku Σ (\`… run=r12\`); hlavička \`MNCAD/1 …\` se nemění. Konzole ukazuje „Běh r12:
+počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předchozí protokol jen sbalený jako **Předchozí běh r11** – starý
+protokol se nikdy nečte jako výsledek nového běhu (atributy \`data-run-id\`, \`data-run-state\` u výstupu); tlačítko
+**Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
+✗ \`run.cancelled\` před dalším řádkem. Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny \`pohyb přehrát\` se panelu doručí až po zápisu
+dokumentu běhu.
+
+**Uložit, export a sdílet pracují s dokončeným stavem:** nejdřív se zapíše rozepsané pole (napsaná hodnota bez opuštění pole)
+a rozepsaný list výkresu, pak se počká na běhy a stavbu modelu (u spodního okraje „Čekám na dokončení výpočtu…“ se
+**Zrušit**). Soubor .mncad nese \`modelRev\` (\`r·a1b2c3\`, revize modelu, ze které vznikl), řádek F exportu \`rev=r·a1b2c3\`.
+
+**Export je úloha s fázemi:** přestavba modelu → převod (STEP…) → **kontrola zpětným načtením** (STEP / BREP, stejná jako
+textové \`export step\` – i export z menu) → zápis souboru. Seznam **Exporty** vpravo dole drží stav, fázi, čas, soubor,
+velikost, kontrolu a revizi modelu i po konci (\`data-export-job\`, \`data-export-state\`); úlohu jde zrušit – soubor, který
+už založil dialog „Uložit jako“, se odstraní. \`window.mncad.exportFile\` vrací \`{ …, modelRev, check, job }\`, průběh
+ukazuje \`window.mncad.exports()\`. CLI \`--progress\` vypisuje fáze jménem (\`  export:step: převod do STEP\`,
+\`  build: síť modelu\`).
 
 ### Plech – tvářecí nástroje a křížový zlom (\`plech …\`, EN \`sheet …\`, DE \`blech …\`)
 
@@ -1207,6 +1351,109 @@ pružina tabulka "Talíře"
 Tažná: natočení oček 180° (n = 12,5), L0 = Lk + 2·Di = 21,6 + 2 · 8,8 = 39,2 mm, při 50 mm F2 = F0 + R·(50 − 39,2) = 56,3 N.
 Talíře A 40: L0 = 4·(h0 + t) = 12,6 mm, při 11,4 mm zdvih talíře 0,3 mm (33 % h0) a síla 3069 N; \`L2 19\` (víc než L0) by byl
 ✗ „délka L2 19 mm je větší než volná výška sloupce L0 12,6 mm“.
+
+### Kola a ozubení – \`kolo …\`, \`soukolí …\` (EN \`gear …\` / \`gearpair …\`, DE \`rad …\` / \`radpaar …\`)
+
+Každé kolo je **jeden prvek historie** „Ozubené kolo m2 z24“ (rozšíření \`gear.<druh>\`), jehož data jsou **jedna tabulka** –
+stejná jako v průvodci „Kola a ozubení“ a ve formuláři úprav (změna z nebo m → model se přestaví). Text čte slova řádků
+tabulky; co nezadáte, má rozumnou výchozí hodnotu (protokol napíše, které povinné řádky zůstaly výchozí). Popis všech řádků
+druhu (slovo, jednotka, výchozí hodnota, rozsah, norma) vypíše \`kolo nápověda <druh>\`, přehled druhů \`kolo nápověda\`.
+
+| Druh (\`kolo <druh>\`) | Prvek | Povinné řádky (výchozí) | Norma |
+|---|---|---|---|
+| \`čelní\` (přímé zuby) · \`šikmé\` (\`beta 15 pravé|levé\`) · \`šípové\` (\`drážka 6\`) | gear.spur / helical / herringbone | \`m 2 z 24 b 20\` | ISO 53, ISO 54, ISO 21771, DIN 3960 |
+| \`vnitřní\` (věnec) | gear.internal | \`m 2 z 60 věnec 0\` (0 = auto) | ISO 21771 |
+| \`hřeben\` (lineární ozubení, i šikmý \`beta\`) | gear.rack | \`m 2 z 40 h 20\` (h = výška celkem) | ISO 53 |
+| \`kuželové\` (\`beta 35\` = zakřivené zuby) · \`hypoidní\` (\`pastorek|talíř\`, \`z1 z2 de2 e\`) | gear.bevel / hypoid | \`m 2 z 20 protikolo 20\` · \`z1 11 z2 41 de2 200 e 25\` | ISO 23509 |
+| \`šnek\` (ZA) · \`šnekové\` (kolo) | gear.worm / wormwheel | \`m 2 q 10 l 0\` · \`m 2 z 30 q 10\` | DIN 3975 |
+| \`cykloidní\` (hodinové kolo / \`pastorek\` s lístky) · \`cyklodisk\` (kotouč reduktoru / \`věnec\` s čepy) | gear.cycloid / cyclodisc | \`m 1 z 30 protikolo 8\` · \`n 10 dp 60 čep 6 e 1,5\` | BS 978-2 |
+| \`řetězové\` (\`08B\`, \`10B\` … \`24B\`, ANSI \`40\` … \`80\`) | gear.sprocket | \`08B z 19\`, \`řady 1–3\` | ISO 606 |
+| \`řemenice\` (HTD \`3M\`…\`14M\`, \`T5\`, \`T10\`) · \`rohatka\` | gear.pulley / ratchet | \`5M z 32\` · \`z 24 da 60\` | ISO 13050, DIN 7721 |
+
+**Zápis:** \`slovo hodnota\` (\`m 2\`, \`z 24\`, \`úhel 20\`, \`x 0,2\`), zkráceně \`m2 z24 b20\` i \`m=2 z=24\`, desetinná čárka i tečka,
+\`°\` a \`mm\` za číslem nevadí. Složené zápisy těla kola: \`díra 20 [pero]\` (drážka DIN 6885-1), \`náboj 40 15 [obě strany|dole]\`
+(řetězové kolo typ \`B\` / \`C\`), \`díry 6 12 [80]\` (odlehčovací: počet, Ø, roztečná Ø), \`stojina 6\`, \`sražení 0,5\`, \`šroub M5\`.
+Výstup: \`polotovar\` = jen soustružené tělo Ø dₐ × b s nábojem a dírou (bez zubů), \`zuby\` = zubové mezery vyříznuté do
+aktivního tělesa (operace Odebrat). Operace: v dílu, který už těleso má, vznikne kolo jako **nové těleso**; \`přidat\` = sloučit
+s aktivním tělesem. Poloha \`v x y z\`, osa \`osa X|Y|Z|x y z\`, natočení zubů \`natočení 7,5\`, název \`název "Pastorek"\`.
+
+**Soukolí** \`soukolí <druh> …\` (druhy čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, cyklodisk,
+řetězové, řemenice) založí **dva díly s koly, novou sestavu, vloží obě kola ve správném záběru a spojí je vazbou ozubení**
+(hřeben: vazba hřeben) – stejnými existujícími příkazy, jaké vypíše průvodce (\`nový díl\`, \`prvek gear.*\`, \`nová sestava\`,
+\`vložit\`, \`sestava vazba ozubení\`). Zadaná osová vzdálenost \`a\` → součet posunutí Σx se dopočítá a rozdělí podle DIN 3992
+(\`x1\`, \`x2\` přepíšou, \`auto ne\` vypne dělení), hlava se zkrátí na hlavovou vůli 0,25·m; \`vůle\` = celková boční vůle
+(výchozí 0,04·m), \`díra1\` / \`díra2\` (výchozí asi čtvrtina roztečného průměru). Protokol vypíše převod, a_w, α_w, Σx, x1/x2,
+ε_α, ε_β a varování (podřezání, špičatý zub, interference, malé ε_α). Sestava nemá rám – kola jsou volná, drží je jen vazba
+ozubení; pro pohybovou studii vložte rám a vazby závěs (příklad 2).
+
+**Tabulka ozubení:** \`kolo tabulka\` vypíše tabulku posledního kola aktivního dílu (\`vše\` = všech kol, \`"název"\` = jednoho):
+modul, z, základní profil, α, β a smysl, x, průměry d / dₐ / d_f / d_b, výšku zubu, tloušťku zubu, rozměr přes zuby W_k (k),
+rozměr přes kuličky M_dK (D_M), u soukolí z protikola a osovou vzdálenost; řetězové kolo p, d₁, d, dₐ, d_f, M_R. Funguje i bez
+prohlížeče (CLI \`mncad run\`). V sestavě je to ✗ – přepněte na záložku dílu. \`stav\` má u každého kola jeden řádek
+(\`čelní m2 z24 x0 b20 · d 48 · dₐ 52 · W3 15,433 · díra 20 pero · kolo\`). **Na výkres:** \`výkres tabulka ozubení ano\`
+(EN \`drawing gear table yes\`, DE \`zeichnung verzahnungstabelle ja\`; ve výkrese přepínač „Tabulka ozubení“) – tabulka nad
+razítkem (nad kusovníkem a tabulkou děr), 110 mm na kolo, nejvýš dvě kola vedle sebe; v SVG, PDF, DXF i DWG; \`výkres stav\`
+ji vypíše řádkem „Tabulka ozubení: …“. Překryv s pohledy = ⚠ (větší list nebo menší měřítko). Umístění se odchyluje od
+ISO 1340 (pravý horní roh drží tabulka revizí); zjednodušené zobrazení ozubení podle ISO 2203 výkres nekreslí (pohledy
+ukazují skutečné zuby).
+
+#### Příklad 1 – čelní kolo s nábojem, tabulka ozubení a výkres
+\`\`\`
+nový díl "Kolo z24"
+kolo čelní m 2 z 24 b 20 díra 20 pero náboj 40 15     # d 48 · dₐ 52 · W3 15,433 · M_dK 52,951
+kolo tabulka
+výkres A3 tabulka ozubení ano
+výkres stav
+výkres export pdf
+\`\`\`
+
+#### Příklad 2 – soukolí s posunutím na osovou vzdálenost 81 a pohybová studie
+\`\`\`
+nový díl Rám
+kvádr 140 60 10 v -30 -30 -10                     # deska pod koly
+díra 10 skrz v 0 0                                 # osa pastorku (Ø díry kola 1)
+díra 30 skrz v 81 0                                # osa kola (a = 81)
+soukolí čelní m 2 z1 20 z2 60 a 81 b 20           # → x1 0,3668 · x2 0,1558 · ε_α 1,52 + sestava „Soukolí m2 z20/z60“
+vložit "Rám" ukotvit
+sestava vazba závěs "Pastorek m2 z20" Ø10 "Rám" Ø10
+sestava vazba závěs "Kolo m2 z60" Ø30 "Rám" Ø30
+pohyb motor rotační "Pastorek m2 z20" 0..360 krok 10
+pohyb stav
+\`\`\`
+
+#### Příklad 3 – řetězové kolo 08B duplex a kotouč cykloidního reduktoru s věncem
+\`\`\`
+nový díl Řetězka
+kolo řetězové 08B z 19 řady 2 díra 25 pero náboj 50 25 B
+kolo tabulka
+nový díl "Kotouč reduktoru"
+kolo cyklodisk n 10 dp 60 čep 6 e 1,5 b 8 ložisko 20
+nový díl "Věnec reduktoru"
+kolo cyklodisk n 10 dp 60 čep 6 e 1,5 b 8 věnec
+\`\`\`
+
+- EN: \`gear spur m 2 z 24 b 20 bore 20 keyway hub 40 15 both sides\`, \`gear helical m 2 z 30 beta 15 left\`, \`gear sprocket 08B z 19
+  strands 2\`, \`gear table all\`, \`gear help spur\`, \`gearpair spur m 2 z1 20 z2 60 a 81\`. DE: \`rad stirnrad m 2 z 24 bohrung 20 nut
+  nabe 40 15 beide seiten\`, \`rad schräg … beta 15 links\`, \`rad kettenrad 08B z 19 reihen 2\`, \`rad tabelle alle\`,
+  \`radpaar stirnrad m 2 z1 20 z2 60 a 81\`. Česká slova platí v každém jazyce rozhraní.
+- Obecný příkaz: \`prvek gear.spur m=2 z=24 b=20 bore=20 keyway=ano hubD=40 hubL=15\` dává stejná data (klíče řádků tabulky,
+  \`prvek nápověda gear.spur\`). Dokument → skript zapisuje kola zpět příkazem \`kolo …\` (jen hodnoty odlišné od výchozích
+  a povinné řádky); kolo s polohou odkazem nebo jiným tělesem zapíše obecným \`prvek gear.*\`.
+
+| Druh | Přesně | Přibližně / nemodeluje se |
+|---|---|---|
+| čelní, šikmé, šípové | evolventa (B-spline ≤ 4·10⁻⁵ mm), trochoida paty z nástroje se zaoblením 0,38·m, podřezání, šroubovice | vrchol šípu ostrý, bez modifikace hlavy a podélné modifikace |
+| vnitřní | evolventa | zaoblení paty oblouk 0,3·m (skutečné dává obrážecí nůž), kolize hlav pravidlem a 2D kontrolou |
+| hřeben | celý profil ISO 53 | – |
+| kuželové přímé | sférická evolventa, úhly kuželů | zaoblení paty |
+| kuželové zakřivené, hypoidní | roztečné kužele, střední úhly sklonu, oblouk stopy zubu | tvar boku jmenovitý (ne obálkový, ne sdružený) – pro zástavbu, hmotnost a výkres, ne pro výrobu ozubení |
+| šnek (ZA) / šnekové kolo | šroubová plocha, osový profil / profil ve střední rovině, hrdlo | boky kola mimo střední rovinu (bez obálky šneku); jiné tvary boku a globoidní šnek se nenabízejí |
+| cykloidní, cyklodisk | epicykloida, hypocykloida, ekvidistanta epitrochoidy | proporce BS 978-2 jen jako výchozí hodnoty |
+| řetězové | oblouky ISO 606, průměry | boční sražení zubu zjednodušené |
+| řemenice | rozteč, průměry | tvar drážky HTD (oblouk + zaoblení) |
+
+Mimo rozsah: pevnostní výpočet (ISO 6336), stupně přesnosti (ISO 1328) kromě jmenovité boční vůle, modifikace boků, planetové
+soukolí jedním příkazem, rám soukolí, zjednodušené zobrazení ISO 2203 na výkrese.
 
 ### Příklad – příruba DN50 (6 řádků)
 
@@ -1488,6 +1735,9 @@ je na jejich řádku.
 | \`skica export dxf ["Skica 1"] [jako název]\` (\`sketch export dxf\` · \`skizze export dxf\`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
 | \`sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]\` (\`share\` · \`freigeben\` – německé \`teilen\` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku \`URL: …\`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
 | \`odkaz\` (\`link\`) | vypíše poslední sdílený odkaz znovu |
+| \`exporty [vymazat]\` (\`exports [clear]\` · \`exporte [löschen]\`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý \`export …\`, \`výkres export …\`, \`skica export dxf\` i export tlačítkem zapíše formát, soubor, revizi modelu \`r·a1b2c3\` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení) |
+| \`výstupy [zastaralé]\` (\`outputs [stale]\` · \`ausgaben [veraltet]\`) · \`zastaralé\` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
+| \`přepočítat vše\` (\`recompute all\` · \`alles neu berechnen\`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (\`sestava obnovit vše\` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, \`kolize\`, \`pohyb spustit\`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (\`výkres vydat B\`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz) |
 
 \`\`\`
 uložit
@@ -1555,6 +1805,22 @@ Data ▸ Export ▸ Textový skript (.txt).
   vlastními příkazy, výkresy), u sestavy pak \`nová sestava "…"\`, \`vložit "díl" v x y z otočení rx ry rz [ukotvit]\` pro každou
   komponentu (stejný díl se zapíše jednou a vloží N×), vazby \`sestava vazba … #1 F3 #2 F7\` (komponenty pořadím \`#k\`;
   závěs / šířka / drážka i s druhými plochami, symetricky s \`rovina #1 F1\`), pohybovou studii a listy výkresu.
+  Zapíše vše, co jde napsat textem (vlna E): přezdívky komponent (\`vložit "Šroub" … jako "K48"\`), pružiny mezi díly
+  (\`sestava pružina #4 mezi #3 F9 #2 F6 volná 41 blok 16 tuhost 5.069 vedená ano\` – i z „Pružiny mezi díly“ do děr vzoru),
+  dynamiku pohybu (\`pohyb hmotnost\`, \`pohyb síla|moment\`, \`pohyb dynamika čas … krok … gravitace 0 -0.6 -0.8 …\`, u kinematické
+  studie s nastavením dynamiky ještě \`pohyb kinematika\`), celé razítko (šablona, logo jako data URL, firma, zákazník,
+  projekt, kontroloval, schválil, polotovar, počet, tepelné, povrch, úhly, sražení, nepředepsané i tabulkou podle desetinných
+  míst), tabulku revizí (\`výkres revize A "…" datum=… kreslil=…\`, \`výkres revize A značky ne\`), funkční kóty a polohy děr
+  (\`kótovat chytře funkční 80 díry tabulka\`), \`pružiny plně\`, další modely, pomocné pohledy, řezy lomenou čarou a detaily
+  (nejdřív pohled, na který se odkazuje – pomocný pohled z řezu C až po řezu C; písmena jako v dokumentu, jde-li to, jinak
+  je protokol vypíše „C → B“; umístění na listu s pevným formátem \`umístit x y\` od levého dolního rohu, na listu
+  s automatickým formátem \`umístit x y odshora\` od levého horního – výška takového listu se při čtení mění s každým
+  dalším pohledem), částečné řezy, přerušení, \`výkres uložení zobrazení … / tabulka ano\` a upravené vygenerované kóty
+  celkových rozměrů a pozice (\`výkres vygenerované skrýt dim:front:t\`, \`výkres vygenerované posun pos:1 5 -3\` – jen ty,
+  které na listu jsou: klíče ověří jádro, úpravu objektu, který už na listu není, skript vynechá a ohlásí).
+  Razítko se píše proti stavu při čtení: \`výkres list nový\` převezme razítko aktivního listu, proto má další list jen
+  řádek s tím, co se liší – i vyprázdnění (\`výkres razítko šablona=iso7200 číslo="" zákazník=""\`, \`logo=ne\`); popisové
+  údaje dokumentu (číslo, kreslil, revize) se na konci dorovnají (\`výkres list 1\` · \`výkres razítko číslo="…"\` · \`výkres list 2\`).
 - **Přesnost:** každý řádek prvku se před zápisem přečte stejným rozborem jako konzole, doplní nad prvky tak, jak budou
   v dokumentu PO PŘEČTENÍ skriptu (nová id), a porovná s původním prvkem. Co vlastní příkaz neumí, zapíše se obecným
   \`prvek <typ> klíč=hodnota\`, a co ani ten, jako jednořádkový JSON – protokol napíše pokrytí („183 prvků: 183 vlastním
@@ -1579,10 +1845,30 @@ Data ▸ Export ▸ Textový skript (.txt).
 - **Kontrola tam a zpět (doporučený postup):** \`const t = await window.mncad.script()\` → \`await window.mncad.run(t)\` (nová
   záložka) → \`měřit těleso\` / \`stav\` v obou záložkách: objem a obálka každého dílu, počet komponent a „Vazby: N splněno“
   musí být stejné.
-- **Co se nepřenáší** (protokol to vypíše řádky ℹ): vygenerované kóty výkresu vznikají znovu příkazem \`kótovat chytře\`
+- **Co se nepřenáší** (protokol to vypíše řádky ℹ a skript totéž v komentářích \`# ℹ …\` za hlavičkou): volby listu bez
+  textového příkazu (\`dimRoom\`, \`weldSymbols\` – jen JSON), model na listu ze záložky (jiného dokumentu), pružina nebo
+  vazba s plochou v podsestavě; pohled, řez, detail, částečný řez a přerušení, jejichž základní pohled na listu není
+  (vypnutý pohled – aplikace je drží, ale nekreslí); vygenerované kóty výkresu vznikají znovu příkazem \`kótovat chytře\`
   (nová id; kóty, které jste smazali, smaže skript znovu – \`výkres smazat a3 a8\`), jejich ruční úpravy (tolerance)
   a ruční kóty / značky je třeba doplnit (\`výkres tolerance …\`); komponenty z importovaných souborů a podsestavy; barvy
   těles a ploch, podklady skic; 2D výkres se zapíše jako jeden řádek JSON.
+
+### Vygenerované kóty celkových rozměrů a pozice textem
+
+Kóty celkových rozměrů pohledů (\`kótovat celkově\` / \`základní\`) a pozice (balónky) sestavy, které jde ve výkresu vybrat
+myší (Delete skryje, tažení posune), jdou upravit i textem – klíč \`dim:<pohled>:t\` (kóta nahoře), \`dim:<pohled>:l\` (vlevo),
+\`pos:<číslo>\` (pozice):
+
+\`\`\`
+výkres vygenerované                       # klíče listu a dosavadní úpravy
+výkres vygenerované skrýt dim:front:t pos:3
+výkres vygenerované zobrazit pos:3
+výkres vygenerované posun pos:1 5 -3      # mm listu, y nahoru; kóta se posouvá jen kolmo k sobě
+výkres vygenerované obnovit               # vše na výchozí místo (s klíči jen ty; klíč, který na listu ani mezi úpravami není = ✗)
+\`\`\`
+
+EN \`drawing generated hide|show|move|restore\`, DE \`zeichnung generiert ausblenden|einblenden|verschieben|wiederherstellen\`.
+\`výkres stav\` vypíše řádek „Vygenerované kóty a pozice upravené: …“.
 
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 
@@ -1936,6 +2222,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | \`výkres razítko logo="firma.png"\` · \`… logo="data:image/png;base64,…"\` · \`… logo=ne\` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek, DXF/DWG jako vyplněný obrys (SOLID) |
 | \`výkres nepředepsané ISO 2768-mK\` · \`… mK\` · \`… f H\` · \`… desetinná\` · \`… desetinná ±0,1 ±0,1 ±0,01 ±0,005\` · \`… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005\` · \`… X.XX=±0,02\` · \`… ne\` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); \`ne\` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | \`výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]\` · \`výkres revize smazat B\` | tabulka revizí; poslední revize se zapíše do razítka |
+| \`výkres vydat [B] ["popis změny"] [datum …] [vše]\` · \`výkres vydat zrušit [vše]\` (\`drawing issue\` · \`zeichnung freigeben\`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu \`r·a1b2c3\` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu je vydaný list **zastaralý**: \`výkres stav\` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), \`stav\`, konec běhu, řádek D (\`stale=drawing\`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ \`drawing.stale\`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani \`přepočítat vše\` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999 |
 | \`výkres otočení 0|90|180|270\` · \`výkres řez XZ odsazení 0 poloviční|celý\` · \`výkres kusovník ano|ne\` · \`výkres balónky ano|ne\` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | \`výkres pružiny zjednodušeně|plně\` | pružiny se na výkrese kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr přes volnou délku), osa a čerchované osy drátu na středním průměru jen tam, kde je obrys vidět; v řezu se obal nešrafuje (jen obrys a osy drátu). Pružina = prvek Pružina nebo Tažení po šroubovici s profilem Kruh, který je **prvním materiálem svého tělesa** (normálie pružin, \`pružina …\` jako první prvek dílu, \`… nové těleso "Pružina"\`, i jako komponenty sestavy); těleso pak smí už jen odebírat (zabroušené konce) nebo přidat jiný tvar (očka, ramena). Šroubovice přidaná na existující těleso (chod šneku, oblý závit na hřídeli, pružina přidaná do pouzdra) se kreslí vždy přesně, stejně jako šroubovicová drážka (odebrání) – samostatnou pružinu proto zakládejte jako \`nové těleso\`. Chytré kóty čtou skutečný tvar (obal pružiny nekótují jako díru). \`plně\` = skutečná šroubovice – skrytí hran trvá u každé pružiny desítky sekund (A1 sestava se 4 pružinami: minuty). Stav listu (\`výkres stav\`) uvádí ve Volbách, jak se pružiny kreslí, jen když list nějakou pružinu má. |
 | \`kótovat základní\` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
@@ -1949,7 +2236,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | \`výkres kóta průměr|poloměr pohled horní střed x y [r R] [úhel 45]\` · \`výkres kóta úhel pohled přední x1 y1 x2 y2 x3 y3 x4 y4\` | kóta kružnice (dohledá se podle středu a poloměru) a úhlu dvou hran (mezi směry 1→2 a 3→4) |
 | \`výkres upravit a3 odsazení=8 přípona="H7" text="(20)"\` · \`výkres upravit a5 posun="5 -3"\` | úprava kóty / značky (také \`hodnota=\`, \`základna=\`, \`výška=\`; \`posun\` přesune popisek značky v mm listu); cíl id nebo popisek |
 | \`výkres smazat a3 a5\` · \`výkres smazat "Ra 1,6"\` · \`výkres smazat vlastní\` · \`výkres smazat vše\` | smazání; smazané vygenerované kóty se při přegenerování nevrátí |
-| \`výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]\` · \`výkres detail A měřítko 5:1\` · \`výkres detail smazat A\` | detailní pohled (střed v mm modelu, umístění středu v mm listu) |
+| \`výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]\` · \`výkres detail A měřítko 5:1\` · \`výkres detail smazat A\` | detailní pohled (střed v mm modelu, umístění středu v mm listu od levého dolního rohu; \`umístit 330 97 odshora\` = od levého horního rohu – nezávisí na výšce listu, která se u automatického formátu mění s dalšími pohledy; en \`from-top\`, de \`von-oben\`) |
 | \`výkres model "Hřídel" [pohled horní] [měřítko 1:2]\` · \`výkres model smazat "Hřídel"\` | další model na listu: komponenta sestavy nebo otevřená záložka |
 | \`výkres stav list 2\` · \`výkres stav vše\` | stav zvoleného / všech listů (přehled listů, souřadnice, id, razítko, revize) |
 
@@ -2001,7 +2288,7 @@ Body se zadávají jako u ostatních příkazů výkresu v **mm modelu v rovině
 | Příkaz | Význam |
 | --- | --- |
 | \`výkres pohled pomocný přední hrana 40 50 100 15,36\` | **pomocný pohled** (POHLED B, metoda šipky ISO 128-30) kolmo na šikmou plochu, která je v rodičovském pohledu vidět jako hrana – plocha ve skutečném tvaru; bod hrany se přichytí k hraně pohledu |
-| \`… hrana … podél\` · \`… otočit\` · \`… umístit 330 120\` | pohled podél hrany · z opačné strany · střed pohledu na zadané místo listu (jinak zarovnaně s rodičem: ISO E po šipce, A proti ní) |
+| \`… hrana … podél\` · \`… otočit\` · \`… umístit 330 120\` · \`… umístit 330 177 odshora\` | pohled podél hrany · z opačné strany · střed pohledu na zadané místo listu od levého dolního rohu, s \`odshora\` od levého horního (jinak zarovnaně s rodičem: ISO E po šipce, A proti ní) |
 | \`výkres pohled pomocný plocha F7\` · \`výkres pohled pomocný směr 0,5 0 0,87\` | směr podle rovinné plochy (číslo F z \`měřit\`) nebo vektoru k pozorovateli; rodič se vybere sám (pohled, ve kterém je plocha vidět z boku) |
 | \`výkres řez zalomený horní body -70 -10 -20 -10 -20 10 70 10\` | **zalomený řez** (ŘEZ B–B): rovnoběžné úseky spojené skoky; skoky se v řezu nekreslí, šrafy jen v rovinách úseků |
 | \`výkres řez natočený horní body 60 0 0 0 -30 52\` | **natočený řez**: konec hlavního ramena, vrchol (osa otočení), konec šikmého ramena – šikmé rameno se otočí do roviny hlavního (příruby, rozteče děr) |
@@ -2155,13 +2442,21 @@ třídí. Nejčastější:
 | \`select.fallback\` ⚠ / \`select.ambiguous\` ⚠ | pravidlo plochy nenašlo plochu na obálce / našlo víc ploch | plochu číslem F3 |
 | \`name.renamed\` ⚠ / \`name.renamed-auto\` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
 | \`material.density-assumed\` ⚠ / \`material.class\` ℹ | \`materiál X\` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | \`materiál hlinik\` + označení |
-| \`asm.stale-copy\` ⚠ | díl změněný po \`vložit\` – komponenta je kopie, změna se do sestavy nepromítne | vložit znovu / \`sestava upravit\` |
+| \`asm.stale-copy\` ⚠ | díl změněný po \`vložit\` (prvek, číslo, materiál, druh, výkres) – komponenta je kopie, změna se do sestavy sama nepromítne; hlásí se na řádku změny i u \`kusovník\`, listu sestavy a \`stav\` | \`sestava obnovit "X"\` (\`vše\`, \`údaje\`) |
+| \`mate.lost\` ✗ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí | \`sestava vazba N plocha b <plocha>\` / \`sestava vazba N smazat\` |
+| \`mate.renumbered\` ℹ / \`mate.restored\` ℹ | táž plocha má po úpravě dílu jiné číslo / ztracená plocha je zpět (přesná shoda) | – |
+| \`bom.make-incomplete\` ⚠ / \`bom.docs\` ℹ | vyráběný díl bez čísla výkresu, výkresu nebo označení materiálu / souhrn dokumentace u výstupů sestavy („vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“) | \`výkres razítko číslo=…\` a \`materiál …\` v dílu, \`sestava obnovit\`, \`druh nakupovaný\` |
 | \`clash.thread\` ℹ, \`clash.underhead\` ℹ / \`clash.real\` ⚠ | \`kolize\`, \`kontrola sestava\` i \`pohyb … kolize\` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen \`clash.real\` řešit; \`pohyb krok N\` vypíše kolize kroku |
 | \`clash.undetermined\` ⚠ / \`clash.hidden\` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (\`závit M10\`) |
+| \`clash.touch\` ℹ / \`clash.work\` ℹ / \`clash.stale\` ⚠ | dotyk – průnik tenčí než \`kolize tolerance\` (výchozí 0,01 mm) / pracovní kontakt podle pravidla \`kolize pravidlo pracovní …\` v okně operace / \`kolize seznam\` nad kontrolou z dřívějšího stavu sestavy | dotyk a pracovní kontakt nejsou závada; \`clash.stale\` → \`kolize\` znovu; jádrová díra bez závitu = \`clash.undetermined\` s nápovědou (\`díra … závit M12\` nebo \`kolize pravidlo závit\`) |
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
+| \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
+| \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
+| \`op.accepted\` ℹ / \`op.superseded\` ℹ / \`feature.unchecked\`, \`doc.unchecked\` ℹ / \`feature.built\` ℹ / \`feature.suppressed\` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u \`feature.unchecked\` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
 | \`drawing.section-legacy\` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (\`dnes pište: …\` v hlášce) |
 | \`drawing.tolerance-missing\` ⚠ | \`výkres kontrola tolerancí\`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | \`výkres tolerance aN …\` |
+| \`drawing.stale\` ⚠ | vydaný list (\`výkres vydat\`) neodpovídá nynější revizi modelu: \`výkres stav\`, \`stav\`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | \`výkres vydat B\` (nová revize), přehled \`výstupy zastaralé\` |
 | \`param.clamped\` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
 | \`geom.approx\` ℹ / \`geom.volume-failed\` ⚠ | objem ze sítě (velké těleso) / objem se nepodařilo změřit (0) | |
 | \`tab.settle-timeout\` ✗ | aplikace nepřepnula záložku do 5 s | zopakovat |
@@ -2202,7 +2497,39 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 
 ## Stav prvku: ✓ / ⚠ / ✗ – co znamená
 
-- Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
+- Výsledek prvku se v protokolu vypíše **až po výpočtu**. Řádek „→ … – výsledek po výpočtu níže“ (ℹ \`op.accepted\`) jen
+  potvrzuje přijetí příkazu – u nového prvku, u úpravy (\`upravit\`, \`smazat\`, \`přesunout\`, \`proměnná\`, \`konfigurace\`,
+  entita / kóta skici, \`zpět\`), u příkazů výkresu („… – výsledek po vyhodnocení listu níže“; pak ✓ „list … vyhodnocen bez
+  nálezů“ nebo ✗ / ⚠ listu) i u načtení dokumentu s prvky (JSON na řádku, \`otevřít\`, \`--open\`: po ověřovací stavbě na
+  řádku načtení ✗ / ⚠ vadného prvku, nebo ✓ „dokument … postaven: prvků N, bez ⚠ a ✗ · těleso platné“; ℹ \`doc.unchecked\`,
+  když se platnost tělesa nekontrolovala). Běžný (ne přísný) běh staví model jednou na konci – ověřen je tedy stav po
+  POSLEDNÍ změně. Řádek, po kterém přišla další změna a který nemá výsledek žádného prvku, dostane ℹ \`op.superseded\`
+  („stav modelu po tomto příkazu se samostatně nestavěl – ověřen je až stav po řádku N“): mezistav není ✓ ani ✗, jen
+  nezkontrolovaný. Kdo chce výsledek po každém řádku, pustí běh \`přísně\` (staví po každé operaci). **Žádný řádek
+  nedostane ✓ a později ✗.**
+- Stav má čtyři oddělené úrovně: **přijato** (ℹ) → **vznik prvku** (✗ \`feature.failed\`, když stavitel selže) → **účinek
+  booleovské operace** proti nástroji („úběr 352,1 mm³ (>99 % nástroje)“, „přidáno 2000 mm³ (celý nástroj)“; žádný účinek =
+  ⚠) → **konečné těleso** („těleso platné“, „2 těles, platná“, „žádné objemové těleso“, nebo „těleso nezkontrolováno (důvod)“).
+  Řádek výsledku je nese všechny: \`✓ Díra 1 (hole) · úběr 125,7 mm³ (12 % nástroje) · těleso platné\`; JSON má totéž
+  strojově v \`entries[].data.levels\` (\`built\`, \`effect {op, level: none|partial|full|changed, dV_mm3, tool_mm3}\`,
+  \`body {solids, free, valid: true|false|"unchecked"}\`).
+- Platnost tělesa se po prvku kontroluje do 400 ploch, větší těleso až na konci stavby (do 1000 ploch); nad to se
+  nekontroluje vůbec (těleso se měří ze sítě). Prvek bez kontroly **není ✓**, ale ℹ \`feature.unchecked\` s důvodem; řádek D
+  a \`= status\` pak mají \`valid=unchecked\` (jinak \`solids=N valid=1|0\`) a prvek se nepočítá do prvního čísla \`feat=\`
+  (✓), ale do \`unchecked=N\`. Plochy mimo objemová tělesa (volné plochy, pláště vedle tělesa) hlásí \`free=N\`.
+- Po stavbě proběhne **rychlá** kontrola platnosti (BRepCheck; odchylka hran od ploch jen v několika bodech) – řádek Geometrie
+  ve \`stav\` končí „· rychlá kontrola“. **Přesnou** kontrolu (odchylka počítaná přesně) spustí \`kontrola přesně\` (EN \`check
+  exact\`, DE \`prüfen genau\`; v aplikaci čip „platné · rychlá kontrola“ ve stavovém řádku) a sama proběhne před exportem
+  STEP / BREP do 400 ploch („✓ těleso: přesná kontrola platnosti … – platné“, vada = ⚠ \`geom.exact-invalid\`, nad limit ℹ
+  s důvodem). Výsledek platí pro tutéž geometrii: Geometrie pak končí „· přesná kontrola“, řádek D nese \`vcheck=exact\`
+  (bez klíče = rychlá kontrola), JSON \`docs[].validCheck\` = \`exact\` | \`fast\`. Model se kvůli exportu neupravuje
+  (žádné „opravy tolerancí“) – STEP je přesně model.
+- Potlačený prvek (\`potlačit\`, nebo potlačený aktivní konfigurací) se nestaví: má ℹ \`feature.suppressed\` („potlačen – nestaví
+  se“), nikdy ✓; ve výpisu \`stav\` „ℹ (potlačen)“ a počet „N ℹ potlačeno“, v řádku D \`off=N\` (nepočítá se do \`feat=\` mezi ✓).
+- Prvek objemového typu (primitiva, vysunutí, díra, zaoblení, pole, prvky rozšíření s operací přidat / odebrat a všechny
+  prvky rozšíření mimo kartu Plochy – plech, svařence, pružiny, pokročilé prvky), po kterém nezůstalo objemové těleso
+  nebo přibyly volné plochy, je ✗ u toho prvku („má dát objemové těleso, ale výsledek je jen plocha / plášť“) a těleso
+  zůstane jako před ním. Prvky ploch (\`surf.*\` bez operace) plochu dát smějí – jejich stav říká „žádné objemové těleso“.
 - **✓** = výsledek je platné objemové těleso a operace se projevila (objem nebo topologie se změnily).
 - **⚠** = prvek se zpracoval, ale výsledek si žádá pozornost:
   - *„Prvek těleso nezměnil“* / *„Prvek objem tělesa nezměnil (jen rozdělil plochy)“* – nástroj leží mimo těleso, jen se
@@ -2230,14 +2557,20 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 - Skoro-dotyk se nikdy „nezaokrouhluje“: dvě díry, které se překrývají o 0,00001 mm, kanál, který prorazí plochu
   o 0,00001 mm, nebo nálitek s mezerou 0,00001 mm se postaví přesně tak, jak jsou zadané.
 - **✗** = operace selhala, těleso zůstalo jako před prvkem (např. skořepina, kterou jádro neumí, tažení bez objemu).
-- Řádek **Geometrie:** ve \`stav\` říká „platná · 1 těleso“, nebo „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“.
+- Řádek **Geometrie:** ve \`stav\` říká „platná · 1 těleso“, „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“, nebo
+  „nezkontrolováno (důvod)“ – kontrola, která neproběhla, se nikdy nevypíše jako platná.
   Pokles objemu ani „1 těleso“ samy o sobě správnost nedokazují – rozhoduje tento řádek a nepřítomnost ⚠.
 
 ## Závity – jak je zadat správně
 
-- Katalogový závit: \`závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]\` – hrubé i jemné stoupání
-  (M18×1,5, M10×1,25; jiné stoupání se dopočítá). Bez \`modelovat\` je kosmetický: geometrie se nemění, na výkrese
-  se kružnice válce (nebo jádra díry u \`vnitřní\`) kótuje označením. S \`modelovat\` vzniknou zjednodušené drážky.
+- Katalogový závit: \`závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat | šroubovice]\` – hrubé i jemné stoupání
+  (M18×1,5, M10×1,25; označení i s mezerami „m18 x 1,5“, × / x / X, čárka i tečka; CS / EN \`thread\` / DE \`gewinde\`).
+  Bez volby je kosmetický: geometrie se nemění, na výkrese se kružnice válce (nebo jádra díry u \`vnitřní\`) kótuje
+  označením. \`modelovat\` = zjednodušené soustružené drážky (bez stoupání), \`šroubovice\` (EN \`helix\`, DE \`schraubenlinie\`)
+  = **skutečná šroubovice** z označení – stejné jádro i čísla jako Tažení po šroubovici níže (vnější: povrch Ø d, hloubka
+  0,6134·P; vnitřní: povrch D1/2, hloubka 0,5413·P do stěny, špička na d/2 – díra vrtaná vrtákem závitu Ø16,5 u M18×1,5).
+  Jemné stoupání CAD umí v obou cestách; stoupání mimo řadu ISO 261 (např. M18×3 nebo M18×1,25 – řada M18 je 2,5 / 2 /
+  1,5 / 1) se postaví, ale dostane ⚠ \`thread.pitch-nonstandard\` (i u díry se závitem a u kosmetického závitu).
 - Díra se závitem: \`díra závit M18×1,5 hloubka 20 v x y\` – vrták (Ø16,5) se dopočítá z označení; zadaný průměr
   (\`díra 16,4 závit M18×1,5 …\`) má přednost, \`jádro\` = D1 podle ISO 965-1 (16,376).
 - Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON \`{"type":"ext","ext":"surf.helixSweep","data":{…}}\`):
@@ -2246,8 +2579,14 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   volitelně \`leadIn\` (náběh jako u závitového kalibru: hřbet prvního závitu je od začátku vybroušený až na dno drážky
   a během N otáček se zvedá do plného profilu – drážka sama je plná od začátku).
   Příklad matice M18×1,5 s jádrem Ø16,4: \`radius: 8.2, depth: 0.8, pitch: 1.5, turns: 12, side: "internal"\`.
+  Závit z katalogu místo čísel: \`prvek surf.helixSweep profile=thread60 thread=M18×1,5 side=internal turns=12 mode=cut\`
+  (\`thread\` vyplní poloměr, stoupání a hloubku podle strany – zadané radius / pitch / depth se pak nepoužijí).
   JSON prvku na jednom řádku lze míchat s textovými příkazy (\`trubka 42 16,4 30\`, další řádek \`{"type":"ext",…}\`, \`stav\`).
-  Špička profilu nesmí být tečná k povrchu (např. radius 9 + depth 0,8 u díry Ø16,4) – takový výsledek je ⚠.
+  Program ověří, že drážka řeže povrch, na kterém závit vzniká (body profilu ve 12 místech šroubovice proti tělesu před
+  prvkem): špička tečná k povrchu (radius 9 + depth 0,8 u díry Ø16,4) = ⚠ \`thread.tip-tangent\`; drážka celá v materiálu
+  (side=internal s radius 9 v díře Ø16,4 – skrytý kanál) = ⚠ \`thread.no-reach\`; drážka ústí do povrchu jen špičkou
+  (obrácená strana, radius 9 + depth 0,82 u díry Ø16,4) = ⚠ \`thread.wrong-side\`. Hláška radí side a radius podle nalezeného
+  povrchu. Drážka, která odebrala celý nástroj (žádná část profilu ve vzduchu), je ⚠ \`thread.no-reach\` vždy.
 - Na **výkrese** se modelované závity kreslí zjednodušeně (ISO 6410): hladký válec / díra s označením „M18×1,5 dl. 18“;
   skutečná šroubovice je jen v 3D a ve STEP (přesná projekce šroubovice by trvala minuty).
 
@@ -2294,6 +2633,10 @@ v hostiteli:
 - **Akce jen pro aplikaci** (\`akce …\`, \`barva plochy\`, analýzy a formařské nástroje, \`výkres export png\`, export snímků
   pohybu) dávají v CLI/HTTP ✗ \`host.app-only\` – nikdy tiše. Výjimka: \`pružina tabulka …\` (= \`akce spring.table\`) čte jen
   dokument, provádí ji engine i v CLI/HTTP (řádek \`= … api … springs=1 name=… R=…N/mm Ln=…mm …\`).
+- **Úlohy HTTP** (\`mncad serve\`): každý \`POST /run\` je úloha s id (\`j<n>\`, nebo vlastní \`"id": "…"\` v těle – pak ji lze
+  zrušit ještě před odpovědí); \`GET /runs\` a \`GET /run/<id>\` vrátí stav (čeká ve frontě relace / počítá / dokončeno /
+  zrušeno / chyba), \`DELETE /run/<id>\` úlohu zruší: čekající se neprovede, běžící se přeruší ukončením vlákna (odpověď
+  jejího \`POST /run\` = protokol ✗ \`run.cancelled\`, relace zůstane ve stavu před úlohou).
 - **\`otevřít "soubor"\`** (EN \`open\`, DE \`öffnen\`) otevře dokument ze vstupních souborů v nové záložce: v CLI soubory
   ve složce \`--files\` a ve složce skriptu, v HTTP klíče \`files\`. Formáty .mncad / JSON, STEP (velká sestava se rozdělí na
   díly jádrem), BREP, STL, OBJ, 3MF, DXF jako skica. Chybějící soubor = ✗ \`file.missing\` se seznamem dostupných.
@@ -2311,6 +2654,37 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
 - Dokument vytvořený během (\`nový díl\`, \`nová sestava\`, JSON, normálie, \`otevřít\`) dostane **vlastní záložku** a nikdy
   nepřepíše jiný dokument – ani prázdnou sestavu z dřívějšího běhu konzole (prázdnou záložku znovu použije jen úvodní
   prázdný díl, do kterého žádný běh nezapsal). Skript lze tedy posílat po částech.
+- **Opakovaný běh téhož skriptu** (\`window.mncad.run\` dvakrát, konzole, CLI \`--resume relace\`) nezaloží druhou sadu
+  záložek. Platí pro **každý** dokument běhu – \`nový díl\`, \`nová sestava\`, \`normálie\`, \`otevřít\`, JSON dokument
+  (\`window.mncad.setDocument\`), \`2d nový\`, rám formy, \`předloha otevřít\`: záložku stejného názvu a druhu, kterou
+  **dřívější běh** založil **stejným druhem příkazu**, běh převezme – nahradí její obsah (jeden krok historie – \`zpět\` ho
+  vrátí) a ohlásí to (✓ „… – znovu použitá záložka“ a ℹ \`doc.reused\`); stejné záložky, stejné objemy, žádné „Kvádr 2“.
+  Druhy jsou dva: dokument **vytvořený** příkazem (\`nový díl\`, \`nová sestava\`, normálie, \`2d nový\`, rám formy…) a dokument
+  **načtený** zvenku (\`otevřít\`, JSON / \`setDocument\`, \`předloha otevřít\`). Záložku jiného druhu běh nepřepíše –
+  \`nový díl "Deska"\` nikdy nenahradí otevřený soubor „Deska“ ani ruční práci, \`--open\` nebo záložku z jiné karty
+  prohlížeče: dokument jde do nové záložky a ℹ \`doc.name-taken\` to řekne. Volba na konci řádku \`nový díl\` / \`nová sestava\`:
+  \`nový díl "A" nový\` (EN \`new\`, DE \`neu\`) = vždy nová záložka, \`nový díl "A" znovu\` (EN \`again\`, DE \`erneut\`) =
+  převzít i záložku jiného druhu. Dokument s výchozím názvem (\`nový díl\` bez názvu, JSON bez názvu, „Nový díl 2“) se
+  nepřevezme nikdy – pro opakovatelné skripty **pojmenujte každý dokument** a začněte jím každý blok (příkazy bez
+  \`nový díl\` se přidají do otevřeného dokumentu). Převzetí je vidět vždy: ℹ \`doc.reused\` / \`doc.name-taken\` jsou ve
+  stručném protokolu i bez \`--notes\` – víc dokumentů jedním řádkem s počtem a názvy
+  (\`ℹ L1,L3,L5 ×3 doc.reused záložky z dřívějšího běhu použité znovu – …: „Deska“, „Čep“, „S“\`; s \`--notes\`, v plném
+  protokolu a v JSON každý dokument zvlášť) – a Σ má \`reused=<n>\` / \`name-taken=<n>\`. V prohlížeči si aplikace
+  záložky běhů pamatuje i po obnovení stránky v téže kartě (jen jejich id v sessionStorage).
+- Každý dokument, který běh založil nebo změnil, se na konci postaví a změří (díl se znovu nestaví, výsledek je z ověření
+  dílu během) a má řádek \`D\` s čísly (\`feat=\`, \`V=\`, \`m=\`, \`bbox=\`) v **plném** protokolu (\`--full\`,
+  \`protocol: "full"\`) a v JSON (\`docs\`); prázdný dokument běhu (prázdná sestava) také. **Stručný** protokol (CLI výchozí,
+  \`protocol: "short"\`) vypíše řádek \`D\` jen hlavního dokumentu a dokumentů s ✗ / ⚠ – čísla jiného dílu tedy čtěte z plného
+  protokolu nebo JSON. Dokumenty dřívějších běhů relace beze změny se nestaví (\`V=-\`). Vedlejší dokument běhu bez tělesa
+  (jen skica – profil, dráha) není chyba (\`V=-\`); ✗ \`build.failed\` „model nemá těleso“ dostane jen hlavní dokument.
+- **Stručný protokol i v prohlížeči:** \`await window.mncad.run(text, { protocol: "short" })\` (nebo jen
+  \`run(text, "short")\`) vrátí tentýž protokol MNCAD/1 jako \`mncad run … --formats none\` (≤ 2 kB, řádky D, F souborů, které
+  skript zapsal – \`export step\` i s \`check=ok\`, Σ \`files=\`; liší se jen \`t=\`, \`slow=\`, \`mem=\` a id běhu \`run=\`); \`"full"\` = plný
+  protokol, \`"json"\` = RunReport (s \`full\`), \`budget\` (celé číslo 1–1048576, jen \`short\` / \`json\`) a \`notes\`
+  (true / false, ne u \`console\`) jako \`--budget\` / \`--notes\`, výchozí (\`"console"\`) = text konzole. Neznámá volba nebo
+  hodnota (\`protocoll\`, \`budget: -5\`) je chyba, ne tichý jiný výstup. Značka přebytku \`… in protocol-full.txt\` znamená
+  v prohlížeči: celý protokol vrátí \`protocol: "full"\`. Konzole Textové příkazy má přepínač **Stručný protokol**
+  (pamatuje si ho).
 - \`vložit "Díl"\` a \`výkres model "Díl"\` berou **aktuální** dokument záložky (i změněný v dřívějším běhu) pod jeho
   aktuálním názvem; po \`název "B"\` už starý název neplatí.
 - Stav sestavy (řádek „Sestava: … obálka, objem Σ, hmotnost Σ“), stav vazeb, kusovník a kolize se počítají z dílů
@@ -2338,10 +2712,10 @@ Výpisy \`=\` stručného protokolu CLI/HTTP mají strojovou část **stejnou v 
 
 Pohybová studie (\`pohyb motor …\`, \`pohyb stav\`, \`pohyb spustit\`) má ve stručném protokolu **jeden** řádek – kroky, zdvih
 tuhých skupin (komponenty, které se pohybují spolu: \`<zdvih>mm:<počet komponent>\`), stojící a natáčející se komponenty
-a třídy kolizí v krocích; rozsah pohybu každé komponenty je v plném protokolu:
+a třídy kolizí v krocích, na konci motory (průběh, začátek > konec, směr); rozsah pohybu každé komponenty je v plném protokolu:
 
 \`\`\`
-= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3
+= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3 m1=range:0>-50:-
 ⚠ L364 clash.real "Střižný nástroj": v pohybu „Horní deska“ × „Pružina“ od kroku 3 (t = 0,15 s): kroků 38, dvojic komponent 4, …
 \`\`\`
 
@@ -2353,7 +2727,8 @@ prvkem do jednoho řádku (\`⚠ L76-L90 ×8 feature.warning "Matrice": 8 prvků
 „Rotace 1, Vysunutí 2, …“\`) a stejně varování listů výkresu (\`… drawing.warning "Sestava": 5 listů: N ručních úprav kót
 se nepodařilo přiřadit … – „01 Deska: 1, …“\`); plný protokol a JSON mají každý prvek / list zvlášť.
 
-\`status\` má tytéž klíče jako řádek \`D\` (u dílu \`feat=✓/⚠/✗ V= m= bbox= solids= valid=\`). Výpis bez strojových údajů
+\`status\` má tytéž klíče jako řádek \`D\` (u dílu \`feat=✓/⚠/✗ V= m= bbox= solids= valid=1|0|unchecked\`, podle stavu
+\`free=N\` – plochy mimo tělesa – a \`unchecked=N\` – prvky bez kontroly platnosti, které nejsou v \`feat\` mezi ✓; \`off=N\` – potlačené prvky). Výpis bez strojových údajů
 (nápověda, záložky, kusovník, vazby, CSV) má v prvním řádku jen \`lines=<n>\` a jeho řádky jsou odsazené pod ním – to je
 volný text v jazyce běhu. Lokalizovaný text měření a stavu (jako v konzoli) je v \`--full\` / \`protocol-full.txt\` a v JSON
 \`entries[].detail\`; \`entries[].text\` je strojová část.
@@ -2498,6 +2873,43 @@ zastaví); textový stav (\`stav\`) takový výsledek označí \`clash.stale=1\`
 ISO 4762 / ISO 4017 z knihovny i ze šroubového spoje (\`sestava šroub\`) nemají prstenec pod hlavou (hlava se srazí dřív, než
 se přidá dřík) – v průchozí díře ani na podložce se se sevřeným dílem neprotnou; \`clash.underhead\` zůstává pro šrouby uložené
 starší verzí a pro vlastní modely.
+
+**Třídy, místo a pravidla kolizí** (vlna 22): každý výstup – protokol \`kolize\`, \`stav\`, řádek \`D\`, panel Kolize v aplikaci,
+zvýraznění ve 3D, souhrn pohybové studie i \`window.mncad.motion()\` – čte TÝŽ zařazený seznam, nikdy surové průniky. Třídy:
+⚠ skutečná (\`clash.real\`), ⚠ nevyhodnotitelná (\`clash.undetermined\`), ℹ pracovní kontakt (\`clash.work\`), ℹ dotyk
+(\`clash.touch\`), ℹ pod hlavou, ℹ šroub v závitu. Dvojice nese **instanci** (\`„Šroub M12 [S2]“\` přezdívka, \`„Blok #2“\` pořadí,
+v podsestavě \`„Horní skupina › Šroub M12 [S1]“\`) a **místo** průniku (těžiště a obálka ve světových souřadnicích:
+\`– místo [50; 30; 28,5] · obálka 18 × 18 × 3 mm\`; JSON \`entries[].data.items[]\` = \`a, b, aPath, bPath, volume, at, box, depth\`).
+Opakované nálezy se seskupí (stejná třída, stejné díly, objem v toleranci 2 %): \`⚠ 4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4,
+#5, #6] (365,2 mm³)\`. **Dotyk**: průnik tenčí než tolerance (\`kolize tolerance 0,01\`, výchozí 0,01 mm; tloušťka = 2·V/S
+nejtlustšího kusu) – přesah 0,0001 mm dvou desek je ℹ \`clash.touch\`, ne kolize (výpis \`= clash … touch=1\`, D \`clash=3(thread=0,
+real=2,touch=1)\`). **Jádrová díra bez prvku závitu** (hladká díra Ø10,2, importovaný díl) se šroubem Ø12 = ⚠ \`clash.undetermined\`
+s nápovědou „zadejte díru se závitem, nebo pravidlo“ – ne skutečná kolize; hlava nebo konec dříku v plném materiálu zůstanou
+skutečnou kolizí. **Pravidla** (\`doc.clashRules\`, jeden model i pro procesní vrstvu): \`kolize pravidlo pracovní "Razník"
+"Plech" kroky 10..20\` nebo \`… pohyb "ZDVIH" 30..27\` (hodnota motoru vazby; staticky hodnota vazby v dokumentu) = pracovní
+kontakt nástroj × plech jen v okně operace, mimo okno zůstává ⚠; \`kolize pravidlo závit "Deska A" ["Šroub M12"]\` = šroub
+v hladké jádrové díře je závitový záběr (třída podle pásma závitu). Pravidla se uplatní hned nad uloženou kontrolou (geometrie
+se nemění – výsledek neplatnost nezíská); \`kolize pravidla\` je vypíše, \`kolize pravidlo 2 smazat\` odebere, skript dokumentu
+je přenáší. \`kolize seznam [skutečné|závit|dotyk|pracovní|závady|vše]\` = výpis po skupinách s filtrem. V pohybu \`clash.steps=K/N\`
+počítá jen kroky se skutečnou (nebo nevyhodnotitelnou) kolizí, šrouby v závitu zvlášť (\`thread=\`), na konci \`touch=\` /
+\`work=\` (jen nenulové). Panel Kolize: přepínače tříd s počty (\`data-clash-filter\`), skupiny (\`data-clash-group\`,
+\`data-clash-cls\`), u závady „Pracovní kontakt…“ / „Je to závit“, pravidla a tolerance dotyku; ve 3D svítí jen listy se závadou.
+
+**Platnost výsledků (žádné falešné zelené):** každý uložený výsledek platí jen pro dokument + revizi geometrie + konfiguraci +
+polohu mechanismu, pro které vznikl – na jinou záložku se nikdy nepřenese. Ve \`stav\` (řádek \`= … status\`): \`clash=-\` =
+sestava kontrolována nebyla, \`clash.stale=1\` = kontrola je z jiného stavu sestavy; \`mates=N/M\` je vždy pro nynější stav (po
+kroku zpět nebo změně se stav vazeb přepočítá), \`mates.stale=1\` + „NEPLATÍ pro polohy v dokumentu“ = polohy komponent
+v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený stav platí až po přepočtu a \`sestava vazby\` to hlásí ⚠;
+\`measure.stale=1\` / \`compare.stale=1\` + „Měření: výsledek L12 je pro revizi r·a1b2c3 – NEPLATÍ“ = poslední \`měřit\` /
+\`porovnat\` tohoto dokumentu je z dřívější revize, příkaz zopakujte. Řádek \`D\` končí \`stale=clash,mates,motion,measure,compare\`
+(jen druhy, které konečnému stavu neodpovídají; JSON \`docs[].stale\`) – kolize a vazby se před tím přepočítají, zůstává hlavně
+měření a porovnání provedené před poslední změnou. Výsledek bez \`stale\` (\`✓ kolize: žádné\`, \`ok=1\`, \`mates=N/N\`) tedy
+popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
+(\`data-clash-state\`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi \`r·…\` a polohu.
+Výstupy (vlna 22, bod 20): dokument s výkresy nebo záznamy exportů má v řádku \`D\` revizi modelu \`rev=r·a1b2c3\` (JSON
+\`docs[].rev\`) a \`stale=\` navíc \`drawing\` (vydaný list ze starší revize modelu – \`výkres vydat\`) a \`export\` (záznam exportu ze
+starší revize – \`exporty\`); \`stav\` pak má řádky „Revize modelu“, „Výkres: …“, „Exporty: …“ a strojově \`drawing.stale=N
+export.stale=N\`. Přehled a opravy: \`výstupy zastaralé\`, \`přepočítat vše\`.
 
 **\`porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]\`** (EN \`compare\`,
 DE \`vergleichen\`) porovná model se souborem reference (STEP, BREP, STL; sestava STEP jako jedno těleso) – stejný výpočet jako

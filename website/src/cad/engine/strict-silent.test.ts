@@ -51,7 +51,7 @@ function fakeKernel(over: Partial<Record<string, unknown>> = {}, metrics: Partia
 }
 const hostOf = (kernel: KernelApi): EngineHost => ({ kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
 /** záznamy s kódem jako „L<n> <úroveň> <kód>“ */
-const coded = (r: RunReport) => r.entries.filter((e) => e.code && e.level !== "ok" && e.level !== "measure" && e.code !== "msg.note").map((e) => `L${e.line ?? "-"} ${e.level} ${e.code}`);
+const coded = (r: RunReport) => r.entries.filter((e) => e.code && e.level !== "ok" && e.level !== "measure" && e.code !== "msg.note" && e.code !== "op.accepted").map((e) => `L${e.line ?? "-"} ${e.level} ${e.code}`);
 const find = (r: RunReport, code: string): Entry | undefined => r.entries.find((e) => e.code === code);
 const has = (r: RunReport, line: number | null, level: string, code: string) => expect(coded(r), JSON.stringify(coded(r))).toContain(`L${line ?? "-"} ${level} ${code}`);
 

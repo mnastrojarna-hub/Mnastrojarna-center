@@ -11,7 +11,7 @@ import * as r from "replicad";
 
 export type Shape = r.Shape3D;
 type OC = {
-  BRepCheck_Analyzer: new (s: unknown, geom: boolean) => { IsValid(): boolean; delete(): void };
+  BRepCheck_Analyzer: new (s: unknown, geom: boolean, parallel?: boolean, exact?: boolean) => { IsValid(s?: unknown): boolean; delete(): void };
   TopExp_Explorer: new () => { Init(s: unknown, kind: unknown, avoid: unknown): void; More(): boolean; Next(): void; Current(): unknown; delete(): void };
   TopAbs_ShapeEnum: Record<string, unknown>;
   ShapeFix_Solid: new (s: unknown) => { Perform(p: unknown): boolean; Solid(): unknown; delete(): void };
@@ -44,15 +44,74 @@ export function countSub(shape: r.AnyShape, kind: "SOLID" | "SHELL" | "FACE" | "
   return n;
 }
 
-/** Platnost tvaru podle BRepCheck_Analyzer (včetně geometrických kontrol: sebeprotínající dráty, neorientovatelné plochy). */
-export function isValidShape(shape: r.AnyShape): boolean {
+/**
+ * Složení tvaru pro očekávaný typ výsledku prvku (feature-levels.ts): objemová tělesa, plochy mimo ně (volné plochy,
+ * pláště – průzkum s vynecháním těles) a všechny plochy. Levné i u velkých těles (jen průchod topologií).
+ */
+export function compositionOf(shape: r.AnyShape): { solids: number; free: number; faces: number } {
+  const o = oc();
+  const ex = new o.TopExp_Explorer();
+  let free = 0;
+  try {
+    ex.Init(shape.wrapped, o.TopAbs_ShapeEnum.TopAbs_FACE, o.TopAbs_ShapeEnum.TopAbs_SOLID);
+    while (ex.More()) {
+      free++;
+      ex.Next();
+    }
+  } finally {
+    ex.delete();
+  }
+  return { solids: countSub(shape, "SOLID"), free, faces: countSub(shape, "FACE") };
+}
+
+/**
+ * Platnost tvaru podle BRepCheck_Analyzer (včetně geometrických kontrol: sebeprotínající dráty, neorientovatelné plochy).
+ * `exact` = přesná metoda (vlna 22, bod 22a): odchylka křivky hrany od plochy se počítá přesně (BRepLib_CheckCurveOnSurface),
+ * ne v konečném počtu bodů – pomalejší, ale bez ní „platná“ znamená jen „platná rychlou kontrolou“.
+ */
+export function isValidShape(shape: r.AnyShape, exact = false): boolean {
   const o = oc();
   let a: { IsValid(): boolean; delete(): void } | null = null;
   try {
-    a = new o.BRepCheck_Analyzer(shape.wrapped, true);
+    a = exact ? new o.BRepCheck_Analyzer(shape.wrapped, true, false, true) : new o.BRepCheck_Analyzer(shape.wrapped, true);
     return a.IsValid();
   } catch {
     return false;
+  } finally {
+    a?.delete();
+  }
+}
+
+/** výsledek přesné kontroly: platnost, počet ploch a ploch s vadou (hrana mimo plochu v toleranci, drát, orientace…) */
+export type ExactCheck = { valid: boolean; faces: number; badFaces: number; ms: number };
+
+/**
+ * Přesná kontrola platnosti (BRepCheck přesnou metodou) s počtem vadných ploch. Vadná plocha = plocha, která sama nebo
+ * v kontextu svých hran / drátů / vrcholů neprojde (typicky křivka hrany dál od plochy, než dovoluje tolerance hrany).
+ */
+export function exactCheck(shape: r.AnyShape): ExactCheck {
+  const o = oc();
+  const t0 = Date.now();
+  let a: { IsValid(s?: unknown): boolean; delete(): void } | null = null;
+  let faces = 0;
+  let badFaces = 0;
+  try {
+    a = new o.BRepCheck_Analyzer(shape.wrapped, true, false, true);
+    const valid = a.IsValid();
+    const ex = new o.TopExp_Explorer();
+    try {
+      ex.Init(shape.wrapped, o.TopAbs_ShapeEnum.TopAbs_FACE, o.TopAbs_ShapeEnum.TopAbs_SHAPE);
+      while (ex.More()) {
+        faces++;
+        if (!valid && !a.IsValid(ex.Current())) badFaces++;
+        ex.Next();
+      }
+    } finally {
+      ex.delete();
+    }
+    return { valid, faces, badFaces: valid ? 0 : Math.max(1, badFaces), ms: Date.now() - t0 };
+  } catch {
+    return { valid: false, faces, badFaces: Math.max(1, badFaces), ms: Date.now() - t0 };
   } finally {
     a?.delete();
   }

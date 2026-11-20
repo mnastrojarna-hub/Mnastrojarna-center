@@ -1,0 +1,62 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Šroub M12“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska B“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska C“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+→ Díra 3 (hole) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+✓ Válec 1 (cylinder)
+✓ Válec 2 (cylinder)
+✓ Kvádr 2 (box)
+✓ Kvádr 3 (box)
+✓ Díra 3 (hole)
+
+Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 118,45 cm³ · ploch 8 · hran 17
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 3 [hole, id #] ✓ – Ø10,20 hloubka 18 v [20; 30; 20], osa Z
+=== run 2 ===
+✓ nová sestava „Sestava 5b“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S4“
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S5“
+✓ komponenta „Deska B“ vložena do sestavy
+kolize: 3 – skutečné 2 · dotyk 1
+⚠ řádek 6: kolize „Deska A“ × „Šroub M12 [S4]“ (993,9 mm³) – místo [20; 30; 11,78] · obálka 18 × 18 × 20 mm
+⚠ řádek 6: kolize „Deska A“ × „Šroub M12 [S5]“ (1 135,2 mm³) – místo [50; 30; 8,25] · obálka 12 × 12 × 18 mm
+✓ tolerance dotyku 0,00001 mm (průnik tenčí = dotyk, ne kolize)
+kolize po pravidlech: skutečné 3
+Kolize (zkontrolováno ?): skutečné 3 · zobrazeno 0 skupin (dotyk)
+✓ tolerance dotyku 0,01 mm (průnik tenčí = dotyk, ne kolize)
+kolize po pravidlech: skutečné 2 · dotyk 1
+
+Dokument: „Sestava 5b“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Šroub M12 [S4] [20; 30; 0] · Šroub M12 [S5] [50; 30; 2] · Deska B [0; 60; 0]
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 120 × 32 mm · objem Σ 187,73 cm³ · hmotnost Σ 1,474 kg
+Kolize: 3 – skutečné 2: Deska A × Šroub M12 [S4] (993,9 mm³) v místě [20; 30; 11,78]; Deska A × Šroub M12 [S5] (1 135,2 mm³) v místě [50; 30; 8,25]; dotyk 1 (zkontrolováno ?)
+=== run 3 ===
+✓ nová sestava „Sestava 5P“ – nová záložka
+✓ komponenta „Deska C“ vložena do sestavy (ukotvená)
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S1“
+kolize: 1 – šroub v závitu 0, pod hlavou 0, skutečné 0, nevyhodnotitelné 1
+⚠ řádek 4: kolizi „Deska C“ × „Šroub M12 [S1]“ nelze vyhodnotit: šroub Ø12 v díře Ø10,2 bez prvku závitu – zadejte díru se závitem (díra … závit M12), nebo dvojici označte pravidlem „kolize pravidlo závit“ – místo [20; 30; 16] · obálka 12 × 12 × 8 mm
+✓ pravidlo kolizí r1 závit bez prvku „Deska C“ × „Šroub M12 [S1]“ vždy
+kolize po pravidlech: šroub v závitu 1
+Kolize (zkontrolováno ?): šroub v závitu 1 · zobrazeno 1 skupin (vše)
+ · šroub v závitu: šroub v závitu „Deska C“ × „Šroub M12 [S1]“ (pravidlo závit)
+
+Dokument: „Sestava 5P“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska C [0; 0; 0] ⚓ · Šroub M12 [S1] [20; 30; 12]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 42 mm · objem Σ 123,54 cm³ · hmotnost Σ 0,970 kg
+Kolize: 1 – šroub v závitu 1 (zkontrolováno ?)

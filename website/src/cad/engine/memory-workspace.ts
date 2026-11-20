@@ -6,13 +6,14 @@
  * * historie zpět je na záložku a má nejvýš `HISTORY_MAX` (80) kroků;
  * * prázdná záložka se znovu použije jen pro úvodní prázdný díl relace – dokument vytvořený během ji nikdy nepřepíše
  *   (oprava tiché ztráty prázdné sestavy, CAD-HEADLESS-NAVRH.md 5.2 č. 14);
- * * relace (`save` / `loadWorkspace`) nese dokumenty všech záložek s daty importů (`embedBlobs`), bez historie.
+ * * relace (`save` / `loadWorkspace`) nese dokumenty všech záložek s daty importů (`embedBlobs`), bez historie;
+ * * záložky, které založil běh skriptu (`origin`, i v relaci), opakovaný běh převezme dokumentem téhož původu (engine/runs.ts).
  */
 import { b64ToBytes, embedBlobs, internBlobs, putBlobAs, type SavedDoc } from "../blobs";
 import { docHasContent, docTabKind, normalizeDraftDoc } from "../draft/doc";
 import { tr } from "../i18n";
 import { emptyDoc, uid, type CadDoc } from "../types";
-import { HISTORY_MAX, newAsmCaches, type AsmCaches, type DocKey, type TabInfo, type Workspace } from "./workspace";
+import { HISTORY_MAX, newAsmCaches, type AsmCaches, type DocKey, type RunDocKind, type RunOrigin, type TabInfo, type Workspace } from "./workspace";
 
 type Hist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
 type Tab = {
@@ -25,6 +26,10 @@ type Tab = {
   run: number;
   /** pořadí vzniku (pro „nejnovější dokument běhu“) */
   seq: number;
+  /** záložku založil běh skriptu (`openInTab({ origin })`) – opakovaný běh ji převezme dokumentem téhož původu (engine/runs.ts) */
+  origin?: RunOrigin;
+  /** číslo běhu, který do záložky naposledy zapsal (`openInTab` / `commit`) – dokumenty běhu pro řádky D */
+  wrote: number;
 };
 
 /** soubor relace (`session.mncad-ws`, paměť `mncad serve`) */
@@ -38,6 +43,12 @@ export type SessionFile = {
   docIds?: string[];
   /** indexy záložek, které jsou stále úvodním prázdným dílem */
   initial?: number[];
+  /**
+   * indexy záložek, které založil běh skriptu: `made` = dokument vytvořený příkazem (`nový díl`, normálie…), `opened` =
+   * dokument načtený během (`otevřít`, JSON) – opakovaný běh je převezme dokumentem téhož původu; starší relace bez polí = žádné
+   */
+  made?: number[];
+  opened?: number[];
   blobs?: Record<string, string>;
 };
 
@@ -57,9 +68,9 @@ export class MemoryWorkspace implements Workspace {
     if (!o.empty) this.activeId = this.addTab(emptyDoc(), { initial: true }).id;
   }
 
-  private addTab(d: CadDoc, o: { id?: string; docId?: string; initial?: boolean } = {}): Tab {
+  private addTab(d: CadDoc, o: { id?: string; docId?: string; initial?: boolean; origin?: RunOrigin; wrote?: boolean } = {}): Tab {
     const id = o.id && !this.list.some((t) => t.id === o.id) ? o.id : uid();
-    const t: Tab = { id, docId: o.docId ?? uid(), hist: { past: [], present: d, future: [] }, initial: !!o.initial, run: this.runNo, seq: ++this.seq };
+    const t: Tab = { id, docId: o.docId ?? uid(), hist: { past: [], present: d, future: [] }, initial: !!o.initial, run: this.runNo, seq: ++this.seq, ...(o.origin ? { origin: o.origin } : {}), wrote: o.wrote ? this.runNo : -1 };
     this.list.push(t);
     return t;
   }
@@ -90,9 +101,10 @@ export class MemoryWorkspace implements Workspace {
     const t = this.active();
     t.hist = { past: [...t.hist.past, t.hist.present].slice(-HISTORY_MAX), present: d, future: [] };
     t.initial = false;
+    t.wrote = this.runNo;
   }
 
-  async openInTab(d0: CadDoc, o: { docId?: string; reuseEmpty?: boolean } = {}): Promise<{ id: DocKey; reused: boolean }> {
+  async openInTab(d0: CadDoc, o: { docId?: string; reuseEmpty?: boolean; origin?: RunOrigin } = {}): Promise<{ id: DocKey; reused: boolean }> {
     const d = normalizeDraftDoc(internBlobs(d0));
     const cur = this.list.find((x) => x.id === this.activeId);
     if (cur && o.reuseEmpty !== false && cur.initial && isPartDoc(cur.hist.present) && !docHasContent(cur.hist.present)) {
@@ -101,9 +113,10 @@ export class MemoryWorkspace implements Workspace {
       cur.docId = o.docId ?? uid();
       cur.run = this.runNo;
       cur.seq = ++this.seq;
+      cur.origin = o.origin;
       return { id: cur.id, reused: true };
     }
-    const t = this.addTab(d, { docId: o.docId });
+    const t = this.addTab(d, { docId: o.docId, origin: o.origin, wrote: true });
     this.activeId = t.id;
     return { id: t.id, reused: false };
   }
@@ -190,6 +203,31 @@ export class MemoryWorkspace implements Workspace {
     return (id === undefined ? this.active() : this.list.find((t) => t.id === id))?.docId ?? "";
   }
 
+  docOf(id: DocKey): CadDoc | null {
+    return this.list.find((t) => t.id === id)?.hist.present ?? null;
+  }
+
+  namedTabs(name: string, kind: RunDocKind): { id: DocKey; origin?: RunOrigin; claimed: boolean }[] {
+    const key = fold(name);
+    return this.list
+      .filter((t) => docTabKind(t.hist.present) === kind && fold(t.hist.present.name) === key)
+      .map((t) => ({ id: t.id, ...(t.origin ? { origin: t.origin } : {}), claimed: this.runNo > 0 && t.run === this.runNo }));
+  }
+
+  async claimTab(id: DocKey, origin: RunOrigin): Promise<CadDoc> {
+    const t = this.tab(id);
+    this.activeId = t.id;
+    t.origin = origin;
+    t.initial = false;
+    t.run = this.runNo; // dokument tohoto běhu (`findPart`, `partNames`, další `nový díl` ho znovu nepřevezme)
+    t.seq = ++this.seq;
+    return t.hist.present;
+  }
+
+  runDocKeys(): DocKey[] {
+    return this.runNo > 0 ? this.list.filter((t) => t.wrote === this.runNo).map((t) => t.docId) : [];
+  }
+
   freshName(base: string): string {
     const taken = new Set(this.list.map((t) => t.hist.present.name));
     if (!taken.has(base)) return base;
@@ -219,6 +257,8 @@ export class MemoryWorkspace implements Workspace {
       ids: this.list.map((t) => t.id),
       docIds: this.list.map((t) => t.docId),
       initial: this.list.flatMap((t, i) => (t.initial ? [i] : [])),
+      made: this.list.flatMap((t, i) => (t.origin === "new" ? [i] : [])),
+      opened: this.list.flatMap((t, i) => (t.origin === "open" ? [i] : [])),
       ...(Object.keys(blobs).length ? { blobs } : {}),
     };
     return new TextEncoder().encode(JSON.stringify(file));
@@ -260,7 +300,7 @@ export class MemoryWorkspace implements Workspace {
     for (const [id, data] of blobs) putBlobAs(id, data);
     const ws = new MemoryWorkspace({ empty: true });
     docs.forEach((doc, i) => {
-      ws.addTab(normalizeDraftDoc(internBlobs(doc)), { id: f.ids?.[i], docId: f.docIds?.[i], initial: !!f.initial?.includes(i) });
+      ws.addTab(normalizeDraftDoc(internBlobs(doc)), { id: f.ids?.[i], docId: f.docIds?.[i], initial: !!f.initial?.includes(i), origin: Array.isArray(f.made) && f.made.includes(i) ? "new" : Array.isArray(f.opened) && f.opened.includes(i) ? "open" : undefined });
     });
     if (!ws.list.length) ws.addTab(emptyDoc(), { initial: true });
     const a = Number.isInteger(f.active) ? Math.min(Math.max(0, f.active), ws.list.length - 1) : 0;

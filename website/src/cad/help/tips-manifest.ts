@@ -288,6 +288,8 @@ export const TIP_MANIFEST: Record<TipPackage, readonly ManifestRow[]> = {
     ["adv.dome", "Kopule", "Tvorba › Pokročilé tvary"],
     ["adv.textOnCyl", "Text na válci", "Tvorba › Pokročilé tvary"],
     ["adv.lipGroove", "Lem / drážka", "Tvorba › Pokročilé tvary"],
+    ["gear.wizard", "Kola a ozubení", "Tvorba › Kola a ozubení"],
+    ["gear.pair", "Soukolí", "Tvorba › Kola a ozubení"],
     ["surf.extrude", "Plošné vysunutí", "Plochy › Plochy"],
     ["surf.revolve", "Plošná rotace", "Plochy › Plochy"],
     ["surf.sweep", "Tažení plochy", "Plochy › Plochy"],

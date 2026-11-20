@@ -1,7 +1,8 @@
 /**
  * Kontrola a porovnání textem (CAD-HEADLESS-NAVRH.md kap. 6.1, 6.2; balík B5) – rozbor řádku, bez jádra:
  *
- *   kontrola [díl "A" | sestava | vše] [díry] [polohy]                         EN check …     DE prüfen …
+ *   kontrola [díl "A" | sestava | vše] [díry] [polohy] [přesně]                EN check … exact  DE prüfen … genau
+ *     `přesně` = platnost tělesa přesnou metodou BRepCheck (vlna 22, bod 22a) – výpis říká, která kontrola proběhla
  *     přesný objem / hmotnost / obálka / tělesa / platnost + hustota (a zda je předpokládaná) a tabulka děr
  *     (souosé úseky sloučené, zahloubení, závit, dno díry); sestava = Σ objem (V.sum i V.union), obálka, vazby, kolize
  *     po třídách a řádek na každý různý díl
@@ -16,7 +17,8 @@ import { tr } from "./i18n";
 import { isReferenceLine } from "./reference/parse";
 
 export type CheckTarget = "active" | "assembly" | "all" | { part: string };
-export type CheckCmd = { target: CheckTarget; holes: boolean; positions: boolean };
+/** `exact` = přesná kontrola platnosti tělesa (BRepCheck přesnou metodou – vlna 22, bod 22a; validity.ts) */
+export type CheckCmd = { target: CheckTarget; holes: boolean; positions: boolean; exact?: boolean };
 export type CompareAlignMode = "auto" | "center" | "none";
 export type CompareCmd = { file: string; tolerance: number; align: CompareAlignMode; target: Exclude<CheckTarget, "all">; map: boolean; strict: boolean };
 export type CheckOp = { k: "check"; cmd: CheckCmd; line: number } | { k: "compare"; cmd: CompareCmd; line: number };
@@ -39,6 +41,7 @@ const TOL = W("tolerance", "tol", "toleranz");
 const ALIGN = W("zarovnat", "zarovnání", "align", "alignment", "ausrichten", "ausrichtung");
 const MAP = W("mapa", "mapu", "map", "karte");
 const STRICT = W("přísně", "strict", "streng");
+const EXACT = W("přesně", "přesná", "přesný", "exact", "exactly", "genau", "exakt");
 const YES = W("ano", "yes", "ja", "zap", "on");
 const NO = W("ne", "no", "nein", "vyp", "off");
 const ALIGN_MODE: Record<string, CompareAlignMode> = Object.fromEntries(
@@ -64,7 +67,7 @@ const num = (s: string | undefined) => {
   return Number.isFinite(v) ? v : NaN;
 };
 
-export const checkUsage = () => tr('kontrola [díl "A" | sestava | vše] [díry] [polohy]');
+export const checkUsage = () => tr('kontrola [díl "A" | sestava | vše] [díry] [polohy] [přesně]');
 export const compareUsage = () => tr('porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]');
 
 /** Řádek `kontrola …` / `porovnat …` → operace bez čísla řádku; null = jiný příkaz. Chyba zápisu = výjimka (✗ parse.error). */
@@ -98,6 +101,7 @@ function parseCheck(w: { w: string; quoted: boolean }[]): CheckCmd {
     else if (ALL.has(x)) setTarget("all");
     else if (HOLES.has(x)) c.holes = true;
     else if (POSITIONS.has(x)) c.positions = c.holes = true;
+    else if (EXACT.has(x)) c.exact = true;
     else throw new Error(tr("kontrola: neznámá volba „{0}“ – {1}", w[i].w, checkUsage()));
   }
   return c;
@@ -151,6 +155,14 @@ export const CHECK_COMMANDS: { cmd: string; en: string; de: string; desc: string
     de: "prüfen [teil \"A\" | baugruppe | alle] [bohrungen] [positionen]",
     desc: tr(
       "kontrola modelu jako tabulka: přesný objem, hmotnost, hustota (rho.assumed = materiál jen označením), obálka, počet těles, platnost; díry (souosé úseky sloučené, zahloubení, závit a hloubka závitu, ploché dno / kužel hrotu) spojené s prvky díry – prvek bez díry v geometrii = ⚠ check.hole-missing; sestava: V.sum i V.union, hmotnost, přesná obálka, vazby, kolize po třídách a řádek na každý různý díl; polohy = i středy děr",
+    ),
+  },
+  {
+    cmd: "kontrola přesně · kontrola sestava přesně",
+    en: "check exact",
+    de: "prüfen genau",
+    desc: tr(
+      "platnost tělesa přesnou metodou BRepCheck (odchylka křivek hran od ploch počítaná přesně, ne v několika bodech) – výpis „platné (přesná kontrola)“ nebo „NEPLATNÉ (přesná kontrola: N z M ploch s vadou)“, strojově valid=1|0 vcheck=exact bad=N; výsledek platí pro tuto geometrii: řádek Geometrie ve stav končí „· přesná kontrola“, řádek D nese vcheck=exact, JSON docs[].validCheck = exact (jinak „· rychlá kontrola“ a fast); nad 5000 ploch se přesná kontrola neprovede (ℹ s důvodem). Před exportem STEP / BREP proběhne sama do 400 ploch",
     ),
   },
   {

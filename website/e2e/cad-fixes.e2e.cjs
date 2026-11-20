@@ -55,6 +55,21 @@ const part = (name, number, materialName, size) => ({ app: 'mnastrojarna-cad', v
   await p.locator('button[title="OK (Enter)"]').first().click(); await p.waitForTimeout(1200);
   st = await status(p);
   ok(/Ø9\b/.test(st), 'hodnota napsaná do pole bez opuštění pole se uložila (průběžné potvrzení)\n' + (st.match(/Díra 2[^\n]*/) || [''])[0]);
+  // vlna 22 (22e): hodnota napsaná automatizací bez fokusu a hned OK (< 450 ms, žádný blur, žádný časovač) se neztratí –
+  // bariéra rozepsaných změn ji zapíše při zavření panelu; opuštění pole bez změny nepřidá krok Zpět
+  await p.getByRole('button', { name: 'Díra', exact: true }).first().click(); await p.waitForTimeout(600);
+  const undo0 = await p.evaluate(() => window.mncad.history().undo);
+  await p.locator('input[aria-label="Průměr"]').first().focus(); await p.keyboard.press('Tab'); await p.waitForTimeout(150);
+  ok((await p.evaluate(() => window.mncad.history().undo)) === undo0, '22e: opuštění pole bez změny nepřidalo krok Zpět');
+  await p.evaluate(() => {
+    const el = document.querySelector('input[aria-label="Průměr"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '11');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('button[title="OK (Enter)"]').click(); // ve stejném tiku – bez blur, bez 450 ms
+  });
+  await p.waitForTimeout(1200);
+  st = await status(p);
+  ok(/Ø11\b/.test(st), '22e: hodnota zapsaná bez fokusu a hned OK (< 450 ms) se uložila\n' + (st.match(/Díra 3[^\n]*/) || [''])[0]);
 
   // ── 3. výkres: změna formátu a okamžité zavření (Esc) – formát se neztratí; patička bez automatické poznámky ──
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();
@@ -67,9 +82,13 @@ const part = (name, number, materialName, size) => ({ app: 'mnastrojarna-cad', v
   const target = before === 'A3' ? 'A2' : 'A3';
   await sel.selectOption(target);
   await p.keyboard.press('Escape'); // hned – bez čekání na přepočet a odložené uložení
-  await p.waitForTimeout(800);
+  // vlna 22 (22f): nečekat déle než odložené uložení (500 ms) – dřív test čekal 800 ms a „okamžité“ zavření nedokazoval;
+  // první Esc v poli jen opustí pole → druhý Esc výkres zavře; ověřit, že je výkres opravdu zavřený
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(100);
+  const closed = (await p.locator('[data-sheet]').count()) === 0;
   const dwg = await p.evaluate(() => window.mncad.getDocument());
-  ok(dwg.drawings?.[0]?.options?.sheet === target, `formát ${target} uložen i při okamžitém zavření (bylo ${before}, dokument má ${dwg.drawings?.[0]?.options?.sheet})`);
+  ok(closed && dwg.drawings?.[0]?.options?.sheet === target, `formát ${target} uložen i při okamžitém zavření do 100 ms (bylo ${before}, dokument má ${dwg.drawings?.[0]?.options?.sheet}, výkres zavřen: ${closed})`);
 
   // ── 4. sestava: kusovník s číslem dílu a označením materiálu, stav sestavy, kolize do protokolu ──
   const asm = { app: 'mnastrojarna-cad', version: 2, name: 'QA sestava', kind: 'assembly', material: 'ocel', features: [], components: [

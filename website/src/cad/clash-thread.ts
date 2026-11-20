@@ -18,6 +18,7 @@
  */
 import { flattenAssembly, rotMatrix, apply3 } from "./assembly";
 import { planeBasis, threadByName } from "./defaults";
+import { threadOfFeature } from "./thread-spec";
 import type { Direction } from "./refs";
 import type { AsmComponent, Axis, CadDoc, Feature, Placement, Vec3 } from "./types";
 
@@ -39,10 +40,10 @@ type HoleInfo = { line: Line | null; band: number };
 export function screwOf(c: AsmComponent): { d: number; length?: number } | null {
   if (c.source.kind !== "part") return null;
   const doc = c.source.doc;
+  // vnější závit: prvek Závit (kosmetický, drážky, šroubovice) i Tažení po šroubovici s označením – jednotně (thread-spec.ts, 22d)
   for (const f of doc.features) {
-    if (f.suppressed || f.type !== "thread" || f.internal) continue;
-    const t = threadByName(f.designation);
-    if (t) return { d: t.d, length: f.length };
+    const th = threadOfFeature(f);
+    if (th && !th.internal) return { d: th.t.d, length: th.length };
   }
   const label = [c.name, doc.name, doc.props?.number ?? ""].join(" ");
   const m = SIZE.exec(label);
@@ -65,7 +66,8 @@ export function screwAxes(doc: CadDoc, d: number): Line[] {
   for (const f of doc.features) {
     if (f.suppressed) continue;
     if (f.type === "sketch") lastSketch = f;
-    if (f.type === "thread" && !f.internal && !f.positionRef) out.push({ p: f.position, d: dirVec(f.dirDef, f.axis) });
+    const th = threadOfFeature(f);
+    if (th && !th.internal && !th.positionRef && (th.source === "thread" || !th.dirDef || th.dirDef.kind === "axis" || th.dirDef.kind === "vector")) out.push({ p: th.position, d: dirVec(th.dirDef, th.axis) });
     else if (f.type === "cylinder" && f.mode !== "cut" && !f.positionRef && Math.abs(2 * f.radius - d) <= Math.max(0.5, 0.25 * d)) out.push({ p: f.position, d: dirVec(f.dirDef, f.axis) });
     else if (f.type === "revolve" && f.mode !== "cut") {
       const sk = (sketches.get(f.sketchId) ?? lastSketch) as Extract<Feature, { type: "sketch" }> | undefined;
@@ -97,10 +99,12 @@ export function threadHoles(c: AsmComponent, d: number, screwLength?: number): H
       const dir = dirVec(f.dirDef, f.axis);
       const pts = f.points?.length ? f.points : [{ kind: "xyz" as const, p: f.position }];
       for (const r of pts) out.push({ line: r.kind === "xyz" ? { p: r.p, d: dir } : null, band });
-    } else if (f.type === "thread" && f.internal) {
-      const t = threadByName(f.designation);
-      if (!t || Math.abs(t.d - d) > 1e-6) continue;
-      out.push({ line: f.positionRef ? null : { p: f.position, d: dirVec(f.dirDef, f.axis) }, band: (Math.PI / 4) * (d * d - t.tap * t.tap) * f.length });
+    } else {
+      // vnitřní závit: prvek Závit i Tažení po šroubovici s označením (thread-spec.ts) – stejné pásmo mezikruží
+      const th = threadOfFeature(f);
+      if (!th || !th.internal || Math.abs(th.t.d - d) > 1e-6) continue;
+      const fixed = !th.positionRef && (th.source === "thread" || !th.dirDef || th.dirDef.kind === "axis" || th.dirDef.kind === "vector");
+      out.push({ line: fixed ? { p: th.position, d: dirVec(th.dirDef, th.axis) } : null, band: (Math.PI / 4) * (d * d - th.t.tap * th.t.tap) * th.length });
     }
   }
   return out;

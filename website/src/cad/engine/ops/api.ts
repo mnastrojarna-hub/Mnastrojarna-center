@@ -5,8 +5,10 @@
  * text (tabulka pružin – doc-actions.ts), provádí engine sám v aplikaci i v CLI.
  */
 import type { ApiCmd } from "../../agent-api";
+import { getExt } from "../../ext/registry";
 import { tr } from "../../i18n";
-import { flush, runOf, startDoc } from "../run-doc";
+import { flush, runOf } from "../run-doc";
+import { startRunDoc, type RunDocStart } from "../runs";
 import { docAction } from "./doc-actions";
 import { coded, say, sayKv, type OpHandler } from "./util";
 
@@ -52,17 +54,22 @@ export const apiOp: OpHandler<"api"> = async (op, ctx) => {
     const out = await own(r.doc, op.cmd.arg ?? "");
     return sayKv(ctx, out.kv, ...out.lines);
   }
+  // akce s čistým textovým výstupem (tabulka ozubení): engine ji provede sám – stejně v aplikaci i v CLI
+  const report = op.cmd.kind === "action" ? getExt(op.cmd.id)?.report : undefined;
+  if (report && op.cmd.kind === "action") return say(ctx, ...report(r.doc, op.cmd.arg));
   const ui = ctx.host.ui?.api;
   if (!ui) return coded(ctx, VIEW_ONLY.has(op.cmd.kind) ? "ui.no-view" : "host.app-only", { args: [apiLabel(op.cmd)] });
   const res = await ui(op.cmd, r.doc);
+  let st: RunDocStart | null = null;
   if (res.open) {
     await flush(ctx);
     r.currentBody = null;
-    startDoc(ctx, res.open);
+    st = await startRunDoc(ctx, res.open, { origin: "new" }); // sestava z vyhazovačů / chlazení – opakovaný běh (engine/runs.ts)
   } else if (res.doc) {
     r.doc = res.doc;
     r.changed = true;
   }
   r.added.push(...(res.added ?? []));
   say(ctx, ...res.log);
+  st?.report();
 };

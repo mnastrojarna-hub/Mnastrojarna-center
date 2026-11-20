@@ -66,7 +66,7 @@ describe("engineRun – --open + smyčka enginu (engine/run.ts)", () => {
     const rb = s.rb(script);
     const { log, hooks } = hooksLog();
     await engineRun(s.ws, script, s.host, rb, { strict: false, open: [] }, hooks);
-    expect(codes(rb)).toEqual(["3 error parse.error", "1 ok undefined", "2 note msg.note", "2 ok undefined"]);
+    expect(codes(rb)).toEqual(["3 error parse.error", "1 ok undefined", "2 note op.accepted", "2 ok undefined"]);
     expect(rb.entries[1].text).toBe("nový díl „A“ – nová záložka");
     expect(rb.entries[3].text).toBe("Kvádr 1 (box)");
     // závěrečná ověřovací stavba enginu = operace „build“ bez řádku (hlídač CLI ji zná při --timeout)
@@ -110,7 +110,10 @@ describe("engineRun – --open + smyčka enginu (engine/run.ts)", () => {
     const rb = s.rb();
     const { log, hooks } = hooksLog();
     await engineRun(s.ws, "", s.host, rb, { strict: false, open: ["deska.mncad", "chybí.mncad", "x.step", "bad.mncad", "nodoc.mncad", "../../etc/passwd"] }, hooks);
-    expect(codes(rb)).toEqual(["- ok undefined", "- error file.missing", "- error op.failed", "- error op.failed", "- error op.failed", "- error file.missing"]);
+    // vlna 22 (22i): otevření dokumentu s prvky je přijetí (ℹ op.accepted); ✓ „dokument … postaven“ až po ověřovací stavbě enginu
+    expect(codes(rb)).toEqual(["- note op.accepted", "- error file.missing", "- error op.failed", "- error op.failed", "- error op.failed", "- error file.missing", "- ok undefined"]);
+    expect(rb.entries[0].text).toBe("otevřeno „deska.mncad“ – výsledek po výpočtu níže");
+    expect(rb.entries[6].text).toMatch(/^dokument „Deska 1“ postaven: prvků 2, bez ⚠ a ✗/);
     expect(rb.entries[1].text).toMatch(/chybí\.mncad.*bad\.mncad, deska\.mncad, nodoc\.mncad, x\.step/);
     expect(rb.entries[2].text).toMatch(/STEP/);
     expect(s.ws.present().name).toBe("Deska 1");

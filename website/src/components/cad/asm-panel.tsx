@@ -11,7 +11,9 @@ import {
   faceLabel,
   faceRow,
   hasFixedMate,
+  lostSides,
   mateFaceKind,
+  mateLost,
   mateNeedsValue,
   patchMate,
   releaseComponent,
@@ -26,12 +28,14 @@ import {
   type PendingMate,
 } from "@/cad/mates";
 import { evalExpr } from "@/cad/params";
-import { uid, type AsmComponent, type CadDoc, type ComponentSource, type MateRef, type PlaneName, type Vec3 } from "@/cad/types";
+import { uid, type AsmComponent, type CadDoc, type ComponentSource, type Mate, type MateRef, type PlaneName, type Vec3 } from "@/cad/types";
 import { MATERIALS, fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
 import { AsmInstanceProps } from "./asm-spring-props";
+import { AsmSupplyFields } from "./asm-supply";
+import { kindsIn, supplySection, supplyWord } from "@/cad/bom-model";
 import { renameProblem } from "@/cad/agent-asm";
 import { KIN_SPEC, isKinMode, kinHasLimits, kinHasValue } from "@/cad/mate-spec";
 import { CadIcon } from "./cad-icons";
@@ -51,8 +55,11 @@ export function AsmTree({
   onContext,
   menuFor,
   mateStatus,
+  mateState,
   onResolve,
   picked,
+  onRepick,
+  repickMate,
 }: {
   doc: CadDoc;
   selected: string | null;
@@ -65,8 +72,17 @@ export function AsmTree({
   picked?: readonly string[];
   /** stav trvalých vazeb (z řešiče) */
   mateStatus?: Record<string, MateStatus>;
+  /**
+   * platnost stavu vazeb pro nynější stav sestavy (cad/engine/result-key.ts): „stale“ = sestava se od přepočtu změnila
+   * nebo polohy v dokumentu vazbám neodpovídají → žádná zelená, výzva k přepočtu; „unchecked“ = stav se teprve počítá
+   */
+  mateState?: "ok" | "stale" | "unchecked";
   /** přepočítat vazby */
   onResolve?: () => void;
+  /** ztracená reference vazby (vlna 22, bod 20): začít nový výběr plochy strany `side` (klik do modelu nebo seznam ploch) */
+  onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void;
+  /** vazba, jejíž plocha se právě vybírá znovu */
+  repickMate?: string | null;
 }) {
   const comps = doc.components ?? [];
   const groups = groupComponents(comps); // „Normálie“ i „Standard parts“ = jedna skupina (asm-groups.ts)
@@ -138,40 +154,59 @@ export function AsmTree({
             ))}
         </div>
       ))}
-      <MatesList doc={doc} status={mateStatus} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} />
+      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} />
     </div>
   );
 }
 
-const STATUS_DOT: Record<MateStatus, string> = { ok: "bg-emerald-500", conflict: "bg-brand", missing: "bg-[#9aa5b1]", suppressed: "bg-[#d5dbe2]" };
-const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "konflikt – vazbu nelze splnit spolu s ostatními", missing: "plocha nenalezena / díl se ještě staví", suppressed: "potlačeno" };
+const STATUS_DOT: Record<MateStatus, string> = { ok: "bg-emerald-500", conflict: "bg-brand", missing: "bg-[#9aa5b1]", suppressed: "bg-[#d5dbe2]", lost: "bg-[#b42318]" };
+const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "konflikt – vazbu nelze splnit spolu s ostatními", missing: "plocha nenalezena / díl se ještě staví", suppressed: "potlačeno", lost: "ztracená reference – plocha po úpravě dílu neexistuje nebo není jednoznačná; vazba je mimo řešení" };
 
 /**
  * Seznam trvalých vazeb sestavy (pod stromem komponent). Vazbu lze po vytvoření upravit: hodnotu Vzdálenosti / Úhlu přepsat
  * v poli (číslo i výraz), otočit, potlačit nebo smazat – každá změna jde přes `onCommit`, které sestavu znovu přepočítá.
  * Vazba Ukotvit se týká jedné komponenty; jejím smazáním / potlačením se komponenta uvolní.
  */
-function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc; status?: Record<string, MateStatus>; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void }) {
+function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null }) {
   const mates = doc.mates ?? [];
   const [closed, setClosed] = useState(false);
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
   if (!mates.length) return null;
   const conflicts = mates.filter((m) => status?.[m.id] === "conflict").length;
+  const lost = mates.filter((m) => !m.suppressed && mateLost(m));
   return (
-    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list>
+    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list data-mates-state={state ?? "ok"} data-mates-lost={lost.length}>
       <button type="button" onClick={() => setClosed((v) => !v)} className="flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left text-[11.5px] font-semibold text-[#4a5664]">
         <CadIcon name={closed ? "chevronRight" : "chevronDown"} className="h-3 w-3" />
         {tr("Vazby")}
         {conflicts > 0 && <span className="rounded bg-brand/10 px-1 text-[10px] text-brand-600">{tr("{0} konflikt", conflicts)}</span>}
+        {lost.length > 0 && <span className="rounded bg-[#fde8e7] px-1 text-[10px] text-[#b42318]">{tr("{0} ztracená reference", lost.length)}</span>}
         <span className="ml-auto pr-2 font-mono text-[10px] font-normal text-[#8a95a3]">{mates.length}</span>
       </button>
+      {!closed && lost.length > 0 && (
+        // ztracené reference (vlna 22, bod 20): plocha vazby po úpravě dílu neexistuje / není jednoznačná – vazba je mimo řešení,
+        // komponenty se kvůli ní nehýbou; nic se tiše nepřipojilo jinam. Oprava: vybrat plochu znovu, nebo vazbu smazat.
+        <p data-mates-lost-note className="ml-3 mr-2 rounded border border-[#f3c4c0] bg-[#fef3f2] px-2 py-1 text-[11px] leading-snug text-[#912018]">
+          {tr("Ztracené reference vazeb: {0}. Plocha, na kterou vazba ukazovala, po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení a komponenty se kvůli ní nehýbou. Vyberte plochu znovu, nebo vazbu smažte.", lost.length)}
+        </p>
+      )}
+      {!closed && state === "stale" && (
+        <p data-mates-stale className="ml-3 mr-2 rounded border border-[#f1d9a7] bg-[#fff8e6] px-2 py-1 text-[11px] leading-snug text-[#7a5600]">
+          {tr("Stav vazeb neplatí pro tento stav sestavy – polohy komponent vazbám neodpovídají. Přepočítejte vazby.")}
+        </p>
+      )}
       {!closed &&
         mates.map((m) => {
-          const st = status?.[m.id] ?? (m.suppressed ? "suppressed" : "missing");
+          // bez platného stavu (jiný stav sestavy, stav se počítá) nikdy „splněno“: šedá „nepřepočteno“
+          // ztracená reference je vlastnost dokumentu – „lost“ bez ohledu na platnost stavu řešení (nikdy zelená)
+          const isLost = !m.suppressed && mateLost(m);
+          const known = isLost || state === undefined || state === "ok";
+          const st: MateStatus = isLost ? "lost" : ((known ? status?.[m.id] : undefined) ?? (m.suppressed ? "suppressed" : "missing"));
+          const sides = isLost ? lostSides(m) : [];
           const valued = mateNeedsValue(m.type);
           const kinValue = !valued && kinHasValue(m.type) ? KIN_SPEC[m.type as keyof typeof KIN_SPEC].params.find((p) => p.key === "value") : undefined;
           return (
-            <div key={m.id} data-mate={m.id} data-mate-type={m.type} className={cn("group ml-3 rounded px-2 py-[3px] text-[12px]", m.suppressed && "opacity-45")} onClick={() => onSelect(m.a.compId)} title={tr(STATUS_TITLE[st])}>
+            <div key={m.id} data-mate={m.id} data-mate-type={m.type} data-mate-status={known ? st : "unknown"} {...(isLost ? { "data-mate-lost": sides.join(",") } : {})} className={cn("group ml-3 rounded px-2 py-[3px] text-[12px]", m.suppressed && "opacity-45", isLost && "bg-[#fef3f2]", repickMate === m.id && "ring-1 ring-[#2563eb]")} onClick={() => onSelect(m.a.compId)} title={known ? tr(STATUS_TITLE[st]) : tr("nepřepočteno – stav vazby pro tento stav sestavy není znám")}>
               <div className="flex items-center gap-2">
                 <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[st])} />
                 <span className="min-w-0 flex-1 truncate">
@@ -191,6 +226,25 @@ function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc
                   <CadIcon name="trash" className="h-3.5 w-3.5" />
                 </button>
               </div>
+              {isLost && (
+                <div className="ml-4 mt-0.5 text-[10.5px] leading-snug text-[#912018]" data-mate-lost-detail={m.id}>
+                  {sides.map((k) => (
+                    <span key={k} className="block">
+                      {tr("{0}: plocha {1} dílu „{2}“ – {3}", k.toUpperCase(), `${m[k]!.ent === "edge" ? "E" : m[k]!.ent === "vertex" ? "V" : "F"}${m[k]!.face + 1}`, name(m[k]!.compId), m[k]!.lost!.why === "ambiguous" ? tr("není jednoznačná") : m[k]!.lost!.why === "unknown" ? tr("nejde ověřit") : tr("po úpravě dílu neexistuje"))}
+                    </span>
+                  ))}
+                  <span className="mt-0.5 flex gap-1.5">
+                    {onRepick && !m[sides[0]]!.ent && (
+                      <button type="button" data-mate-repick={m.id} onClick={(e) => { e.stopPropagation(); onRepick(m.id, sides[0]); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
+                        {repickMate === m.id ? tr("Vybírám plochu…") : tr("Vybrat plochu znovu")}
+                      </button>
+                    )}
+                    <button type="button" data-mate-delete={m.id} onClick={(e) => { e.stopPropagation(); onCommit(removeMate(doc, m.id)); }} className="rounded border border-[#d5dbe2] bg-white px-1.5 py-[1px] text-[10.5px] text-[#4a5664] hover:bg-[#f3f6f9]">
+                      {tr("Smazat vazbu")}
+                    </button>
+                  </span>
+                </div>
+              )}
               {valued && (
                 // hodnota vazby: pole Num bez nadpisu (typ vazby je o řádek výš); změna se uloží a sestava se přepočítá
                 <div className="ml-4 mt-0.5 w-[150px] [&_label>span:first-child]:hidden" onClick={(e) => e.stopPropagation()} title={tr("Hodnotu vazby lze přepsat (číslo i výraz, např. 25/2) – Enter potvrdí a sestava se přepočítá")}>
@@ -207,6 +261,15 @@ function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc
                 <div className="ml-4 mt-0.5 grid w-[200px] grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()} data-mate-limits={m.id}>
                   <Num label={tr("Min")} value={m.min ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.min && onCommit(patchMate(doc, m.id, { min: v }))} />
                   <Num label={tr("Max")} value={m.max ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.max && onCommit(patchMate(doc, m.id, { max: v }))} />
+                  {/* preferovaná strana meze (vlna 22, bod 2): kde díl zůstane, když ho vazby neurčují – nikdy proti pevné vazbě či motoru */}
+                  <label className="col-span-2 flex items-center gap-1.5 text-[11px]" title={tr("Kinematika i přepočet vazeb drží díl u této meze, když jeho polohu ostatní vazby neurčují (bez pružiny). Pevnou vazbu, ukotvení ani motor nepřebije.")}>
+                    <span className="shrink-0 text-[#6b7785]">{tr("Preferovaná strana")}</span>
+                    <select data-mate-prefer={m.id} value={m.prefer ?? ""} onChange={(e) => onCommit(patchMate(doc, m.id, { prefer: (e.target.value || undefined) as Mate["prefer"] }))} className="min-w-0 flex-1 rounded border border-[#cfd6de] bg-white px-1 py-0.5">
+                      <option value="">{tr("žádná")}</option>
+                      <option value="min">min</option>
+                      <option value="max">max</option>
+                    </select>
+                  </label>
                 </div>
               )}
             </div>
@@ -602,6 +665,7 @@ export function AsmProps({
   onBolt,
   bolting,
   onRun,
+  partOf,
 }: {
   c: AsmComponent;
   /** sestava (komponenty a vazby) – seznamy ploch pro vazby, vazba Ukotvit */
@@ -627,6 +691,8 @@ export function AsmProps({
   bolting?: boolean;
   /** textový příkaz z panelu (pružina mezi komponentami) – provede ho konzole aplikace */
   onRun?: (text: string) => void;
+  /** díl otevřený v záložce podle názvu – stav kopie dílu a Obnovit z dílu (asm-supply.tsx, bod 22g) */
+  partOf?: (name: string) => CadDoc | null;
 }) {
   const [pat, setPat] = useState<CompPattern>({ kind: "linear", count: 3, spacing: 50, direction: [1, 0, 0] });
   const [mirrorPlane, setMirrorPlane] = useState<PlaneName>("YZ");
@@ -654,6 +720,8 @@ export function AsmProps({
         <TextProp key={`${c.id}:number:${c.number ?? ""}`} label={tr("Číslo / norma")} value={c.number ?? ""} onCommit={(v) => onChange({ number: v || undefined })} />
         <TextProp key={`${c.id}:group:${c.group ?? ""}`} label={tr("Skupina")} value={c.group ? groupLabel(c.group) : ""} onCommit={(v) => onChange({ group: v.trim() ? groupKey(v) : undefined })} />
       </div>
+      {/* druh v kusovníku (vyráběný / normálie / nakupovaný) a stav kopie dílu – bod 19 a 22g */}
+      <AsmSupplyFields c={c} doc={doc} onChange={onChange} onRun={onRun} partOf={partOf} />
       <AsmInstanceProps key={`${c.id}:${JSON.stringify(c.spring ?? null)}`} c={c} doc={doc} onChange={onChange} onRun={onRun} />
       {/* ukotvená komponenta (příznak nebo vazba Ukotvit) se nepřesouvá – jako gizmo a klávesa G; poloha jde změnit po uvolnění */}
       <fieldset disabled={!!c.fixed || fixedByMate} data-placement-locked={!!c.fixed || fixedByMate || undefined} className="space-y-4 disabled:opacity-55">
@@ -820,11 +888,30 @@ export function AsmProps({
   );
 }
 
-/** Kusovník – tabulka + CSV. */
-export function BomTable({ rows, onCsv, onDrawing }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void }) {
+/**
+ * Kusovník – tabulka + CSV. Při více druzích položek oddíly Vyráběné díly / Normálie / Nakupované díly (bom-model.ts);
+ * upozornění (`notes`): kopie dílu starší než díl v záložce (s tlačítkem Obnovit z dílu) a co chybí vyráběným dílům.
+ */
+export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void }) {
   const total = rows.reduce((s, r) => s + (r.massKg ?? 0) * r.qty, 0);
+  const sections = kindsIn(rows).length > 1 && !rows.some((r) => (r.level ?? 0) > 0);
+  let cur: string | undefined;
   return (
     <div>
+      {notes.length > 0 && (
+        <div data-bom-notes={notes.length} className="mb-2 space-y-1 rounded border border-[#f0c36d] bg-[#fff8e6] p-2 text-[11.5px] leading-snug text-[#7a5300]">
+          {notes.map((n, i) => (
+            <p key={i} data-bom-note={n.stale ? "stale" : "missing"}>
+              ⚠ {n.text}
+            </p>
+          ))}
+          {onRefresh && notes.some((n) => n.stale) && (
+            <button type="button" data-refresh-btn="bom" onClick={onRefresh} className="mt-1 rounded bg-brand px-2 py-1 text-[11.5px] font-semibold text-white hover:bg-brand-600">
+              {tr("Obnovit z dílů")}
+            </button>
+          )}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[12px]">
           <thead>
@@ -832,22 +919,45 @@ export function BomTable({ rows, onCsv, onDrawing }: { rows: BomRow[]; onCsv: ()
               <th className="px-2 py-1.5">Poz.</th>
               <th className="px-2 py-1.5">{tr("Název")}</th>
               <th className="px-2 py-1.5">{tr("Číslo / norma")}</th>
+              <th className="px-2 py-1.5">{tr("Rozměr / kat. č.")}</th>
               <th className="px-2 py-1.5 text-right">{tr("Ks")}</th>
               <th className="px-2 py-1.5">{tr("Materiál")}</th>
+              <th className="px-2 py-1.5">{tr("Druh")}</th>
               <th className="px-2 py-1.5 text-right">kg/ks</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.pos} className="border-b border-[#edf1f5]">
-                <td className="px-2 py-1 font-mono">{r.pos}</td>
-                <td className="px-2 py-1">{r.name}</td>
-                <td className="px-2 py-1 text-[#5b6776]">{r.number ?? ""}</td>
-                <td className="px-2 py-1 text-right font-mono">{r.qty}</td>
-                <td className="px-2 py-1">{r.material ?? ""}</td>
-                <td className="px-2 py-1 text-right font-mono">{r.massKg != null ? fmtNum(r.massKg, 3) : "—"}</td>
-              </tr>
-            ))}
+            {rows.flatMap((r) => {
+              const k = r.kind ?? "make";
+              const head =
+                sections && k !== cur ? (
+                  <tr key={`s-${k}`} data-bom-section={k} className="bg-[#f6f8fa]">
+                    <td colSpan={8} className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#5b6776]">
+                      {supplySection(k)}
+                    </td>
+                  </tr>
+                ) : null;
+              cur = k;
+              const sizeCell = r.kind === "buy" ? (r.catalog ?? "") : r.kind === "standard" ? [r.size, r.grade].filter(Boolean).join(" – ") : "";
+              return [
+                ...(head ? [head] : []),
+                <tr key={r.pos} data-bom-row={r.pos} data-bom-kind={r.kind} className="border-b border-[#edf1f5]">
+                  <td className="px-2 py-1 font-mono">{r.pos}</td>
+                  <td className="px-2 py-1">
+                    {r.name}
+                    {r.vendor ? <span className="text-[#6b7785]"> ({r.vendor})</span> : null}
+                  </td>
+                  <td className="px-2 py-1 text-[#5b6776]">{r.kind === "standard" ? (r.standard ?? r.number ?? "") : (r.number ?? "")}</td>
+                  <td className="px-2 py-1 text-[#5b6776]">{sizeCell}</td>
+                  <td className="px-2 py-1 text-right font-mono">{r.qty}</td>
+                  <td className={cn("px-2 py-1", r.noDesignation && "text-[#a15c00]")} title={r.noDesignation ? tr("díl nemá označení materiálu – jen třídu (materiál 1.2379 v dílu)") : undefined}>
+                    {r.material ?? ""}
+                  </td>
+                  <td className="px-2 py-1 text-[#5b6776]">{r.assembly ? "" : supplyWord(k as "make" | "standard" | "buy")}</td>
+                  <td className="px-2 py-1 text-right font-mono">{r.massKg != null ? fmtNum(r.massKg, 3) : "—"}</td>
+                </tr>,
+              ];
+            })}
           </tbody>
         </table>
       </div>

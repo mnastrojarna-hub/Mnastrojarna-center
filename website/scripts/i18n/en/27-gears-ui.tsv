@@ -1,0 +1,82 @@
+# Kola a ozubení (vlna 19, balík ui): průvodce (galerie, tabulka, náhled, soukolí), formulář úprav, vstupní body
+{0} – dva díly a sestava s vazbou.	{0} – two parts and an assembly with a mate.
+{0} – otevřeno jako nový díl.	{0} – opened as a new part.
+{0} – přidáno do historie.	{0} – added to the history.
+{0} – přidáno do historie. Zadejte další kolo.	{0} – added to the history. Enter the next gear.
+3D náhled	3D preview
+Cykloidní	Cycloidal
+Cykloidní (hodinové)	Cycloidal (clock)
+Cykloidní reduktor (kotouč a věnec)	Cycloidal reducer (disc and pin ring)
+Čelní a hřeben	Spur and rack
+Čelní s přímými zuby	Spur
+Čelní se šikmými zuby	Helical
+Další	More
+Detail zubu	Tooth detail
+detail zubu (pata a hlava)	tooth detail (root and tip)
+Do tohoto dílu	Into this part
+Druh soukolí	Kind of gear pair
+Druhy: {0}	Kinds: {0}
+Dvě kola v záběru	Two meshing gears
+dvě kola v záběru: z₁, z₂, modul, osová vzdálenost → díly a sestava s vazbou ozubení	two meshing gears: z₁, z₂, module, centre distance → parts and an assembly with a gear mate
+hlavová	tip
+Hypoidní	Hypoid
+Jako nový díl	As a new part
+Kam:	Where:
+Kola a ozubení	Gears
+Kola a ozubení – {0}	Gears – {0}
+Kola a ozubení – soukolí	Gears – gear pair
+Kolo bude prvním tělesem dílu.	The gear will be the first body of the part.
+Kolo se otevře jako nový díl v nové záložce.	The gear opens as a new part in a new tab.
+Kolo se přidá na konec historie otevřeného dílu.	The gear is added at the end of the history of the open part.
+Kuželová a šneková	Bevel and worm
+Náhled kola	Gear preview
+Náhled se ukáže po opravě řádků označených ✗.	The preview appears once the rows marked ✗ are fixed.
+Náhled soukolí	Gear pair preview
+Nově: kola z tabulky s výpočtem (posunutí, rozměr přes zuby, soukolí) – parametrický prvek, který jde později upravit.	New: gears from a table with calculation (profile shift, span measurement, gear pairs) – a parametric feature you can edit later.
+Nový díl z průvodce tady nejde založit – otevřete díl, nebo použijte textový příkaz:	A new part cannot be created from the wizard here – open a part, or use the text command:
+Obě kola jako díly a sestava s vazbou ozubení (v pohybové studii se otáčejí v převodu).	Both gears as parts and an assembly with a gear mate (in a motion study they turn in the ratio).
+Obnovit 3D náhled	Refresh 3D preview
+Operace:	Operation:
+Opravte řádky označené ✗	Fix the rows marked ✗
+oranžově přímka záběru (tečna k základním kružnicím přes valivý bod)	orange: line of action (tangent to the base circles through the pitch point)
+Otevřený dokument není díl – kolo se otevře jako nový díl v nové záložce.	The open document is not a part – the gear opens as a new part in a new tab.
+Otevřít v tabulce Kola a ozubení	Open in the Gears table
+ozubené kolo z tabulky: čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, řetězové kolo, řemenice, rohatka	gear from a table: spur, helical, herringbone, internal, rack, bevel, hypoid, worm, cycloidal, chain sprocket, timing pulley, ratchet
+Ozubené kolo, hřeben, řetězové kolo, řemenice, soukolí – vyplníte tabulku a máte díl.	Gear, rack, chain sprocket, timing pulley, gear pair – fill in a table and you have the part.
+Pastorek a hřeben	Pinion and rack
+patní	root
+Podle tabulky: {0} (název prvku se nemění – přejmenujte ho v historii).	By the table: {0} (the feature name does not change – rename it in the history).
+Průvodce Kola a ozubení je okno pro práci myší. Textem se kolo zadá obecným příkazem prvku:	The Gears wizard is a window for mouse work. As text, a gear is entered with the generic feature command:
+Přesnost:	Accuracy:
+roztečná	pitch
+Řemenový převod	Belt drive
+Řetěz, řemen, rohatka	Chain, belt, ratchet
+Řetězový převod	Chain drive
+Skrýt 3D náhled	Hide 3D preview
+Skrýt textové příkazy	Hide text commands
+Soukolí	Gear pair
+Soukolí nejde vytvořit – opravte řádky označené ✗.	The gear pair cannot be created – fix the rows marked ✗.
+Soukolí s tímto kolem…	Gear pair with this gear…
+Soukolí tady nejde vytvořit – spusťte tyto textové příkazy v konzoli:	The gear pair cannot be created here – run these text commands in the console:
+Šípové	Herringbone
+Šnek a šnekové kolo	Worm and worm wheel
+Tělo kola	Gear body
+Ukázat textové příkazy (stejné jako pro AI agenty)	Show the text commands (the same as for AI agents)
+Umístění a výstup	Placement and output
+Vnitřní (pastorek ve věnci)	Internal (pinion in a ring gear)
+Všechny druhy	All kinds
+Všechny řádky tabulky druhu (klíč, jednotka, výchozí hodnota, nápověda): prvek nápověda gear.spur	All table rows of a kind (key, unit, default, hint): feature help gear.spur
+Vyberte druh kola – otevře se jedna tabulka s výchozími hodnotami. Stačí vyplnit modul a počet zubů a kliknout na Vytvořit.	Choose the kind of gear – one table with default values opens. Fill in the module and the number of teeth and click Create.
+Vypočteno	Computed
+Výsledek soukolí	Gear pair result
+Vytvářím…	Creating…
+Vytvořit	Create
+Vytvořit a další	Create and next
+Vytvořit soukolí	Create gear pair
+z₁, z₂ (nebo převod), modul, osová vzdálenost → obě kola a sestava s vazbou ozubení	z₁, z₂ (or ratio), module, centre distance → both gears and an assembly with a gear mate
+základní	base
+Základní	Basic
+Zubové mezery se vyříznou do aktivního tělesa (polotovaru).	The tooth spaces are cut into the active body (the stock).
+Zuby do tělesa jdou jen do otevřeného dílu s tělesem.	Teeth into the body only work in an open part with a body.
+Zuby do tělesa potřebují těleso – nejdřív vytvořte polotovar (výstup Polotovar) nebo jiný tvar.	Teeth into the body need a body – first create the stock (output Stock) or another shape.
+Zuby se řežou do tělesa otevřeného dílu – nejdřív vytvořte polotovar.	The teeth are cut into the body of the open part – create the stock first.

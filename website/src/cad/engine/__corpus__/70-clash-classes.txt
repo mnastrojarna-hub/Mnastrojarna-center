@@ -1,0 +1,28 @@
+# vlna 22, bod 5: třídy kolizí – šroub v závitu × náraz hlavy do sousední desky × hlava bokem do plechu; instance [S2] a místo průniku
+nový díl Deska A
+kvádr 100 60 20
+díra závit M12 hloubka 18 v 20 30
+díra závit M12 hloubka 18 v 50 30
+díra závit M12 hloubka 18 v 80 30
+nový díl Přidržovač
+kvádr 100 60 10
+díra 13 skrz v 20 30
+díra 13 skrz v 50 30
+díra 13 skrz v 80 30
+nový díl Šroub M12
+válec 12 18
+válec 18 12 v 0 0 18
+nový díl Plech
+kvádr 20 60 5
+#--- run
+nová sestava Sestava 5
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 0 0 20
+vložit "Šroub M12" v 20 30 12 jako "S1"
+vložit "Šroub M12" v 50 30 9 jako "S2"
+vložit "Šroub M12" v 80 30 12 jako "S3"
+vložit "Plech" v 87 0 30
+kolize
+stav
+kolize seznam závit
+kolize seznam skutečné

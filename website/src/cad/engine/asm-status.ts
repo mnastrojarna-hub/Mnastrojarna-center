@@ -5,17 +5,22 @@
  * `ensureLeaves` postaví všechny listové díly sestavy dřív, než se z nich počítá stav, kusovník, kolize, kontrola nebo
  * souhrn – bez toho byl objem Σ neznámý (P2: Σ = NaN) podle toho, zda aplikace díly zrovna stihla načíst.
  */
-import { docStatusText, type AsmStatus } from "../agent";
+import { docStatusText, type AsmStatus, type StaleNote } from "../agent";
 import { bomOf, flattenLeaves, matrixToPlacement, type Leaf } from "../asm-flatten";
+import { motionStatusOf, motionStoreOf } from "../motion-cache";
 import { sourceKey, transformPoint } from "../assembly";
-import { clashStale } from "../clash-class";
+import { clashStale, countClasses } from "../clash-class";
+import { entryClashes, statusPairs } from "../clash-report";
 import type { DrawingExtras } from "../drawing-agent";
 import type { MateStatus } from "../mates";
 import type { AsmComponent, BuildResult, CadDoc, Vec3 } from "../types";
-import { fmtNum, MATERIALS, massKg } from "@/lib/mesh-metrics";
+import { MATERIALS, massKg } from "@/lib/mesh-metrics";
+import { bomPartInfo, type BomPartInfo } from "../bom-model";
 import { asmWorldBox } from "./asm-box";
+import { springCheck } from "./spring-fresh";
 import { makeAsmEnv, type AsmEnvOptions } from "./asm-env";
 import type { KernelApi } from "./kernel";
+import { geometrySig, mateStatusState, notedResults, setMateStatus } from "./result-key";
 import type { Workspace } from "./workspace";
 
 /**
@@ -35,12 +40,9 @@ export async function ensureLeaves(ws: Workspace, kernel: KernelApi, doc: CadDoc
 }
 
 /** materiál a hmotnost komponenty pro kusovník (označení materiálu dílu, jinak třída; hustota třídy) */
-export function partInfo(cache: Map<string, BuildResult>, c: AsmComponent): { material: string; massKg?: number } {
-  const r = cache.get(sourceKey(c.source));
-  const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
-  const mt = MATERIALS.find((x) => x.id === matId);
-  const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
-  return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
+export function partInfo(cache: Map<string, BuildResult>, c: AsmComponent): BomPartInfo {
+  // jedna funkce materiálu a hmotnosti pro text, CLI i aplikaci (bom-model.ts, vlna 22 body 22g a 19)
+  return bomPartInfo(c, cache.get(sourceKey(c.source)));
 }
 
 /** světová obálka listů podle obálek dílů v mezipaměti */
@@ -67,19 +69,22 @@ function leavesBox(cache: Map<string, BuildResult>, leaves: Leaf[]): [Vec3, Vec3
 
 /**
  * Stav vazeb sestavy pod klíčem `key`: chybí-li (sestava otevřená z JSON / relace / jiné záložky, vazby přidané mimo
- * textové příkazy) nebo nezná-li některou nepotlačenou vazbu či u ní chybí plocha, vazby se přepočítají (`solveAsm`, jako
- * „sestava vazby“ a efekt aplikace po načtení dílů) – dokument se nemění, uloží se jen stav. Bez vazeb → undefined.
+ * textové příkazy), nezná-li některou nepotlačenou vazbu či u ní chybí plocha, NEBO byl spočítán pro jiný stav sestavy
+ * (jiný otisk – krok zpět, posun komponenty, upravený díl, změněná vazba; engine/result-key.ts), vazby se přepočítají
+ * (`solveAsm`, jako „sestava vazby“ a efekt aplikace po načtení dílů) – dokument se nemění, uloží se jen stav s razítkem
+ * sestavy, kterou popisuje: pohnul-li by řešič komponentami, stav patří polohám po přepočtu a pro dokument dál neplatí
+ * (`mateStatusState` → „stale“, textový stav „NEPLATÍ“). Bez vazeb → undefined.
  */
 export async function ensureMateStatus(ws: Workspace, kernel: KernelApi, doc: CadDoc, key: string, o: AsmEnvOptions = {}): Promise<Record<string, MateStatus> | undefined> {
   const mates = doc.mates ?? [];
   if (doc.kind !== "assembly" || !mates.length) return ws.asm.mateStatus.get(key);
-  const st = ws.asm.mateStatus.get(key);
-  if (st && mates.every((m) => m.suppressed || (st[m.id] !== undefined && st[m.id] !== "missing"))) return st;
+  const { status: st, state } = mateStatusState(ws, key, doc);
+  if (st && state === "ok" && mates.every((m) => m.suppressed || (st[m.id] !== undefined && st[m.id] !== "missing"))) return st;
   try {
     const { solveAsm } = await import("../asm-agent");
     const s = await solveAsm(doc, makeAsmEnv(ws, kernel, o));
-    ws.asm.mateStatus.set(key, s.status);
-    return s.status;
+    // nic se nepohnulo → stav popisuje dokument, jak je (řešič jen doplnil geometrii ploch); jinak polohy po přepočtu
+    return setMateStatus(ws, key, s.moved.length ? s.doc : doc, s.status);
   } catch {
     return st;
   }
@@ -95,7 +100,9 @@ export async function asmStatus(ws: Workspace, kernel: KernelApi, doc: CadDoc, o
   const key = o.key ?? ws.docKey();
   const all = await ensureLeaves(ws, kernel, doc, o);
   await ensureMateStatus(ws, kernel, doc, key, o);
-  const st = asmStatusOf(ws, doc, key, all);
+  // pružiny: délka ověřená proti dosedacím plochám (vlna 22, bod 7) – řádek „Pružiny:“ ji označí jako odvozenou / rozpor / nezkontrolováno
+  const springs = await springCheck(ws, kernel, doc, o);
+  const st = { ...asmStatusOf(ws, doc, key, all), ...(springs ? { springs } : {}) };
   if (o.quick) return st;
   // obálka přesně z těles listových dílů v jádře (vlna 15, B10 – natočené díly by rohy lokálních obálek zvětšily; engine/asm-box.ts);
   // velké importy ze sítě (`approx`); jádro bez obálky (chyba, starší hostitel) = obálka z lokálních obálek dílů
@@ -120,16 +127,33 @@ export function asmStatusOf(ws: Workspace, doc: CadDoc, key: string, all: Leaf[]
     mass += partInfo(cache, l.comp).massKg ?? 0;
   }
   const clash = ws.asm.clash.get(key);
-  const compName = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  // zařazené dvojice po pravidlech dokumentu (vlna 22, bod 5): závady s instancí a místem, šrouby v závitu jen počtem
+  const cls = clash ? entryClashes(clash, doc) : [];
   return {
     components: (doc.components ?? []).length,
     parts: vis.length,
     bbox: leavesBox(cache, vis),
     volume: known ? volume : undefined,
     massKg: known ? mass : undefined,
-    clash: clash ? { count: clash.res.length, pairs: clash.res.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
+    clash: clash ? { count: clash.res.length, pairs: statusPairs(cls, doc), classes: countClasses(cls), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
     mates: ws.asm.mateStatus.get(key),
+    // stav vazeb spočítaný pro jiný stav sestavy (nebo pro polohy po přepočtu, které dokument nemá) – nikdy jako platný
+    ...((doc.mates ?? []).length && mateStatusState(ws, key, doc).state === "stale" ? { matesStale: true } : {}),
+    // výsledek pohybové studie pro nynější stav sestavy: platí / NEPLATÍ (co se změnilo) / nespočítáno (cad/motion-cache.ts)
+    motion: motionStatusOf(motionStoreOf(ws.asm), key, doc),
   };
+}
+
+/**
+ * Uložené výsledky dokumentu, které pro jeho nynější geometrii neplatí (měření, porovnání s referencí – `noteResult`):
+ * textový stav je vypíše jako „NEPLATÍ“ a strojová část `measure.stale=1` / `compare.stale=1` (engine/result-key.ts).
+ */
+export function staleNotes(ws: Workspace, doc: CadDoc, key: string): StaleNote[] {
+  if (doc.kind === "draft") return [];
+  const geo = geometrySig(doc);
+  return notedResults(ws, key)
+    .filter((id) => id.sig !== geo)
+    .map((id) => ({ kind: id.kind, rev: id.rev, ...(id.line != null ? { line: id.line } : {}), ...(id.at ? { at: id.at } : {}) }));
 }
 
 /**
@@ -141,8 +165,25 @@ export async function presentStatusText(ws: Workspace, kernel: KernelApi, o: Asm
   const res = d.kind === "draft" ? null : await kernel.build(d).catch(() => null);
   // obálka sestavy přesně – stejně jako příkaz `stav` (asmStatus → engine/asm-box.ts)
   const asm = await asmStatus(ws, kernel, d, { ...o, key: ws.docKey() }).catch(() => undefined);
-  return docStatusText(d, res, asm);
+  return docStatusText(d, res, asm, staleNotes(ws, d, ws.docKey()));
 }
+
+/** řádek kusovníku sestavy → položka kusovníku na listu (druh, norma, rozměr, třída, katalog, výrobce – bom-model.ts) */
+export const bomItemOf = (r: import("../assembly").BomRow): NonNullable<DrawingExtras["bom"]>[number] => ({
+  pos: r.pos,
+  name: r.name,
+  number: r.number,
+  qty: r.qty,
+  material: r.material,
+  massKg: r.massKg,
+  ...(r.kind ? { kind: r.kind } : {}),
+  ...(r.standard ? { standard: r.standard } : {}),
+  ...(r.size ? { size: r.size } : {}),
+  ...(r.grade ? { grade: r.grade } : {}),
+  ...(r.catalog ? { catalog: r.catalog } : {}),
+  ...(r.vendor ? { vendor: r.vendor } : {}),
+  ...(r.noDesignation ? { noDesignation: true } : {}),
+});
 
 /**
  * Doplňky razítka výkresu (hmotnost, kusovník, pozice komponent) jako ve výkresovém prostředí aplikace: sestava =
@@ -169,7 +210,7 @@ export async function drawExtras(ws: Workspace, kernel: KernelApi, doc: CadDoc, 
   }
   return {
     massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0),
-    bom: bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })),
+    bom: bom.map(bomItemOf),
     balloons,
   };
 }

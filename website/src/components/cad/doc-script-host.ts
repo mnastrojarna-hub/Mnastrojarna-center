@@ -6,12 +6,19 @@
 import { cad } from "@/cad/client";
 import type { DocScript } from "@/cad/doc-script";
 import { scriptOfDocWith, type FreshScriptDoc, type ScriptOfDocOptions } from "@/cad/doc-script-fresh";
+import type { DrawingExtras } from "@/cad/drawing-agent";
 import type { CadDoc } from "@/cad/types";
 
 /** volby `window.mncad.script(opts)`; `sigs: "keep"` = otisky výběru zapsat beze změny (bez ověření jádrem) */
 export type ScriptHostOptions = ScriptOfDocOptions;
 
-/** skript dokumentu; `fresh` = co ověřilo jádro (počet prvků s otisky výběru, přečíslované, nenalezené, listy se smazanými kótami) */
-export function scriptOfDoc(doc: CadDoc, opts: ScriptHostOptions = {}): Promise<DocScript & { fresh?: FreshScriptDoc["stats"] }> {
-  return scriptOfDocWith({ pickSigs: (before, f) => cad.pickSigs(before, f), drawing: (d, meta, o) => cad.drawing(d, meta, o) }, doc, opts);
+/**
+ * skript dokumentu; `fresh` = co ověřilo jádro (počet prvků s otisky výběru, přečíslované, nenalezené, listy se smazanými kótami).
+ * `extras` = doplňky razítka otevřeného dokumentu (kusovník a pozice sestavy – stav výkresového prostředí): podle nich jádro
+ * ověří, které upravené vygenerované pozice na listu sestavy jsou. Sestava bez spočítaných pozic (díly se ještě nepostavily)
+ * se neověřuje – převodník pak pozice zapíše podle voleb listu a ohlásí, že ověřené nejsou.
+ */
+export function scriptOfDoc(doc: CadDoc, opts: ScriptHostOptions = {}, extras?: DrawingExtras): Promise<DocScript & { fresh?: FreshScriptDoc["stats"] }> {
+  const known = doc.kind !== "assembly" || !!extras?.balloons?.length;
+  return scriptOfDocWith({ pickSigs: (before, f) => cad.pickSigs(before, f), drawing: (d, meta, o) => cad.drawing(d, meta, o), ...(known ? { extras: (d: CadDoc) => (d === doc ? (extras ?? {}) : {}) } : {}) }, doc, opts);
 }

@@ -53,6 +53,7 @@ import { compareReportCsv, compareReportText, regionHint, regionList } from "@/c
 import type { CompareOptions, ReferenceFile } from "@/cad/compare";
 import { distanceColors } from "@/cad/mesh-distance";
 import { projectionRange, type PlaneMesh, type SectionState } from "@/cad/section-plane";
+import { capSummary } from "@/cad/section-cap";
 import { sketchToDxf } from "@/cad/sketch";
 import { loadSettings, type Settings } from "@/cad/settings";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type Feature, type SketchEntity, type Vec3 } from "@/cad/types";
@@ -104,7 +105,8 @@ export type ApiHost = {
   setDraft: Dispatch<SetStateAction<DraftSetup>>;
   setSurface: Dispatch<SetStateAction<SurfaceSetup>>;
   setPartingZ: (p: { z: number; perimeter: number } | null) => void;
-  setCmpView: (v: CompareView | null) => void;
+  /** mapa porovnání do 3D okna; `src` = dokument (klíč záložky + dokument), pro který porovnání vzniklo – jinde se nekreslí */
+  setCmpView: (v: CompareView | null, src?: { key: string; doc: CadDoc }) => void;
   commit: (d: CadDoc) => void;
   openDocInTab: (d: CadDoc) => string;
   insertComponent: (c: AsmComponent) => void;
@@ -227,7 +229,10 @@ export async function runApiCmd(cmd: ApiCmd, d: CadDoc, host: ApiHost): Promise<
       const s: SectionState = { axis: cmd.axis, offset, flip: cmd.flip };
       host.setSection(s);
       const out = sectionReport(s, bbox ?? (range ? ([av.map((c) => c * range[0]), av.map((c) => c * range[1])] as [Vec3, Vec3]) : null));
-      return { log: [range && (offset < range[0] - 1e-6 || offset > range[1] + 1e-6) ? out + tr(" – ⚠ poloha je mimo model, řez nic neukáže") : out] };
+      // vlna 22: v sestavě věta o čelech řezu (stejné pravidlo jako 3D okno, @/cad/section-cap)
+      const caps = isPartDoc(d) ? "" : capSummary(items.length, host.prefs().display);
+      const line = caps ? `${out} · ${caps}` : out;
+      return { log: [range && (offset < range[0] - 1e-6 || offset > range[1] + 1e-6) ? line + tr(" – ⚠ poloha je mimo model, řez nic neukáže") : line] };
     }
     case "sectionOff":
       host.setSection(null);
@@ -651,13 +656,14 @@ async function compare(host: ApiHost, ref: { name: string; base64: string }, o: 
   if (r.kind !== "body") throw new Error(r.kind === "unsupported" ? r.message : tr("{0}: soubor obsahuje jen 2D výkres – jako referenci použijte 3D model (STEP).", ref.name));
   const file: ReferenceFile = { data: dataBytes(r.data, ref.name), format: r.format, fileName: ref.name };
   const opts: CompareOptions = { align: { mode: o.align ?? "none", rotate: o.rotate, offset: o.offset }, tolerance: tol, booleans: o.booleans ?? "auto", map: o.map ?? true };
+  const src = { key: host.docId(), doc }; // mapa patří tomuto dokumentu a geometrii – po přepnutí záložky / změně modelu se nekreslí
   const res = await cad.compare(doc, file, opts);
   const meta = { model: doc.name, tolerance: tol, date: new Date().toLocaleString(cadLocale()) };
   const list = regionList(res);
   if (o.show && res.map) {
     const c = distanceColors(res.map.distances, tol, Math.max(1, tol * 1.0001));
     for (let i = 0; i < c.length; i++) c[i] = c[i] ** 2.2; // sRGB → lineární (jako dialog)
-    host.setCmpView({ mesh: res.map.mesh, colors: c, ghosts: [] });
+    host.setCmpView({ mesh: res.map.mesh, colors: c, ghosts: [] }, src);
   } else if (o.show === false) host.setCmpView(null);
   const mapOk = res.map ? res.map.stats.max <= tol + res.map.accuracy : null;
   const ok = !list.length && (mapOk ?? !!(res.extra || res.missing));
@@ -867,7 +873,7 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       const h = host();
       return saveProjectFile(h.doc(), name, h);
     },
-    script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
+    script: async (opts) => (await scriptOfDoc(host().doc(), opts, host().drawEnv?.())).text,
     reference: async (cmd) => {
       const c = (cmd ?? "").trim();
       // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha

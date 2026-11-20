@@ -1,4 +1,5 @@
-// Textová verze dokumentace CADu pro vyhledávače a AI: public/cad/dokumentace.md + public/llms.txt
+// Textová verze dokumentace CADu pro vyhledávače a AI: public/cad/dokumentace.md + public/llms.txt + public/cad/schema-pro-ai.md
+// + tahák pro agenty public/cad/tahak.md (tahak.en.md, tahak.de.md – src/cad/agent-cheatsheet.ts)
 // Spuštění: node --experimental-strip-types scripts/cad-docs-text.mjs
 import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -38,6 +39,7 @@ const llms = [
   `> Mnástrojárna s.r.o. je česká nástrojárna (prototypy, náhradní díly do jednoúčelových strojů, nástroje, přípravky, 1–99 ks, konsignace) a autor bezplatného online 3D/2D CADu Mnástrojárna CAD, který běží v prohlížeči na jádru OpenCascade.`,
   "",
   "## Mnástrojárna CAD",
+  `- [Tahák pro AI agenty](${SITE}/cad/tahak.md): začněte zde – nejčastější textové příkazy jako hotové řádky (≤ 5 kB; anglicky ${SITE}/cad/tahak.en.md, německy ${SITE}/cad/tahak.de.md). Hledání v nápovědě: nápověda hledat <slova> v konzoli, mncad help search <slova> v CLI.`,
   `- [Aplikace](${SITE}/cad): spuštění bez instalace a registrace, česky.`,
   `- [Kompletní dokumentace (HTML)](${SITE}${CAD_DOCS_META.docsUrl}): ${CAD_DOCS.length} kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, 2D CAD (DWG/DXF), formáty, sdílení odkazem, nastavení, zkratky, AI agenti a automatizace, FAQ.`,
   `- [Dokumentace jako Markdown](${SITE}${CAD_DOCS_META.mdUrl}): stejný obsah v prostém textu pro strojové zpracování.`,
@@ -54,8 +56,26 @@ const llms = [
 ].join("\n");
 writeFileSync(resolve("public/llms.txt"), llms, "utf8");
 
-// Návod pro AI agenty + úplné schéma (TypeScript typy přímo ze zdrojového kódu – vždy platné)
-const guide = (await import(new URL("../src/cad/agent-guide.ts", import.meta.url).href)).AGENT_GUIDE;
+// Tahák pro agenty (≤ 5 kB na jazyk): samostatné soubory a začátek schema-pro-ai.md
+const { AGENT_CHEATSHEET } = await import(new URL("../src/cad/agent-cheatsheet.ts", import.meta.url).href);
+const CHEAT_FILES = { cs: "tahak.md", en: "tahak.en.md", de: "tahak.de.md" };
+for (const [lang, file] of Object.entries(CHEAT_FILES)) {
+  const text = AGENT_CHEATSHEET[lang];
+  if (Buffer.byteLength(text) > 5120) throw new Error(`${file}: tahák má ${Buffer.byteLength(text)} B > 5 kB`);
+  writeFileSync(resolve("public/cad", file), text, "utf8");
+}
+
+// Návod pro AI agenty + úplné schéma (TypeScript typy přímo ze zdrojového kódu – vždy platné); tahák hned za úvodní odkaz
+const guideSrc = (await import(new URL("../src/cad/agent-guide.ts", import.meta.url).href)).AGENT_GUIDE;
+const withCheat = (g, cheat) => {
+  const lines = g.split("\n");
+  const q = lines.findIndex((l) => l.startsWith("> "));
+  let at = q >= 0 ? q : 1;
+  while (at < lines.length && lines[at].startsWith(">")) at++;
+  const demoted = cheat.trimEnd().replace(/^(#+) /gm, "#$1 ");
+  return [...lines.slice(0, at), "", demoted, ...lines.slice(at)].join("\n");
+};
+const guide = withCheat(guideSrc, AGENT_CHEATSHEET.cs);
 const cut = (file, from, to) => {
   const src = readFileSync(new URL(file, import.meta.url), "utf8");
   const a = src.indexOf(from);
@@ -81,3 +101,4 @@ const schema = [
 writeFileSync(resolve("public/cad/schema-pro-ai.md"), schema, "utf8");
 console.log(`schema-pro-ai.md: ${schema.length} znaků`);
 console.log(`dokumentace.md: ${md.join("\n").length} znaků, llms.txt: ${llms.length} znaků`);
+console.log(`tahák: ${Object.entries(CHEAT_FILES).map(([l, f]) => `${f} ${Buffer.byteLength(AGENT_CHEATSHEET[l])} B`).join(", ")}`);

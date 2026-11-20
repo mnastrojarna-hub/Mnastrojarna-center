@@ -1,0 +1,84 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ materiál „1.2379“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 5: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ razítko: číslo „DA-001“
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Pouzdro“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ druh dílu „Pouzdro“: nakupovaný · katalog „SFJ8-30“ · výrobce „Katalog A“
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Válec 1 (cylinder)
+
+Dokument: „Pouzdro“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 20 mm (X -5…5, Y -5…5, Z 0…20) · objem 1,57 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø10 × 20 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Nástroj“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Pouzdro“ vložena do sestavy
+✓ normálie „ISO 4762 – M12×40 – 12.9“ vložena do sestavy jako komponenta
+✓ normálie „ISO 8734 – 8×30 – m6“ vložena do sestavy jako komponenta
+Sestava „Nástroj“: komponent 5 · vazby 0
+ #1 Deska A · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Přidržovač · díl · poloha [10; 10; 20]
+ #3 Pouzdro · díl · poloha [80; 40; 20] · druh nakupovaný · katalog SFJ8-30 · výrobce Katalog A
+ #4 Šroub M12×40 ISO 4762 · díl · poloha [50; 30; 20] · č. ISO 4762 – M12×40 – 12.9 · skupina Normálie · druh normálie
+ #5 Kolík Ø8×30 ISO 8734 · díl · poloha [80; 10; 20] · č. ISO 8734 – 8×30 – m6 · skupina Normálie · druh normálie
+Kusovník „Nástroj“ (plochý): položek 5, kusů 5, hmotnost Σ 1,115 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+— Vyráběné díly —
+1 | Deska A | DA-001 | 1 | 1.2379 | 0,942
+2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
+— Normálie —
+3 | Šroub M12×40 ISO 4762 | ISO 4762 – M12×40 – 12.9 | 1 | 12.9 | 0,055
+4 | Kolík Ø8×30 ISO 8734 | ISO 8734 – 8×30 – m6 | 1 | dle normy | 0,012
+— Nakupované díly —
+5 | Pouzdro (Katalog A) | SFJ8-30 | 1 | Ocel | 0,012
+CSV (oddělovač ;, desetinná čárka):
+Pozice;Název;Číslo výkresu / norma;Ks;Materiál;Hmotnost 1 ks [kg];Hmotnost celkem [kg];Druh;Norma;Rozměr;Třída / tolerance;Katalogové číslo;Výrobce;Skupina
+1;Deska A;DA-001;1;1.2379;0,942;0,942;vyráběný;;;;;;
+2;Přidržovač;;1;— (třída Ocel);0,094;0,094;vyráběný;;;;;;
+3;Šroub M12×40 ISO 4762;ISO 4762 – M12×40 – 12.9;1;12.9;0,055;0,055;normálie;ISO 4762;M12×40;12.9;;;Normálie
+4;Kolík Ø8×30 ISO 8734;ISO 8734 – 8×30 – m6;1;dle normy;0,012;0,012;normálie;ISO 8734;8×30;m6;;;Normálie
+5;Pouzdro;;1;Ocel;0,012;0,012;nakupovaný;;;;SFJ8-30;Katalog A;
+⚠ řádek 8: vyráběné díly bez čísla výkresu: Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 8: vyráběné díly bez označení materiálu (jen třída): Přidržovač – materiál 1.2379 v dílu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20] · Pouzdro [80; 40; 20] · Šroub M12×40 ISO 4762 [50; 30; 20] · Kolík Ø8×30 ISO 8734 [80; 10; 20]
+Sestava: 5 komponent (5 dílů po rozložení podsestav) · obálka 100 × 60 × 70 mm · objem Σ 142,07 cm³ · hmotnost Σ 1,115 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+✓ komponenta „Přidržovač“: druh nakupovaný · katalog „PR-77“
+Sestava „Nástroj“: komponent 5 · vazby 0
+ #1 Deska A · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Přidržovač · díl · poloha [10; 10; 20] · druh nakupovaný · katalog PR-77
+ #3 Pouzdro · díl · poloha [80; 40; 20] · druh nakupovaný · katalog SFJ8-30 · výrobce Katalog A
+ #4 Šroub M12×40 ISO 4762 · díl · poloha [50; 30; 20] · č. ISO 4762 – M12×40 – 12.9 · skupina Normálie · druh normálie
+ #5 Kolík Ø8×30 ISO 8734 · díl · poloha [80; 10; 20] · č. ISO 8734 – 8×30 – m6 · skupina Normálie · druh normálie
+✓ komponenta „Přidržovač“: druh výchozí · katalog „“
+Kusovník „Nástroj“ (plochý): položek 5, kusů 5, hmotnost Σ 1,115 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+— Vyráběné díly —
+1 | Deska A | DA-001 | 1 | 1.2379 | 0,942
+2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
+— Normálie —
+3 | Šroub M12×40 ISO 4762 | ISO 4762 – M12×40 – 12.9 | 1 | 12.9 | 0,055
+4 | Kolík Ø8×30 ISO 8734 | ISO 8734 – 8×30 – m6 | 1 | dle normy | 0,012
+— Nakupované díly —
+5 | Pouzdro (Katalog A) | SFJ8-30 | 1 | Ocel | 0,012
+⚠ řádek 5: vyráběné díly bez čísla výkresu: Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 5: vyráběné díly bez označení materiálu (jen třída): Přidržovač – materiál 1.2379 v dílu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20] · Pouzdro [80; 40; 20] · Šroub M12×40 ISO 4762 [50; 30; 20] · Kolík Ø8×30 ISO 8734 [80; 10; 20]
+Sestava: 5 komponent (5 dílů po rozložení podsestav) · obálka 100 × 60 × 70 mm · objem Σ 142,07 cm³ · hmotnost Σ 1,115 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

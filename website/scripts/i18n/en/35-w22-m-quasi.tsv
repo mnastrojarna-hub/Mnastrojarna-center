@@ -1,0 +1,82 @@
+# vlna 22, balík M, etapa 2: předpětí pružiny (kvazistatika, režim a úroveň studie), pružina po načtení, konflikty vazeb (priorita, motor na mezi, neplatné kroky)
+  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)	  component positions unchanged – the mates cannot be satisfied together (no compromise is written)
+  rovnováha pružin a preferovaných stran mezí posunula: {0}	  spring equilibrium and preferred limit sides moved: {0}
+ … a další {0} (pohyb krok {1})	 … and {0} more (motion step {1})
+ (zvoleno automaticky: {0}; jiný režim: pohyb kinematika | kvazistatika | dynamika)	 (chosen automatically: {0}; another mode: motion kinematics | quasistatic | dynamics)
+ ⚠ motor stojí na mezi: dosaženo {0} (žádáno {1})	 ⚠ motor stopped at a limit: reached {0} (requested {1})
+ ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok {0}), žádný kompromis	 ⚠ UNSOLVABLE step – the last valid position is shown (step {0}), no compromise
+„{0}“ (splněno)	“{0}” (satisfied)
+„{0}“ {1} (splněno)	“{0}” {1} (satisfied)
+„{0}“ {1} (vazba {2})	“{0}” {1} (mate {2})
+„{0}“ {1} místo {2} ({3})	“{0}” {1} instead of {2} ({3})
+„{0}“ odchylka {1}	“{0}” deviation {1}
+(nezjištěno)	(not determined)
+{0} {1} – na délce na doraz Ln {2}	{0} {1} – at the solid length Ln {2}
+{0} {1} – na mezi max {2} (doraz)	{0} {1} – at the max limit {2} (stop)
+{0} {1} – na mezi min {2} (doraz)	{0} {1} – at the min limit {2} (stop)
+{0} {1} < min {2} ({3})	{0} {1} < min {2} ({3})
+{0} {1} > max {2} (+{3})	{0} {1} > max {2} (+{3})
+{0} {1} v mezích ⟨{2}; {3}⟩	{0} {1} within ⟨{2}; {3}⟩
+{0} + geometrická aproximace	{0} + geometric approximation
+{0} vazba {1} ({2}): {3}{4}	{0} mate {1} ({2}): {3}{4}
+{0}: geometrie chybí	{0}: geometry missing
+⚠ vazby splněny ve všech krocích, ale polohu {0} neurčují – zobrazená poloha není fyzikální výsledek (motion.undetermined)	⚠ mates satisfied in all steps, but they do not determine the position of {0} – the shown position is not a physical result (motion.undetermined)
+✓ pohybová studie: {0}	✓ motion study: {0}
+animace	animation
+Automaticky: kvazistatika, když na pohyblivý díl dosedá pružina, jinak kinematika.	Automatic: quasi-statics when a spring seats on a moving part, otherwise kinematics.
+bez preferované strany	no preferred side
+bez pružiny a bez preferované strany zůstává, kde byla – sestava vazba {0} preferovat min|max	without a spring and without a preferred side it stays where it was – assembly mate {0} prefer min|max
+délka odvozená z dosedacích ploch (řídí polohy komponent)	length derived from the seat faces (component positions drive it)
+doraz pružiny „{0}“ (délka na doraz Ln)	spring stop “{0}” (solid length Ln)
+dynamika	dynamics
+jen zobrazení (výměna dílů) bez výpočtu poloh	display only (parts swapped) without computing positions
+kinematika	kinematics
+Kinematika i přepočet vazeb drží díl u této meze, když jeho polohu ostatní vazby neurčují (bez pružiny). Pevnou vazbu, ukotvení ani motor nepřebije.	Kinematics and the mate solve keep the part at this limit when the other mates do not determine its position (no spring). It never overrides a fixed mate, an anchor or a motor.
+kinematika ji nechává, kde byla (posune ji jen doraz meze) – pružina „{0}“ by ji tlačila: fyzikální poloha = pohyb kvazistatika (nebo sestava vazba {1} preferovat min|max)	kinematics leaves it where it was (only a limit stop moves it) – spring “{0}” would push it: the physical position = motion quasistatic (or assembly mate {1} prefer min|max)
+kinematika ji nechává, kde byla (posune ji jen doraz meze), a výsledek závisí na předchozím pohybu – sestava vazba {0} preferovat min|max, nebo pružina a pohyb kvazistatika	kinematics leaves it where it was (only a limit stop moves it) and the result depends on the previous motion – assembly mate {0} prefer min|max, or a spring and motion quasistatic
+konflikt:	conflict:
+kvazistatika	quasi-statics
+Kvazistatika	Quasi-statics
+motor {0} stojí na mezi v krocích {1}: žádáno {2}, dosaženo {3} – brání: {4}; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)	motor {0} stopped at a limit in steps {1}: requested {2}, reached {3} – blocked by: {4}; cause: the motor requests a value that the hard conditions (limits, stops, fixed mates) do not allow – the parts stay physical (motor at limit: stop; invalid steps instead of stopping: motion motor … at limit error)
+Motor na mezi	Motor at limit
+Motor na mezi: stop = stojí na poslední dosažitelné hodnotě · neplatný krok = kroky za mezí se neřeší, zůstane poslední platná poloha	Motor at limit: stop = stays at the last reachable value · invalid step = steps beyond the limit are not solved, the last valid position remains
+motor stojí na mezi: {0}	motor stopped at a limit: {0}
+motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)	the motor requests a value the hard conditions do not allow (motor at limit: error; to stop the motor instead: motion motor … at limit stop)
+motor: na mezi stop | chyba – stop = motor stojí na poslední dosažitelné hodnotě, chyba = kroky za mezí jsou neplatné	motor: at limit stop | error – stop = the motor stays at the last reachable value, error = the steps beyond the limit are invalid
+na mezi: chyba	at limit: error
+na mezi: stop	at limit: stop
+nejbližší dosažitelná hodnota {0} (zadáno {1}) – brání: {2}	nearest reachable value {0} (entered {1}) – blocked by: {2}
+neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}), žádný kompromis; konflikt: {2}; příčina: {3}	unsolvable steps {0} – the last valid position is shown (step {1}), no compromise; conflict: {2}; cause: {3}
+NEŘEŠITELNÝ krok – zobrazen krok {0}	UNSOLVABLE step – step {0} shown
+Neřešitelný krok {0} – zobrazena poslední platná poloha (krok {1})	Unsolvable step {0} – the last valid position is shown (step {1})
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa "<X>" [bod x y z]] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	motion motor rotary|linear "<component>"|mate <N> <from>..<to> | [from <A>] stroke <Δ> [step S | steps N] [time T] [rpm R | speed V] [at limit stop|error] [collisions] [trace "<X>" [point x y z]] · motion kinematics|quasistatic|dynamics|auto · motion status|run|play|stop|step N|export csv|png|webm|delete
+poloha „{0}“ není vazbami určena (volná v mezi {1}) – {2}	the position of “{0}” is not determined by the mates (free within limit {1}) – {2}
+polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl	positions from mates and motors only – springs are measured but do not push; a part whose position the mates do not determine stays where it was
+Preferovaná strana	Preferred side
+preferovaná strana {0}	preferred side {0}
+preferovat: min | max | ne – strana meze, u které má díl zůstat, když ho vazby neurčují	prefer: min | max | no – the side of the limit where the part stays when the mates do not determine it
+preferuje max	prefers max
+preferuje min	prefers min
+pružina „{0}“: uložená délka {1} mm neodpovídá dosedacím plochám ({2} mm) – délka odvozena z ploch; řídí polohy komponent, uložená délka je jen odvozená hodnota	spring “{0}”: stored length {1} mm does not match the seat faces ({2} mm) – length derived from the faces; component positions are driving, the stored length is only a derived value
+pružina „{0}“: uložená poloha začátku neodpovídá dosedací ploše (posun {1} mm, délka {2} mm) – odvozeno z ploch	spring “{0}”: the stored start position does not match the seat face (shift {1} mm, length {2} mm) – derived from the faces
+přechodový děj s hmotnostmi, gravitací a silami pružin v čase	transient with masses, gravity and spring forces over time
+sestava má pružinu „{0}“ na pohyblivé komponentě	the assembly has spring “{0}” on a moving component
+sestava nemá pružinu na pohyblivé komponentě	the assembly has no spring on a moving component
+uložená délka, s dosedacími plochami nezkontrolováno	stored length, not checked against the seat faces
+Úroveň simulace: {0} – {1}{2}	Simulation level: {0} – {1}{2}
+v každém kroku rovnováha pružin a kontaktů (meze vazeb, délka pružiny na doraz) – nezávisle na předchozím kroku a směru pohybu	equilibrium of springs and contacts (mate limits, spring solid length) in every step – independent of the previous step and the direction of motion
+vazba {0} ({1}) není mez – preferovanou stranu má Mez vzdálenosti, Mez úhlu a Drážka bez polohy	mate {0} ({1}) is not a limit – a preferred side exists for Distance limit, Angle limit and Slot without position
+vazby nelze splnit spolu – polohy komponent zůstaly beze změny (žádný kompromis); {0}	the mates cannot be satisfied together – component positions unchanged (no compromise); {0}
+Vazby nelze splnit spolu – polohy komponent zůstaly beze změny: {0}	The mates cannot be satisfied together – component positions unchanged: {0}
+vazby si odporují i bez motoru – opravte nebo potlačte některou z nich (sestava vazba N potlačit | hodnota)	the mates contradict each other even without the motor – fix or suppress one of them (assembly mate N suppress | value)
+vazby si odporují: {0}	mates contradict each other: {0}
+žádná	none
+Auto	Auto
+délka pružiny v sestavě je odvozená (vlna 22, bod 7): řídí polohy komponent a dosedací plochy, spring.length/offset/seat je jen mezipaměť; po načtení dokumentu (JSON, .mncad, --open, otevřít, aplikace) se délka odvodí z ploch a rozpor s uloženou délkou se ohlásí ⚠ spring.stale (uložená × z ploch) a opraví; stav píše „délka odvozená z dosedacích ploch“, rozpor ⚠ nebo „nezkontrolováno“	the spring length in an assembly is derived (wave 22, point 7): component positions and seat faces are driving, spring.length/offset/seat is only a cache; after a document is loaded (JSON, .mncad, --open, open, app) the length is derived from the faces and a contradiction with the stored length is reported as ⚠ spring.stale (stored × from the faces) and fixed; status writes “length derived from the seat faces”, ⚠ for a contradiction or “not checked”
+režim a úroveň pohybové studie (vlna 22): kinematika = polohy jen z vazeb (díl volný v mezi zůstává, kde byl – ⚠ motion.undetermined), kvazistatika = v každém kroku rovnováha pružin a kontaktů (meze, Ln pružiny jako doraz) nezávisle na předchozím kroku a směru, dynamika; automaticky = kvazistatika s pružinou na pohyblivém dílu; úroveň v protokolu (Úroveň simulace: …) a na konci řádku motion (level=kin|quasi|dyn). Tvrdé podmínky (ukotvení, vazby, meze, Ln) mají přednost před motorem: motor na mezi stojí (⚠ motion.motor-limit s blokujícími vazbami a odchylkami) nebo s „na mezi chyba“ jsou kroky neplatné a zůstane poslední platná poloha (⚠ motion.invalid); žádný kompromis s ujetím a naklopením. Preferovaná strana meze drží díl u meze, když ho vazby neurčují (nikdy proti pevné vazbě či motoru); statický přepočet při úpravě dá díly volné v mezi do rovnováhy pružin, konflikt nezapíše kompromis (⚠ mate.conflict s nejbližší dosažitelnou hodnotou)	mode and level of the motion study (wave 22): kinematics = positions from mates only (a part free within a limit stays where it was – ⚠ motion.undetermined), quasi-statics = equilibrium of springs and contacts (limits, spring Ln as a stop) in every step independent of the previous step and the direction, dynamics; auto = quasi-statics with a spring on a moving part; the level in the protocol (Simulation level: …) and at the end of the motion line (level=kin|quasi|dyn). Hard conditions (anchors, mates, limits, Ln) take priority over the motor: the motor stops at the limit (⚠ motion.motor-limit with the blocking mates and deviations) or with “at limit error” the steps are invalid and the last valid position remains (⚠ motion.invalid); never a compromise with drift and tilt. The preferred side of a limit keeps the part at the limit when the mates do not determine it (never against a fixed mate or a motor); the static solve on an edit puts parts free within limits into spring equilibrium, a conflict writes no compromise (⚠ mate.conflict with the nearest reachable value)
+#!dynamic – texty kódů registru (engine/codes.ts motion.motor-limit, motion.invalid, motion.undetermined, mate.conflict, spring.stale)
+motor {0} stojí na mezi v krocích {1} – brání: {2}	motor {0} stopped at a limit in steps {1} – blocked by: {2}
+neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}); konflikt: {2}	unsolvable steps {0} – the last valid position is shown (step {1}); conflict: {2}
+poloha „{0}“ není vazbami určena (volná v mezi {1})	the position of “{0}” is not determined by the mates (free within limit {1})
+vazby nelze splnit spolu – polohy komponent beze změny; {0}	the mates cannot be satisfied together – component positions unchanged; {0}
+pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch	spring “{0}”: stored length {1} does not match the seat faces ({2}) – length derived from the faces

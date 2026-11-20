@@ -27,6 +27,8 @@ export type ExtActionApi = {
   exportModel: (format: string) => Promise<void>;
   /** údaj z textového příkazu, který akci spustil (např. název pružiny u `pružina tabulka "Název"`) – jen z textu, jinak undefined */
   arg?: string;
+  /** spustí textové příkazy jako konzole (nový díl, sestava…) a vrátí protokol; jen v okně aplikace (kola a ozubení) */
+  runText?: (text: string) => Promise<string>;
 };
 
 export type ExtUi = {

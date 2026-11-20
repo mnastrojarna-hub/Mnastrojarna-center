@@ -1,0 +1,64 @@
+=== run 1 ===
+✓ nový díl „Deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1000 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 10 mm (X 0…10, Y 0…10, Z 0…10) · objem 1 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Sestava A“ – nová záložka
+✓ komponenta „Deska“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska“ F6 · 20 mm: ok · poloha beze změny
+✓ kolize: žádné (2 komponent)
+Deska:F6 (rovina) ↔ Přidržovač:F5 (rovina): vzdálenost 20 mm · ΔX 0 · ΔY 0 · ΔZ 20 · nejbližší body [40; 20; 10] a [40; 20; 30] · úhel normál 180° (rovnoběžné) · vzdálenost rovin 20 mm
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
+Vazby: 1 (1 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?)
+=== run 3 ===
+✓ nová sestava „Sestava B“ – nová záložka
+✓ komponenta „Deska“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+
+Dokument: „Sestava B“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 5]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 4 ===
+✓ záložka „Sestava A“ (sestava) je aktivní – další příkazy pracují s ní
+✓ komponenta „Přidržovač“: ukotvená
+✓ komponenta „Přidržovač“: poloha [40; 10; 5]
+⚠ v sestavě je konflikt vazeb – sestava vazby
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 5] ⚓
+Vazby: 1 (1 konflikt)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Měření: výsledek L6 je pro revizi r·? – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz
+=== run 5 ===
+✓ zpět o 1 krok(ů) (zbývá zpět 0, znovu 1)
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
+Vazby: 1 (1 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?)
+=== run 6 ===
+✓ kolize: žádné (2 komponent)
+Deska:F6 (rovina) ↔ Přidržovač:F5 (rovina): vzdálenost 20 mm · ΔX 0 · ΔY 0 · ΔZ 20 · nejbližší body [40; 20; 10] a [40; 20; 30] · úhel normál 180° (rovnoběžné) · vzdálenost rovin 20 mm
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
+Vazby: 1 (1 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: žádné (zkontrolováno ?)

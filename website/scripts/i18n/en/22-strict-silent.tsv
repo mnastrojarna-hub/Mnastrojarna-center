@@ -8,7 +8,6 @@
 ✓ materiál „{0}“ = označení do razítka, třída „{1}“ ({2} g/cm³)	✓ material “{0}” = designation for the title block, class “{1}” ({2} g/cm³)
 ✓ přísný režim – první ⚠ nebo ✗ zastaví běh{0}	✓ strict mode – the first ⚠ or ✗ stops the run{0}
 ✓ přísný režim vypnut	✓ strict mode off
-díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)	part “{0}” was inserted into the assembly at line {1} as a copy – this change does not reach the assembly (insert it again, or assembly edit)
 hrot vrtáku 60–170° (180 = ploché dno)	drill point 60–170° (180 = flat bottom)
 Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}	Interference in motion: steps with interference {0} of {1} · screw in thread {2} pairs{3} · real: {4}
 kolize: {0} – šroub v závitu {1}, skutečné {2}	interference: {0} – screw in thread {1}, real {2}

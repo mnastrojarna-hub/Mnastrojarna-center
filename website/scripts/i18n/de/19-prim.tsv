@@ -414,8 +414,6 @@ základní rovina zrcadlení	Grundebene der Spiegelung
 zaoblit R	verrunden R
 zaoblit R [hrany <pravidlo>] · zaoblit R hrany … setback S · zaoblit eliptické D1 D2 hrany …	verrunden R [kanten <regel>] · verrunden R kanten … rückversatz S · verrunden elliptisch D1 D2 kanten …
 závit (M8, M18×1,5)	Gewinde (M8, M18×1,5)
-závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat]	gewinde M18×1,5 länge L [bei x y z | bei …] [achse …] [innen] [modellieren]
-závit M18×1,5 délka L [vnitřní] [modelovat]	gewinde M18×1,5 länge L [innen] [modellieren]
 závit M8	gewinde M8
 závit nemá operaci – kosmetický je jen ve výkrese, „modelovat“ vyřízne drážky: {0}	ein Gewinde hat keine Operation – kosmetisch nur in der Zeichnung, „modellieren“ schneidet die Rillen: {0}
 závity N | délka L	windungen N | länge L

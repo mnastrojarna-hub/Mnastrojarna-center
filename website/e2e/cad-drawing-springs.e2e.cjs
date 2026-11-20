@@ -47,7 +47,7 @@ const first = (log, re) => (re.exec(log) || [])[0] || '';
   const r3 = await timed(['nový díl "Pružina M"', 'pružina 10 stoupání 4 závity 1 drát 1,5', 'výkres A4 pohledy přední', 'výkres pružiny plně', 'výkres stav'].join('\n'));
   fs.writeFileSync(S + 'log3.txt', r3.log);
   ok(!/^✗/m.test(r3.log), 'výkres pružiny plně bez chyb' + (first(r3.log, /^✗.*$/m) ? ' – ' + first(r3.log, /^✗.*$/m) : ''));
-  ok(/✓ výkres: pružiny plně \(šroubovice\)/.test(r3.log), '„výkres pružiny plně“ potvrzeno');
+  ok(/→ výkres: pružiny plně \(šroubovice\)/.test(r3.log), '„výkres pružiny plně“ potvrzeno');
   ok(/Volby: .*pružiny plně \(šroubovice\)/.test(r3.log), 'výkres stav: Volby – pružiny plně');
   const bad = await run('výkres pružiny ano');
   ok(/^✗ .*pružiny: zjednodušeně .* nebo plně/m.test(bad), '„výkres pružiny ano“ = ✗ s nápovědou');

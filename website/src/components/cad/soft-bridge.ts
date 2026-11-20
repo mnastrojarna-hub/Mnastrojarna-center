@@ -8,7 +8,7 @@ import type { SoftViewName } from "@/cad/soft-render";
 import type { Vec3 } from "@/cad/types";
 import type { BoxRect } from "@/cad/box-select";
 import type { SelItem } from "./selection";
-import type { Hint, ViewportProps } from "./viewport";
+import type { Hint, NeutralCam, ViewportProps } from "./viewport";
 
 export type SoftViewHandle = {
   setView: (v: SoftViewName) => void;
@@ -24,6 +24,11 @@ export type SoftViewHandle = {
   clickHint?: (id: string, additive?: boolean) => boolean;
   /** výběr oknem / křížením (CSS px náhledu) podle filtru – bez změny výběru; null = v tomto režimu nejde */
   boxPick?: (rect: BoxRect, crossing: boolean) => SelItem[] | null;
+  /** vlna 22: vykreslí náhled hned (plná kvalita) a vrátí plátna (obraz + překryv) k sejmutí snímku videa */
+  frame?: () => HTMLCanvasElement[] | null;
+  /** kamera nezávislá na způsobu kreslení (viewport.tsx NeutralCam) */
+  viewState?: () => NeutralCam | null;
+  setViewState?: (c: NeutralCam) => void;
 };
 
 /** Aktivní softwarový náhled hlavního 3D okna; null = kreslí WebGL. */

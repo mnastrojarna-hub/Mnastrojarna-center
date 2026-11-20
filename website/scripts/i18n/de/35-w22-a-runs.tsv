@@ -1,0 +1,48 @@
+# Vlna 22, balík A, etapa A3 (body 12, 22e, 22f, 22h): fronta a identita běhů, zrušení, čekání výstupů, export jako úloha
+{0}: neprovedeno – čekání na dokončení výpočtu bylo zrušeno	{0}: nicht ausgeführt – das Warten auf das Ende der Berechnung wurde abgebrochen
+✗ Běh {0} zrušen dřív, než začal – nic se neprovedlo, dokument zůstal beze změny.	✗ Lauf {0} vor dem Start abgebrochen – nichts wurde ausgeführt, das Dokument ist unverändert.
+Akce se neprovede; výpočet poběží dál	Die Aktion wird nicht ausgeführt; die Berechnung läuft weiter
+běh {0}	Lauf {0}
+Běh {0}	Lauf {0}
+Běh {0} čeká ve frontě – začne, až doběhne dřívější běh. Protokol se ukáže po jeho dokončení.	Lauf {0} wartet in der Warteschlange – er startet, wenn der vorherige Lauf fertig ist. Das Protokoll erscheint nach seinem Ende.
+běh {0} zrušen	Lauf {0} abgebrochen
+Běh {0}: {1}	Lauf {0}: {1}
+čeká	wartet
+čeká na dokončení dřívějšího běhu	wartet auf das Ende eines vorherigen Laufs
+Čekám na dokončení výpočtu…	Warte auf das Ende der Berechnung…
+dokončeno	fertig
+dokument JSON	JSON-Dokument
+Export {0} zrušen – soubor nebyl zapsán.	Export {0} abgebrochen – keine Datei geschrieben.
+Export {0}: úloha {1} – průběh a výsledek v seznamu Exporty	Export {0}: Auftrag {1} – Fortschritt und Ergebnis in der Liste Exporte
+export skriptu	Skriptexport
+Exporty	Exporte
+fáze	Phase
+kontrola zpětným načtením	Prüfung durch Zurücklesen
+nahrazeno	ersetzt
+počítá	rechnet
+prázdný soubor z dialogu odstraněn	leere Datei aus dem Dialog entfernt
+Probíhá běh {0}… Protokol se ukáže po jeho dokončení.	Lauf {0} läuft… Das Protokoll erscheint nach seinem Ende.
+Předchozí běh {0} – protokol (nepatří běžícímu běhu)	Vorheriger Lauf {0} – Protokoll (gehört nicht zum laufenden Lauf)
+Předchozí výstup (nepatří běžícímu běhu)	Vorherige Ausgabe (gehört nicht zum laufenden Lauf)
+přestavba modelu	Modellneuaufbau
+převod	Konvertierung
+převod do {0}	Konvertierung nach {0}
+run: neznámá volba „{0}“ – protocol, budget, notes, signal	run: unbekannte Option „{0}“ – protocol, budget, notes, signal
+run: signal musí být AbortSignal (new AbortController().signal)	run: signal muss ein AbortSignal sein (new AbortController().signal)
+sdílení	Teilen
+Sdílení zrušeno.	Teilen abgebrochen.
+síť modelu	Modellnetz
+Skrýt dokončené exporty	Abgeschlossene Exporte ausblenden
+soubor nebyl zapsán	keine Datei geschrieben
+soubor nebyl zapsán (0 B) – prázdný soubor z dialogu smažte ručně	keine Datei geschrieben (0 B) – löschen Sie die leere Datei aus dem Dialog von Hand
+soubor nebyl zapsán ani stažen	keine Datei geschrieben oder heruntergeladen
+úloha „{0}“ neexistuje	Auftrag „{0}“ existiert nicht
+úloha „{0}“ už skončila ({1})	Auftrag „{0}“ ist bereits beendet ({1})
+uložení	Speichern
+Uložení zrušeno – soubor nebyl zapsán.	Speichern abgebrochen – keine Datei geschrieben.
+Uložení zrušeno.	Speichern abgebrochen.
+ve frontě {0}	in der Warteschlange {0}
+zápis souboru	Datei schreiben
+zrušeno	abgebrochen
+Zruší běh: čekající se neprovede, běžící se zastaví a dokument zůstane beze změny	Bricht den Lauf ab: ein wartender wird nicht ausgeführt, ein laufender stoppt und das Dokument bleibt unverändert
+Zrušit běh	Lauf abbrechen

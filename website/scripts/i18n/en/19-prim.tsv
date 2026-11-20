@@ -414,8 +414,6 @@ základní rovina zrcadlení	base mirror plane
 zaoblit R	fillet R
 zaoblit R [hrany <pravidlo>] · zaoblit R hrany … setback S · zaoblit eliptické D1 D2 hrany …	fillet R [edges <rule>] · fillet R edges … setback S · fillet elliptical D1 D2 edges …
 závit (M8, M18×1,5)	thread (M8, M18×1.5)
-závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat]	thread M18×1.5 length L [at x y z | at …] [axis …] [internal] [modeled]
-závit M18×1,5 délka L [vnitřní] [modelovat]	thread M18×1.5 length L [internal] [modeled]
 závit M8	thread M8
 závit nemá operaci – kosmetický je jen ve výkrese, „modelovat“ vyřízne drážky: {0}	a thread has no operation – a cosmetic one is drawing only, “modeled” cuts the grooves: {0}
 závity N | délka L	turns N | length L

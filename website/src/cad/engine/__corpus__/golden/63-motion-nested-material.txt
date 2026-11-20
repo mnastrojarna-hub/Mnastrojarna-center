@@ -1,0 +1,125 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Doraz“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Sloupek“ – nová záložka
+→ Kvádr 4 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Kvádr 3 (box)
+✓ Kvádr 4 (box)
+
+Dokument: „Sloupek“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 4 [box, id #] ✓ – 5 × 5 × 5 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Sestava A“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Doraz“ vložena do sestavy
+✓ komponenta „Sloupek“ vložena do sestavy
+✓ podsestava „Skupina“: „Doraz“, „Sloupek“
+✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
+Kolize: žádné ve všech krocích
+Vazby splněny ve všech krocích
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30] · Skupina [0; 0; 0] (podsestava)
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
+Sestava: 3 komponent (4 dílů po rozložení podsestav) · obálka 60 × 40 × 55 mm · objem Σ 25,63 cm³ · hmotnost Σ 0,201 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)
+=== run 3 ===
+✓ úprava podsestavy „Skupina“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
+✓ komponenta „Doraz“: poloha [40; 10; 22]
+✓ „Skupina“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 0,63 cm³ · vazby 1/1 ok
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
+ 1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+⚠ řádek 5: výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“; přepočítá ho „pohyb spustit“
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
+ 1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
+Kolize v pohybu: kroků s kolizí 4 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 4 krocích, první v kroku 2
+Vazby splněny ve všech krocích
+ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“
+⚠ řádek 6: v pohybu „Přidržovač“ × „Skupina“ od kroku 2 (t = 0,8 s): kroků 4, dvojic komponent 1, největší průnik 500 mm³
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30] · Skupina [0; 0; 0] (podsestava)
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
+Sestava: 3 komponent (4 dílů po rozložení podsestav) · obálka 60 × 40 × 55 mm · objem Σ 25,63 cm³ · hmotnost Σ 0,201 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 4 krocích (podrobně pohyb stav)
+=== run 4 ===
+✓ pohybová studie smazána
+Pohybová studie: motorů 0 · kroků 36
+✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
+Vazby splněny ve všech krocích
+ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30] · Skupina [0; 0; 0] (podsestava)
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 3 komponent (4 dílů po rozložení podsestav) · obálka 60 × 40 × 55 mm · objem Σ 25,63 cm³ · hmotnost Σ 0,201 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 5 ===
+✓ nový díl „Vodítko“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nová sestava „S1“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Vodítko“ vložena do sestavy
+✓ vazba Ukotvit „Vodítko“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
+Pohybová studie: motorů 0 · kroků 36
+Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0
+Pohybová studie: 20 kroků · 0,02 s · motory: 
+Vazby splněny ve všech krocích
+Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
+ „Přidržovač“ 0,0078 kg (z objemu × hustoty): v klidu
+ Kontrola energie: odchylka 0 % z 0 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0 J, dotyky 0 J, zadané síly 0 J)
+✓ síla 10 N na vazbě „ZDVIH“ (kladná zvětšuje hodnotu vazby)
+Pohybová studie: motorů 0 · kroků 36
+Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0 · síla vazba 2 ZDVIH: 10 N
+Pohybová studie: 20 kroků · 0,02 s · motory: 
+Vazby splněny ve všech krocích
+Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
+ „Přidržovač“ 0,0078 kg (z objemu × hustoty): v klidu
+ Kontrola energie: odchylka 0 % z 0 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0 J, dotyky 0 J, zadané síly 0 J)
+✓ Válec 1 (cylinder)
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [30; 20; -10] ⚓ · Přidržovač [25; 15; 30]
+Vazby: 2 (2 ok)
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 60 × 40 × 60 mm · objem Σ 29,71 cm³ · hmotnost Σ 0,233 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 20 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 6 ===
+✓ úprava dílu „Přidržovač“ v kontextu sestavy „S1“ – další příkazy pracují s ním; návrat: sestava hotovo
+✓ materiál = Hliník (2.7 g/cm³)
+✓ „Přidržovač“ vrácen do sestavy „S1“ (změnu převzalo komponent: 1) · objem dílu 1 cm³ · vazby 2/2 ok
+Pohybová studie: motorů 0 · kroků 36
+Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0 · síla vazba 2 ZDVIH: 10 N
+⚠ řádek 4: výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: materiál dílu „Přidržovač“ (hmotnost v dynamice); přepočítá ho „pohyb spustit“
+
+Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [30; 20; -10] ⚓ · Přidržovač [25; 15; 30]
+Vazby: 2 (2 ok)
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 60 × 40 × 60 mm · objem Σ 29,71 cm³ · hmotnost Σ 0,228 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: materiál dílu „Přidržovač“ (hmotnost v dynamice); přepočítá „pohyb spustit“

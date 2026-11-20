@@ -401,13 +401,14 @@ export function featureFields(): FieldTable {
     },
     thicken: { fields: { faces: FACES(), thickness: N(tr("tloušťka"), "mm"), mode: MODE_NO_TEXT(), faceSigs: SIGS() } },
     thread: {
-      cmd: tr("závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat]"),
+      cmd: tr("závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat | šroubovice]"),
       fields: {
         designation: { k: "text", desc: tr("označení (M8, M18×1,5)"), text: tr("závit M8") },
         position: POS(tr("začátek závitu na ose")),
         axis: AXIS(),
         length: N(tr("délka závitu"), "mm", tr("délka L")),
         modeled: B(tr("modelované drážky (jinak kosmetický – jen výkres)"), tr("modelovat")),
+        helix: B(tr("skutečná šroubovice z označení (s modelovat; jinak soustružené drážky)"), tr("šroubovice")),
         internal: B(tr("vnitřní závit (v díře)"), tr("vnitřní"), true),
         positionRef: POSREF(),
         dirDef: DIRDEF(),

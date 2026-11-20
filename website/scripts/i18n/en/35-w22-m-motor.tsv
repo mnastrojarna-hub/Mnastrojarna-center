@@ -1,0 +1,52 @@
+# vlna 22, balík M, etapa 1 – model motoru (body 9 a 11): rozsah × rychlost, začátek + zdvih, význam hodnot
+ · uložený konec {0} se nepoužívá	 · the stored end {0} is not used
+ (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)	 (the mate value is absolute – it does not matter that the component is B of the mate)
+ (pak stojí do konce studie {0} s)	 (then stands until the end of the study at {0} s)
+{0} → {1} → {0} mm {2} zdvih {3} mm tam a zpět	{0} → {1} → {0} mm {2} stroke {3} mm there and back
+{0} → {1} → {0}° {2} otočení {3}° tam a zpět	{0} → {1} → {0}° {2} turn {3}° there and back
+{0} → {1} mm {2} zdvih {3} mm	{0} → {1} mm {2} stroke {3} mm
+{0} → {1}° {2} otočení {3}°	{0} → {1}° {2} turn {3}°
+od {0} mm {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4} mm)	from {0} mm {1} at {2} (no end value – at {4} mm after {3} s)
+od {0}° {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4}°)	from {0}° {1} at {2} (no end value – at {4}° after {3} s)
+hodnota vazby {0}	mate value {0}
+posuv od výchozí polohy {0}	offset from the initial pose {0}
+natočení od výchozí polohy {0}	rotation from the initial pose {0}
+zdvih	stroke
+motor: rychlost musí být nenulová	motor: the speed must not be zero
+motor: zdvih je nulový	motor: the stroke is zero
+motor: zadejte konec (od..do), nebo zdvih – ne obojí	motor: give the end (from..to) or the stroke – not both
+motor: rozsah od–do je nulový – např. 0..360 (jen rychlost od hodnoty: od 5 rychlost 3)	motor: the from–to range is zero – e.g. 0..360 (speed only from a value: from 5 speed 3)
+motor: „tam a zpět“ jede sinusově přes celou studii – rychlost k němu nezadávejte (délku určuje pohyb čas T)	motor: “there and back” runs sinusoidally over the whole study – do not give a speed with it (the length is set by motion time T)
+motor: rychlost {0} je záporná, ale rozsah {1} → {2}{3} roste – zadejte kladnou rychlost (směr určuje rozsah), nebo rozsah otočte	motor: the speed {0} is negative but the range {1} → {2}{3} rises – give a positive speed (the range sets the direction) or reverse the range
+motor: rozsah {0}{1} rychlostí {2} trvá {3} s, zadaný čas {4} s nestačí – vynechte čas (délka studie bude {3} s), nebo rychlost (motor projede rozsah za {4} s)	motor: the range {0}{1} at {2} takes {3} s, the given time {4} s is not enough – leave out the time (the study will be {3} s long) or the speed (the motor covers the range in {4} s)
+délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)	study length extended from {1} s to {2} s – motor {0} needs {2} s for its range (other motors with a range without speed become slower)
+motor {0} nedojede na konec: {1} rychlostí {2} trvá {3} s, studie má {4} s – skončí na {5}; pohyb čas {3}	motor {0} does not reach its end: {1} at {2} takes {3} s, the study is {4} s long – it ends at {5}; motion time {3}
+motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)	motor {0}: the value of mate “{1}” falls below zero ({2} mm) – the mate faces pass through each other and the parts may penetrate; interferences are not checked in this study (motion collisions)
+motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo zdvih Δ	motor {0}: the start {1} is not 0 – with mate “{2}” the motor value is an offset / rotation from the initial pose, in step 0 the part jumps by {3}; without a jump: 0..Δ or stroke Δ
+motor {0}: začátek {1} se liší od aktuální hodnoty vazby „{2}“ {3} – v kroku 0 díl přeskočí o {4}; zdvih od aktuální hodnoty: pohyb motor … zdvih Δ	motor {0}: the start {1} differs from the current value of mate “{2}” {3} – in step 0 the part jumps by {4}; stroke from the current value: motion motor … stroke Δ
+motor pohybové studie – význam zadání: u vazby Vzdálenost (a Drážky s polohou) jsou hodnoty hodnotou vazby, jinak posuv / natočení od výchozí polohy; zdvih Δ = konec o Δ od začátku (bez „od“ od aktuální hodnoty vazby); rozsah nebo zdvih + rychlost = dojede na konec a stojí, doba = zdvih / rychlost (kratší zadaný čas je chyba); jen rychlost = od začátku bez konce. Protokol vždy uvádí začátek → konec, zdvih, směr a dobu; ⚠ motion.start-jump, když začátek neodpovídá aktuální hodnotě. Výsledek studie platí jen pro stav sestavy, pro který vznikl: po změně dílu, polohy, vazby nebo studie stav hlásí motion.stale a pohyb spustit přepočítá	motion study motor – meaning of the input: with a Distance mate (and a Slot with position) the values are the mate value, otherwise an offset / rotation from the initial pose; stroke Δ = the end is Δ from the start (without “from” it starts at the current mate value); range or stroke + speed = runs to the end and stops, time = stroke / speed (a shorter given time is an error); speed only = from the start without an end. The protocol always shows start → end, stroke, direction and time; ⚠ motion.start-jump when the start does not match the current value. The study result is valid only for the assembly state it was computed for: after a change of a part, a position, a mate or the study the status reports motion.stale and motion run recomputes
+# panel Pohybová studie – formulář motoru
+Začátek – hodnota vazby	Start – mate value
+Začátek – natočení od výchozí polohy	Start – rotation from the initial pose
+Začátek – posuv od výchozí polohy	Start – offset from the initial pose
+Konec – hodnota vazby	End – mate value
+Konec – natočení od výchozí polohy	End – rotation from the initial pose
+Konec – posuv od výchozí polohy	End – offset from the initial pose
+Začátek a konec jsou hodnoty vazby „{0}“ (teď {1} mm) – ne zdvih. Zdvih = konec − začátek.	Start and end are values of mate “{0}” (now {1} mm) – not the stroke. Stroke = end − start.
+Začátek a konec jsou natočení od výchozí polohy (0 = jak díl teď stojí).	Start and end are rotations from the initial pose (0 = where the part stands now).
+Začátek a konec jsou posuv od výchozí polohy (0 = jak díl teď stojí), ne hodnota vazby.	Start and end are offsets from the initial pose (0 = where the part stands now), not the mate value.
+Průběh motoru	Motor profile
+Rozsah za dobu studie	Range over the study time
+Rozsah rychlostí	Range at a speed
+Rychlost bez konce	Speed without an end
+Rychlost (± = směr)	Speed (± = direction)
+Otočení (od začátku, ±)	Turn (from the start, ±)
+Zdvih (od začátku, ±)	Stroke (from the start, ±)
+Zadat	Enter
+konec (hodnotu)	end (value)
+zdvih (relativní posun)	stroke (relative offset)
+délka studie bude {0} s	the study will be {0} s long
+Začít od aktuální hodnoty {0} {1}	Start from the current value {0} {1}
+#!dynamic – texty kódů motorů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+motor {0}: začátek {1} neodpovídá aktuální hodnotě vazby {2} – v kroku 0 díl přeskočí	motor {0}: the start {1} does not match the current mate value {2} – the part jumps in step 0
+motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s	motor {0} does not reach its end: the travel takes {1} s, the study is {2} s long

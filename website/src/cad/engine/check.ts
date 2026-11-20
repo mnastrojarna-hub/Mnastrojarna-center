@@ -20,6 +20,8 @@ import { cadLocale, tr } from "../i18n";
 import { leafByRef } from "../leaf-ref";
 import type { MeasureBody, MeasureCyl } from "../measure";
 import type { ComponentSource, CadDoc, Feature, Vec3 } from "../types";
+import { validityText, type ValidityResult } from "../validity";
+import { noteValidity } from "./validity-store";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { asmStatus } from "./asm-status";
 import { IDENT } from "./asm-box";
@@ -335,10 +337,31 @@ function partWarnings(ctx: OpCtx, part: string, valid: boolean | null, missing: 
     });
 }
 
+/**
+ * Platnost dílu pro kontrolu: s `přesně` přesná kontrola v jádře (BRepCheck přesnou metodou, validity-kernel.ts) – výsledek se
+ * zapamatuje k otisku geometrie aktivního dokumentu (řádek Geometrie, D `vcheck=exact`, JSON); jinak rychlá kontrola po stavbě.
+ */
+async function partValidity(ctx: OpCtx, d: CadDoc, fast: boolean | null, exact: boolean | undefined): Promise<{ valid: boolean | null; how: "fast" | "exact"; v?: ValidityResult }> {
+  if (!exact) return { valid: fast, how: "fast" };
+  const v = await ctx.host.kernel.validity(d);
+  if (v.method === "exact") {
+    if (d === runOf(ctx).doc) noteValidity(ctx.ws, docKeyOf(ctx), d, v);
+    return { valid: v.valid, how: "exact", v };
+  }
+  return { valid: fast, how: "fast", v };
+}
+/** text platnosti ve výpisu kontroly: „platné (přesná kontrola)“, „NEPLATNÉ (přesná kontrola: 14 z 19 ploch)“, „platné (rychlá kontrola)“ */
+function validWords(p: { valid: boolean | null; how: "fast" | "exact"; v?: ValidityResult }): string {
+  if (p.valid === null) return tr("platnost nezkontrolována");
+  const how = p.how === "exact" ? (p.valid ? tr("přesná kontrola") : tr("přesná kontrola: {0} z {1} ploch s vadou", p.v!.badFaces, p.v!.faces)) : tr("rychlá kontrola");
+  return `${p.valid ? tr("platné") : tr("NEPLATNÉ (BRepCheck)")} (${how})`;
+}
+
 async function checkPart(ctx: OpCtx, d: CadDoc, cmd: CheckCmd, label = d.name): Promise<void> {
   const res = await ctx.host.kernel.build(d);
   if (!res.metrics) throw new Error(tr("kontrola: díl „{0}“ nemá těleso", label));
-  const valid = res.metrics.valid ?? null;
+  const pv = await partValidity(ctx, d, res.metrics.valid ?? null, cmd.exact);
+  const valid = pv.valid;
   const { check, missing } = await measurePart(ctx, { label, doc: d, src: null, holes: true, valid });
   const c = check;
   const assumed = c.densityAssumed;
@@ -350,15 +373,20 @@ async function checkPart(ctx: OpCtx, d: CadDoc, cmd: CheckCmd, label = d.name): 
     ["bbox", bboxKv(c.bbox)],
     ["solids", c.solids],
     ["valid", valid ?? undefined],
+    ["vcheck", pv.how === "exact" ? "exact" : undefined],
+    ["bad", pv.how === "exact" && valid === false ? pv.v!.badFaces : undefined],
     ["holes", c.holes.reduce((a, r) => a + r.n, 0)],
   ])}`;
-  const text = tr("Kontrola „{0}“: objem {1} cm³ · hmotnost {2} kg (hustota {3} g/cm³{4}) · obálka {5} · těles {6} · {7}", label, loc(c.volume_mm3 / 1000), loc(c.mass_kg), loc(c.density, 3), assumed ? tr(", předpokládaná – materiál zadán jen označením") : "", bboxText(c.bbox), c.solids, valid === false ? tr("NEPLATNÉ (BRepCheck)") : tr("platné"));
-  sayData(ctx, label, head, c, [text]);
+  const text = tr("Kontrola „{0}“: objem {1} cm³ · hmotnost {2} kg (hustota {3} g/cm³{4}) · obálka {5} · těles {6} · {7}", label, loc(c.volume_mm3 / 1000), loc(c.mass_kg), loc(c.density, 3), assumed ? tr(", předpokládaná – materiál zadán jen označením") : "", bboxText(c.bbox), c.solids, validWords(pv));
+  sayData(ctx, label, head, { ...c, validCheck: pv.how }, [text]);
+  // přesná kontrola nešla provést (velké těleso / prázdný model) – řekne to, ne mlčky rychlou
+  if (cmd.exact && pv.v && pv.v.method !== "exact") coded(ctx, "msg.note", { text: validityText(pv.v, res.metrics.valid ?? null), doc: label });
   if (c.holes.length) sayKvAs(ctx, label, [`holes=${c.holes.reduce((a, r) => a + r.n, 0)} rows=${c.holes.length}`, ...c.holes.map((r) => holeRowKv(r, cmd.positions))].join("\n"), tr("Díry ({0}):", c.holes.reduce((a, r) => a + r.n, 0)), ...c.holes.map((r) => holeRowText(r, cmd.positions)));
   partWarnings(ctx, label, valid, missing);
 }
 
-const clashKvShort = (c: ClashCounts) => `${c.total}(thread=${c.thread},underhead=${c.underhead},real=${c.real},undetermined=${c.undetermined})`;
+// dotyk a pracovní kontakt (vlna 22, bod 5 – pravidla dokumentu) jen nenulové na konci
+const clashKvShort = (c: ClashCounts) => `${c.total}(thread=${c.thread},underhead=${c.underhead},real=${c.real},undetermined=${c.undetermined}${c.touch ? `,touch=${c.touch}` : ""}${c.work ? `,work=${c.work}` : ""})`;
 
 async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void> {
   const k = ctx.host.kernel;
@@ -378,7 +406,10 @@ async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void
       continue;
     }
     const pdoc = l.comp.source.kind === "part" ? l.comp.source.doc : null;
-    const valid = ctx.ws.asm.cache.get(l.key)?.metrics?.valid ?? null;
+    const fastValid = ctx.ws.asm.cache.get(l.key)?.metrics?.valid ?? null;
+    // `kontrola sestava přesně`: každý různý díl přesnou kontrolou (díl s historií; importovaný soubor jen rychle)
+    const pv = pdoc ? await partValidity(ctx, pdoc, fastValid, cmd.exact) : { valid: fastValid, how: "fast" as const };
+    const valid = pv.valid;
     const m = await measurePart(ctx, { label: l.comp.name, doc: pdoc, src: { key: l.key, source: l.comp.source }, holes: withHoles, valid });
     if (!pdoc) m.check.density = densityOf(l.comp.material ?? "ocel");
     parts.set(l.key, { leaf: l, n: 1, m });

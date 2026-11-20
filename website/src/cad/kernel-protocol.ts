@@ -21,6 +21,7 @@ import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
 import type { BodyInfo, BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Feature, FeatureStatus, Vec3 } from "./types";
 import type { SplitPart, StepSplit } from "./formats/step-assembly";
 import type { KernelShapeStats } from "./export-verify";
+import type { ValidityResult } from "./validity";
 import type { PerfEntry } from "./perf-log";
 
 /** Požadavek na jádro (dřív `Req` v `cad.worker.ts`). `id` přidělí klient; odpověď nese totéž `id`. */
@@ -34,6 +35,8 @@ export type KernelReq =
   | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
   /** kontrola exportu z konzole: soubor znovu načíst a změřit proti modelu (export-verify.ts) */
   | { id: number; op: "exportStats"; doc: CadDoc; bytes: Uint8Array; format: "step" | "brep" }
+  /** přesná kontrola platnosti tělesa dokumentu (BRepCheck přesnou metodou, vlna 22 bod 22a – validity-kernel.ts) */
+  | { id: number; op: "validity"; doc: CadDoc; maxFaces?: number }
   /** `offset`/`total` = pořadí dávky v celém načítání sestavy (průběh „díl k z n“) */
   | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[]; offset?: number; total?: number }
   | { id: number; op: "asmFace"; key: string; index: number }
@@ -86,6 +89,7 @@ export interface KernelResults {
   face: FaceInfo | null;
   export: ArrayBuffer;
   exportStats: { model: KernelShapeStats; file: KernelShapeStats };
+  validity: ValidityResult;
   asmParts: { key: string; result: BuildResult }[];
   asmFace: FaceInfo | null;
   interference: Interference[];

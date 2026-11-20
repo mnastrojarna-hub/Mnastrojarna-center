@@ -29,7 +29,7 @@ export async function ensureMateRefs(mates: Mate[], leafKeyOf: (ref: MateRef) =>
   const out = mates.map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b }, ...(m.c ? { c: { ...m.c } } : {}), ...(m.d ? { d: { ...m.d } } : {}) }));
   for (const m of out)
     for (const ref of [m.a, m.b, m.c, m.d]) {
-      if (!ref) continue;
+      if (!ref || ref.lost) continue; // ztracená reference: geometrie se nenačítá (cad/mate-remap.ts)
       const key = leafKeyOf(ref);
       if (!key) continue;
       if (ref.face < 0 && ref.radius && ops.cylFace && !ref.ent) {

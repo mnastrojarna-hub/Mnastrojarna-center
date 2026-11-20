@@ -27,14 +27,14 @@ Prvky:
 → Skica 3 (sketch) přidán – výsledek po výpočtu níže
 ✓ 1 entita do skici „Skica 3“ (e1)
 → Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
-✓ Skica 3 (sketch)
-✓ Vysunutí 1 (extrude)
 ✗ Tažení 1: Chybí skica dráhy – vyberte ji v parametrech.
 ✗ Pole 1: Není těleso.
+✓ Skica 3 (sketch)
+✓ Vysunutí 1 (extrude) · přidáno 500 mm³ · těleso platné
 
 Dokument: „Odkazy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 6 (4 ✓, 2 ✗)
 Rozměry: 10 × 10 × 5 mm (X 45…55, Y -5…5, Z 0…5) · objem 0,50 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø10
     entity: e1 kružnice Ø10 [0; 0]
@@ -47,4 +47,4 @@ Prvky:
  5. Skica 3 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 10×10
     entity: e1 obdélník 10×10 [50; 0]
     profil: 1 uzavřený obrys (e1) ✓
- 6. Vysunutí 1 [extrude, id #] ✓ – 5 mm, add
+ 6. Vysunutí 1 [extrude, id #] ✓ přidáno 500 mm³ · těleso platné – 5 mm, add

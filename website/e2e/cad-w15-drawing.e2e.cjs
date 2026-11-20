@@ -73,18 +73,18 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   // ── B5: řez v konvenci skici, ✗ mimo těleso ──
   let log = await consoleRun('nový díl Hranol\nskica XZ: obdélník 40 30 v 0 15\nvysunout 60\nvýkres A3 pohledy přední,horní řez XZ odsazení -80');
   fs.writeFileSync(S + 'b5-miss.txt', log);
-  ok(/✓ výkres: A3, pohledy přední, horní, řez XZ odsazení -80 \(rovina Y = 80\)/.test(log), 'B5: protokol ukáže rovinu řezu (odsazení -80 = rovina Y = 80)');
+  ok(/→ výkres: A3, pohledy přední, horní, řez XZ odsazení -80 \(rovina Y = 80\)/.test(log), 'B5: protokol ukáže rovinu řezu (odsazení -80 = rovina Y = 80)');
   ok(/✗ (řádek \d+: rovina řezu neprotíná těleso: [^\n]* – )?rovina řezu Y = 80 leží mimo těleso \(Y -60…0\) – odsazení -80 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než 0 a menší než 60 \(krajní hodnoty leží na ploše tělesa\), např\. 30/.test(log), 'B5: rovina mimo těleso = řádek ✗ s otevřeným rozsahem odsazení 0…60 a příkladem');
   // starší zápis (číslo jako souřadnice osy): dnešní výklad těleso mine, starý ho protne → vyloží se postaru s ⚠, bez ✗
   await closeDrawing();
   log = await consoleRun('výkres řez XZ odsazení -20');
   fs.writeFileSync(S + 'b5-legacy.txt', log);
-  ok(/✓ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && /⚠ (řádek \d+: )?řez XZ odsazení -20: rovina Y = 20 těleso míjí – číslo vyloženo postaru jako souřadnice Y = -20 .*dnes pište: výkres řez XZ odsazení 20/.test(log) && !/✗ rovina řezu/.test(log.split('\n').slice(-5).join('\n')), 'B5: starší zápis odsazení -20 = ⚠ s dnešním zápisem, řez uložen jako odsazení 20, bez ✗');
+  ok(/→ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && /⚠ (řádek \d+: )?řez XZ odsazení -20: rovina Y = 20 těleso míjí – číslo vyloženo postaru jako souřadnice Y = -20 .*dnes pište: výkres řez XZ odsazení 20/.test(log) && !/✗ rovina řezu/.test(log.split('\n').slice(-5).join('\n')), 'B5: starší zápis odsazení -20 = ⚠ s dnešním zápisem, řez uložen jako odsazení 20, bez ✗');
   await closeDrawing();
   log = await consoleRun('výkres řez XZ odsazení 20');
   fs.writeFileSync(S + 'b5-ok.txt', log);
   const last = log.split('\n').slice(-4).join('\n');
-  ok(/✓ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && !/✗ rovina řezu/.test(last), 'B5: řez XZ odsazení 20 (jako skica XZ odsazení 20) protne těleso – bez ✗');
+  ok(/→ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && !/✗ rovina řezu/.test(last), 'B5: řez XZ odsazení 20 (jako skica XZ odsazení 20) protne těleso – bez ✗');
   await p.waitForSelector('[data-sheet]', { timeout: 180000 }).catch(() => {});
   ok(await waitSheetHas('A–A'), 'B5: řez A–A je na listu');
   const pos = await p.locator('[data-section-pos]').innerText().catch(() => '');
@@ -101,12 +101,12 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   // ── B7: desetinná místa a tolerance hodnotou / id ──
   log = await consoleRun('nový díl Presny\nkvádr 74,175 40 20\nvýkres A3 pohledy přední,horní,iso\nkótovat\nvýkres tolerance 74,175 -0,005\nvýkres stav');
   fs.writeFileSync(S + 'b7.txt', log);
-  ok(/✓ tolerance -0,005 → 74,175-0,005 \(přední\)/.test(log), 'B7: výkres tolerance 74,175 najde kótu hodnotou (ne „74,18“)');
+  ok(/→ tolerance -0,005 → 74,175-0,005 \(přední\)/.test(log), 'B7: výkres tolerance 74,175 najde kótu hodnotou (ne „74,18“)');
   ok(/přední: 74,175-0,005/.test(log) && /x 0…74,175, y 0…20 mm/.test(log) && !/74,18\b/.test(log), 'B7: výkres stav – kóta i rozsah pohledu s tisícinami 74,175');
   ok(await waitSheetText('74,175-0,005'), 'B7 GUI: list ukazuje 74,175-0,005');
   await closeDrawing();
   log = await consoleRun('výkres tolerance a1 h7');
-  ok(/✓ tolerance h7 → 74,175h7/.test(log), 'B7: výkres tolerance a1 h7 (id kóty)');
+  ok(/→ tolerance h7 → 74,175h7/.test(log), 'B7: výkres tolerance a1 h7 (id kóty)');
   await closeDrawing();
 
   // ── B8 + 5.3: funkční rozměry, převod pomocné kóty, kontrola tolerancí ──
@@ -118,7 +118,7 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   ok(/Funkční rozměry: 50, 30 · kontrola tolerancí: bez tolerance 2 z 2 funkčních rozměrů/.test(log), 'B8: výkres stav – řádek Funkční rozměry s kontrolou tolerancí');
   await closeDrawing();
   log = await consoleRun('výkres tolerance 42 ±0,05');
-  ok(/✓ tolerance ±0,05 → 42±0,05 \(přední\) – rozměr 42 je nyní funkční \(pomocnou kótou řetězu je \(15\)\)/.test(log), 'B8: tolerance na pomocnou kótu (42) ji převede na funkční, pomocná je (15)');
+  ok(/→ tolerance ±0,05 → 42±0,05 \(přední\) – rozměr 42 je nyní funkční \(pomocnou kótou řetězu je \(15\)\)/.test(log), 'B8: tolerance na pomocnou kótu (42) ji převede na funkční, pomocná je (15)');
   await closeDrawing();
   log = await consoleRun('výkres tolerance 50 -0,1\nvýkres kontrola tolerancí\nvýkres');
   fs.writeFileSync(S + 'tolcheck.txt', log);
@@ -166,13 +166,13 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   // ── 2. kontrola: přeurčený řetěz ──
   log = await consoleRun(`${SHAFT}\nvýkres A3 na šířku pohledy přední,levý,iso\nkótovat funkční 30 3 50 15 42\nvýkres tolerance 50 -0,1\nvýkres tolerance 140 ±0,2`);
   fs.writeFileSync(S + 'r2-overdetermined.txt', log);
-  ok(/✓ tolerance ±0,2 → 140±0,2 \(přední\) – rozměr 140 je nyní funkční; řetěz by byl přeurčený, pomocnou kótou je proto funkční rozměr bez tolerance \(42\)/.test(log), 'B8 (2. kontrola): tolerance celkové délky u přeurčeného řetězu – pomocná je funkční rozměr bez tolerance (42)');
+  ok(/→ tolerance ±0,2 → 140±0,2 \(přední\) – rozměr 140 je nyní funkční; řetěz by byl přeurčený, pomocnou kótou je proto funkční rozměr bez tolerance \(42\)/.test(log), 'B8 (2. kontrola): tolerance celkové délky u přeurčeného řetězu – pomocná je funkční rozměr bez tolerance (42)');
   ok(await waitSheetText('140±0,2'), 'B8 GUI: 140±0,2 na listu');
   const tr2 = await sheetTexts();
   ok(tr2.includes('(42)') && tr2.includes('50-0,1') && !tr2.some((t) => /^\(50/.test(t || '')), 'B8 GUI: (42) pomocná, 50-0,1 bez závorek – žádná „(50-0,1)“');
   await closeDrawing();
   log = await consoleRun('výkres tolerance 50 -0,1');
-  ok(/✓ tolerance -0,1 → 50-0,1 \(přední\)/.test(log), 'B8: tolerance 50 znovu ✓ (dřív ✗ „pomocná kóta se netoleruje“)');
+  ok(/→ tolerance -0,1 → 50-0,1 \(přední\)/.test(log), 'B8: tolerance 50 znovu ✓ (dřív ✗ „pomocná kóta se netoleruje“)');
   await closeDrawing();
 
   // ── 2. kontrola: tabulka děr v levém pohledu ──

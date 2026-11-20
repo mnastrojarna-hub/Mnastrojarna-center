@@ -212,8 +212,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode; faceSigs?: PickSigs }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
+  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“); `helix` (jen s `modeled`) = skutečná šroubovice z označení místo soustružených drážek (vlna 22, bod 22d – thread-spec.ts) */
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; helix?: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
@@ -265,6 +265,8 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
+  /** druh položky kusovníku dílu (vyráběný / normálie / nakupovaný) a údaje normálie / nakupované položky – cad/bom-model.ts */
+  supply?: SupplyInfo;
   /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
   kind?: "part" | "assembly" | "draft";
   /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
@@ -275,10 +277,16 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
+  outputs?: ExportRecord[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
   motion?: MotionStudy;
+  /** pravidla kontroly kolizí sestavy (pracovní kontakt operace, závit bez prvku) – cad/clash-rules.ts (vlna 22, bod 5) */
+  clashRules?: ClashRule[];
+  /** tolerance dotyku kontroly kolizí [mm]: průnik tenčí než tolerance = ℹ dotyk, ne kolize (výchozí 0,01) */
+  clashTol?: number;
   /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
@@ -351,13 +359,27 @@ export type AsmComponent = {
   alias?: string;
   /** pružina mezi dvěma komponentami: délka podle vzdálenosti dosedacích ploch (cad/asm-spring.ts) */
   spring?: SpringDef;
+  /** druh položky kusovníku na komponentě (přepíše druh dílu) – cad/bom-model.ts `supplyOf` */
+  supply?: SupplyInfo;
+  /** otisk dílu záložky při vložení / `sestava obnovit` – pozdější změna dílu = kopie starší než díl (cad/asm-refresh.ts) */
+  origin?: CopyOrigin;
 };
+
+/** druh položky kusovníku: vyráběný díl (výkres, číslo), normálie (norma), nakupovaný díl (katalog) – vlna 22, bod 19 */
+export type SupplyKind = "make" | "standard" | "buy";
+/** druh a údaje položky kusovníku: norma, rozměr, pevnostní třída / tolerance (normálie), katalogové číslo a výrobce (nákup) */
+export type SupplyInfo = { kind?: SupplyKind; standard?: string; size?: string; grade?: string; catalog?: string; vendor?: string };
+/** stav dílu v okamžiku vložení / obnovení komponenty: název dílu, otisk geometrie (`sourceKey`) a vlastnosti do kusovníku */
+export type CopyOrigin = { part: string; sig: string; number?: string; material: string; materialName?: string; kind?: SupplyKind; /** otisk výkresů dílu */ drw?: string };
 
 /**
  * Pružina v sestavě (cad/asm-spring.ts): komponenta s prvkem Pružina (normálie DIN 2095 nebo vlastní díl) mezi dosedací plochou
  * `a` (začátek pružiny – strana jejího počátku) a `b` (konec). Délka pružiny = vzdálenost obou rovin podél osy pružiny; mění se
  * při přepočtu vazeb i v pohybové studii. `free` = volná délka L0, `solid` = délka na doraz Ln, `rate` = tuhost c [N/mm]
  * (síla F = c·(L0 − L)). `length`, `offset` (posun začátku pružiny po ose k dosedací ploše A) a `seat` zapíše poslední přepočet.
+ * Řídicí × odvozené (vlna 22, bod 7): ŘÍDÍ polohy komponent, dosedací plochy `a`/`b` a `free`/`solid`/`rate`; `length`, `offset` a `seat`
+ * jsou jen ODVOZENÁ mezipaměť z ploch – po načtení dokumentu (JSON, .mncad, `--open`, otevřít v aplikaci) se odvodí znovu a rozpor
+ * s uloženou hodnotou se ohlásí ⚠ `spring.stale` (cad/asm-spring.ts `springDrift`). Zápisem jiné `length` pružinu natáhnout nelze.
  */
 export type SpringDef = {
   a: MateRef;
@@ -378,7 +400,11 @@ export type SpringDef = {
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
 /** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown> };
+/**
+ * Úrovně stavu (vlna 22, feature-levels.ts): `ok` = prvek vznikl · `effect` = účinek booleovské operace (změna objemu proti
+ * nástroji) · `body` = konečné těleso po prvku (počet těles, volné plochy, platnost; `valid: null` = nezkontrolováno).
+ */
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown>; effect?: import("./feature-levels").FeatureEffect; body?: import("./feature-levels").BodyCheck; /** prvek je potlačený (přímo nebo aktivní konfigurací) – nestavěl se, nemá výsledek (vlna 22: nikdy ✓) */ suppressed?: boolean; /** kód ⚠ prvku pro protokol místo obecného `feature.warning` (např. `thread.tip-tangent`, vlna 22 bod 22a) */ warnCode?: string };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -406,6 +432,10 @@ export type BuildResult = {
     valid?: boolean;
     /** počet objemových těles (0 = jen pláště / plochy) */
     solids?: number;
+    /** která kontrola platnosti `valid` určila: rychlá po stavbě (výchozí) nebo přesná (`kontrola přesně`, export – vlna 22, bod 22a) */
+    validCheck?: "fast" | "exact";
+    /** počet ploch mimo objemová tělesa (volné plochy, pláště vedle těles) – vlna 22, řádek D `free=N` */
+    free?: number;
     /** objem a plocha ze sítě (velké těleso, lehká komponenta) – ℹ geom.approx (5.2 č. 27) */
     approx?: boolean;
     /** měření objemu selhalo – objem je 0 (⚠ geom.volume-failed, 5.2 č. 28) */
@@ -461,6 +491,27 @@ export type DrawingDoc = {
   annotations: DrawingAnnotation[];
   /** název výkresu, ke kterému list patří (více výkresů jednoho dílu); chybí = první výkres (cad/drawing-sets.ts) */
   drawing?: string;
+  /** vydání listu (`výkres vydat`): písmeno revize, revize modelu, čas – po změně modelu je list zastaralý (cad/doc-outputs.ts) */
+  issued?: IssuedSheet;
+};
+
+/** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
+export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string };
+/**
+ * Záznam exportu v dokumentu (bod 20): co (3D model / výkres / skica), formát, název souboru, revize modelu a otisk, čas ISO;
+ * výkres navíc listy (id) a písmeno revize listu v době exportu. `job` = stav úlohy exportu (balík A3, RunTracker).
+ */
+export type ExportRecord = {
+  id: string;
+  what: "model" | "drawing" | "sketch";
+  format: string;
+  file: string;
+  modelRev: string;
+  sig: string;
+  at: string;
+  sheets?: string[];
+  rev?: string;
+  job?: { id?: string; state?: string };
 };
 
 // ---------------- vazby sestavy ----------------
@@ -473,7 +524,14 @@ export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | 
  * Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`).
  * `ent` = druh entity: bez hodnoty plocha, „edge“ = hrana (index hrany), „vertex“ = vrchol (index vrcholu).
  */
-export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex" };
+export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex"; lost?: LostRef };
+/**
+ * Ztracená reference vazby (vlna 22, bod 20): plocha / hrana / vrchol, který po změně historie dílu v dílu není, nebo odpovídá víc
+ * entitám – otisk původní entity v souřadnicích dílu (`why`: none = nic, ambiguous = víc kandidátů, unknown = původní geometrie
+ * není známa, gone = díl v podsestavě zmizel). Vazba s ní se neřeší (komponenta se nehýbe, stav „lost“), dokud uživatel entitu
+ * nevybere znovu (`sestava vazba N plocha …`, panel Vazby); `face` drží původní číslo jen pro text. cad/mate-remap.ts
+ */
+export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: number; area?: number; length?: number; pts?: Vec3[]; why: "none" | "ambiguous" | "unknown" | "gone" };
 /**
  * Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl.
  * `c`, `d` = další odkazy (Symetricky: rovina souměrnosti; Šířka: druhá plocha jazýčku / drážky; Drážka: druhý konec; Závěs: dosedací roviny).
@@ -483,15 +541,55 @@ export type MateRef = { compId: string; leaf?: string; face: number; radius?: nu
 export type Mate = {
   id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string;
   c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
+  /**
+   * preferovaná strana meze (Mez vzdálenosti, Mez úhlu, Drážka bez polohy; vlna 22, bod 2): kinematika i statický přepočet drží díl
+   * u této meze, když ho vazby neurčují – nikdy proti pevné vazbě, ukotvení, kontaktu ani pohonu motoru (cad/motion-quasi.ts)
+   */
+  prefer?: "min" | "max";
 };
-/** Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost). */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
+/**
+ * Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost).
+ * `from` / `to`: u vazby Vzdálenost a Drážky s polohou hodnota vazby (absolutní), jinak posuv / natočení od výchozí polohy. `speed` bez
+ * `ranged` = od `from` rychlostí bez konce (znaménko = směr, `to` se nepoužije); s `ranged` (vlna 22) = rozsah × rychlost: z `from`
+ * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
+ */
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean; /** chování, když hodnotě brání mez / doraz / pevná vazba (vlna 22, bod 8): „stop“ (výchozí) = motor stojí na poslední dosažitelné hodnotě, „error“ = krok je neplatný a zůstává poslední platná poloha */ atLimit?: "stop" | "error" };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic } & MotionStudyViews;
+/**
+ * Pracovní prostředí přehrávání (vlna 22, bod 14 – cad/motion-views.ts): uložené pohledy studie (kamera + rovina řezu), aktivní
+ * pohled, nastavení posledního exportu videa (bod 13 – cad/motion-video.ts) a anotací. Jen zobrazení – výsledek studie neovlivní.
+ */
+export type MotionStudyViews = { views?: MotionView[]; /** id aktivního pohledu (přehrávání, export) */ view?: string; video?: MotionVideoSettings; annot?: MotionAnnotSettings };
+/** Uložený pohled studie: kamera (nezávislá na WebGL / softwarovém náhledu) a jedna rovina řezu (null = bez řezu). */
+export type MotionView = { id: string; name: string; camera?: StudyCamera; section?: StudySection | null };
+/** Kamera pohledu: pojmenovaný směr nebo směr od cíle ke kameře, cíl a viditelná výška [mm]; co chybí, doplní přizpůsobení modelu. */
+export type StudyCamera = { view?: "iso" | "front" | "back" | "top" | "bottom" | "left" | "right"; dir?: Vec3; target?: Vec3; height?: number };
+/** Rovina řezu pohledu (shodná se stavem řezu 3D okna, cad/section-plane.ts SectionState). */
+export type StudySection = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean; normal?: Vec3; origin?: Vec3 };
+/** Volby exportu videa / snímků: rychlost (1 = skutečná), FPS, ruční délka [s], pohledy (víc = synchronní dlaždice), anotace. */
+export type MotionVideoSettings = { speed?: number; fps?: number; seconds?: number; views?: string[]; annot?: boolean };
+/** Anotace aktuální polohy (v okně i v exportu): vypnuté, nebo skryté řádky. */
+export type MotionAnnotSettings = { off?: boolean; hide?: ("t" | "step" | "motors" | "clearance" | "cut")[] };
 /**
  * Dynamika pohybové studie (cad/motion-dynamic.ts): integrační krok [s], gravitace (směr; null = vypnutá, chybí = −Z), viskózní tlumení
  * pružin [N·s/mm], součinitel odrazu na dorazech (0–1), ručně zadané hmotnosti komponent [kg] a síly / momenty na vazbách.
  */
 export type MotionDynamic = { dt: number; gravity?: Vec3 | null; damping?: number; restitution?: number; masses?: Record<string, number>; loads?: MotionLoad[]; /** počet zaznamenaných snímků (výchozí 400) */ frames?: number };
 /** Síla [N] / moment [N·m] na vazbě: kladná hodnota zvětšuje hodnotu vazby (vzdálenost, posuv, natočení A vůči B). */
+/**
+ * Pravidlo kontroly kolizí (vlna 22, bod 5 – jeden model pro pracovní kontakt i pro procesní vrstvu): `a` / `b` = cesty id
+ * komponent (komponenta nejvyšší úrovně nebo díl v podsestavě; bez `b` = s čímkoli). `work` = pracovní kontakt (nástroj × plech)
+ * v okně operace → ℹ `clash.work` místo ⚠; `thread` = šroub v jádrové díře bez prvku závitu je závitový záběr. Okno `when`:
+ * kroky pohybové studie `steps`, nebo hodnota motoru vazby `mate` v rozsahu `from`–`to` (staticky hodnota vazby v dokumentu);
+ * bez okna platí vždy.
+ */
+export type ClashRule = {
+  id: string;
+  kind: "work" | "thread";
+  a: string[];
+  b?: string[];
+  when?: { steps?: [number, number]; mate?: string; from?: number; to?: number };
+  note?: string;
+};
 export type MotionLoad = { mate: string; kind: "force" | "torque"; value: number };

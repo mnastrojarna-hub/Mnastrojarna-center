@@ -1,0 +1,82 @@
+/**
+ * Vlna 22, balík V (body 13 a 14) – „žádné falešně zelené“: úspěšný text exportu videa / snímků a anotací se nesmí objevit,
+ * když kontrola neproběhla, proběhla na jiném vstupu, nebo selhala.
+ *  - „obraz se mění ve všech … snímcích“ jen když se obraz opravdu měnil s polohou (mrtvé plátno = ✗, část = ⚠);
+ *  - video, jehož soubor neodpovídá plánu (délka 2,926 s pro studii 0,65 s, chybějící snímky), kontrola souboru odmítne;
+ *  - anotace nikdy nepíší vůli ani hloubku zásahu, které se nepočítaly; „✓“ u pohledu jen když se opravdu uložil.
+ */
+import { describe, expect, it } from "vitest";
+import { applyMotionViewCmd } from "../agent-motion-view";
+import { parseMotionText, type MotionCmd } from "../agent-motion";
+import { setLang } from "../i18n";
+import type { MotionResult } from "../motion";
+import { checkFrames, checkText, frameSig, videoPlan } from "../motion-video";
+import { annotRows } from "../motion-views";
+import { emptyDoc, type CadDoc } from "../types";
+import { checkWebm, muxWebm, readWebm } from "../webm-mux";
+
+setLang("cs");
+const OK_FRAMES = /obraz se mění ve všech/;
+
+describe("greens V: kontrola obrazu snímků", () => {
+  const gray = (v: number) => {
+    const d = new Uint8ClampedArray(32 * 18 * 4);
+    for (let i = 0; i < 32 * 18; i++) d.set([v, v, v, 255], i * 4);
+    return frameSig(d, 32, 18);
+  };
+  it("mrtvé plátno (poloha se mění, obraz ne) → ✗, nikdy „mění ve všech“", () => {
+    const c = checkFrames(Array.from({ length: 20 }, (_, i) => ({ pose: `p${i}`, sig: gray(90) })));
+    expect(c.verdict).toBe("dead");
+    expect(checkText(c)).not.toMatch(OK_FRAMES);
+    expect(checkText(c)).toMatch(/^✗/);
+  });
+  it("část snímků beze změny obrazu → ⚠, ne úspěch", () => {
+    const c = checkFrames([0, 1, 2, 3].map((i) => ({ pose: `p${i}`, sig: gray(i < 2 ? 90 + i * 20 : 110) })));
+    expect(c.verdict).toBe("partial");
+    expect(checkText(c)).not.toMatch(OK_FRAMES);
+  });
+  it("studie bez pohybu → ℹ (nic se nekontrolovalo proti pohybu), ne úspěch", () => {
+    const c = checkFrames([{ pose: "a", sig: gray(90) }, { pose: "a", sig: gray(90) }]);
+    expect(checkText(c)).not.toMatch(OK_FRAMES);
+  });
+  it("úspěch jen když se obraz mění s polohou", () => {
+    const c = checkFrames([0, 1, 2].map((i) => ({ pose: `p${i}`, sig: gray(90 + i * 30) })));
+    expect(checkText(c)).toMatch(OK_FRAMES);
+  });
+});
+
+describe("greens V: kontrola hotového videa proti plánu", () => {
+  const fr = (n: number) => Array.from({ length: n }, (_, i) => ({ data: new Uint8Array([i, i + 1, i + 2]), time: (i * 1000) / 30, key: i === 0 }));
+  it("délka 2,926 s pro studii 0,65 s při 1× (zpráva majitele) → rozpor", () => {
+    expect(checkWebm(readWebm(muxWebm({ codec: "V_VP8", width: 8, height: 8, fps: 30, frames: fr(88), duration: 2926 })), videoPlan(0.65)).length).toBeGreaterThan(0);
+  });
+  it("správná délka, ale chybějící snímky → rozpor", () => {
+    expect(checkWebm(readWebm(muxWebm({ codec: "V_VP8", width: 8, height: 8, fps: 30, frames: fr(19), duration: 666.67 })), videoPlan(0.65)).join(" ")).toMatch(/blocks/);
+  });
+  it("odpovídající video → bez rozporu", () => {
+    expect(checkWebm(readWebm(muxWebm({ codec: "V_VP8", width: 8, height: 8, fps: 30, frames: fr(20), duration: 666.667 })), videoPlan(0.65))).toEqual([]);
+  });
+});
+
+describe("greens V: anotace a pohledy", () => {
+  const doc = (): CadDoc => ({ ...emptyDoc(), kind: "assembly", name: "S", components: [], mates: [], motion: { motors: [], duration: 1, steps: 4 } });
+  it("bez kontroly vůle a bez procesní vrstvy anotace vůli ani zásah nepíší", () => {
+    const rows = annotRows({ t: 0, step: 0, steps: 5, motors: [], stepData: { conflicts: [] } }, doc());
+    expect(rows.some((r) => r.key === "clearance" || r.key === "cut")).toBe(false);
+    expect(rows.map((r) => r.text).join(" ")).not.toMatch(/vůle|zásah/);
+  });
+  it("nesplněné vazby / kolize kroku jsou v anotaci ⚠, ne mlčení", () => {
+    const rows = annotRows({ t: 0, step: 0, steps: 5, motors: [], stepData: { conflicts: ["m1"], clashes: [{}] } }, doc());
+    expect(rows.find((r) => r.key === "flags")).toMatchObject({ warn: true, text: "⚠ kolize · nesplněno 1" });
+  });
+  it("„✓ pohled … uložen“ jen když se pohled do studie opravdu zapsal; neplatný řez = chyba, žádné ✓", async () => {
+    const run = (line: string) => applyMotionViewCmd(doc(), (parseMotionText(line) as Extract<MotionCmd, { op: "view" }>).cmd, { run: async () => ({ steps: [] }) as unknown as MotionResult });
+    const r = await run('pohyb pohled uložit "A" řez Z 5');
+    expect(r.log[0].startsWith("✓")).toBe(true);
+    expect(r.doc.motion!.views).toHaveLength(1);
+    expect(() => parseMotionText('pohyb pohled uložit "A" řez normála 0 0 0')).toThrow(/nulový/);
+    // bez studie: chyba, ne ✓
+    const bare: CadDoc = { ...doc(), motion: undefined };
+    await expect(applyMotionViewCmd(bare, { k: "save", name: "A" }, { run: async () => ({ steps: [] }) as unknown as MotionResult })).rejects.toThrow(/nemá pohybovou studii/);
+  });
+});
