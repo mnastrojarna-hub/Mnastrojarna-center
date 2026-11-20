@@ -482,12 +482,17 @@ describe("výběr úložiště a návrat k odkazu", () => {
     expect(r.note).toMatch(/HTTP 500: chyba PHP 8\.1\.2 – store\.php:42 Error: Call to undefined function/);
     // zavaděč: staré PHP / zakázané nezbytné funkce
     resetShareProbe();
-    reply(500, { ok: false, error: "php_too_old", php: "5.6.40", need: "7.0" });
-    await expect(createShareLink(sample(), { days: 10, base: BASE, mode: "self" })).rejects.toThrow(/PHP 5\.6\.40 na serveru je příliš staré, úložiště potřebuje PHP 7\.0/);
+    reply(500, { ok: false, error: "php_too_old", php: "5.4.45", need: "5.6" });
+    await expect(createShareLink(sample(), { days: 10, base: BASE, mode: "self" })).rejects.toThrow(/PHP 5\.4\.45 na serveru je příliš staré, úložiště potřebuje PHP 5\.6/);
     resetShareProbe();
     reply(500, { ok: false, error: "php_functions_disabled", php: "8.2.0", missing: ["fwrite", "rename"] });
     r = await createShareLink(sample(), { days: 10, base: BASE });
     expect(r.note).toMatch(/hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: fwrite, rename/);
+    // bez silného zdroje náhody (PHP 5.6 bez openssl i /dev/urandom) úložiště tajné hodnoty slabě nevyrobí
+    resetShareProbe();
+    reply(503, { ok: false, error: "random_unavailable" });
+    r = await createShareLink(sample(), { days: 10, base: BASE });
+    expect(r.note).toMatch(/HTTP 503: PHP na serveru nemá bezpečný zdroj náhodných čísel/);
     // skript chybí (404 stránka webu)
     resetShareProbe();
     reply(404, "<html>404</html>", "text/html");

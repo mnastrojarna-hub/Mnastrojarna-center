@@ -7,3 +7,4 @@ HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2
 HTTP {0}: server nemůže zapisovat data úložiště (práva ke složce)	HTTP {0}: the server cannot write the storage data (folder permissions)
 HTTP 404: na serveru chybí skript úložiště (/cad/share/index.php nebyl nahrán)	HTTP 404: the storage script is missing on the server (/cad/share/index.php was not uploaded)
 server nedostupný (síť nebo časový limit)	server unreachable (network or timeout)
+HTTP {0}: PHP na serveru nemá bezpečný zdroj náhodných čísel (openssl nebo /dev/urandom) – nastavení hostingu	HTTP {0}: PHP on the server has no secure source of random numbers (openssl or /dev/urandom) – hosting settings

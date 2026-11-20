@@ -4,7 +4,7 @@
  *
  * Vlastní logika je ve store.php vedle. Tento soubor záměrně používá jen syntaxi a funkce, které má i velmi staré PHP,
  * aby na KAŽDÉM hostingu odpověděl čitelně, místo prázdné chyby 500:
- *   – staré PHP (< 7.0)               → 500 {"ok":false,"error":"php_too_old","php":"…","need":"7.0"}
+ *   – staré PHP (< 5.6)               → 500 {"ok":false,"error":"php_too_old","php":"…","need":"5.6"}
  *   – zakázané nezbytné funkce        → 500 {"ok":false,"error":"php_functions_disabled","missing":[…]}
  *   – jakákoli fatální chyba PHP       → 500 {"ok":false,"error":"php_fatal","php":"…","detail":"…"} (bez cest na serveru)
  * Klient v CADu text chyby ukáže uživateli; správce ho uvidí i na adrese …/cad/share/?ping a …/cad/share/?diag.
@@ -59,8 +59,9 @@ function mn_boot_shutdown()
 }
 register_shutdown_function('mn_boot_shutdown');
 
-if (version_compare(PHP_VERSION, '7.0.0', '<')) {
-    mn_boot_out(500, array('ok' => false, 'error' => 'php_too_old', 'php' => PHP_VERSION, 'need' => '7.0'));
+// store.php běží na PHP 5.6 až 8.x (hosting s PHP 5.6.40 – bez syntaxe a funkcí PHP 7)
+if (version_compare(PHP_VERSION, '5.6.0', '<')) {
+    mn_boot_out(500, array('ok' => false, 'error' => 'php_too_old', 'php' => PHP_VERSION, 'need' => '5.6'));
     exit;
 }
 
@@ -77,11 +78,17 @@ if ($mn_missing) {
     exit;
 }
 
+/** nezachycená výjimka (PHP 5.6: Exception) nebo chyba (PHP 7+: Error, ParseError … – Throwable) → JSON s místem chyby */
+function mn_boot_caught($t)
+{
+    if (headers_sent()) return;
+    mn_boot_out(500, array('ok' => false, 'error' => 'php_fatal', 'php' => PHP_VERSION,
+        'detail' => mn_boot_detail(array('message' => get_class($t) . ': ' . $t->getMessage(), 'file' => $t->getFile(), 'line' => $t->getLine()))));
+}
 try {
     require dirname(__FILE__) . '/store.php';
-} catch (Throwable $t) {
-    if (!headers_sent()) {
-        mn_boot_out(500, array('ok' => false, 'error' => 'php_fatal', 'php' => PHP_VERSION,
-            'detail' => mn_boot_detail(array('message' => get_class($t) . ': ' . $t->getMessage(), 'file' => $t->getFile(), 'line' => $t->getLine()))));
-    }
+} catch (Throwable $t) { // PHP 7+ (na PHP 5.6 třída neexistuje – blok se jen přeskočí)
+    mn_boot_caught($t);
+} catch (Exception $e) { // PHP 5.6
+    mn_boot_caught($e);
 }

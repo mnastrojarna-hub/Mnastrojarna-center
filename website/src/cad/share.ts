@@ -301,13 +301,15 @@ function storeErrorText(status: number, j: { error?: unknown; php?: unknown; nee
   const php = j && typeof j.php === "string" ? j.php : "";
   switch (j?.error) {
     case "php_too_old":
-      return tr("HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2} nebo novější (nastavení hostingu)", status, php, String(j.need ?? "7.0"));
+      return tr("HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2} nebo novější (nastavení hostingu)", status, php, String(j.need ?? "5.6"));
     case "php_functions_disabled":
       return tr("HTTP {0}: hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: {1}", status, Array.isArray(j.missing) ? j.missing.join(", ") : "?");
     case "php_fatal":
       return tr("HTTP {0}: chyba PHP {1} – {2}", status, php, String(j.detail ?? "").slice(0, 200));
     case "storage_unavailable":
       return tr("HTTP {0}: server nemůže zapisovat data úložiště (práva ke složce)", status);
+    case "random_unavailable":
+      return tr("HTTP {0}: PHP na serveru nemá bezpečný zdroj náhodných čísel (openssl nebo /dev/urandom) – nastavení hostingu", status);
   }
   if (j && typeof j.error === "string") return tr("HTTP {0}: {1}", status, j.error);
   return status ? tr("HTTP {0} bez odpovědi úložiště (PHP skript na serveru selhal nebo chybí)", status) : tr("server nedostupný (síť nebo časový limit)");

@@ -35,7 +35,9 @@
  * s id), takže pod id odvozeným z kódu nejde po smazání nahrát jiný obsah – odkaz, který přestal platit, už nikdo
  * (ani ten, kdo ho zná) neoživí s jiným dokumentem.
  *
- * Funguje na PHP 7.0 až 8.x bez rozšíření (jen standardní funkce) i se zakázanými volitelnými funkcemi (viz náhrady níže).
+ * Funguje na PHP 5.6 až 8.x bez rozšíření (jen standardní funkce) i se zakázanými volitelnými funkcemi (viz náhrady níže).
+ * Proto záměrně BEZ syntaxe PHP 7 (typy parametrů a návratových hodnot, ??, <=>, …) a bez funkcí PHP 7 (random_bytes jen
+ * přes mn_random_bytes) – hlídá to test share-php56.test.ts (statická kontrola a php -l na PHP 5.6 v Dockeru).
  * Nastavení níže lze měnit.
  */
 namespace Mn\Share;
@@ -128,18 +130,52 @@ if (!\function_exists('parse_url')) {
         return $r;
     }
 }
-if (!\function_exists('random_bytes')) {
-    /** náhodné bajty: openssl, jinak mt_rand (slabší – zavaděč to v ?diag ohlásí) */
-    function random_bytes($n)
-    {
-        if (\function_exists('openssl_random_pseudo_bytes')) {
-            $s = \openssl_random_pseudo_bytes($n);
-            if (\is_string($s) && \strlen($s) === $n) return $s;
+/**
+ * Náhodné bajty z nejlepšího dostupného SILNÉHO zdroje: random_bytes (PHP 7+), openssl_random_pseudo_bytes jen se
+ * zárukou kryptografické síly ($strong === true – cesta pro PHP 5.6), /dev/urandom. Vrátí [jméno zdroje, bajty];
+ * bez silného zdroje ['weak', null]. Jméno zdroje ukáže ?diag (random).
+ */
+function mn_random_strong($n)
+{
+    if (\function_exists('random_bytes')) {
+        try {
+            $s = \random_bytes($n);
+            if (\is_string($s) && \strlen($s) === $n) return ['random_bytes', $s];
+        } catch (\Exception $e) {
+            // PHP 7+: bez zdroje náhody výjimka – zkusit další zdroj
         }
-        $s = '';
-        for ($i = 0; $i < $n; $i++) $s .= \chr(\mt_rand(0, 255));
-        return $s;
     }
+    if (\function_exists('openssl_random_pseudo_bytes')) {
+        $strong = false;
+        $s = @\openssl_random_pseudo_bytes($n, $strong);
+        if ($strong === true && \is_string($s) && \strlen($s) === $n) return ['openssl', $s];
+    }
+    $h = @\fopen('/dev/urandom', 'rb');
+    if ($h) {
+        $s = '';
+        while (\strlen($s) < $n) {
+            $b = \fread($h, $n - \strlen($s));
+            if ($b === false || $b === '') break;
+            $s .= $b;
+        }
+        \fclose($h);
+        if (\strlen($s) === $n) return ['urandom', $s];
+    }
+    return ['weak', null];
+}
+/**
+ * Náhodné bajty. Tajné hodnoty ($secret – token zneplatnění, id přidělené serverem, sůl počítadel IP) jen ze silného
+ * zdroje, jinak odpověď 503 random_unavailable – slabý mt_rand se pro ně nikdy nepoužije. Netajné hodnoty (jména
+ * dočasných souborů) vezmou bez silného zdroje mt_rand.
+ */
+function mn_random_bytes($n, $secret = true)
+{
+    $r = mn_random_strong($n);
+    if ($r[1] !== null) return $r[1];
+    if ($secret) mn_fail(503, 'random_unavailable');
+    $s = '';
+    for ($i = 0; $i < $n; $i++) $s .= \chr(\mt_rand(0, 255));
+    return $s;
 }
 
 @ini_set('display_errors', '0'); // varování nesmí rozbít binární odpověď
@@ -165,18 +201,18 @@ const MN_CLIENT_ID_LEN = 11;             // délka id odvozeného prohlížečem
 const MN_B62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 /** nastavení z prostředí (jen pro testy / vlastní server; na sdíleném hostingu není nastaveno) */
-function mn_env_int(string $name, int $def): int
+function mn_env_int($name, $def)
 {
     $v = getenv($name);
     return ($v !== false && $v !== '' && ctype_digit($v)) ? (int)$v : $def;
 }
-function mn_max_bytes(): int { return mn_env_int('MN_SHARE_MAX_BYTES', MN_MAX_BYTES); }
-function mn_rate_count(): int { return mn_env_int('MN_SHARE_RATE', MN_RATE_COUNT); }
-function mn_miss_count(): int { return mn_env_int('MN_SHARE_MISS', MN_MISS_COUNT); }
-function mn_quota(): int { return mn_env_int('MN_SHARE_QUOTA', MN_QUOTA_BYTES); }
+function mn_max_bytes() { return mn_env_int('MN_SHARE_MAX_BYTES', MN_MAX_BYTES); }
+function mn_rate_count() { return mn_env_int('MN_SHARE_RATE', MN_RATE_COUNT); }
+function mn_miss_count() { return mn_env_int('MN_SHARE_MISS', MN_MISS_COUNT); }
+function mn_quota() { return mn_env_int('MN_SHARE_QUOTA', MN_QUOTA_BYTES); }
 
 // ───────── odpovědi ─────────
-function mn_json(int $status, array $data, array $extra = [])
+function mn_json($status, array $data, array $extra = [])
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
@@ -185,13 +221,13 @@ function mn_json(int $status, array $data, array $extra = [])
     echo json_encode($data, JSON_UNESCAPED_SLASHES);
     exit;
 }
-function mn_fail(int $status, string $error, array $more = [], array $extra = [])
+function mn_fail($status, $error, array $more = [], array $extra = [])
 {
     mn_json($status, ['ok' => false, 'error' => $error] + $more, $extra);
 }
 
 // ───────── úložiště ─────────
-function mn_protect(string $dir)
+function mn_protect($dir)
 {
     $ht = $dir . '/.htaccess';
     if (!is_file($ht)) {
@@ -208,7 +244,7 @@ function mn_protect(string $dir)
     }
 }
 
-function mn_data_dir(): string
+function mn_data_dir()
 {
     static $dir = null;
     if ($dir !== null) return $dir;
@@ -216,7 +252,7 @@ function mn_data_dir(): string
     $cands = [];
     if ($env !== false && $env !== '' && $env !== 'local') $cands[] = rtrim($env, '/');
     if ($env !== 'local') {
-        $root = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
+        $root = (string)(isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : '');
         $real = $root !== '' ? @realpath($root) : false;
         if ($real && dirname($real) !== $real) $cands[] = dirname($real) . '/cad-share-data';
     }
@@ -236,42 +272,47 @@ function mn_data_dir(): string
     return '';
 }
 
-function mn_valid_id(string $id): bool
+function mn_valid_id($id)
 {
     return (bool)preg_match('/^[0-9A-Za-z]{8,12}$/D', $id);
 }
 /** id odvozené prohlížečem z kódu odkazu: právě 11 znaků base58 (bez 0 O I l) */
-function mn_valid_client_id(string $id): bool
+function mn_valid_client_id($id)
 {
     return (bool)preg_match('/^[1-9A-HJ-NP-Za-km-z]{' . MN_CLIENT_ID_LEN . '}$/D', $id);
 }
-function mn_rand62(int $n): string
+/** $n znaků base62; $secret = tajná hodnota (token, id od serveru) – jen ze silného zdroje náhody (viz mn_random_bytes) */
+function mn_rand62($n, $secret = true)
 {
+    $abc = MN_B62;
     $out = '';
     while (strlen($out) < $n) {
-        foreach (str_split(random_bytes($n * 2)) as $ch) {
+        $bytes = str_split(mn_random_bytes($n * 2, $secret));
+        // PHP < 8: zakázaná funkce (disable_functions) jen varuje a vrátí null – bez této kontroly nekonečná smyčka
+        if (!is_array($bytes)) mn_fail(500, 'php_functions_disabled', ['php' => \PHP_VERSION, 'missing' => ['str_split']]);
+        foreach ($bytes as $ch) {
             $b = ord($ch);
-            if ($b < 248) $out .= MN_B62[$b % 62]; // 248 = 4 × 62: bez zkreslení
+            if ($b < 248) $out .= $abc[$b % 62]; // 248 = 4 × 62: bez zkreslení
             if (strlen($out) === $n) break;
         }
     }
     return $out;
 }
-function mn_paths(string $id): array
+function mn_paths($id)
 {
     $d = mn_data_dir();
     return ['meta' => "$d/$id.json", 'bin' => "$d/$id.bin", 'part' => "$d/$id.part"];
 }
-function mn_read_meta(string $file)
+function mn_read_meta($file)
 {
     $s = @file_get_contents($file);
     if ($s === false) return null;
     $m = json_decode($s, true);
     return is_array($m) ? $m : null;
 }
-function mn_write_meta(string $file, array $m): bool
+function mn_write_meta($file, array $m)
 {
-    $tmp = $file . '.' . mn_rand62(6) . '.tmp';
+    $tmp = $file . '.' . mn_rand62(6, false) . '.tmp';
     if (@file_put_contents($tmp, json_encode($m)) === false) return false;
     return @rename($tmp, $file);
 }
@@ -282,12 +323,12 @@ function mn_write_meta(string $file, array $m): bool
  * odesílatelem (čas smazání). Náhrobky se nemažou (asi 25 bajtů na sdílení). Nedokončené nahrávání náhrobek nemá –
  * odkaz k němu nikdy nevznikl.
  */
-function mn_dead_file(string $id): string
+function mn_dead_file($id)
 {
     return mn_data_dir() . '/dead/' . substr($id, 0, 2);
 }
 /** náhrobek id: ['k' => druh, 't' => čas] nebo null */
-function mn_dead(string $id)
+function mn_dead($id)
 {
     $s = @file_get_contents(mn_dead_file($id));
     if ($s === false || $s === '') return null;
@@ -296,7 +337,7 @@ function mn_dead(string $id)
     $rest = substr($s, $i + strlen($id) + 1, 24);
     return ['k' => (string)substr($rest, 0, 1), 't' => (int)substr($rest, 1)];
 }
-function mn_bury(string $id, string $kind, int $t): bool
+function mn_bury($id, $kind, $t)
 {
     if (mn_dead($id) !== null) return true;
     return @file_put_contents(mn_dead_file($id), $id . ' ' . $kind . $t . "\n", FILE_APPEND | LOCK_EX) !== false;
@@ -307,7 +348,7 @@ function mn_bury(string $id, string $kind, int $t): bool
  * neuvolní); když náhrobek zapsat nejde (plný disk), záznam zůstane a id je dál obsazené. Bez $kind (nedokončené
  * nahrávání, ke kterému odkaz nikdy nevznikl) se id jen uvolní.
  */
-function mn_remove(string $id, string $kind = '', int $t = 0)
+function mn_remove($id, $kind = '', $t = 0)
 {
     $p = mn_paths($id);
     @unlink($p['bin']);
@@ -316,7 +357,7 @@ function mn_remove(string $id, string $kind = '', int $t = 0)
 }
 
 // ───────── úklid vypršelých dat (líně, omezená dávka) ─────────
-function mn_gc(bool $force = false)
+function mn_gc($force = false)
 {
     $d = mn_data_dir();
     $stamp = "$d/.gc";
@@ -341,10 +382,10 @@ function mn_gc(bool $force = false)
             $m = mn_read_meta("$d/$f");
             // právě zakládaný záznam (soubor už existuje, obsah se teprve zapisuje) není poškozený – nechat být
             if (!$m && ($t = @filemtime("$d/$f")) !== false && $now - $t < 60) continue;
-            $dead = !$m || ($m['exp'] ?? 0) < $now || (empty($m['done']) && ($m['created'] ?? 0) + MN_PARTIAL_TTL < $now);
+            $dead = !$m || (isset($m['exp']) ? $m['exp'] : 0) < $now || (empty($m['done']) && (isset($m['created']) ? $m['created'] : 0) + MN_PARTIAL_TTL < $now);
             // hotový obsah po vypršení → náhrobek „vypršel“; poškozený záznam s obsahem → „zneplatněn“; nedokončené bez náhrobku
-            if ($dead) mn_remove($id, $m ? (!empty($m['done']) ? 'x' : '') : (is_file("$d/$id.bin") ? 'r' : ''), (int)($m['exp'] ?? 0));
-            else $usage += (int)($m['total'] ?? 0);
+            if ($dead) mn_remove($id, $m ? (!empty($m['done']) ? 'x' : '') : (is_file("$d/$id.bin") ? 'r' : ''), (int)(isset($m['exp']) ? $m['exp'] : 0));
+            else $usage += (int)(isset($m['total']) ? $m['total'] : 0);
         } elseif (substr($f, -4) === '.tmp' && ($t = @filemtime("$d/$f")) !== false && $now - $t > 600) {
             @unlink("$d/$f");
         }
@@ -368,12 +409,12 @@ function mn_gc(bool $force = false)
 }
 
 // ───────── ochrana proti zneužití ─────────
-function mn_secret(): string
+function mn_secret()
 {
     $f = mn_data_dir() . '/.secret';
     $s = @file_get_contents($f);
     if ($s === false || strlen($s) < 32) {
-        $s = bin2hex(random_bytes(32));
+        $s = bin2hex(mn_random_bytes(32));
         @file_put_contents($f, $s);
     }
     return $s;
@@ -383,16 +424,16 @@ function mn_secret(): string
  * síť /64, tedy 2^64 adres, a s limitem na adresu by žádný limit neměla. IPv4 zapsaná jako IPv6 (::ffff:a.b.c.d) se
  * počítá jako táž IPv4.
  */
-function mn_client_net(): string
+function mn_client_net()
 {
-    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '0');
+    $ip = (string)(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0');
     $bin = function_exists('inet_pton') ? @inet_pton($ip) : false;
     if ($bin === false || strlen($bin) !== 16) return $ip;
     if (substr($bin, 0, 12) === "\0\0\0\0\0\0\0\0\0\0\xff\xff") return (string)inet_ntop(substr($bin, 12));
     return bin2hex(substr($bin, 0, 8)) . '/64';
 }
 /** počet nových sdílení a bajtů z této IP v aktuálním okně; $add = započítat nahrání */
-function mn_rate(int $addBytes, bool $newShare)
+function mn_rate($addBytes, $newShare)
 {
     $ip = mn_client_net();
     $f = mn_data_dir() . '/rl/' . substr(hash('sha256', mn_secret() . '|' . $ip), 0, 32);
@@ -402,7 +443,7 @@ function mn_rate(int $addBytes, bool $newShare)
     $raw = stream_get_contents($fh);
     $st = json_decode($raw ?: '', true);
     $now = time();
-    if (!is_array($st) || $now - (int)($st['t'] ?? 0) > MN_RATE_WINDOW) $st = ['t' => $now, 'n' => 0, 'b' => 0];
+    if (!is_array($st) || $now - (int)(isset($st['t']) ? $st['t'] : 0) > MN_RATE_WINDOW) $st = ['t' => $now, 'n' => 0, 'b' => 0];
     $err = null;
     if ($newShare && $st['n'] >= mn_rate_count()) $err = 'rate_limited';
     elseif ($st['b'] + $addBytes > MN_RATE_BYTES) $err = 'rate_limited';
@@ -425,7 +466,7 @@ function mn_rate(int $addBytes, bool $newShare)
  * prozradilo, které id existuje); úspěšné dotazy se nepočítají. Požadavek, který se prokáže správným tokenem (smazání,
  * další část nahrávání), limitem neprochází – kdo token má, nic nehádá.
  */
-function mn_miss(bool $add)
+function mn_miss($add)
 {
     $ip = mn_client_net();
     $f = mn_data_dir() . '/rl/' . substr(hash('sha256', mn_secret() . '|miss|' . $ip), 0, 32);
@@ -433,15 +474,15 @@ function mn_miss(bool $add)
     $now = time();
     if (!$add) {
         $st = json_decode((string)@file_get_contents($f), true);
-        if (!is_array($st) || $now - (int)($st['t'] ?? 0) > MN_RATE_WINDOW) return null;
-        return (int)($st['m'] ?? 0) > $limit ? max(1, MN_RATE_WINDOW - ($now - (int)$st['t'])) : null;
+        if (!is_array($st) || $now - (int)(isset($st['t']) ? $st['t'] : 0) > MN_RATE_WINDOW) return null;
+        return (int)(isset($st['m']) ? $st['m'] : 0) > $limit ? max(1, MN_RATE_WINDOW - ($now - (int)$st['t'])) : null;
     }
     $fh = @fopen($f, 'c+');
     if (!$fh) return null; // bez počítadla raději odpovědět než odmítnout
     flock($fh, LOCK_EX);
     $st = json_decode(stream_get_contents($fh) ?: '', true);
-    if (!is_array($st) || $now - (int)($st['t'] ?? 0) > MN_RATE_WINDOW) $st = ['t' => $now, 'm' => 0];
-    $st['m'] = (int)($st['m'] ?? 0) + 1;
+    if (!is_array($st) || $now - (int)(isset($st['t']) ? $st['t'] : 0) > MN_RATE_WINDOW) $st = ['t' => $now, 'm' => 0];
+    $st['m'] = (int)(isset($st['m']) ? $st['m'] : 0) + 1;
     ftruncate($fh, 0);
     rewind($fh);
     fwrite($fh, json_encode($st));
@@ -450,32 +491,32 @@ function mn_miss(bool $add)
     return $st['m'] > $limit ? max(1, MN_RATE_WINDOW - ($now - (int)$st['t'])) : null;
 }
 /** odpověď 429 po překročení limitu neúspěšných dotazů */
-function mn_miss_fail(int $retry)
+function mn_miss_fail($retry)
 {
     mn_fail(429, 'rate_limited', [], ['Retry-After: ' . $retry]);
 }
 /** neexistující (nebo cizí) id: započítat a odpovědět – 429 po překročení limitu, jinak daná chyba */
-function mn_miss_reply(int $status, string $error)
+function mn_miss_reply($status, $error)
 {
     if (($retry = mn_miss(true)) !== null) mn_miss_fail($retry);
     mn_fail($status, $error);
 }
-function mn_same_origin(): bool
+function mn_same_origin()
 {
-    $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
+    $site = (isset($_SERVER['HTTP_SEC_FETCH_SITE']) ? $_SERVER['HTTP_SEC_FETCH_SITE'] : '');
     if ($site !== '' && $site !== 'same-origin' && $site !== 'none') return false;
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $origin = (isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '');
     if ($origin === '' || $origin === 'null') return $origin === '';
     $u = parse_url($origin);
     if (!$u || empty($u['host'])) return false;
     $host = strtolower($u['host'] . (isset($u['port']) ? ':' . $u['port'] : ''));
-    $self = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $self = strtolower((string)(isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : ''));
     // výchozí porty se v Host neuvádějí
     $self = preg_replace('/:(80|443)$/', '', $self);
     $host = preg_replace('/:(80|443)$/', '', $host);
     return $self !== '' && hash_equals($self, $host);
 }
-function mn_post_max(): int
+function mn_post_max()
 {
     $v = trim((string)ini_get('post_max_size'));
     if ($v === '' || $v === '0') return 0;
@@ -486,27 +527,27 @@ function mn_post_max(): int
     elseif ($u === 'k') $n *= 1024;
     return $n;
 }
-function mn_chunk_bytes(): int
+function mn_chunk_bytes()
 {
     $c = mn_env_int('MN_SHARE_CHUNK', MN_CHUNK_MAX);
     $pm = mn_post_max();
     if ($pm > 0) $c = min($c, max(256 * 1024, $pm - 64 * 1024));
     return $c;
 }
-function mn_token(): string
+function mn_token()
 {
-    $t = (string)($_SERVER['HTTP_X_DELETE_TOKEN'] ?? '');
+    $t = (string)(isset($_SERVER['HTTP_X_DELETE_TOKEN']) ? $_SERVER['HTTP_X_DELETE_TOKEN'] : '');
     if ($t === '') $t = mn_str_param('del');
     return preg_match('/^[0-9A-Za-z]{16,64}$/D', $t) ? $t : '';
 }
-function mn_str_param(string $k): string
+function mn_str_param($k)
 {
-    $v = $_GET[$k] ?? '';
+    $v = (isset($_GET[$k]) ? $_GET[$k] : '');
     return is_string($v) ? $v : '';
 }
-function mn_int_param(string $k)
+function mn_int_param($k)
 {
-    $v = $_GET[$k] ?? null;
+    $v = (isset($_GET[$k]) ? $_GET[$k] : null);
     if (!is_string($v) || !preg_match('/^\d{1,12}$/D', $v)) return null;
     return (int)$v;
 }
@@ -515,7 +556,7 @@ function mn_int_param(string $k)
  * Připojí tělo požadavku k souboru. Pozice se ověří pod zámkem: soubor musí mít právě $offset bajtů.
  * Vrátí počet zapsaných bajtů, -1 při překročení $limit, -2 při nesouhlasné pozici.
  */
-function mn_store_body(string $file, int $limit, int $offset): int
+function mn_store_body($file, $limit, $offset)
 {
     $in = fopen('php://input', 'rb');
     $out = @fopen($file, 'cb');
@@ -558,31 +599,35 @@ header('X-Robots-Tag: noindex, nofollow');
 header('Referrer-Policy: no-referrer');
 header('Vary: Origin');
 
-$method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+$method = strtoupper((string)(isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET'));
 $allow = ['Allow: GET, POST, DELETE'];
 
 if ($method === 'GET' && isset($_GET['diag'])) {
     // diagnostika pro správce webu: verze PHP, kam se ukládá, co hosting zakázal (bez cest a bez tajných údajů)
     $optional = ['ini_set', 'ini_get', 'getenv', 'realpath', 'flock', 'header_remove', 'inet_pton', 'inet_ntop', 'microtime', 'touch',
         'filemtime', 'clearstatcache', 'opendir', 'readdir', 'closedir', 'fflush', 'ftruncate', 'is_writable', 'fstat',
-        'stream_get_contents', 'readfile', 'hash_equals', 'ctype_digit', 'parse_url', 'random_bytes'];
+        'stream_get_contents', 'readfile', 'hash_equals', 'ctype_digit', 'parse_url'];
+    // random_bytes je až od PHP 7.0 – na PHP 5.6 nechybí kvůli hostingu, náhodu tam dá openssl (viz random níže)
+    if (\PHP_VERSION_ID >= 70000) $optional[] = 'random_bytes';
     $off = [];
     foreach ($optional as $f) {
         if (!\function_exists($f)) $off[] = $f;
     }
+    $rnd = mn_random_strong(16);
     $d = mn_data_dir();
     $where = $d === __DIR__ . '/data' ? 'local' : (\strpos($d, '/cad-share-data') !== false ? 'outside' : 'env');
-    $probe = $d . '/.diag-' . mn_rand62(6);
+    $probe = $d . '/.diag-' . mn_rand62(6, false);
     $writable = @\file_put_contents($probe, 'x') === 1;
     @\unlink($probe);
     mn_json(200, [
-        'ok' => $writable,
+        'ok' => $writable && $rnd[0] !== 'weak',
         'v' => 2,
         'php' => \PHP_VERSION,
         'sapi' => \PHP_SAPI,
         'storage' => $where,
         'writable' => $writable,
-        'random' => \function_exists('random_bytes') ? 'random_bytes' : (\function_exists('openssl_random_pseudo_bytes') ? 'openssl' : 'weak'),
+        // zdroj náhody pro tajné hodnoty: random_bytes | openssl | urandom; weak = žádný silný → nová sdílení odmítnuta (503)
+        'random' => $rnd[0],
         'disabled' => $off,
         'post_max' => mn_post_max(),
     ]);
@@ -631,7 +676,7 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     if (!mn_same_origin()) mn_fail(403, 'cross_origin');
-    $ct = strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''))[0]));
+    $ct = strtolower(trim(explode(';', (string)(isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : ''))[0]));
     if ($ct !== 'application/octet-stream') mn_fail(415, 'content_type');
     $len = isset($_SERVER['CONTENT_LENGTH']) && ctype_digit((string)$_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : -1;
     $chunkMax = mn_chunk_bytes();
@@ -651,7 +696,7 @@ if ($method === 'POST') {
         $p = mn_paths($id);
         $m = mn_read_meta($p['meta']);
         // správný token = vlastník nahrávání: pokračuje i tehdy, když je z jeho IP vyčerpaný limit neúspěšných dotazů
-        if (!$m || !empty($m['done']) || $tok === '' || !hash_equals((string)($m['del'] ?? ''), hash('sha256', $tok))) {
+        if (!$m || !empty($m['done']) || $tok === '' || !hash_equals((string)(isset($m['del']) ? $m['del'] : ''), hash('sha256', $tok))) {
             if (($retry = mn_miss(false)) !== null) mn_miss_fail($retry);
             mn_miss_reply(!$m || !empty($m['done']) ? 404 : 403, !$m || !empty($m['done']) ? 'not_found' : 'bad_token');
         }
@@ -761,7 +806,7 @@ if ($method === 'DELETE') {
     $p = mn_paths($id);
     $m = mn_read_meta($p['meta']);
     // správný token = odesílatel: odkaz zneplatní i tehdy, když je z jeho IP vyčerpaný limit neúspěšných dotazů
-    if (!$m || $tok === '' || !hash_equals((string)($m['del'] ?? ''), hash('sha256', $tok))) {
+    if (!$m || $tok === '' || !hash_equals((string)(isset($m['del']) ? $m['del'] : ''), hash('sha256', $tok))) {
         if (($retry = mn_miss(false)) !== null) mn_miss_fail($retry);
         if (!$m && mn_dead($id) !== null) mn_fail(404, 'not_found'); // už smazáno dřív – nic se nehádá, nepočítá se
         mn_miss_reply($m ? 403 : 404, $m ? 'bad_token' : 'not_found');
