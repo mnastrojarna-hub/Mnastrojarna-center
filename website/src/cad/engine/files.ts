@@ -443,7 +443,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "bom.docs" | "bom.make-incomplete"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "bom.docs" | "bom.make-incomplete"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
@@ -508,7 +508,8 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
   // list jako vyhodnocení listu během běhu (engine/drawing-track.ts) – job.ts tutéž hlášku podruhé nepřidá
   for (const s of sheets) {
     for (const w of s.warnings) {
-      const code = sheetWarningCode(w) === "drawing.section-miss" ? "drawing.section-miss" : "drawing.warning";
+      // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete
+      const code = sheetWarningCode(w) === "drawing.section-miss" ? "drawing.section-miss" : sheetWarningCode(w) === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning";
       note({ code, args: issueArgs(code, s.issue, w), ...(code === "drawing.section-miss" ? { level: "error" as const } : {}) });
     }
     if (s.lost) note({ code: "drawing.warning", args: [s.issue, tr("Kóty a poznámky bez geometrie: {0}", s.lost)] });

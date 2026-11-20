@@ -16,6 +16,7 @@ import { drawingCmdOp } from "./drawing-cmd";
 import { editOp } from "./edit";
 import { featureOp } from "./feature";
 import { featuresOp } from "./features";
+import { functionalOp } from "./functional";
 import { infoOp } from "./info";
 import { insertOp } from "./insert";
 import { libraryOp } from "./library";
@@ -71,6 +72,7 @@ export const ENGINE_OPS: { [K in OpKind]: OpHandler<K> } = {
   info: infoOp,
   strict: strictOp,
   reference: referenceOp,
+  functional: functionalOp,
 };
 
 /** zaregistruje obsluhy všech druhů operací (opakované volání je bez účinku) */
