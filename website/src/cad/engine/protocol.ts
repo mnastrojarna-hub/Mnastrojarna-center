@@ -41,6 +41,7 @@ import { CODE_RE, codeArgs, codeDef, codeEntry, fallbackCode, type Code, type Co
 import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
 import type { RunStamp } from "./run-queue";
+import { withEntryIds } from "./entry-ids";
 
 export const PROTOCOL_HEAD = "MNCAD/1";
 export const OVERFLOW_FILE = "protocol-full.txt";
@@ -683,7 +684,10 @@ export function formatFull(r: RunReport): string {
   for (const e of sorted) out.push(e.level === "measure" ? measureText(e, true) : msgLine(e, true));
   for (const d of r.docs) out.push(docLine(d));
   for (const f of r.files) out.push(fileLine(f));
-  if (r.share) out.push(linkLine(r.share));
+  // každý odkaz běhu celý (vlna 22, bod 16); poslední = `share`
+  const links = r.shares?.length ? [...r.shares] : [];
+  if (r.share && !links.some((x) => x.url === r.share!.url)) links.push(r.share);
+  for (const l of links) out.push(linkLine(l));
   out.push(sigmaLine(r));
   return out.join("\n");
 }
@@ -701,7 +705,7 @@ export type FinalizeOptions = ShortOptions & { full?: boolean };
 export function finalizeReport(r: RunReport, o: FinalizeOptions = {}): RunReport {
   const { console: _console, ...rest } = r; // text konzole prohlížeče se do JSON / HTTP nepřenáší
   void _console;
-  const merged: RunReport = { ...rest, entries: mergeEntries(r.entries) };
+  const merged: RunReport = { ...rest, entries: withEntryIds(mergeEntries(r.entries)) }; // stabilní id záznamů (vlna 22, bod 15)
   const s = shortProtocol(merged, o);
   const out: RunReport = { ...merged, protocol: s.text };
   if (s.overflow) out.overflow = s.overflow;
@@ -728,6 +732,8 @@ export class ReportBuilder {
   private stoppedAt?: { line: number | null; code: string };
   /** odkaz vytvořený během běhu (text `sdílet` / `odkaz`) – řádek O, pokud ho `finish` nepřepíše (`--share`) */
   private sharedLink?: ShareInfo;
+  /** všechny odkazy běhu (vlna 22, bod 16) – `RunReport.shares` */
+  private sharedLinks: ShareInfo[] = [];
   /** přísný režim běhu (volba + řádky `přísně`) – CLI podle něj zastaví i závěrečnou stavbu a výstupy (engine/strict.ts) */
   strictMode?: StrictState;
   private readonly t0: number;
@@ -768,6 +774,9 @@ export class ReportBuilder {
   /** sdílený odkaz z běhu (poslední vyhrává; `finish({ share })` má přednost) */
   setShare(s: ShareInfo): void {
     this.sharedLink = s;
+    // každý odkaz běhu zůstane v `shares` (tři `sdílet` = tři adresy); `odkaz` (znovu vypsaný poslední) se nepřidá podruhé
+    const last = this.sharedLinks[this.sharedLinks.length - 1];
+    if (!last || last.url !== s.url) this.sharedLinks.push(s);
   }
   /** přísný režim zastavil běh */
   stop(line: number | null, code: string): void {
@@ -798,7 +807,7 @@ export class ReportBuilder {
       ms: this.elapsed(o.ms),
       lang: this.o.lang,
       counts: { lines: this.o.lines, ops: this.ops, ok: this.count("ok"), notes: this.count("note"), warnings: this.count("warn"), errors },
-      entries: mergeEntries(this.list),
+      entries: withEntryIds(mergeEntries(this.list)),
       docs: o.docs ?? [],
       files: o.files ?? [],
       timing: [...this.times].sort((a, b) => b.ms - a.ms).slice(0, 5),
@@ -809,6 +818,8 @@ export class ReportBuilder {
     if (this.run) r.run = { ...this.run };
     const share = o.share ?? this.sharedLink;
     if (share) r.share = share;
+    const shares = o.share && !this.sharedLinks.some((x) => x.url === o.share!.url) ? [...this.sharedLinks, o.share] : [...this.sharedLinks];
+    if (shares.length) r.shares = shares;
     return r;
   }
 }

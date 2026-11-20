@@ -40,6 +40,7 @@ import { hostAssets, setHostAssets } from "../host-assets";
 import { selfStoreBase } from "../share";
 import { hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
 import { shareInfo, shareWithPolicy } from "../engine/share-out";
+import { shareContent, shareLinkKv } from "../engine/share-content";
 import type { DocSummary, Entry, OutFile, RunReport, ShareInfo } from "../engine/protocol-types";
 import type { Workspace } from "../engine/workspace";
 import { inputRevOf, type RunStamp } from "../engine/run-queue";
@@ -324,7 +325,12 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
       // krátký odkaz přes úložiště; odmítnutí → ✗ share.rejected + ⚠ share.fallback-link s dlouhým odkazem (kap. 3.4)
       const doc = mainItem.doc.name;
       const res = await shareWithPolicy(mainItem.doc, { days: p.share.days, view: p.share.view, want: "auto" }, (n) => rb.code(n.code, { doc, ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}) }));
-      if (res) share = shareInfo({ ...res, ...(res.note ? { note: res.note } : {}) });
+      if (res) {
+        // obsah odkazu a výpis `= L- link …` jako u textového `sdílet` (vlna 22, bod 16)
+        const content = shareContent(mainItem.doc);
+        share = { ...shareInfo({ ...res, ...(res.note ? { note: res.note } : {}) }), line: null, view: p.share.view, password: res.password, content };
+        rb.measure(null, "link", shareLinkKv(share, content), { doc, data: share });
+      }
     } catch (e) {
       rb.code("share.rejected", { doc: mainItem.doc.name, args: [errText(e)] });
     }
@@ -375,7 +381,7 @@ export function installHostAssets(shims: InstalledShims): void {
       }
       return p;
     },
-    ...(page ? { share: { page, store } } : {}),
+    ...(page ? { share: { page, store, ...(shims.linkPage ? { linkPage: shims.linkPage } : {}) } } : {}),
   });
 }
 

@@ -36,6 +36,9 @@ export const CODES = [
   { code: "share.rejected", level: "error", key: "úložiště odkazů odmítlo zápis: {0}" },
   { code: "share.fallback-link", level: "warn", key: "krátký odkaz se nepodařil – použit dlouhý odkaz" },
   { code: "share.uncompressed", level: "note", key: "odkaz není komprimovaný (prostředí neumí deflate-raw)" },
+  // vlna 22, bod 16: vypnuté úložiště je vidět (ℹ, ne tichý dlouhý odkaz) a ověření odkazu textem (`odkaz ověřit`)
+  { code: "share.store-off", level: "note", short: true, key: "úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu ({0} znaků)" },
+  { code: "share.link-broken", level: "error", key: "odkaz se neotevře ({0}): {1}" },
   // ── výstupy textem (balík B3 outputs) ──
   { code: "share.store-unavailable", level: "error", key: "úložiště krátkých odkazů není dostupné: {0}" },
   { code: "share.long-link", level: "warn", key: "odkaz má {0} znaků – prohlížeč agenta v cloudu přijme nejvýš 4096; krátký odkaz dá „sdílet úložiště“" },
