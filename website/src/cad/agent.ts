@@ -1598,7 +1598,9 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
   if (res?.bodies && res.bodies.length > 1) lines.push(tr("Tělesa: {0}", res.bodies.map((b) => `${b.name}${b.active ? tr(" (aktivní)") : ""} ${fmt(b.volume / 1000, 2)} cm³`).join(" · ")));
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
-    lines.push(tr("Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2]), fmt(a[0]), fmt(b[0]), fmt(a[1]), fmt(b[1]), fmt(a[2]), fmt(b[2]), fmt(res.metrics.volume / 1000, 2), res.metrics.faces, res.metrics.edges));
+    // bez objemového tělesa (jen plochy / skořepina – 22c) objem není: „–“, ne pseudoobjem ploch
+    if (res.metrics.solids === 0) lines.push(tr("Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem – (žádné těleso) · ploch {9} · hran {10}", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2]), fmt(a[0]), fmt(b[0]), fmt(a[1]), fmt(b[1]), fmt(a[2]), fmt(b[2]), res.metrics.faces, res.metrics.edges));
+    else lines.push(tr("Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2]), fmt(a[0]), fmt(b[0]), fmt(a[1]), fmt(b[1]), fmt(a[2]), fmt(b[2]), fmt(res.metrics.volume / 1000, 2), res.metrics.faces, res.metrics.edges));
     const m = res.metrics;
     // kontrola, která se neprovedla (velké těleso), se vypíše jako „nezkontrolováno“ s důvodem – nikdy tiše jako platná
     if (m.valid !== undefined || m.solids !== undefined) lines.push(tr("Geometrie: {0}{1}", geometryText(m), ""));

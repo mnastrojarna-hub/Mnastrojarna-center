@@ -21,6 +21,8 @@ import { quote } from "../protocol";
 import type { OutFile } from "../protocol-types";
 import { docKeyOf, runOf } from "../run-doc";
 import { exactBeforeExport } from "../validity-store";
+import { isVolumeFormat, solidVerdict } from "../../solid-export";
+import { modelSolids } from "../solid-check";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 import { runExportJob } from "../export-job";
@@ -62,16 +64,19 @@ type Out = { name: string; mime: string; data: Uint8Array; format: string };
  * úložiště odkazů s odkazem na stránku ke stažení (share-file.ts). Vrací zapsaný soubor (řádek F) – u base64 / odkazu jen
  * popis bez cesty; null = nedoručeno (✗ out.too-big, share.store-unavailable, share.rejected).
  */
-async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery): Promise<OutFile | null> {
+async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery, weak = false): Promise<OutFile | null> {
   const doc = runOf(ctx).doc.name;
+  // `weak` (22c): objemový formát z modelu bez tělesa – soubor je zapsaný, ale export se nepočítá mezi ✓ (ℹ; ✗ out.no-solid následuje)
+  const done = (text: string) => (weak ? void ctx.report.code("msg.note", { line: ctx.line, doc, text }) : e.ok(text));
+  const sym = (line: string) => (weak ? line.replace(/^✓/, "ℹ") : line);
   if (how === "link") {
     const { shareFile, FileStoreError } = await import("../../share-file");
     try {
       const hs = ctx.host.share;
       const r = await shareFile(f, hs ? { store: hs.store } : {});
       const exp = new Date(r.exp);
-      e.console(tr("✓ {0}: {1} · {2} · {3} – v úložišti, odkaz ke stažení platí do {4}", what, f.name, fmtBytes(f.data.length), label, exp.toLocaleDateString(cadLocale(), { day: "numeric", month: "numeric", year: "numeric" })), `URL: ${r.url}`);
-      e.ok(okText(what, f.name, f.data.length, label));
+      e.console(sym(tr("✓ {0}: {1} · {2} · {3} – v úložišti, odkaz ke stažení platí do {4}", what, f.name, fmtBytes(f.data.length), label, exp.toLocaleDateString(cadLocale(), { day: "numeric", month: "numeric", year: "numeric" }))), `URL: ${r.url}`);
+      done(okText(what, f.name, f.data.length, label));
       const sha256 = await sha256Hex(f.data);
       ctx.report.measure(ctx.line, "file", `name=${quote(f.name)} format=${f.format} bytes=${f.data.length} sha256=${sha256} url=${r.url} exp=${exp.toISOString().slice(0, 10)}`, { doc, data: { name: f.name, mime: f.mime, bytes: f.data.length, sha256, url: r.url, exp: r.exp } });
       return { name: f.name, format: f.format, bytes: f.data.length, sha256, doc, url: r.url };
@@ -89,14 +94,14 @@ async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string,
     }
     const b64 = bytesToBase64(f.data);
     const sha256 = await sha256Hex(f.data);
-    e.console(tr("✓ {0}: {1} · {2} · {3} – jako base64 v protokolu ({4} znaků)", what, f.name, fmtBytes(f.data.length), label, b64.length), `BASE64 ${quote(f.name)} ${f.data.length}B ${b64}`);
-    e.ok(okText(what, f.name, f.data.length, label));
+    e.console(sym(tr("✓ {0}: {1} · {2} · {3} – jako base64 v protokolu ({4} znaků)", what, f.name, fmtBytes(f.data.length), label, b64.length)), `BASE64 ${quote(f.name)} ${f.data.length}B ${b64}`);
+    done(okText(what, f.name, f.data.length, label));
     ctx.report.measure(ctx.line, "file", `name=${quote(f.name)} format=${f.format} bytes=${f.data.length} sha256=${sha256} base64=${b64.length}`, { doc, detail: b64, data: { name: f.name, mime: f.mime, bytes: f.data.length, sha256, base64: b64 } });
     return { name: f.name, format: f.format, bytes: f.data.length, sha256, doc, base64: b64 };
   }
   const file = await ctx.host.files.write({ name: f.name, mime: f.mime, data: f.data, doc, format: f.format });
-  e.console(fileLogLine(what, file.name, f.data.length, label));
-  e.ok(okText(what, file.name, f.data.length, label));
+  e.console(sym(fileLogLine(what, file.name, f.data.length, label)));
+  done(okText(what, file.name, f.data.length, label));
   return file;
 }
 
@@ -119,8 +124,13 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (cmd.format === "mncad") return saveProject(ctx, e, cmd, tr("export MNCAD"));
   const d = runOf(ctx).doc;
   const fmt = cmd.format;
-  // objemový formát: přesná kontrola platnosti před exportem (do 400 ploch sama, jinak řekne, že proběhla jen rychlá – 22a)
-  const pre = (fmt === "step" || fmt === "brep") && cmd.check !== false ? await exactBeforeExport(ctx.host.kernel, ctx.ws, docKeyOf(ctx), d) : null;
+  const FMT = fmt.toUpperCase();
+  // objemový formát (STEP, BREP, STL, 3MF – 22c): složení modelu – bez tělesa je export ✗ out.no-solid, ne ✓
+  const ms = isVolumeFormat(fmt) ? await modelSolids(ctx.host.kernel, ctx.ws, d, asmHooks(ctx)) : null;
+  const noSolid = ms?.solids === 0;
+  // objemový formát: přesná kontrola platnosti před exportem (do 400 ploch sama, jinak řekne, že proběhla jen rychlá – 22a);
+  // model bez tělesa ji nepotřebuje („těleso platné“ by u ploch klamalo)
+  const pre = (fmt === "step" || fmt === "brep") && cmd.check !== false && !noSolid ? await exactBeforeExport(ctx.host.kernel, ctx.ws, docKeyOf(ctx), d) : null;
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
   // export jako úloha s fázemi (vlna 22, bod 22h – engine/export-job.ts): přestavba modelu, převod, zápis, kontrola
   // zpětným načtením; pořadí řádků protokolu jako dřív (soubor, pak kontrola); fáze hlásí hostitel (CLI --progress, běh v GUI)
@@ -130,9 +140,9 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     {
       kernel: ctx.host.kernel,
       phase: (p) => ctx.host.phase?.(`export:${fmt}`, p),
-      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file"),
+      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", noSolid),
     },
-    { check: cmd.check !== false, verifyFirst: false },
+    { check: cmd.check !== false, verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) },
   );
   const f = job.out;
   if (!f) return;
@@ -146,9 +156,15 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });
     else e.code("msg.note", { text: pre.text, indent: "  " });
   }
-  if (fmt !== "step" && fmt !== "brep") return;
-  if (cmd.check === false) {
-    e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", fmt.toUpperCase()));
+  if (!f) return;
+  if ((fmt !== "step" && fmt !== "brep") || cmd.check === false) {
+    if (fmt === "step" || fmt === "brep") e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", FMT));
+    // bez zpětného čtení (síť, „bez kontroly“): složení modelu – ✗ bez tělesa / ⚠ plochy mimo tělesa (22c)
+    const v = ms ? solidVerdict(ms, FMT, "model", ms.parts) : null;
+    if (v) {
+      e.code(v.code, { text: v.text, indent: "  ", level: v.level });
+      f.check = { ok: false, text: v.text };
+    }
     return;
   }
   const c = job.check!;
@@ -157,7 +173,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (c.ok) {
     e.console(`  ${c.line}`);
     e.ok(text);
-  } else e.code("out.check-failed", { text, indent: "  ", level: Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+  } else e.code(c.code ?? "out.check-failed", { text, indent: "  ", level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
 }
 
 /* ───────────────────────── výkres, skica ───────────────────────── */
