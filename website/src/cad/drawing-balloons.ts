@@ -238,7 +238,8 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
   }
 
   // 2) automaticky po pohledech: pořadí podle úhlu kotvy ke středu pohledu, nejbližší volný slot
-  const RINGS = 8;
+  // nejvýš 5 řad kolem pohledu (~45 mm) – dál od pohledu je pozice nečitelná, přeteče do dalšího pohledu
+  const RINGS = 5;
   const pending = [...rest];
   const tried = new Map<string, Set<string>>();
   const results: (PlacedBalloon & { slotRing: number })[] = [];
