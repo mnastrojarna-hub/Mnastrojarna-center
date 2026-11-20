@@ -444,13 +444,16 @@ export function emitSheetViews(o: SheetOut, doc: CadDoc, s: DrawingDoc): void {
   const H = sheetHeight(opts as Rec);
   const labels = new Map<string, string>();
   const bad = (what: string) => o.note(tr("{0} listu „{1}“ nejde zapsat textem – doplňte ho ručně", what, s.name));
-  const emit = (l: string | null, want: unknown, what: string): boolean => {
-    if (l !== null && sameCmd(l, want)) {
-      o.line(l);
-      return true;
-    }
+  /** řádek, který rozbor přečte jako `want`; jinak poznámka a null */
+  const checked = (l: string | null, want: unknown, what: string): string | null => {
+    if (l !== null && sameCmd(l, want)) return l;
     bad(what);
-    return false;
+    return null;
+  };
+  const emit = (l: string | null, want: unknown, what: string): boolean => {
+    const ok = checked(l, want, what);
+    if (ok !== null) o.line(ok);
+    return ok !== null;
   };
   type Place = { p: Vec2; top: boolean };
   const place = (at: Vec2 | undefined, dx = 0): Place | undefined => (!at ? undefined : H === undefined ? { p: [at[0] + dx, at[1] + dx], top: true } : { p: [at[0] + dx, H - (at[1] + dx)], top: false });
@@ -489,23 +492,32 @@ export function emitSheetViews(o: SheetOut, doc: CadDoc, s: DrawingDoc): void {
     ...(opts.cuts ?? []).map((v): It => ({ kind: "cut", v, base: v.parent })),
     ...(opts.details ?? []).map((v): It => ({ kind: "detail", v, base: v.view })),
   ];
-  const usedView = new Set<string>();
-  const usedDet = new Set<string>();
+  /** písmena, která aplikace dá při čtení: pomocný pohled / řez = první volné mimo pohledy i detaily, detail = první volné mimo detaily */
+  const letters = () => {
+    const uv = new Set<string>();
+    const ud = new Set<string>();
+    return {
+      next: (detail: boolean) => (detail ? (DETAIL_LETTERS.find((l) => !ud.has(l)) ?? "A") : (VIEW_LETTERS.find((l) => !uv.has(l) && !ud.has(l)) ?? "Z")),
+      use: (detail: boolean, l: string) => (detail ? ud : uv).add(l),
+    };
+  };
+  // 1) výběr a písmena: z připravených (pohled, na který se odkazuje, už je zapsaný) ten, který dostane své písmeno, jinak první
+  const base0 = new Set(onSheet);
+  const planned: { it: It; line: string; given: string }[] = [];
+  const lt = letters();
   let renamed = false;
   while (pending.length) {
     const ready = pending.filter((it) => !it.base || onSheet.has(it.base));
     if (!ready.length) break;
-    const nextView = VIEW_LETTERS.find((l) => !usedView.has(l) && !usedDet.has(l)) ?? "Z";
-    const nextDet = DETAIL_LETTERS.find((l) => !usedDet.has(l)) ?? "A";
-    let it = ready.find((x) => x.v.label === (x.kind === "detail" ? nextDet : nextView));
+    let it = ready.find((x) => x.v.label === lt.next(x.kind === "detail"));
     if (!it) {
       it = ready[0];
       renamed = true;
     }
     pending = pending.filter((x) => x !== it);
-    const given = it.kind === "detail" ? nextDet : nextView;
+    const given = lt.next(it.kind === "detail");
     const key = keyOf(it);
-    let ok = false;
+    let ok: string | null = null;
     if (it.kind === "aux") {
       const a = it.v;
       const parent = a.parent ? viewText(o, a.parent, models, labels) : "";
@@ -534,29 +546,47 @@ export function emitSheetViews(o: SheetOut, doc: CadDoc, s: DrawingDoc): void {
         want.flip = true;
       }
       l += placeText(at);
-      ok = emit(parent === null ? null : l, { k: "views", cmd: { ...want, ...placeWant(at) } }, whatOf(it));
+      ok = checked(parent === null ? null : l, { k: "views", cmd: { ...want, ...placeWant(at) } }, whatOf(it));
     } else if (it.kind === "cut") {
       const c = it.v;
       const parent = viewText(o, c.parent, models, labels);
       const pts = c.pts.map(toAgent);
       const at = place(c.at);
       const l = parent === null ? null : `${head(o)} ${w(o, "section")} ${w(o, c.kind === "aligned" ? "aligned" : "stepped")} ${parent} ${w(o, "points")} ${pts.map((p) => pt(o, p)).join(" ")}${c.flip ? ` ${w(o, "flip")}` : ""}${placeText(at)}`;
-      ok = emit(l, { k: "views", cmd: { op: "cut", kind: c.kind, parent: viewRefOf(c.parent, models, labels), pts, ...(c.flip ? { flip: true } : {}), ...placeWant(at) } }, whatOf(it));
+      ok = checked(l, { k: "views", cmd: { op: "cut", kind: c.kind, parent: viewRefOf(c.parent, models, labels), pts, ...(c.flip ? { flip: true } : {}), ...placeWant(at) } }, whatOf(it));
     } else {
       const d = it.v;
       const view = viewText(o, d.view, models, labels);
       const c = toAgent([d.cx, d.cy]);
       const at = place(d.at, d.r * d.scale);
       const l = view === null ? null : `${head(o)} ${w(o, "detail")} ${view} ${w(o, "at")} ${pt(o, c)} ${w(o, "radius")} ${o.n(d.r)} ${w(o, "scale")} ${scaleText(o, d.scale)}${placeText(at)}`;
-      ok = emit(l, { k: "detail", op: "add", view: viewRefOf(d.view, models, labels), at: c, r: d.r, scale: d.scale, ...placeWant(at) }, whatOf(it));
+      ok = checked(l, { k: "detail", op: "add", view: viewRefOf(d.view, models, labels), at: c, r: d.r, scale: d.scale, ...placeWant(at) }, whatOf(it));
     }
-    if (!ok) continue;
+    if (ok === null) continue;
     // zapsaný pohled dostane při čtení písmeno `given` – pohledy a detaily z něj se na něj odkazují tímto písmenem
     labels.set(key, given);
-    (it.kind === "detail" ? usedDet : usedView).add(given);
+    lt.use(it.kind === "detail", given);
     if (it.kind !== "detail") onSheet.add(key);
+    planned.push({ it, line: ok, given });
   }
   for (const it of pending) gone(whatOf(it), it.base ?? "");
+  // 2) pořadí zápisu: tentýž výběr znovu, ale nad písmeny, která pohledy při čtení dostanou (`given`) – tak je vybere i druhý
+  //    export (dokument po přečtení skriptu), takže zapíše stejné řádky ve stejném pořadí. Písmena jsou stejná: pohled /
+  //    detail s písmenem, které právě přijde na řadu, je vždy připravený; kdyby ne, zůstane pořadí z kroku 1.
+  const order: typeof planned = [];
+  const lt2 = letters();
+  const on2 = new Set(base0);
+  const kinds = ["aux", "cut", "detail"];
+  let rest = [...planned].sort((a, b) => kinds.indexOf(a.it.kind) - kinds.indexOf(b.it.kind));
+  while (rest.length) {
+    const p = rest.find((x) => (!x.it.base || on2.has(x.it.base)) && x.given === lt2.next(x.it.kind === "detail"));
+    if (!p) break;
+    rest = rest.filter((x) => x !== p);
+    lt2.use(p.it.kind === "detail", p.given);
+    if (p.it.kind !== "detail") on2.add(keyOf(p.it));
+    order.push(p);
+  }
+  for (const p of rest.length ? planned : order) o.line(p.line);
   if (renamed) o.note(tr("písmena pomocných pohledů, řezů a detailů listu „{0}“ dostane po přečtení skriptu aplikace znovu – po smazání některých se mohou lišit: {1}", s.name, [...labels].filter(([k, v]) => k.slice(k.indexOf(":") + 1) !== v).map(([k, v]) => `${k.slice(k.indexOf(":") + 1)} → ${v}`).join(", ") || "—"));
 
   // částečné řezy a přerušení

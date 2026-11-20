@@ -74,7 +74,7 @@ export type DocScriptOptions = {
   /**
    * klíče vygenerovaných kót celkových rozměrů a pozic, které na listu jsou (id listu → ["dim:front:t", "pos:1"]) – spočítá je
    * jádro (`freshScriptDoc`) pro listy s upravenými vygenerovanými objekty; úprava objektu, který na listu není, se nezapíše.
-   * Bez nich převodník vynechá jen klíče, které na listu podle voleb být nemohou, a ohlásí, že zbytek ověří až jádro.
+   * Bez nich převodník vynechá jen klíče, které na listu podle voleb být nemohou, a ohlásí, že zbytek jádrem ověřený není.
    */
   genKeys?: Record<string, string[]>;
   /** poznámky volajícího (co ověřilo jádro) – přidají se k poznámkám převodníku i do komentáře skriptu */

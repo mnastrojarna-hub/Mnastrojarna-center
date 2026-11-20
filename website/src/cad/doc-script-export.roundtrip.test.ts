@@ -17,7 +17,7 @@ import { formatConsole, formatShort } from "./engine/protocol";
 import { runScript } from "./engine/run";
 import { docToScript, type ScriptLang } from "./doc-script";
 import { scriptOfDocWith } from "./doc-script-fresh";
-import { SCRIPT_SHEETS } from "./doc-script-sheet";
+import { SCRIPT_DEFAULT_VIEWS, SCRIPT_INHERITED_TITLE, SCRIPT_SHEETS } from "./doc-script-sheet";
 import { SCRIPT_DEFAULT_DT } from "./doc-script-asm";
 import { sheetMeta, sheetOptions } from "./drawing-agent";
 import { drawExtras } from "./engine/asm-status";
@@ -285,6 +285,20 @@ výkres revize A "první vydání" datum 3.3.2026`,
     const b = await roundTrip(`${head}\nvýkres detail řez C v 60 20 poloměr 12 měřítko 2:1\nvýkres pohled pomocný smazat B`, "Pořadí");
     const ob = b.rt.drawings![0].options as O;
     expect([(ob.cuts ?? []).map((c) => c.label), (ob.details ?? []).map((d) => [d.label, d.view])]).toEqual([["B"], [["A", "cut:B"]]]);
+    // smazané detaily i pomocné pohledy (písmena se po přečtení posunou): druhý export dokumentu po přečtení zapíše stejné
+    // řádky ve stejném pořadí (pořadí zápisu podle písmen, která pohledy při čtení dostanou)
+    const c = await roundTrip(
+      `nový díl "Pořadí"\nkvádr 120 80 40\nválec 30 60 v 60 40 0 odebrat\nvýkres A1 měřítko 1:1 pohledy přední,horní
+výkres detail přední v 20 10 poloměr 8 měřítko 2:1\nvýkres detail přední v 100 10 poloměr 8 měřítko 2:1\nvýkres detail horní v 60 40 poloměr 6 měřítko 2:1\nvýkres detail smazat B
+výkres pohled pomocný přední směr 0,5 0 0,87\nvýkres pohled pomocný přední hrana 0 0 120 40\nvýkres pohled pomocný směr 1 1 0\nvýkres pohled pomocný smazat B
+výkres řez zalomený horní body -10 20 60 20 60 60 130 60`,
+      "Pořadí",
+    );
+    const oc = (d: CadDoc) => d.drawings![0].options as O;
+    expect([oc(c.orig).aux!.map((x) => x.label), oc(c.orig).cuts!.map((x) => x.label), oc(c.orig).details!.map((x) => x.label)]).toEqual([["D", "E"], ["B"], ["A", "C"]]);
+    expect([oc(c.rt).aux!.map((x) => x.label), oc(c.rt).cuts!.map((x) => x.label), oc(c.rt).details!.map((x) => x.label)]).toEqual([["C", "D"], ["B"], ["A", "B"]]);
+    expect(c.script.notes.join(" ")).toMatch(/se mohou lišit: .*D → C/);
+    await c.sameAgain();
   }, 600_000);
 
   it("kontrola 5: pohledy, řezy, detaily a přerušení na vypnutém základním pohledu se vynechají s poznámkou (žádné ✗)", async () => {
@@ -507,8 +521,11 @@ kótovat chytře funkční 80 díry řetězově`,
   }, 300_000);
 
   it("formáty listu převodníku odpovídají výpočtu výkresu (drawing.ts SHEETS)", async () => {
-    const { SHEETS } = await import("./drawing");
+    const { SHEETS, defaultDrawingOptions } = await import("./drawing");
     expect(SCRIPT_SHEETS).toEqual(SHEETS);
+    // výchozí pohledy listu a pole razítka, která nový list převezme z aktivního (převodník je drží jako konstanty bez jádra)
+    expect(SCRIPT_DEFAULT_VIEWS).toEqual(defaultDrawingOptions.views);
+    expect(SCRIPT_INHERITED_TITLE).toEqual((await import("./title-block")).INHERITED_TITLE);
     const a = await run(`${PART}\nvýkres A2 na výšku pohledy přední`);
     const d = docNamed(a.ws, "Deska")!;
     const res = await kernel.drawing(d, sheetMeta(d, d.drawings![0], 0), sheetOptions(d.drawings![0]));

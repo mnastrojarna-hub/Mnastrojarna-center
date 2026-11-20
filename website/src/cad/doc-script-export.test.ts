@@ -163,6 +163,23 @@ describe("převodník: volby listu a poznámky", () => {
     expect(linesOf(chain.text).filter((l) => /pomocný|řez|detail/.test(l))).toEqual(["výkres řez zalomený horní body -10 20 60 20 60 60 130 60", "výkres pohled pomocný řez B směr 1 0 1", "výkres detail pomocný C v 5 4 poloměr 3 měřítko 2:1"]);
     expect(chain.notes.filter((n) => /písmena/.test(n))).toEqual([]);
   });
+  it("kontrola: pořadí řádků po smazání pohledů a detailů – druhý export (dokument po přečtení, nová písmena) zapíše totéž", () => {
+    // detaily A, C (B smazán), pomocné D, E (B smazán), řez B: po přečtení pomocné C, D a detaily A, B
+    const cut = { id: "c", label: "B", parent: "top", kind: "stepped", pts: [[-10, -20], [60, -20], [60, -60], [130, -60]] };
+    const aux = (label: string, dir: number[]) => ({ id: `a${label}`, label, parent: "front", dir });
+    const det = (label: string, view: string, cx: number) => ({ id: `d${label}`, label, view, cx, cy: -10, r: 6, scale: 2 });
+    const views = (o: Record<string, unknown>) => linesOf(docToScript(part({ sheet: "A1", ...o })).text).filter((l) => /pomocný|řez|detail/.test(l));
+    const first = views({ aux: [aux("D", [0.5, 0, 0.87]), aux("E", [1, 0, 1])], cuts: [cut], details: [det("A", "front", 20), det("C", "top", 60)] });
+    const again = views({ aux: [aux("C", [0.5, 0, 0.87]), aux("D", [1, 0, 1])], cuts: [cut], details: [det("A", "front", 20), det("B", "top", 60)] });
+    expect(first).toEqual([
+      "výkres řez zalomený horní body -10 20 60 20 60 60 130 60",
+      "výkres pohled pomocný přední směr 0.5 0 0.87",
+      "výkres pohled pomocný přední směr 1 0 1",
+      "výkres detail přední v 20 10 poloměr 6 měřítko 2:1",
+      "výkres detail horní v 60 10 poloměr 6 měřítko 2:1",
+    ]);
+    expect(again).toEqual(first);
+  });
   it("kontrola: pohledy, řezy, detaily a přerušení na pohledu, který na listu není (vypnutý pohled, smazaný řez) – vynechat s poznámkou", () => {
     const stale = {
       sheet: "A2",
@@ -231,6 +248,12 @@ describe("převodník: volby listu a poznámky", () => {
     // číslo dokumentu (doc.props) by po řádku listu 2 bylo prázdné → dorovná ho řádek razítka na listu 1 (pro list beze změny)
     expect(ls.slice(-3)).toEqual(["výkres list 1", 'výkres razítko číslo="D-7"', "výkres list 2"]);
     expect(r.notes.filter((n) => /razítk|popisové/.test(n))).toEqual([]);
+    // anglicky a německy stejně (vyprázdnění, výchozí šablona, logo no / nein, přepnutí listu)
+    const en = docToScript({ ...d, props: { number: "D-7" } } as CadDoc, { lang: "en" });
+    expect(linesOf(en.text).slice(-5)).toEqual(['drawing titleblock template=iso7200 number="" revision="" customer="" stock="" general=""', "drawing titleblock logo=no", "drawing sheet 1", 'drawing titleblock number="D-7"', "drawing sheet 2"]);
+    const de = docToScript({ ...d, props: { number: "D-7" } } as CadDoc, { lang: "de" });
+    expect(linesOf(de.text).slice(-5)).toEqual(['zeichnung schriftfeld vorlage=iso7200 nummer="" revision="" kunde="" rohteil="" allgemeintoleranz=""', "zeichnung schriftfeld logo=nein", "zeichnung blatt 1", 'zeichnung schriftfeld nummer="D-7"', "zeichnung blatt 2"]);
+    expect([...en.notes, ...de.notes].filter((n) => /razítk|popisové/.test(n))).toEqual([]);
     // list 2 se stejným razítkem jako list 1 (převzatým): žádný řádek razítka ani logo znovu; jiná hodnota jen ta
     const same = docToScript(sheet2(part({}, m1), "Detaily", { ...m1, name: "Deska", author: "", date: "", revisions: undefined, customer: "Jiný" }));
     const ss = linesOf(same.text);
