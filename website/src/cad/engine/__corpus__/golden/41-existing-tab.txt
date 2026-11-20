@@ -15,7 +15,8 @@ Prvky:
 
 Dokument: „Dvojice“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Kus [0; 0; 0] ⚓ · Kus [40; 0; 0]
-Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 65 × 25 × 25 mm · objem Σ 31,25 cm³ · hmotnost Σ 0,245 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 3 ===
 ✓ komponenta „Kus“: poloha [40; 10; 0]
 
@@ -27,7 +28,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 ✓ záložka „Kus“ (díl) je aktivní – další příkazy pracují s ní
 → Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
 ⚠ řádek 2: díl „Kus“ je v sestavě „Dvojice“ jako kopie – změna (geometrie) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Kus"
-✓ Zaoblení 1 (fillet) · úběr 246,8 mm³ · těleso platné
+ℹ Zaoblení 1 (fillet) · úběr 246,8 mm³ · těleso platné
 
 Dokument: „Kus“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 25 × 25 × 25 mm (X 0…25, Y 0…25, Z 0…25) · objem 15,38 cm³ · ploch 26 · hran 56

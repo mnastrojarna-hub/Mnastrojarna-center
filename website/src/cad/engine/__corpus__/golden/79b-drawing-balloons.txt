@@ -36,28 +36,28 @@
 ✓ komponenta „Deska 10“ vložena do sestavy
 ✓ komponenta „Deska 11“ vložena do sestavy
 ✓ komponenta „Deska 12“ vložena do sestavy
-✓ nový list výkresu „List 1“ (Chytré kóty)
-✓ výkres: A3, na šířku, pohledy přední, horní
-✓ výkres: kusovník nad razítkem
-✓ výkres: pozice komponent (balónky)
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3, na šířku, pohledy přední, horní – výsledek po vyhodnocení listu níže
+→ výkres: kusovník nad razítkem – výsledek po vyhodnocení listu níže
+→ výkres: pozice komponent (balónky) – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 10, horní 2) · přiřazené ručně 0 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 2–8, 10–12
   horní: 1, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ pozice 1–4 → pohled horní
+→ pozice 1–4 → pohled horní – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 5–8, 10–12
   horní: 1–4, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ pozice 6 zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout 6)
+→ pozice 6 zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout 6) – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 0 · zamčené 1 · nevešlo se 0 · křížení odkazů 0
   přední: 5–8, 10–12
   horní: 1–4, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ vygenerované pos:7 posunuto: celkem [0; 6] mm listu
+→ vygenerované pos:7 posunuto: celkem [0; 6] mm listu – výsledek po vyhodnocení listu níže
 Výkres „List 1“: list A3 na šířku · měřítko 2:1 · pohledy: přední, horní · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A3 (aktivní)
 Kóty a popisy (0, z toho vygenerovaných 0):
@@ -80,18 +80,19 @@ Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty,
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…95, y 0…23 mm · 2:1 · na listu x 120…310, y 216…262
   horní (x = X, y = Y): x 0…95, y 0…40 mm · 2:1 · na listu x 120…310, y 112…192
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
-✓ Kvádr 4 (box)
-✓ Kvádr 5 (box)
-✓ Kvádr 6 (box)
-✓ Kvádr 7 (box)
-✓ Kvádr 8 (box)
-✓ Kvádr 9 (box)
-✓ Kvádr 10 (box)
-✓ Kvádr 11 (box)
-✓ Kvádr 12 (box)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 4 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 5 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 6 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 7 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 8 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 9 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 10 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 11 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 12 (box) · přidáno 800 mm³ · těleso platné
 
 Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska 1 [0; 0; 0] ⚓ · Deska 2 [25; 0; 16] · Deska 3 [50; 0; 0] · Deska 4 [75; 0; 8] · Deska 5 [0; 15; 16] · Deska 6 [25; 15; 0] · Deska 7 [50; 15; 8] · Deska 8 [75; 15; 16] · Deska 9 [0; 30; 0] · Deska 10 [25; 30; 8] · Deska 11 [50; 30; 16] · Deska 12 [75; 30; 0]
@@ -104,14 +105,14 @@ Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 1 · za
   horní: 1–4, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ výkres: kusovník ve sloupcích vlevo od razítka
-✓ pozice 6 odemčeny – rozmístí se automaticky
+→ výkres: kusovník ve sloupcích vlevo od razítka – výsledek po vyhodnocení listu níže
+→ pozice 6 odemčeny – rozmístí se automaticky – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 1 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 5–8, 10–12
   horní: 1–4, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ pozice 1–4: pohled automaticky
+→ pozice 1–4: pohled automaticky – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 10, horní 2) · přiřazené ručně 0 · posunuté 1 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 2–8, 10–12
   horní: 1, 9
@@ -122,25 +123,26 @@ Pozice: 12 (přední 10, horní 2) · přiřazené ručně 0 · posunuté 1 · z
   horní: 1, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
 
 Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska 1 [0; 0; 0] ⚓ · Deska 2 [25; 0; 16] · Deska 3 [50; 0; 0] · Deska 4 [75; 0; 8] · Deska 5 [0; 15; 16] · Deska 6 [25; 15; 0] · Deska 7 [50; 15; 8] · Deska 8 [75; 15; 16] · Deska 9 [0; 30; 0] · Deska 10 [25; 30; 8] · Deska 11 [50; 30; 16] · Deska 12 [75; 30; 0] · Deska 12 [0; -30; 0]
 Sestava: 13 komponent (13 dílů po rozložení podsestav) · obálka 95 × 70 × 23 mm · objem Σ 14 cm³ · hmotnost Σ 0,110 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 3 ===
-✓ pozice 1–2 → pohled horní
+→ pozice 1–2 → pohled horní – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 9, horní 3) · přiřazené ručně 2 · posunuté 1 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 3–8, 10–12
   horní: 1–2, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ pozice 3 zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout 3)
+→ pozice 3 zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout 3) – výsledek po vyhodnocení listu níže
 Pozice: 12 (přední 9, horní 3) · přiřazené ručně 2 · posunuté 1 · zamčené 1 · nevešlo se 0 · křížení odkazů 0
   přední: 3–8, 10–12
   horní: 1–2, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ kusovník na samostatném listu 2 „Kusovník“ – list 1 „List 1“ ho nekreslí (zpět: výkres kusovník nad | sloupce) · list 1 „List 1“
+→ kusovník na samostatném listu 2 „Kusovník“ – list 1 „List 1“ ho nekreslí (zpět: výkres kusovník nad | sloupce) · list 1 „List 1“ – výsledek po vyhodnocení listu níže
 Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Kusovník“ auto
 ⚠ řádek 4: překryv na listu List 1: 1 překryvů – balónek × geometrie 1; např. 3 – rozdělte pozice do pohledů (výkres pozice pohled horní 13-30), posuňte a zamkněte pozici (výkres vygenerované posun pos:7 dx dy · výkres pozice zamknout 7) nebo zvolte větší formát
 
@@ -151,10 +153,11 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 === run 4 ===
 ✓ nový díl „Deska K“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ nový list výkresu „List 1“ (Chytré kóty)
-✓ výkres: A4, na šířku, pohledy přední, horní
-✓ upraveno a1: 100 → 100 (odsazení 30)
-✓ Kvádr 1: size.0 100 → 110
+ℹ řádek 3: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 6
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4, na šířku, pohledy přední, horní – výsledek po vyhodnocení listu níže
+→ upraveno a1: 100 → 100 (odsazení 30) – výsledek po vyhodnocení listu níže
+→ Kvádr 1: size.0 100 → 110 – výsledek po výpočtu níže
 Výkres „List 1“: list A4 na šířku · měřítko 1:1 · pohledy: přední, horní · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A4 (aktivní)
 Kóty a popisy (3, z toho vygenerovaných 3):
@@ -176,10 +179,10 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
   přední (x = X, y = Z): x 0…110, y 0…20 mm · 1:1 · na listu x 39…149, y 161…181
   horní (x = X, y = Y): x 0…110, y 0…60 mm · 1:1 · na listu x 39…149, y 72…132
 ⚠ řádek 7: překryv na listu List 1: 1 překryvů – text × geometrie 1; např. „110“ – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 132000 mm³ · těleso platné
 
 Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 110 × 60 × 20 mm (X 0…110, Y 0…60, Z 0…20) · objem 132 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 110 × 60 × 20 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 132000 mm³ · těleso platné – 110 × 60 × 20 mm, new, roh [0; 0; 0]
