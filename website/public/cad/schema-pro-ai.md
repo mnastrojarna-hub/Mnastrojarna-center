@@ -826,9 +826,17 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   rychlostí 15,175 mm/s, **na konci motor stojí**; délka studie = |do − od| / rychlost (2 s). Rychlost je velikost – směr dává
   rozsah (`27..57 rychlost -5` je chyba). Se zadaným `čas T`: kratší než jízda = chyba s vysvětlením, delší = motor po dojetí
   stojí. Později zkrácená studie = ⚠ `motion.motor-short`; druhý motor s delší jízdou studii prodlouží (⚠
-  `motion.duration-extended`). **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
+  `motion.duration-extended`); jediný motor bez `čas` změní dřív zadanou délku studie jen s ℹ `motion.duration-set` a dynamickou
+  studii nezkracuje. **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
   znaménko = směr. Popis motoru: `hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s` (↓ hodnota klesá, ↑ roste,
   ↺ / ↻ natočení). Mezera Vzdálenosti pod nulou bez kontroly kolizí = ⚠ `motion.gap-negative` (plochy se prostoupí).
+- **Starší dokumenty a skripty:** zápis `A..B rychlost V` dřív znamenal jízdu od A bez konce (B se nepoužilo); dnes je to rozsah ×
+  rychlost. Dřívější význam zapíšete `od A rychlost V`. Uložený motor s rychlostí a nepoužitým koncem (dokument starší verze) dá
+  ⚠ `motion.end-unused` při načtení i při výpočtu (kam motor opravdu dojede, i opačným směrem); převod na rozsah × rychlost =
+  znovu zadat `pohyb motor … A..B rychlost V` (v panelu tlačítko „Převést na rozsah × rychlost“), převod do skriptu to uvede v poznámce.
+- **Motory na strojovém řádku** (i ve stručném protokolu): na konci `= … motion …` jedno pole na motor
+  `m<i>=<průběh>:<začátek>><konec>:<směr>` – průběh `range` | `back` (`55>25>55`) | `ranged` | `open` (konec = hodnota na konci
+  studie), směr `+` roste / `-` klesá / `+-` `-+` tam a zpět; např. `m1=ranged:57.5>27.15:-`.
 - `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
@@ -839,12 +847,16 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   každá komponenta má svůj záznam (stejně sloupce CSV).
 - Studie se ukládá do sestavy (`motion` v JSON; rozsah × rychlost má u motoru `ranged: true`) a v `stav` je řádek
   „Pohybová studie: …“.
-- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy + vazby + studie).
-  Po změně čehokoli z toho: `stav` píše „Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: geometrie dílu „Deska A““
-  (strojově `motion=stale motion.stale=1`; platný `motion=ok|conflict|clash`, nespočítáno `motion=-`), `pohyb stav` dá
-  ⚠ `motion.stale` bez souhrnu (řádek `= … motion steps=5 t=2 motors=1 motion.stale=1`) a nepřepočítává; `pohyb spustit`,
+- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy, i komponent uvnitř
+  podsestav + vazby + studie; u dynamiky i materiál dílů). Po změně čehokoli z toho: `stav` píše „Pohyb: výsledek NEPLATÍ – od
+  výpočtu se změnilo: geometrie dílu „Deska A““ (strojově `motion=stale motion.stale=1`, nespočítáno `motion=-`), `pohyb stav` dá
+  ⚠ `motion.stale` bez souhrnu (řádek `= … motion steps=5 t=2 motors=1 motion.stale=1 m1=…`) a nepřepočítává; `pohyb spustit`,
   `pohyb krok N`, `pohyb export`, `pohyb přehrát` a `window.mncad.motion()` přepočítají (ℹ `motion.recomputed` řekne, co se
-  změnilo) – starý výsledek se nikdy nevrací jako platný. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"`.
+  změnilo) – starý výsledek se nikdy nevrací jako platný. Platný výsledek: `motion=ok` JEN když se kolize v krocích opravdu
+  kontrolovaly bez průniku a k motorům není upozornění; `motion=mates-ok` = vazby splněny, kolize nekontrolovány; `warn` = ⚠ k motorům
+  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec); `conflict` / `clash` = nesplněné vazby / průnik. Dva výpočty
+  téhož stavu (panel + text, dvakrát API) se spojí v jeden. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"` a
+  verdikt `data-motion-verdict`.
 - Natočení v souhrnu (` · natáčí se 30°`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
   matice, ne Eulerovy úhly: komponenta vložená s `otočení 180 0 0`, která se jen posouvá, „natáčí se“ nehlásí.
 
@@ -2478,10 +2490,10 @@ Výpisy `=` stručného protokolu CLI/HTTP mají strojovou část **stejnou v cs
 
 Pohybová studie (`pohyb motor …`, `pohyb stav`, `pohyb spustit`) má ve stručném protokolu **jeden** řádek – kroky, zdvih
 tuhých skupin (komponenty, které se pohybují spolu: `<zdvih>mm:<počet komponent>`), stojící a natáčející se komponenty
-a třídy kolizí v krocích; rozsah pohybu každé komponenty je v plném protokolu:
+a třídy kolizí v krocích, na konci motory (průběh, začátek > konec, směr); rozsah pohybu každé komponenty je v plném protokolu:
 
 ```
-= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3
+= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3 m1=range:0>-50:-
 ⚠ L364 clash.real "Střižný nástroj": v pohybu „Horní deska“ × „Pružina“ od kroku 3 (t = 0,15 s): kroků 38, dvojic komponent 4, …
 ```
 

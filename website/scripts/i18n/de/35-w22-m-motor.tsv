@@ -1,4 +1,4 @@
-# vlna 22, balík M, etapa M1 – model motoru (body 9 a 11): rozsah × rychlost, začátek + zdvih, význam hodnot
+# vlna 22, balík M, etapa 1 – model motoru (body 9 a 11): rozsah × rychlost, začátek + zdvih, význam hodnot
  · uložený konec {0} se nepoužívá	 · das gespeicherte Ende {0} wird nicht verwendet
  (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)	 (der Verknüpfungswert ist absolut – es spielt keine Rolle, dass die Komponente B der Verknüpfung ist)
  (pak stojí do konce studie {0} s)	 (steht dann bis zum Ende der Studie bei {0} s)

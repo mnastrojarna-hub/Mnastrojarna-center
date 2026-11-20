@@ -101,6 +101,8 @@ export const CODES = [
   { code: "motion.motor-short", level: "warn", key: "motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s" },
   { code: "motion.gap-negative", level: "warn", key: "motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)" },
   { code: "motion.duration-extended", level: "warn", key: "délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)" },
+  { code: "motion.duration-set", level: "note", key: "délka studie změněna z {1} s na {2} s – určuje ji doba jízdy jediného motoru {0} (rozsah × rychlost)" },
+  { code: "motion.end-unused", level: "warn", key: "motor {0}: uložený konec {1} se nepoužívá – motor jede bez koncové hodnoty, na konci studie je na {2}" },
   // ── měření, kontrola, porovnání, materiál (5.2 č. 31, 37; kap. 6) ──
   { code: "measure.truncated", level: "note", key: "vypsáno {0} z {1}" },
   { code: "check.hole-missing", level: "warn", key: "prvek díry „{0}“ nemá v geometrii díru" },

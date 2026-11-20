@@ -1,4 +1,4 @@
-// E2E vlna 22 – balík M, etapa M1 (produkční build): výsledky pohybové studie jen pro dokument a stav, pro který vznikly
+// E2E vlna 22 – balík M, etapa 1 (produkční build): výsledky pohybové studie jen pro dokument a stav, pro který vznikly
 // (body 1 a 12 zprávy), motor rozsah × rychlost (bod 9), absolutní hodnota vazby × zdvih (bod 11).
 //  1. formulář motoru (skutečné kliky a psaní): Začátek předvyplněný AKTUÁLNÍ hodnotou vazby (ne 0), popisky podle významu
 //     (hodnota vazby × posuv od výchozí polohy), vypočtený zdvih a směr, zadání zdvihem, ⚠ při začátku ≠ aktuální hodnota,
@@ -6,7 +6,9 @@
 //  2. panel řízený stavem: data-motion-state ok → po změně geometrie dílu „stale“ („Výsledek neplatí“, ŽÁDNÝ starý souhrn),
 //     po přepnutí na jinou sestavu „unchecked“, po změně studie „stale“; window.mncad.motion() vždy výsledek nynějšího stavu;
 //  3. bod 12, scénář A: dávka, která mění motory a přehrává, nesmí spočítat ani ukázat původní desetikrokovou studii;
-//  4. text v prohlížeči = CLI: přesný příkaz bodu 9 česky, anglicky (/en/cad) a německy (/de/cad) – směr, konec, doba; S2 bodu 11.
+//  4. text v prohlížeči = CLI: přesný příkaz bodu 9 česky, anglicky (/en/cad) a německy (/de/cad) – směr, konec, doba; S2 bodu 11;
+//  6. opravy po kontrole: chyba výpočtu v panelu jen u svého dokumentu, data-motion-verdict (mates-ok × ok), starý dokument
+//     s nepoužitým koncem motoru (⚠ při načtení, převod na rozsah × rychlost), posun dílu uvnitř podsestavy → „stale“.
 // Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -253,6 +255,53 @@ async function open(b, path) {
   await p.waitForTimeout(200);
   const rotLabel = await field('from').getAttribute('aria-label', { timeout: 1500 }).catch(() => '');
   ok(rotLabel === 'Začátek – natočení od výchozí polohy' && /^0 → 360° ↺ otočení 360°$/.test(await txt('[data-motor-computed]')), `bod 11: rotační motor – natočení od výchozí polohy, směr ↺ (${rotLabel}; ${await txt('[data-motor-computed]')})`);
+
+  // ══ 6. opravy po kontrole etapy 1: chyba výpočtu jen u svého dokumentu, verdikt, starý motor s nepoužitým koncem, podsestava ══
+  // a) chyba výpočtu (motor na potlačené vazbě) patří dokumentu a stavu – nad jinou sestavou ani po změně studie se neukáže
+  await tab('Sestava B');
+  log = await run('pohyb motor lineární vazba 1 30..20 kroky 4\nsestava vazba 1 potlačit');
+  await openPanel();
+  await mp.locator('[data-motion-run]').click();
+  const errShown = await mp.locator('[data-motion-error]').waitFor({ timeout: 20000 }).then(() => true, () => false);
+  ok(errShown && /potlačená/.test(await txt('[data-motion-error]')), `chyba výpočtu u „Sestava B“ (motor na potlačené vazbě) – ${await txt('[data-motion-error]')}`);
+  await tab('Sestava A');
+  await openPanel();
+  ok((await mp.locator('[data-motion-error]').count()) === 0 && (await mp.getAttribute('data-motion-doc')) === 'Sestava A', 'bod 12: chyba sestavy B se nad sestavou A neukáže (dřív zůstala viset)');
+  await tab('Sestava B');
+  await openPanel();
+  await run('pohyb kroky 6');
+  await p.waitForTimeout(400);
+  ok((await mp.locator('[data-motion-error]').count()) === 0, 'po změně studie sestavy B stará chyba zmizí (patřila jinému stavu)');
+  // b) verdikt: kolize nekontrolovány → „mates-ok“, ne „ok“; s kontrolou kolizí bez průniku → „ok“
+  await tab('Mechanika');
+  await openPanel();
+  log = await run('pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175\nstav');
+  ok((await waitState('ok', 20000)) && (await mp.getAttribute('data-motion-verdict')) === 'mates-ok' && /kolize nekontrolovány/.test(line(log, /^Pohyb: /)), `verdikt bez kontroly kolizí: data-motion-verdict="${await mp.getAttribute('data-motion-verdict')}" – ${line(log, /^Pohyb: /)}`);
+  log = await run('pohyb kolize\nstav');
+  ok((await waitState('ok', 60000)) && (await mp.getAttribute('data-motion-verdict')) === 'ok' && /bez průniku těles v kontrolovaných krocích/.test(line(log, /^Pohyb: /)), `verdikt po kontrole kolizí: data-motion-verdict="${await mp.getAttribute('data-motion-verdict')}" – ${line(log, /^Pohyb: /)}`);
+  // c) dokument starší verze: motor s rychlostí a uloženým koncem bez `ranged` → ⚠ při načtení, v panelu převod na rozsah × rychlost
+  const legacy = await p.evaluate(() => {
+    const d = window.mncad.getDocument();
+    d.motion = { ...d.motion, collisions: undefined, motors: d.motion.motors.map((m) => { const x = { ...m }; delete x.ranged; return x; }) };
+    return JSON.stringify(d);
+  });
+  log = await run(legacy);
+  ok(/uložený konec 27,15 mm se nepoužívá/.test(log), `starý dokument: ⚠ motion.end-unused při načtení – ${line(log, /nepoužívá/).slice(0, 140)}`);
+  await openPanel();
+  const endNote = await txt('[data-motion-note="motion.end-unused"]');
+  ok(/na konci studie je na 87,85 mm \(opačným směrem, než leží konec\)/.test(endNote), `panel: upozornění na nepoužitý konec – ${endNote.slice(0, 120)}`);
+  await mp.locator('[data-motor-to-ranged="1"]').click().catch(() => {});
+  await p.waitForTimeout(500);
+  const conv = await getDoc();
+  ok(conv.motion.motors[0].ranged === true && conv.motion.duration === 2 && /57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm\/s · 2 s/.test(await txt('[data-motor-range]')) && (await mp.locator('[data-motion-note="motion.end-unused"]').count()) === 0, `Převést na rozsah × rychlost: motor dojede na 27,15 a stojí – ${await txt('[data-motor-range]')}`);
+  // d) podsestava: posun dílu UVNITŘ podsestavy → výsledek neplatí (panel „stale“, `stav` NEPLATÍ jmenuje podsestavu)
+  log = await run(['nový díl "Doraz"', 'kvádr 10 10 5', 'nový díl "Sloupek"', 'kvádr 5 5 5'].join('\n'));
+  log += await run(['nová sestava "Sestava S"', 'vložit "Deska A" ukotvit', 'vložit "Přidržovač" v 40 10 30', 'vložit "Doraz" v 0 0 50', 'vložit "Sloupek" v 20 0 50', 'sestava podsestava "Doraz" "Sloupek" jako "Skupina"', 'sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20', 'pohyb motor lineární vazba 1 20..5 kroky 5'].join('\n'));
+  await openPanel();
+  ok((await waitState('ok', 20000)) && (await mp.getAttribute('data-motion-doc')) === 'Sestava S', `podsestava: výsledek „Sestava S“ platí (${await state()})`);
+  log = await run('sestava upravit "Skupina"\nsestava komponenta "Doraz" v 40 10 22\nsestava hotovo\nstav');
+  ok((await waitState('stale', 8000)) && /Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“/.test(log), `bod 1: posun dílu uvnitř podsestavy → „stale“ a NEPLATÍ (dřív motion=ok) – ${line(log, /^Pohyb: /).slice(0, 140)}`);
+  ok(!GREEN.test(await mp.innerText()), 'podsestava: žádný starý souhrn v panelu');
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
 
   // ── EN a DE: stejný příkaz, protokol i panel bez českých zlomků ──

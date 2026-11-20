@@ -9,7 +9,7 @@ import { motionCached, motionRun } from "./asm-agent-kin";
 import { MotionSuperseded, dropMotion, motionSig, motionState, motionStatusOf, motionStoreOf, runStored, type MotionSlot } from "./motion-cache";
 import type { MotionResult } from "./motion";
 import type { CadDoc } from "./types";
-import { fakeEnv, press, resizePart, runLines } from "./w22/m1-fixture";
+import { fakeEnv, press, resizePart, runLines } from "./w22/w22-motion-fixture";
 
 const MATE = 'sestava vazba vzdálenost "Deska A" F1 "Rám" F2 hodnota 57.5 název "ZDVIH"';
 const MOTOR = "pohyb motor lineární vazba 1 57,5..27,15 kroky 4";
@@ -145,7 +145,8 @@ describe("stav pro příkaz `stav`", () => {
     const withStudy = { ...a.doc, motion: { motors: [{ id: "m", kind: "linear" as const, mate: a.doc.mates![0].id, from: 57.5, to: 27.15 }], duration: 2, steps: 4 } };
     expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "unchecked", line: "Pohyb: nespočítáno – „pohyb spustit“ nebo Vypočítat pohyb v panelu studie" });
     await motionRun(withStudy, e);
-    expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "ok", line: "Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)" });
+    // kolize se nekontrolovaly → „mates-ok“, ne „ok“ (oprava po kontrole: strojové `motion=ok` jen po kontrole kolizí)
+    expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "mates-ok", line: "Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)" });
     expect(motionStatusOf(slot.store, "d", resizePart(withStudy, "Deska A", [50, 100, 10]))).toEqual({ state: "stale", line: "Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: geometrie dílu „Deska A“; přepočítá „pohyb spustit“" });
     expect(motionStatusOf(slot.store, "jiný", withStudy)!.state).toBe("unchecked");
   });

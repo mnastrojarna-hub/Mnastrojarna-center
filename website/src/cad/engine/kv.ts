@@ -178,8 +178,13 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
 /**
  * Strojová část `stav` (`= Ln status "dokument" …`): tytéž klíče jako řádek D (`docKv`), u dílu navíc `solids` / `valid`,
  * u sestavy obálka a výsledek poslední kontroly kolizí (`clash=<počet>`, nezkontrolováno `clash=-`, sestava se od kontroly
- * změnila `clash.stale=1`); sestava s pohybovou studií navíc `motion=ok|conflict|clash|stale|-` (nesplněné vazby / průnik těles v některém kroku) a u výsledku, který pro nynější stav
- * sestavy neplatí, `motion.stale=1`.
+ * změnila `clash.stale=1`); sestava s pohybovou studií navíc `motion=ok|mates-ok|warn|conflict|clash|stale|-` (`ok` jen po kontrole
+ * kolizí bez průniku a bez upozornění k motorům; `mates-ok` = vazby splněny, kolize nekontrolovány; `warn` = ⚠ k motorům;
+ * cad/motion-cache.ts `motionVerdict`) a u výsledku, který pro nynější stav sestavy neplatí, `motion.stale=1`.
+ *
+ * Pořadí polí řádku (jednou pro všechny balíky): `docKv` … `bbox=` `clash=` `clash.stale=1` `motion=` `motion.stale=1`, pak
+ * příznaky uložených výsledků z jiné revize `mates.stale=1` `measure.stale=1` `compare.stale=1` (vždy na konci – `tail`).
+ * Nová pole se přidávají na konec své skupiny; zkouška pořadí: w22/w22-motion-fix.test.ts.
  */
 export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, stale: readonly StaleNote[] = []): string {
   const base = docKv(docSummaryOf(doc, res, asm));

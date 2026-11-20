@@ -12,7 +12,7 @@ import { springComps, springMotionLines, springSteps, type SpringStep } from "./
 import { getLang, tr } from "./i18n";
 import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
 import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
-import { motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
+import { DEFAULT_STUDY_DURATION, motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách – zařazení šroub × závit) */
@@ -78,7 +78,7 @@ export type MotionResult = {
   motorInfo?: MotorInfo[];
 };
 
-export const defaultStudy = (): MotionStudy => ({ motors: [], duration: 2, steps: 36 });
+export const defaultStudy = (): MotionStudy => ({ motors: [], duration: DEFAULT_STUDY_DURATION, steps: 36 });
 
 /**
  * Hodnota motoru v kroku `k` z `n`: profil motoru (cad/motor-model.ts `motorKeys` – rozsah „od–do“, tam a zpět, rychlost od hodnoty

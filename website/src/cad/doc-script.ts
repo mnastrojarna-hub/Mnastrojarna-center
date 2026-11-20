@@ -43,6 +43,7 @@ import type { SectionOpt } from "./drawing";
 import { sectionToSketchConvention } from "./drawing-section";
 import { dictOf, getLang, setLang, tr } from "./i18n";
 import { KIN_SPEC } from "./mate-spec";
+import { unusedEnd } from "./motor-model";
 import { exprRefs, resolveVariables, VAR_NAME } from "./params";
 import { pickFieldsOf } from "./pick-fields";
 import type { Direction, Ref } from "./refs";
@@ -2045,6 +2046,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       }
       // rychlost bez `ranged` = od začátku bez konce (`od A rychlost V`); `A..B rychlost V` je rozsah × rychlost (cad/motor-model.ts)
       const open = m.speed !== undefined && !m.ranged;
+      // uložený konec staršího dokumentu, který motor nikdy nepoužil: do skriptu nejde (význam by se změnil) – ale ne potichu
+      const end = open ? unusedEnd(m) : null;
+      if (end !== null)
+        c.note(tr("motor pohybové studie č. {0}: uložený konec {1} se nepoužíval (motor jede od začátku rychlostí bez konce) – skript ho nezapisuje; dojet na konec a stát = {2}..{1} s rychlostí (rozsah × rychlost)", i + 1, n(end), n(m.from)));
       let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
       if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;

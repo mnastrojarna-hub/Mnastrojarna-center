@@ -7,7 +7,14 @@
  * I = tr(C)·E − C, C = ∫(x−t)(x−t)ᵀ dV. Hmotnost se bere z PŘESNÉHO objemu jádra × hustota (síť dodá jen rozložení – těžiště a tvar
  * tenzoru). Jednotky: mm, kg, kg·mm². Čisté funkce bez jádra.
  */
-import type { Vec3 } from "./types";
+import type { AsmComponent, Vec3 } from "./types";
+
+/**
+ * Materiál, z jehož hustoty dynamika počítá hmotnost listového dílu (`asm-agent-dyn.ts compInertias`): u dílu materiál dílu,
+ * u importu materiál komponenty (výchozí ocel). Jediná definice – otisk vstupu dynamické studie (cad/motion-cache.ts) ji čte také,
+ * takže změna materiálu dílu výsledek dynamiky zneplatní.
+ */
+export const massMaterialId = (c: Pick<AsmComponent, "source" | "material">): string => (c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel"));
 
 /** 3×3 po řádcích */
 export type M3 = [number, number, number, number, number, number, number, number, number];

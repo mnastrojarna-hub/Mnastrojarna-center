@@ -20,7 +20,7 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
 import { defaultStudy, motionMotorNotes, type MotionResult } from "@/cad/motion";
-import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
+import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
 import { studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
@@ -111,7 +111,8 @@ export function MotionPanel({
   const study: MotionStudy = doc.motion ?? defaultStudy();
   const mates = useMemo(() => (doc.mates ?? []).filter((m) => !m.suppressed && (ROTARY_MOTOR_TYPES.has(m.type) || LINEAR_MOTOR_TYPES.has(m.type))), [doc.mates]);
   const [busy, setBusy] = useState<{ k: number; n: number } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  /** chyba výpočtu i s dokumentem a stavem, pro který vznikla (klíč dokumentu + otisk) – u jiného dokumentu / stavu se neukáže */
+  const [err, setErr] = useState<{ key: string; sig: string; text: string } | null>(null);
   const [loop, setLoop] = useState(!!study.loop);
   const [rec, setRec] = useState<string | null>(null);
   const cancel = useRef(false);
@@ -177,15 +178,18 @@ export function MotionPanel({
   const compute = useCallback(async (): Promise<MotionResult | null> => {
     const d = docRef.current;
     const n = (d.motion ?? defaultStudy()).steps;
+    const e0 = envRef.current();
+    const at = { key: motionSlot(e0).key, sig: motionSig(d) };
     setErr(null);
     cancel.current = false;
-    computing.current = motionSig(d);
+    computing.current = at.sig;
     setBusy({ k: 0, n });
     try {
       // výsledek se uloží pod otiskem `d`; platí-li pak pro zobrazený dokument, panel ho ukáže sám (stav z úložiště)
-      return await motionRun(d, envRef.current(), { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current });
+      return await motionRun(d, e0, { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current });
     } catch (e) {
-      if (!(e instanceof MotionSuperseded)) setErr((e as Error).message);
+      // chyba patří dokumentu a stavu, pro který se počítalo – nad jinou sestavou / po změně se neukáže
+      if (!(e instanceof MotionSuperseded)) setErr({ ...at, text: (e as Error).message });
       return null;
     } finally {
       computing.current = null;
@@ -362,12 +366,31 @@ export function MotionPanel({
   // upozornění k motorům zvlášť (i bez výpočtu – níže), v souhrnu výsledku by byla podruhé
   const summary = res ? motionSummary(res, doc, { notes: false }) : [];
   const notes = res ? motionMotorNotes(res, doc) : motorNotes(study, doc.mates ?? [], (m) => m.name ?? tr(MATE_LABEL[m.type]));
+  // verdikt platného výsledku (jako pole `motion=` příkazu `stav`): ok jen po kontrole kolizí bez průniku a bez upozornění
+  const verdict = res ? motionVerdict(res, doc).state : "";
+  const errText = err && err.sig === sig && err.key === (live?.key ?? err.key) ? err.text : null;
+  /**
+   * starší dokument: motor s rychlostí a nepoužitým uloženým koncem (⚠ motion.end-unused) → rozsah × rychlost (dojede na uložený
+   * konec a stojí); délka studie podle doby jízdy jako u textového `pohyb motor … A..B rychlost V`
+   */
+  const toRanged = (i: number) => {
+    const mo = study.motors[i];
+    if (!mo || mo.speed === undefined) return;
+    const motors = study.motors.map((x, k) => (k === i ? { ...x, speed: Math.abs(mo.speed!), ranged: true as const } : x));
+    try {
+      const fit = fitDuration({ ...study, motors }, i);
+      setStudy({ motors, duration: fit.duration });
+      if (fit.note) flash(fit.note.text);
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
   const fromLabel = dAbs ? tr("Začátek – hodnota vazby") : rot ? tr("Začátek – natočení od výchozí polohy") : tr("Začátek – posuv od výchozí polohy");
   const toLabel = dAbs ? tr("Konec – hodnota vazby") : rot ? tr("Konec – natočení od výchozí polohy") : tr("Konec – posuv od výchozí polohy");
   const time = (ms: number) => new Date(ms).toLocaleTimeString(cadLocale(), { hour: "2-digit", minute: "2-digit" });
   return (
     <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
-      <div data-motion-panel data-motion-state={state} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
+      <div data-motion-panel data-motion-state={state} data-motion-verdict={verdict} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
         <MotionModeSwitch study={study} onStudy={setStudy} />
         <div>
@@ -512,6 +535,11 @@ export function MotionPanel({
         {notes.map((x, i) => (
           <p key={i} data-motion-note={x.code} className="rounded bg-[#fff4e5] px-2 py-1 text-[11px] leading-snug text-[#8a5300]">
             ⚠ {x.text}
+            {x.code === "motion.end-unused" && (
+              <button type="button" data-motor-to-ranged={Number(x.args[0])} onClick={() => toRanged(Number(x.args[0]) - 1)} className="ml-1 underline">
+                {tr("Převést na rozsah × rychlost")}
+              </button>
+            )}
           </p>
         ))}
         {study.mode === "dynamic" && <DynamicSettings doc={doc} study={study} onStudy={setStudy} env={env} />}
@@ -547,7 +575,11 @@ export function MotionPanel({
             </button>
           )}
         </div>
-        {err && <p className="rounded bg-brand/10 p-2 text-[11.5px] text-brand-600">{err}</p>}
+        {errText && (
+          <p data-motion-error className="rounded bg-brand/10 p-2 text-[11.5px] text-brand-600">
+            {errText}
+          </p>
+        )}
         {/* stav výsledku: pro který dokument a stav platí – nebo že neplatí / nepočítalo se (nikdy starý souhrn) */}
         <p data-motion-status className={cn("rounded px-2 py-1 text-[11px] leading-snug", state === "ok" ? "bg-[#eef7ee] text-[#2f6b35]" : state === "stale" ? "bg-[#fff4e5] text-[#8a5300]" : "bg-[#f3f6f9] text-[#4a5664]")}>
           {state === "running"
