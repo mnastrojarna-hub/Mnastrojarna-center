@@ -26,6 +26,12 @@
  *     žádné ✓ za neprovedené řádky, `run.state` „cancelled“, dokument beze změny
  * 11. `✓ kontrola STEP …` / F `check=ok` – jen když kontrola zpětným načtením opravdu proběhla nad TÍMTO souborem (export
  *     `bez kontroly` = žádné ✓ kontroly ani `check=`); i export z menu ukazuje ✓ jen s výsledkem kontroly (export-run.test.ts)
+ *
+ * Etapa A4 (bod 16 – ověření odkazu, bod 21 – softwarové zobrazení):
+ * 12. `✓ odkaz se otevře …` / `= … link … ok=1` – jen když se odkaz opravdu otevřel a dokument prošel kontrolou; useknutý,
+ *     změněný nebo nerozpoznaný odkaz = ✗ share.link-broken s důvodem a `ok=0`, nikdy ✓ (a useknutý není „nesprávné heslo“)
+ * 13. horní lišta bez WebGL: stav prostředí není zelený ani „OCCT · připraveno“ na jeho místě – stav jádra je samostatný
+ *     (`[data-core-status]`, e2e cad-nowebgl.e2e.cjs); `softStatusText` nikdy neříká, že 3D běží
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -324,4 +330,34 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
     expect(con).toMatch(/✓ kontrola STEP/);
     expect(withCheck).toMatch(/^F step "Export\.step" \d+B check=ok rev=r·[0-9a-f]{6}/m);
   }, 120_000);
+});
+
+describe("vlna 22 A4: žádné falešné zelené u ověření odkazu a softwarového zobrazení", async () => {
+  const { createShareLink } = await import("../share");
+  const { verifyShareLink } = await import("../share-verify");
+  const { softStatusText } = await import("../soft-view");
+  const { emptyDoc } = await import("../types");
+  const doc: CadDoc = { ...emptyDoc("Deska A"), kind: "part", features: [{ id: "b1", name: "Kvádr 1", type: "box", size: [60, 40, 10], position: [0, 0, 0], centered: false, mode: "new" } as never] };
+
+  it("12. ověření: jen otevřený odkaz je ok; useknutý / změněný / nerozpoznaný = ok:false s důvodem", async () => {
+    setLang("cs");
+    const r = await createShareLink(doc, { days: 10, mode: "link", base: "https://www.mnastrojarna.cz/cad" });
+    expect((await verifyShareLink(r.url)).ok).toBe(true);
+    const cut = await verifyShareLink(r.url.slice(0, -5));
+    expect(cut.ok).toBe(false);
+    if (!cut.ok) {
+      expect(cut.reason).toBe("truncated");
+      expect(cut.text).not.toMatch(/heslo/i);
+    }
+    const k = Math.floor(r.url.length * 0.8);
+    const bad = await verifyShareLink(r.url.slice(0, k) + (r.url[k] === "A" ? "B" : "A") + r.url.slice(k + 1));
+    expect(bad.ok).toBe(false);
+    expect((await verifyShareLink("https://www.mnastrojarna.cz/cad")).ok).toBe(false);
+  });
+
+  it("13. stav prostředí bez WebGL netvrdí, že 3D běží (ani zelený stav jádra místo něj)", () => {
+    setLang("cs");
+    expect(softStatusText()).toMatch(/WebGL není dostupné/);
+    expect(softStatusText()).not.toMatch(/OCCT|připraveno|✓/);
+  });
 });

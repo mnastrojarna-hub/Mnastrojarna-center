@@ -523,6 +523,12 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     desc: tr("sdílený odkaz (jako tlačítko Sdílet odkazem): ADRESA SE VYPÍŠE DO PROTOKOLU (a zkopíruje do schránky, když to prohlížeč dovolí); výchozí platnost 10 dní; „odkaz“ vypíše poslední odkaz znovu"),
   },
   {
+    cmd: "odkaz ověřit · odkaz ověřit https://mnastrojarna.cz/s#Ab3kZ9xQ2m · odkaz ověřit <odkaz> heslo X",
+    en: "link verify",
+    de: "link prüfen",
+    desc: tr("otevře sdílený odkaz jako příjemce a nic nezmění: ✓ s režimem, platností a obsahem (komponenty, díly, listy, přílohy), nebo ✗ s důvodem – useknutý, změněný, heslo, platnost, nenalezen; bez odkazu ověří poslední odkaz běhu"),
+  },
+  {
     cmd: "výkres export pdf dokument · export step base64 · export step odkaz · sdílet úložiště nebo odkaz",
     en: "drawing export pdf document · export step base64 · export step link · share store or link",
     de: "zeichnung export pdf dokument · exportieren step base64 · exportieren step link · freigeben speicher oder link",

@@ -244,11 +244,13 @@ describe("sdílení – cesta podle volby (engine/share-out.ts)", () => {
     expect(notes[0].text).toMatch(new RegExp(`dlouhý odkaz \\(${r!.url.length} znaků\\): úložiště krátkých odkazů neodpovídá`));
   });
 
-  it("úložiště vypnuté (store: null, --share-store off): výchozí sdílet = dlouhý odkaz bez ⚠ a bez sítě; sdílet úložiště = ✗", async () => {
+  it("úložiště vypnuté (store: null, --share-store off): výchozí sdílet = dlouhý odkaz bez ⚠ a bez sítě, ale s ℹ share.store-off (vlna 22, bod 16); sdílet úložiště = ✗", async () => {
     const calls = fakeStore({ ping: true });
     const r = await shareWithPolicy(d, { days: 10, view: "model", want: "auto", base: BASE, store: null }, note);
     expect(r?.mode).toBe("link");
-    expect(notes).toEqual([]);
+    // vědomá změna (bod 16): vypnuté úložiště už není tiché – ℹ s délkou odkazu (dřív `notes` prázdné)
+    expect(notes).toEqual([{ code: "share.store-off", args: [r!.url.length] }]);
+    notes.length = 0;
     expect(await shareWithPolicy(d, { days: 10, view: "model", want: "store", base: BASE, store: null }, note)).toBeNull();
     expect(notes.map((n) => n.code)).toEqual(["share.store-unavailable"]);
     expect(calls).toEqual([]);

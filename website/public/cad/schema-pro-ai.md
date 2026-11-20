@@ -167,7 +167,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `soukolí čelní m 2 z1 20 z2 60 [a 81] [x1 …] [x2 …] [vůle 0,05] [díra1 12] [díra2 20]` · `výkres tabulka ozubení ano|ne` | soukolí: dva díly + sestava s vazbou ozubení ve správném záběru, posunutí z osové vzdálenosti; tabulka ozubení na výkrese |
 | `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` · `kolize seznam [třída]` · `kolize pravidlo pracovní "A" "B" [kroky 10..20]` · `kolize tolerance 0,01` | správa; kolize = kontrola průniků komponent sestavy po třídách (viz „Třídy, místo a pravidla kolizí“) |
 | `uložit [název]` · `export step|stl|brep|obj|glb|3mf|wrl|mncad [název]` · `výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]` · `skica export dxf ["Skica 1"]` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
-| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` | sdílený odkaz – adresa se vypíše do protokolu na řádek `URL: …`; `odkaz` ji vypíše znovu |
+| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` · `odkaz ověřit [odkaz] [heslo X]` | sdílený odkaz – konzole vypíše řádek `URL: …`, CLI / JSON výpis `= L<n> link … url=… mode=… exp=… content=…` (každý odkaz běhu) a řádek `O`; `odkaz` ho vypíše znovu, `odkaz ověřit` ho otevře jako příjemce a vypíše režim, platnost a obsah (nebo proč se neotevře) |
 | `upravit` · `potlačit` / `zapnout` · `smazat <prvek>` · `přejmenovat` · `přesunout` · `duplikovat` · `zpět` / `znovu` · `proměnná` · `konfigurace` · `skica "Skica 1"` · `entita` · `kóta k1` · `odsadit` · `promítnout hrany` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
 | `zobraz stínovaný|hrany|drátový|skryté|průhledný|přizpůsobit` · `řez X|Y|Z [poloha] [obráceně]` · `řez vyp` | styl 3D okna a řez modelem (viz „Soubory, obraz, výstupy a analýzy“) |
 | `barva plochy F3 [F5 …]|<pravidlo> #rrggbb|výchozí` · `akce <id|popisek>` | barva ploch; akce rozšíření bez prvku (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica DXF) |
@@ -1774,7 +1774,8 @@ je na jejich řádku.
 | `export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]` (`export` · `exportieren`) | 3D model; u **STEP a BREP kontrola**: stažený soubor se znovu načte jádrem a porovná s modelem – počet těles, objem (rozdíl v %) a obálka (odchylka v mm); bez sítě, opakovaný export nezměněného modelu ji nepočítá znovu; `bez kontroly` (`no check` · `ohne prüfung`) ji vynechá |
 | `výkres export pdf|dxf|dwg|svg|csv|png [list N|N|vše] [název]` (`drawing export` · `zeichnung export`) | list výkresu (bez listu aktivní; `list 2` i holé `2` = list 2, jen celá čísla od 1; `vše` = každý list zvlášť, `…_list2.pdf`; číselný název souboru: `jako 2`); výkres nejdřív `výkres A3 …` a `kótovat` |
 | `skica export dxf ["Skica 1"] [jako název]` (`sketch export dxf` · `skizze export dxf`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
-| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku `URL: …`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
+| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v konzoli prohlížeče na řádku `URL: …`**, ve stručném / plném protokolu a JSON (CLI, `protocol: "short"`) ve výpisu `= L<n> link "<dokument>" url=… mode=… exp=… content=…` a na řádku `O`; zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
+| `odkaz ověřit [<odkaz>|<kód>] [heslo X]` (`link verify` · `link prüfen`) | otevře odkaz jako příjemce (stažení z úložiště webu odkazu, dešifrování, kontrola dokumentu a platnosti) a vypíše `✓ odkaz se otevře (…): <obsah>` + `= L<n> link url=… ok=1 mode=… exp=… content=…`, jinak ✗ `share.link-broken` s důvodem `truncated` (useknutý), `corrupt` (změněný), `password`, `expired`, `notfound`, `network`; bez odkazu = poslední odkaz běhu. Kód bez `#` nebo celý odkaz (`#` za mezerou je komentář) |
 | `odkaz` (`link`) | vypíše poslední sdílený odkaz znovu |
 | `exporty [vymazat]` (`exports [clear]` · `exporte [löschen]`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý `export …`, `výkres export …`, `skica export dxf` i export tlačítkem zapíše formát, soubor, revizi modelu `r·a1b2c3` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení) |
 | `výstupy [zastaralé]` (`outputs [stale]` · `ausgaben [veraltet]`) · `zastaralé` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
@@ -1795,8 +1796,12 @@ sdílet
 # ✓ sdílený odkaz vytvořen – „Konzola“ (model), platí do: 23. 11. 2026, bez hesla, 1,3 kB v úložišti
 # URL: https://mnastrojarna.cz/s#Ab3kZ9xQ2m
 #   kód k přečtení nebo opsání: Ab3k Z9xQ 2m (36 znaků odkazu)
+#   obsah odkazu: díl „Konzola“ – prvků 5, listů výkresu 1, příloh 0
 #   (zkopírováno do schránky)
 ```
+
+(Text výše je **konzole prohlížeče**. V CLI a ve `window.mncad.run(text, { protocol: "short" })` má každý odkaz výpis
+`= L<n> link …` a poslední odkaz řádek `O` – příklad níže v oddílu „Sdílení“.)
 
 - Kontrola STEP / BREP: `✓ … věrná kopie modelu` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm).
   `⚠ kontrola STEP: soubor se od modelu liší – …` napíše, co nesedí (tělesa, objem, obálka) – opravte prvky s ⚠ / ✗
@@ -2032,7 +2037,13 @@ pixely v 3D okně:
 4. Po každém kroku lze stav ověřit textem (`stav` v konzoli nebo `window.mncad.status()`) – není nutné číst
    obrázek.
 5. **Prohlížeč bez WebGL** (headless Chrome bez grafiky, vypnutá akcelerace): místo 3D okna se kreslí **softwarový
-   náhled** (`[data-viewport-fallback="soft"]`, plátno `[data-soft-canvas]`, horní lišta hlásí „3D okno: nedostupné“).
+   náhled** (`[data-viewport-fallback="soft"]`, plátno `[data-soft-canvas]`). Horní lišta hlásí neutrálně (ne jako chybu)
+   **„Softwarové zobrazení – WebGL není dostupné“** (`[data-env-status="soft"]`, klik ukáže omezení) a vedle dál stav
+   jádra a přepočtu (`[data-core-status]`: `loading|ready|busy|stale|error`) – omezení prostředí není chyba modelu.
+   Náhled nekreslí: perspektivu (je pravoúhlý), gizmo přesunu, skici a pomocné roviny v modelu, mřížku, analýzy ploch
+   (zebra, úkosy, tloušťka, křivost), barevnou mapu odchylek, duchy porovnání, grafiku měření a stopu bodu pohybové studie,
+   hřebeny křivosti / řídicí body ploch třídy A a průhlednost – čísla dávají text a panely (`analýza …`, `měřit`,
+   `porovnat`, `pohyb stav`); seznam je pod „Proč nevidím 3D?“ (`[data-soft-limit]`, cad/soft-view.ts).
    Výběr v něm funguje stejně jako ve 3D okně: **klik** vybere plochu (nejbližší ke kameře), hranu (do ~6 px, jen
    viditelnou) nebo vrchol (do ~7 px), **Ctrl / Shift + klik** přidá či odebere, platí filtr výběru (stavový řádek),
    kliknuté hrany a plochy berou formuláře prvků (Zaoblit, Skořepina, „+ aktuální výběr“), skica na ploše, měření,
@@ -2728,8 +2739,17 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   protokol, `"json"` = RunReport (s `full`), `budget` (celé číslo 1–1048576, jen `short` / `json`) a `notes`
   (true / false, ne u `console`) jako `--budget` / `--notes`, výchozí (`"console"`) = text konzole. Neznámá volba nebo
   hodnota (`protocoll`, `budget: -5`) je chyba, ne tichý jiný výstup. Značka přebytku `… in protocol-full.txt` znamená
-  v prohlížeči: celý protokol vrátí `protocol: "full"`. Konzole Textové příkazy má přepínač **Stručný protokol**
-  (pamatuje si ho).
+  v prohlížeči: celý protokol vrátí `protocol: "full"`. Výchozí `window.mncad.run(text)` vrací dál text konzole
+  (skripty agentů se nemění) – stručný protokol si vyžádejte `{ protocol: "short" }`.
+- **Konzole Textové příkazy (vlna 22):** po běhu ukáže **souhrn** (stručný protokol MNCAD/1, přepínač **Stručný souhrn**
+  je výchozí zapnutý a pamatuje se), **Detail** = plný text konzole (`[data-agent-output]`, i když je souhrn vidět),
+  **Záznamy** = každý záznam s rozbalitelným detailem a **filtrem** (✗ chyby, ⚠ varování, obojí; dokument; text – díl,
+  vazba, kód, id). **Historie běhů**: nový „Provést“ předchozí protokol nepřepíše – seznam „r3 · 12:41:05 · ✓12 ⚠2 ✗1 ·
+  první řádek“ (posledních 20, `[data-run-history-item]`). **Stáhnout JSON** = `mncad-run-r3.json` (jako `--json`
+  s plným protokolem). **Stabilní id záznamů**: každý záznam má v JSON `id` = `L<řádek>.<kód>` (`L36.motion`,
+  `L12.ok#2` pro druhý stejný na řádku, `L-.share.rejected` bez řádku) – opakovaný běh téhož skriptu dá tatáž id;
+  úplná reference je `<run.id>:<id>` (`r3:L36.motion`, `[data-entry-id]`). `sestava pole` vypíše souhrn (počet, první
+  a poslední kopie s polohou), polohy všech kopií `sestava komponenty`.
 - `vložit "Díl"` a `výkres model "Díl"` berou **aktuální** dokument záložky (i změněný v dřívějším běhu) pod jeho
   aktuálním názvem; po `název "B"` už starý název neplatí.
 - Stav sestavy (řádek „Sestava: … obálka, objem Σ, hmotnost Σ“), stav vazeb, kusovník a kolize se počítají z dílů
@@ -2843,6 +2863,46 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
     nevejde, je zkrácený na `O <prvních 64 znaků>…(<délka>chars) exp=… mode=link` – celý je v `protocol-full.txt`
     (počítá se do značky přebytku), v JSON `share.url` a v konzoli (`URL: …`). Krátké odkazy úložiště se nezkracují.
     `odkaz` vypíše poslední odkaz znovu (i řádek O).
+  - **Každý odkaz běhu má vlastní výpis `=`** (vlna 22): `= L<n> link "<dokument>" url=<adresa> mode=self|store|link
+    exp=<YYYY-MM-DD|none> view=model|drawing pw=0|1 bytes=<obsah> chars=<délka odkazu> content=part|asm|draft comp=<komponent>
+    parts=<různých dílů> sheets=<listů výkresu> files=<příloh> [features=<prvků dílu>]` – tři `sdílet` v jednom běhu = tři výpisy
+    s třemi adresami (stručný i plný protokol, JSON `entries[].data` a `shares[]`; `share` = poslední, řádek O). Dlouhý
+    odkaz má ve výpisu `=` zkrácenou adresu `…(<délka>chars)` – celá je v JSON a na řádku O (poslední odkaz) a v plném
+    protokolu (řádek O pro každý odkaz). Konzole prohlížeče vypíše u každého odkazu `URL: …` a `obsah odkazu: …`.
+  - **Úložiště vypnuté** (CLI `--share-store off`, hostitel bez úložiště): dlouhý odkaz s ℹ `share.store-off` („úložiště
+    krátkých odkazů je vypnuté – dokument je celý v odkazu (N znaků)“) – vidět i ve stručném protokolu. Náhradní dlouhý
+    odkaz vede vždy na stránku CADu (`MNCAD_ORIGIN`, jinak https://www.mnastrojarna.cz/cad), nikdy na web nedostupného
+    úložiště z `--share-store`.
+  - **Ověření odkazu textem:** `odkaz ověřit [<odkaz|kód>] [heslo X]` (EN `link verify`, DE `link prüfen`) otevře odkaz
+    jako příjemce a nic nezmění: `✓ odkaz se otevře (288 znaků, dokument v odkazu, platí do: 20. 12. 2026, model): díl
+    „Konzola“ – prvků 1, listů výkresu 0, příloh 0` + `= L<n> link "<dokument>" url=… ok=1 mode=… exp=… chars=… content=…`;
+    nefunkční odkaz = ✗ `share.link-broken` `odkaz se neotevře (<důvod>): <text>` + `= … ok=0 reason=<důvod> chars=…`.
+    Důvody: `truncated` = **useknutý** (data končí předčasně – zkopírujte celý odkaz), `corrupt` = **změněný** (data
+    úplná, ale jiná), `password` (chybí / nesprávné heslo; u šifrovaného dlouhého odkazu nejde useknutí od špatného hesla
+    odlišit – text to řekne), `expired`, `revoked`, `notfound`, `network`, `insecure`, `unrecognized` (text není
+    odkaz ani kód). Odkaz s kódem se ověří u úložiště webu, ze kterého je (`<web>/cad/share/`). Totéž rozlišení ukáže
+    prohlížeč při otevření useknutého odkazu.
+  - Příklad výstupu sdílení (CLI `mncad run skript.txt --share-store off`, stručný protokol; platí pro protokol MNCAD/1
+    a CAD od vlny 22 – 20. 11. 2026, verzi CLI vypíše `mncad --version`; test `share-doc-example.test.ts` porovnává
+    tyto řádky se skutečným výstupem):
+
+```
+# skript:
+nový díl "Konzola"
+kvádr 80 50 12
+sdílet
+sdílet odkazem dní 30
+odkaz ověřit
+# stručný protokol:
+MNCAD/1 OK lines=5 ops=5 err=0 warn=0 note=2 t=0.1
+ℹ L3 share.store-off "Konzola": úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu (288 znaků)
+= L3 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9LboQwEAWvEr11RzIwJKSvMEd…(288chars) mode=link exp=2026-11-30 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+= L4 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) mode=link exp=2026-12-20 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+= L5 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) ok=1 mode=link exp=2026-12-20 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12
+O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb77JRHsNb-BhKLlxL6ir1hgpuCHqP4KZ_7fuX9tJ1Qz8QqtMbGGuwuoBgwwzeIDEe0EsuKXxK8vI8iwWhasoueHBL8LIqGG_BP8IiIKxSNDlZwAjzqbuqlK-kGTxucPZw6sXW4QP_8_r7Y9NTA0L5jgd5D3cQsnsoeBwMdYaadiLEkF0546MhQ2YizOqLJrXgqyxZ6fwBhtcb9mnf_wA exp=2026-12-20 mode=link
+Σ docs=1 V=48cm3 m=0.377kg files=0 share=link t=0.1
+```
   - Tvary odkazu (část za `#` se na server nikdy neposílá):
     `…/cad#q=<id 10 znaků>.<klíč 22 znaků base64url>` – vlastní úložiště, obsah AES-GCM, 128bitový klíč jen v odkazu;
     `…/cad#s=1d.<data>` – data = base64url(deflate-raw(JSON `{"v":1,"exp":<ms|null>,"from"?,"view":"model|drawing","doc":{…}}`)),

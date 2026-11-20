@@ -1,0 +1,72 @@
+# Vlna 22, balík A, etapa A4 (body 15, 16, 21): konzole (souhrn, historie, filtr, JSON), sdílení textem (obsah, ověření odkazu, useknutý × poškozený), softwarové zobrazení
+  obsah odkazu: {0}	  Inhalt des Links: {0}
+„Ze seznamu…“ ve formuláři prvku – plochy a hrany podle čísla a popisu	„Aus Liste…“ im Formular des Elements – Flächen und Kanten nach Nummer und Beschreibung
+{0} kopií: první „{1}“ {2} … poslední „{3}“ {4} (polohy všech: sestava komponenty)	{0} Kopien: erste „{1}“ {2} … letzte „{3}“ {4} (Positionen aller: baugruppe komponenten)
+⚠ varování	⚠ Warnungen
+✗ chyby	✗ Fehler
+✗ chyby a ⚠ varování	✗ Fehler und ⚠ Warnungen
+2D výkres „{0}“ – příloh {1}	2D-Zeichnung „{0}“ – Anhänge {1}
+analýzy ploch – zebra, úkosy, tloušťka stěny, křivost	Flächenanalysen – Zebra, Formschrägen, Wandstärke, Krümmung
+barevná mapa odchylek a úkosů na modelu	Farbkarte der Abweichungen und Formschrägen am Modell
+bez kopií	keine Kopien
+Bez WebGL náhled nekreslí:	Ohne WebGL zeichnet die Vorschau nicht:
+Co náhled bez WebGL neukáže – a čím to nahradit	Was die Vorschau ohne WebGL nicht zeigt – und was stattdessen hilft
+číselné výsledky textem („analýza úkosů“, „měřit“)	Zahlenergebnisse als Text („analyse formschrägen“, „messen“)
+díl „{0}“ – prvků {1}, listů výkresu {2}, příloh {3}	Teil „{0}“ – Elemente {1}, Zeichnungsblätter {2}, Anhänge {3}
+díl, vazba, kód, id…	Teil, Verknüpfung, Code, ID…
+dokument v odkazu	Dokument im Link
+duchové – průhledné porovnání s referencí nebo předchozí polohou	Geister – transparenter Vergleich mit Referenz oder vorheriger Lage
+Filtr dokumentu	Dokumentfilter
+Filtr textu (díl, vazba, kód chyby, id záznamu)	Textfilter (Teil, Verknüpfung, Fehlercode, Eintrags-ID)
+Filtr úrovně	Stufenfilter
+gizmo přesunu a otočení komponenty	Gizmo zum Verschieben und Drehen einer Komponente
+grafika měření a stopa bodu pohybové studie	Messgrafik und Punktspur der Bewegungsstudie
+Historie běhů ({0})	Verlauf der Läufe ({0})
+hodnoty v panelu Měření, v panelu Pohyb a textem „měřit“ / „pohyb stav“	Werte im Panel Messen, im Panel Bewegung und als Text „messen“ / „bewegung status“
+hřebeny křivosti a řídicí body ploch třídy A	Krümmungskämme und Kontrollpunkte von Class-A-Flächen
+Je to omezení prohlížeče nebo prostředí, ne chyba modelu: jádro, přepočet, řez, výběr, měření a exporty (i video) běží dál.	Das ist eine Einschränkung des Browsers oder der Umgebung, kein Modellfehler: Kern, Neuberechnung, Schnitt, Auswahl, Messen und Exporte (auch Video) laufen weiter.
+JSON protokolu běhu {0} stažen.	JSON des Laufs {0} heruntergeladen.
+klik v náhledu vybere plochu, hranu nebo vrchol (Ctrl / Shift přidá, tažení = výběr oknem)	ein Klick in die Vorschau wählt Fläche, Kante oder Eckpunkt (Strg / Umschalt fügt hinzu, Ziehen = Fensterauswahl)
+mřížka a osy prostoru	Raster und Raumachsen
+návaznost ploch textem („analýza návaznosti“, „analýza hřebenu“)	Flächenübergänge als Text („analyse stetigkeit“, „analyse kamm“)
+Nesprávné heslo – nebo je odkaz useknutý či změněný (šifrovaný obsah nejde rozlišit; část za #s= má {0} znaků).	Falsches Passwort – oder der Link ist abgeschnitten oder verändert (verschlüsselter Inhalt lässt sich nicht unterscheiden; der Teil nach #s= hat {0} Zeichen).
+odchylky číselně v protokolu „porovnat“	Abweichungen als Zahlen im Protokoll „vergleichen“
+Odkaz je chráněný heslem – ověřte ho s heslem: odkaz ověřit <odkaz> heslo <heslo>.	Der Link ist passwortgeschützt – mit Passwort prüfen: link prüfen <link> passwort <passwort>.
+Odkaz je poškozený – data dokumentu jsou úplná, ale změněná (část za #s= má {0} znaků; změnu mohl udělat program, kterým se odkaz předával). Požádejte odesílatele o nový odkaz.	Der Link ist beschädigt – die Dokumentdaten sind vollständig, aber verändert (der Teil nach #s= hat {0} Zeichen; das Programm, mit dem der Link weitergegeben wurde, kann ihn verändert haben). Bitten Sie den Absender um einen neuen Link.
+Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	Der Link ist abgeschnitten – seine Dokumentdaten enden vorzeitig (der Teil nach #s= hat {0} Zeichen). Kopieren Sie den ganzen Link erneut oder bitten Sie um einen kurzen Link mit Code.
+Odkaz je useknutý – za #s= chybí data dokumentu ({0} znaků odkazu).	Der Link ist abgeschnitten – nach #s= fehlen die Dokumentdaten ({0} Zeichen des Links).
+odkaz nemá další volby – vypíše poslední sdílený odkaz („odkaz ověřit [odkaz] [heslo X]“ ho ověří); nový vytvoří „sdílet“	link hat keine Optionen – gibt den letzten geteilten Link aus („link prüfen [link] [passwort X]“ prüft ihn); „freigeben“ erstellt einen neuen
+odkaz ověřit: chybí odkaz – zadejte odkaz nebo kód (odkaz ověřit https://…/s#KÓD), nebo nejdřív „sdílet“	link prüfen: Link fehlt – Link oder Code angeben (link prüfen https://…/s#CODE) oder zuerst „freigeben“
+odkaz ověřit: za „{0}“ chybí heslo	link prüfen: nach „{0}“ fehlt das Passwort
+odkaz se otevře ({0} znaků, {1}, platí do: {2}, {3}): {4}	der Link öffnet sich ({0} Zeichen, {1}, gültig bis: {2}, {3}): {4}
+omezení	Einschränkungen
+perspektiva – náhled je vždy pravoúhlý	Perspektive – die Vorschau ist immer orthografisch
+Po běhu ukázat souhrn – stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB; plný text konzole je v záložce Detail	Nach dem Lauf eine Zusammenfassung zeigen – das kurze MNCAD/1-Protokoll (wie mncad run in der Kommandozeile): Kopfzeile, ✗ / ⚠, D-Zeilen der Dokumente und Σ – bis 2 kB; der volle Konsolentext ist im Reiter Detail
+pohledy a otáčení fungují	Ansichten und Drehen funktionieren
+poloha číslem v panelu komponenty nebo textem „sestava komponenta …“	Lage als Zahl im Komponentenpanel oder als Text „baugruppe komponente …“
+pomocné roviny, osy a body	Hilfsebenen, -achsen und -punkte
+průhlednost tělesa	Transparenz des Körpers
+rozměry ukazuje „stav“ a panel Měření	Maße zeigen „status“ und das Panel Messen
+řez nebo skrytí komponent	Schnitt oder Ausblenden von Komponenten
+sestava „{0}“ – komponent {1}, různých dílů {2}, listů výkresu {3}, příloh {4}	Baugruppe „{0}“ – Komponenten {1}, verschiedene Teile {2}, Zeichnungsblätter {3}, Anhänge {4}
+seznam v historii prvků, textem „stav“	Liste in der Elementhistorie, als Text „status“
+skica se kreslí a upravuje ve 2D editoru skici	eine Skizze wird im 2D-Skizzeneditor gezeichnet und bearbeitet
+skici v modelu	Skizzen im Modell
+Softwarové zobrazení – WebGL není dostupné	Software-Ansicht – WebGL ist nicht verfügbar
+Souhrn	Zusammenfassung
+Souhrn běhu	Zusammenfassung des Laufs
+Stáhne strukturovaný protokol běhu (JSON jako mncad run --json: záznamy se stabilními id, dokumenty, soubory, odkazy, plný protokol)	Lädt das strukturierte Laufprotokoll herunter (JSON wie mncad run --json: Einträge mit stabilen IDs, Dokumente, Dateien, Links, volles Protokoll)
+Stáhnout JSON	JSON herunterladen
+Stručný souhrn (výchozí)	Kurze Zusammenfassung (Standard)
+Text není sdílený odkaz Mnástrojárna CAD ani kód odkazu (čeká se …/s#KÓD, …/cad#s=…, …/cad#q=… nebo desetimístný kód).	Der Text ist weder ein geteilter Mnástrojárna-CAD-Link noch ein Link-Code (erwartet …/s#CODE, …/cad#s=…, …/cad#q=… oder ein zehnstelliger Code).
+textem „vyber F3 E2“ nebo window.mncad.select([…])	als Text „wähle F3 E2“ oder window.mncad.select([…])
+všechny dokumenty	alle Dokumente
+Výběr hran a ploch bez 3D okna	Kanten und Flächen ohne 3D-Ansicht auswählen
+Výběr hran a ploch bez 3D okna:	Kanten und Flächen ohne 3D-Ansicht auswählen:
+výsledek „porovnat“ v protokolu	das Ergebnis „vergleichen“ im Protokoll
+Záznamy	Einträge
+Žádný záznam neodpovídá filtru.	Kein Eintrag entspricht dem Filter.
+otevře sdílený odkaz jako příjemce a nic nezmění: ✓ s režimem, platností a obsahem (komponenty, díly, listy, přílohy), nebo ✗ s důvodem – useknutý, změněný, heslo, platnost, nenalezen; bez odkazu ověří poslední odkaz běhu	öffnet einen geteilten Link wie der Empfänger und ändert nichts: ✓ mit Modus, Gültigkeit und Inhalt (Komponenten, Teile, Blätter, Anhänge) oder ✗ mit Grund – abgeschnitten, verändert, Passwort, Gültigkeit, nicht gefunden; ohne Link wird der letzte Link des Laufs geprüft
+#!dynamic – texty kódů share.store-off a share.link-broken (src/cad/engine/codes.ts, tr(def.key))
+úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu ({0} znaků)	der Speicher für kurze Links ist ausgeschaltet – das ganze Dokument steht im Link ({0} Zeichen)
+odkaz se neotevře ({0}): {1}	der Link öffnet sich nicht ({0}): {1}

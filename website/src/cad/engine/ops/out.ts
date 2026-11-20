@@ -293,7 +293,11 @@ async function shareCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "share
       ...(cmd.orLink ? { orLink: true } : {}),
       ...(hs ? { base: hs.base, store: hs.store } : {}),
     },
-    (n) => e.code(n.code, { ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}) }),
+    (n) => {
+      // ℹ vypnutého úložiště jednou za běh (vlna 22, bod 16) – délka každého odkazu je v jeho výpisu `= … chars=`
+      if (n.code === "share.store-off" && ctx.report.entries.some((x) => x.code === "share.store-off")) return;
+      e.code(n.code, { ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}) });
+    },
   );
   if (!r) return;
   const content = shareContent(d);
