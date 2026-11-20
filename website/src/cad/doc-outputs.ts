@@ -60,12 +60,12 @@ export function sheetState(doc: CadDoc, s: Pick<DrawingDoc, "issued"> | undefine
   return s.issued.sig === id.sig ? "current" : "stale";
 }
 
-/** další písmeno revize: A → B, Z → AA, 1 → 2, A9 → A10 (prázdné → A) */
+/** další písmeno revize: A → B, Z → AA, 1 → 2, 01 → 02, A9 → A10 (prázdné → A) */
 export function nextRev(rev: string | undefined): string {
   const r = (rev ?? "").trim().toUpperCase();
   if (!r) return "A";
   const num = /^(.*?)(\d+)$/.exec(r);
-  if (num) return `${num[1]}${Number(num[2]) + 1}`;
+  if (num) return `${num[1]}${String(Number(num[2]) + 1).padStart(num[2].length, "0")}`;
   const last = r[r.length - 1];
   if (last >= "A" && last < "Z") return r.slice(0, -1) + String.fromCharCode(last.charCodeAt(0) + 1);
   if (last === "Z") return r.slice(0, -1) + "AA";
@@ -272,7 +272,7 @@ export const ANALYSIS: Record<string, { label: () => string; fix: string; auto: 
 export function staleOutputs(doc: CadDoc, o: { analyses?: readonly string[]; copies?: readonly { name: string; why: string; fix?: string }[] } = {}): StaleItem[] {
   const id = modelId(doc);
   const out: StaleItem[] = [];
-  for (const c of o.copies ?? []) out.push({ kind: "copy", label: tr("komponenta „{0}“", c.name), why: c.why, fix: c.fix ?? "sestava obnovit vše", auto: true });
+  for (const c of o.copies ?? []) out.push({ kind: "copy", label: c.name, why: c.why, fix: c.fix ?? "sestava obnovit vše", auto: true });
   for (const a of o.analyses ?? []) {
     const d = ANALYSIS[a];
     out.push({ kind: "analysis", label: d ? d.label() : a, why: tr("výsledek je ze starší revize modelu"), fix: d?.fix ?? a, auto: d?.auto ?? false });

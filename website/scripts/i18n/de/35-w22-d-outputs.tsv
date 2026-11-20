@@ -16,7 +16,6 @@ Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exporte: 
 Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exporte: {0} von {1} aus einer älteren Modellrevision – {2} (Liste: exporte)
 exporty: neznámé „{0}“ – {1}	exporte: unbekannt „{0}“ – {1}
 Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model {0}	Exporte: keine Einträge – ein Export aus diesem Dokument schreibt sie (export step, zeichnung export pdf…) · Modell {0}
-komponenta „{0}“	Komponente „{0}“
 kontrola	Prüfung
 kontrola kolizí	Kollisionsprüfung
 kontrola kolizí znovu (kolize)	Kollisionsprüfung wiederholt (kollision)

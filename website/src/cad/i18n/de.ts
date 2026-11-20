@@ -3072,7 +3072,6 @@ export const DE: Record<string, string> = {
  "Komponenta": "Komponente",
  "Komponenta ·": "Komponente ·",
  "Komponenta · {0}": "Komponente · {0}",
- "komponenta „{0}“": "Komponente „{0}“",
  "komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit {3}": "Komponente „{0}“ ist älter als das Teil „{1}“ im Tab ({2}) – Stückliste und Zeichnung zeigen die Daten vom Einfügen; aktualisieren: baugruppe aktualisieren {3}",
  "komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu": "Komponente „{0}“ hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube – ein Linearantrieb braucht eine Schiebeverknüpfung",
  "komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs \"{0}\" … \"Rám\" …)": "Komponente „{0}“ hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube – ein Drehantrieb braucht eine Achse (baugruppe verknüpfung scharnier \"{0}\" … \"Rahmen\" …)",

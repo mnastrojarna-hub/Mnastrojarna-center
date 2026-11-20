@@ -16,7 +16,6 @@ Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exports: 
 Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exports: {0} of {1} from an older model revision – {2} (list: exports)
 exporty: neznámé „{0}“ – {1}	exports: unknown “{0}” – {1}
 Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model {0}	Exports: no records – an export from this document writes them (export step, drawing export pdf…) · model {0}
-komponenta „{0}“	component “{0}”
 kontrola	check
 kontrola kolizí	clash check
 kontrola kolizí znovu (kolize)	clash check repeated (clash)

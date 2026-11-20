@@ -3072,7 +3072,6 @@ export const EN: Record<string, string> = {
  "Komponenta": "Component",
  "Komponenta ·": "Component ·",
  "Komponenta · {0}": "Component · {0}",
- "komponenta „{0}“": "component “{0}”",
  "komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit {3}": "component “{0}” is older than part “{1}” in its tab ({2}) – the parts list and drawing show the data from insertion; refresh: assembly refresh {3}",
  "komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu": "component “{0}” has no Distance, Slot, Path, Concentric or Screw mate – a linear motor needs a sliding mate",
  "komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs \"{0}\" … \"Rám\" …)": "component “{0}” has no Hinge, Concentric or Screw mate – a rotary motor needs an axis (assembly mate hinge \"{0}\" … \"Frame\" …)",

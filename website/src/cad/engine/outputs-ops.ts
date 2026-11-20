@@ -13,16 +13,14 @@
  */
 import type { OutputsCmd } from "../agent-outputs";
 import { staleCopies, staleCopyText } from "../asm-refresh";
-import { exportsText, modelId, recordExport, sheetIssueLine, staleExportText, staleExports, staleOutputs, staleOutputsText, staleSheets, staleSheetText, type ExportInput, type StaleItem } from "../doc-outputs";
+import { exportsText, modelId, recordExport, type ModelId, sheetIssueLine, staleExportText, staleExports, staleOutputs, staleOutputsText, staleSheets, staleSheetText, type ExportInput, type StaleItem } from "../doc-outputs";
 import { tr } from "../i18n";
 import type { CadDoc } from "../types";
 import { drawExtras, ensureMateStatus } from "./asm-status";
-import { codeText } from "./codes";
 import { asmHooks, coded, sayKv, type OpCtx } from "./ops/util";
 import { runEngineOp } from "./ops/registry";
 import { staleResults } from "./result-key";
 import { docKeyOf, runOf } from "./run-doc";
-import { runDocKeySet } from "./runs";
 import { drawingMemo } from "./sheet-eval";
 
 /* ───────────────────────── záznamy exportů ───────────────────────── */
@@ -44,29 +42,41 @@ export function warnStaleExport(ctx: OpCtx, doc: CadDoc, sheetIds: readonly stri
   for (const sid of sheetIds) {
     const s = doc.drawings?.find((x) => x.id === sid);
     if (!s?.issued || s.issued.sig === id.sig) continue;
-    coded(ctx, "drawing.stale", { args: [staleExportText(s.name, s.issued, id)], ...(ctx.strict?.escalates("drawing.stale", ctx.line) ? { level: "error" as const } : {}) });
+    coded(ctx, "drawing.stale", { args: [staleExportText(s.name, s.issued, id)], data: staleData(s.id, id), ...(ctx.strict?.escalates("drawing.stale", ctx.line) ? { level: "error" as const } : {}) });
   }
 }
 
+/** strojová data ⚠ drawing.stale: id listu a otisk modelu, pro který hláška platí (jedna hláška za list a revizi v běhu) */
+export const staleData = (sheet: string, id: ModelId): { sheet: string; sig: string; rev: string } => ({ sheet, sig: id.sig, rev: id.rev });
+const reported = (ctx: OpCtx, sheet: string, id: ModelId) => ctx.report.entries.some((e) => e.code === "drawing.stale" && (e.data as { sheet?: string; sig?: string } | undefined)?.sheet === sheet && (e.data as { sig?: string }).sig === id.sig);
+
+/** otisk modelu dokumentu na konci minulého běhu nad týmž prostorem (`ws.asm` – stejný objekt i za obalem prostoru) */
+const lastSig = new WeakMap<object, Map<string, string>>();
+
 /**
- * Vydané listy dokumentu ze starší revize modelu → ⚠ drawing.stale (jednou za běh pro tentýž list a revizi). `end` = konec
- * běhu (záznam bez řádku) – jen u dokumentu, který běh změnil (`runDocKeys`), aby nezměněný dokument nehlásil každý běh.
+ * Vydané listy dokumentu ze starší revize modelu → ⚠ drawing.stale (jednou za běh pro tentýž list a revizi modelu). `end` =
+ * konec běhu (záznam bez řádku) – jen když se model dokumentu od konce minulého běhu změnil (změna v běhu, úprava myší mezi
+ * běhy, nový / načtený dokument); běh, který dokument jen exportoval, ho znovu nehlásí.
  */
 export function reportStaleSheets(ctx: OpCtx, doc: CadDoc, o: { end?: boolean } = {}): void {
-  if (doc.kind === "draft" || !doc.drawings?.some((s) => s.issued)) return;
-  if (o.end) {
-    // hostitel bez seznamu dokumentů běhu hlásí vždy; jinak jen dokument, který běh založil nebo změnil
-    const keys = ctx.ws.runDocKeys ? runDocKeySet(ctx.ws) : null;
-    if (keys && !keys.has(docKeyOf(ctx))) return;
-  }
+  if (doc.kind === "draft") return;
   const id = modelId(doc);
+  if (o.end) {
+    let m = lastSig.get(ctx.ws.asm);
+    if (!m) lastSig.set(ctx.ws.asm, (m = new Map()));
+    const key = docKeyOf(ctx);
+    const prev = m.get(key);
+    m.set(key, id.sig);
+    if (prev === id.sig) return;
+  }
+  if (!doc.drawings?.some((s) => s.issued)) return;
   for (const x of staleSheets(doc, id)) {
+    if (reported(ctx, x.sheet.id, id)) continue;
     const arg = staleSheetText(x.sheet.name, x.issued, id);
-    const text = codeText("drawing.stale", arg);
-    if (ctx.report.entries.some((e) => e.code === "drawing.stale" && e.text === text)) continue;
-    if (!o.end) coded(ctx, "drawing.stale", { args: [arg] });
-    else if (ctx.log) ctx.log.coded(null, "drawing.stale", { doc: doc.name, args: [arg] });
-    else ctx.report.code("drawing.stale", { line: null, doc: doc.name, args: [arg] });
+    const data = staleData(x.sheet.id, id);
+    if (!o.end) coded(ctx, "drawing.stale", { args: [arg], data });
+    else if (ctx.log) ctx.log.coded(null, "drawing.stale", { doc: doc.name, args: [arg], data });
+    else ctx.report.code("drawing.stale", { line: null, doc: doc.name, args: [arg], data });
   }
 }
 
