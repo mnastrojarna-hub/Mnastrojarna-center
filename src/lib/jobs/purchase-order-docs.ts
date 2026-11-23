@@ -23,7 +23,7 @@ import { operationFamily } from "@/lib/jobs/production-suggest";
 import { pragueToday } from "@/lib/jobs/flow-status";
 import { czDate } from "@/lib/pdf/types";
 import { recipientsFor, toneFor } from "@/lib/contacts/server";
-import { enqueueSend } from "@/lib/anonymize/send-queue";
+import { enqueueSend, sendQueuedNow } from "@/lib/anonymize/send-queue";
 import { appOrigin, kick } from "@/lib/anonymize/queue";
 import { pickPoAttachments, type ItemDeviationsRef } from "@/lib/jobs/po-deviations";
 import {
@@ -432,6 +432,10 @@ export async function sendPurchaseOrderCore(
           fileIds: [...files.ready.map((x) => x.fileId), ...files.pending],
         });
         if (!q.ok) return { ok: false, error: q.error };
+        // majitel 23. 11.: odeslání odejde hned (anonymizace v požadavku; nepovedená / nestihnutá → originál) —
+        // stav objednávky a historii zapíše odeslání z fronty
+        const now = await sendQueuedNow(db as never, q.id, { actorId: sender.id });
+        if (now.sent) return { ok: true, queued: false, queueId: q.id, mailboxId: null };
         await logJobEvent(db, {
           jobId: po.jobId, type: "email", entity: "purchase_order", entityId: poId, actorId: sender.id,
           message: `Objednávka ${po.number} čeká na anonymizaci výkresů — odejde dodavateli sama po dokončení`,

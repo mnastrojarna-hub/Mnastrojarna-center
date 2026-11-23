@@ -1165,7 +1165,7 @@ export interface StageEffect {
 
 export function quoteLabel(q: Pick<QuoteFacts, "number" | "revision">): string {
   const base = q.number?.trim() || "Nabídka";
-  return q.revision > 1 && !/-R\d+$/i.test(base) ? `${base} r${q.revision}` : base;
+  return q.revision > 1 && !/-[RV]\d+$/i.test(base) ? `${base} r${q.revision}` : base;
 }
 
 function stageAfterSubChange(f: FlowFacts, change: { kind: "inquiry"; to: InquiryStatus } | { kind: "order"; to: OrderDocStatus }): JobStage | null {

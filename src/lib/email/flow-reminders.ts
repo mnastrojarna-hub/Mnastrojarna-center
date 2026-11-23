@@ -49,6 +49,9 @@ export function quoteReminderText(q: {
 }
 
 /** Jeden běh plánovače (best-effort; chyba jedné položky neshodí ostatní). */
+/** Návrhy e-mailu „Připomenout nabídku" do fronty (zatím vypnuto, majitel 23. 11.). */
+const QUOTE_REMINDER_MAILS = false as boolean;
+
 export async function runFlowReminders(opts: {
   now?: Date;
   actor?: ActorContext;
@@ -109,6 +112,8 @@ export async function runFlowReminders(opts: {
     }
   }
   for (const q of list) {
+    // majitel 23. 11.: žádné předpřipravené e-maily, které nikdo neodklikl — připomínky nabídek zatím vypnuté
+    if (!QUOTE_REMINDER_MAILS) break;
     if (q.valid_until && q.valid_until < today) continue;
     const last = reminded.get(q.id);
     if (last && last >= (q.sent_at ?? "1970-01-01")) continue;

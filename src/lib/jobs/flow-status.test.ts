@@ -245,6 +245,7 @@ describe("quoteStateOf (= quote_state_of)", () => {
   it("štítek nabídky s revizí", () => {
     expect(quoteLabel({ number: "NAB-2026-031", revision: 2 })).toBe("NAB-2026-031 r2");
     expect(quoteLabel({ number: "NAB-2026-031-R2", revision: 2 })).toBe("NAB-2026-031-R2");
+    expect(quoteLabel({ number: "N2026/025-V2", revision: 2 })).toBe("N2026/025-V2");
     expect(quoteLabel({ number: null, revision: 1 })).toBe("Nabídka");
   });
 });

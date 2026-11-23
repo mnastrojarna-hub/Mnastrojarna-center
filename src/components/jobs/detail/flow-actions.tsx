@@ -370,7 +370,7 @@ function FlowDialog({
   const [deliveryAfterFinish] = React.useState(() => key === "delivery.record" && job.stage === "ve_vyrobe"
     && (facts.productionTotal ?? 0) > (facts.productionDone ?? 0) && Boolean(facts.productionStep) && facts.productionStep !== "hotovo");
   const qid = quote?.id ?? null;
-  const qLabel = quote ? `${quote.number}${quote.revision > 1 && !/-R?\d+$/i.test(quote.number) ? ` r${quote.revision}` : ""}` : "nabídka";
+  const qLabel = quote ? `${quote.number}${quote.revision > 1 && !/-[RV]?\d+$/i.test(quote.number) ? ` r${quote.revision}` : ""}` : "nabídka";
   const others = quotes.filter((q) => q.id !== qid && !q.archived && (q.status === "navrh_ai" || q.status === "ke_schvaleni" || q.status === "odeslano"));
   const effectOf = (change: Parameters<typeof stageEffect>[2]) => stageEffectText(stageEffect(facts, quotes, change));
 

@@ -328,19 +328,13 @@ describe.skipIf(!LOCAL_ENABLED)("plné rozlišení a přímé nahrání ↔ lok�
     // podstrčené potvrzení z požadavku klienta se zahodí
     const { data: qr } = await svc.from("anon_send_queue").select("payload").eq("id", q.id).single();
     expect((qr as { payload: Record<string, unknown> }).payload.originalFileIds).toBeUndefined();
-    await sq.flushSendQueue(svc, { ids: [q.id] });
-    const blocked = (await svc.from("anon_send_queue").select("status, reason").eq("id", q.id).single()).data as { status: string; reason: string };
-    expect(blocked.status).toBe("blocked");
-    expect(blocked.reason).toMatch(/jen super admin/);
-    const deny = await sq.allowQueuedOriginals(svc, q.id, { id: salesId, role: "obchodnik" }, null);
-    expect(deny.ok).toBe(false);
+    // majitel 23. 11.: kliknuté odeslání nesmí viset — DWG (anonymizovat nejde) odejde jako originál
+    // s neutrálním názvem, s auditem a záznamem v historii (bez potvrzování super adminem)
     sent.mails.length = 0;
-    const allow = await sq.allowQueuedOriginals(svc, q.id, { id: adminId, role: "super_admin" }, null);
-    expect(allow, JSON.stringify(allow)).toMatchObject({ ok: true, sent: true });
-    expect(sent.mails[0]?.attachments.map((a) => a.filename)).toEqual(["original.dwg"]);
+    await sq.flushSendQueue(svc, { ids: [q.id] });
     const done = (await svc.from("anon_send_queue").select("status").eq("id", q.id).single()).data as { status: string };
     expect(done.status).toBe("sent");
-    expect(localSql(`select count(*) from audit_log where action = 'anon_send_queue_original' and entity_id = '${q.id}'`)).toBe("1");
-    expect(localSql(`select count(*) from audit_log where action = 'anon_send_queue_sent' and entity_id = '${q.id}' and diff->'originals' ? '${dwg}'`)).toBe("1");
+    expect(sent.mails[0]?.attachments.map((a) => a.filename)).toEqual(["original.dwg"]);
+    expect(localSql(`select count(*) from audit_log where action = 'anon_send_queue_sent' and entity_id = '${q.id}' and diff->'originals' ? '${dwg}' and diff->'notAnonymized' ? '${dwg}'`)).toBe("1");
   }, 180_000);
 });

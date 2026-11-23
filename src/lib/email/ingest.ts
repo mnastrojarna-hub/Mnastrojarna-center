@@ -34,6 +34,11 @@ import { LOCKOUT_TEXT, type AuthFailState } from "@/lib/email/auth-lockout";
 import { detectRoleEmails } from "@/lib/contacts/role-detect";
 import { aiToneFor, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/server";
 
+/** Automatické odeslání AI odpovědí je vypnuté (majitel 23. 11.: odchází jen to, co odeslal člověk). */
+const AI_AUTO_SEND = false as boolean;
+/** AI návrhy odpovědí na příchozí poštu se negenerují (majitel 23. 11.: „AI balast" na každý mail — zatím vypnuto). */
+const AI_REPLY_DRAFTS = false as boolean;
+
 /**
  * Stahování a (volitelně) AI-analýza pošty.
  * Zdroje: IMAP / POP3 (hosting90 …) a Microsoft Graph (Outlook / M365) — CELÁ schránka po dávkách
@@ -505,15 +510,16 @@ export async function ingestEmailsProgress(
     }
 
     // Návrh odpovědi jen s AI, ne u spamu a jen u čerstvé pošty: plná automatika = odeslat hned, jinak fronta
-    if (!analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
+    if (!AI_REPLY_DRAFTS || !analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
     try {
       // tykání / vykání vlastníka schránky (odpověď odejde pod jeho jménem) s odesílatelem
       const tone = await aiToneFor(db, opts.ownerId ?? null, e.fromEmail, e.fromName);
       const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category, rules, tone, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) });
       if (!draft.trim()) continue;
 
-      let sentAuto = false;
-      if (replyMode === "full" && smtpReady && e.fromEmail) {
+      // majitel 23. 11.: AI sama NIC neodesílá — odejde jen to, co člověk odeslal kliknutím; návrh čeká ve frontě
+      const sentAuto = false;
+      if (AI_AUTO_SEND && replyMode === "full" && smtpReady && e.fromEmail) {
         const h = replyHeaders({ messageId: e.messageId, references: e.references, subject: e.subject });
         const res = await sendMail({
           to: e.fromEmail,
@@ -529,7 +535,7 @@ export async function ingestEmailsProgress(
           signature: opts.ownerId ? { userId: opts.ownerId, mode: "append" } : null,
           category: isSpam ? undefined : category,
         });
-        sentAuto = res.sent;
+        void res;
       }
 
       const confidence = clamp(analysis.confidence, 0, 1, 0);
