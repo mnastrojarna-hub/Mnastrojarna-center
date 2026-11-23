@@ -3,6 +3,7 @@
  * `uložit`, `export step` s kontrolou znovunačtením a se stejnými bajty při opakování, `… base64`, `výkres export pdf
  * dokument` = jedno PDF všech listů včetně výkresů dílů z komponent (každý díl jednou; stránek = listů), sestava
  * s kusovníkem a balónky na listu, `--formats` (`writeDocFormat`), `sdílet` bez úložiště (⚠ + řádek O) a `odkaz`.
+ * STEP dílu i sestavy navíc projde NEZÁVISLOU kontrolou (scripts/cad-harness/step-check.ts, vlna 22 bod 22c).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -16,6 +17,7 @@ import { MemoryWorkspace } from "./memory-workspace";
 import { formatShort, GRAMMAR } from "./protocol";
 import { runScript } from "./run";
 import { clearDrawingMemo } from "./sheet-eval";
+import { stepCheck, stepCheckProblems } from "../../../scripts/cad-harness/step-check";
 
 const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
 const FONTS = path.resolve(__dirname, "../../../public/fonts");
@@ -41,6 +43,9 @@ describe("výstupy textem se skutečným jádrem (B3)", async () => {
     expect(step.file.check).toMatchObject({ ok: true });
     expect(step.file.check!.text).toMatch(/^kontrola STEP: soubor znovu načten jádrem – těles: 1, objem/);
     expect(f.get("Deska-2.step")!.file.check!.text).toMatch(/\(model od minulé kontroly beze změny\)$/);
+    // nezávislá kontrola (vlna 22, 22c – vlastní kontrola aplikace dřív prošla i se 0 solidy): jiná instance OCCT, prostá
+    // čtečka STEP, přesný BRepCheck – 1 těleso, žádné volné skořepiny / plochy, platné
+    expect(stepCheckProblems(await stepCheck(step.data), { solids: 1 })).toEqual([]);
     // stejný model → stejné bajty (pevný čas v hlavičce STEP)
     expect(step.file.sha256).toBe(f.get("Deska-2.step")!.file.sha256);
     expect(Buffer.from(step.data).toString("latin1")).toMatch(/FILE_NAME\('[^']*','2000-01-01T00:00:00'/);
@@ -62,6 +67,19 @@ describe("výstupy textem se skutečným jádrem (B3)", async () => {
     expect(r.console).toMatch(/^ {2}✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, .* → věrná kopie modelu$/m);
     expect(r.console).toMatch(/^✓ výkres PDF: Deska_vykres\.pdf · [\d,]+ kB · výkres PDF – staženo \(bez dialogu\)$/m);
     expect(pdfPages(f.get("Deska_vykres.pdf")!.data)).toBe(1);
+  }, 240_000);
+
+  it("sestava: export step – kontrola aplikace i NEZÁVISLÁ kontrola STEP (3 tělesa, bez volných ploch, přesně platné)", async () => {
+    const host = hostOf();
+    const script = ["nový díl Deska", "kvádr 80 60 10", "nový díl Čep", "válec 10 30", "nová sestava Uložení", 'vložit "Deska" ukotvit', 'vložit "Čep" v 100 0 0', 'vložit "Čep" v 150 0 0', "export step"].join("\n");
+    const r = await runScript(new MemoryWorkspace(), script, host);
+    expect(r.entries.filter((e) => e.level === "error" || e.level === "warn")).toEqual([]);
+    const step = [...host.files.files.values()].find((x) => x.file.format === "step")!; // název souboru bez diakritiky (plainName)
+    expect(step.file.check).toMatchObject({ ok: true });
+    expect(step.file.check!.text).toMatch(/těles: 3, .* → věrná kopie modelu$/);
+    const c = await stepCheck(step.data);
+    expect(stepCheckProblems(c, { solids: 3 })).toEqual([]);
+    expect(c.freeShells + c.freeFaces).toBe(0);
   }, 240_000);
 
   it("sestava: výkres export pdf dokument i vše = list sestavy + výkresy dílů z komponent (každý díl jednou), stránek = listů; list 1 = jen list sestavy", async () => {
@@ -118,7 +136,10 @@ describe("výstupy textem se skutečným jádrem (B3)", async () => {
     expect(out[1].sheets).toBe(3);
     expect(pdfPages(sink.files.get("Uložení výkres.pdf")!.data)).toBe(3);
     expect(new TextDecoder().decode(sink.files.get("Uložení kusovník.csv")!.data)).toMatch(/Čep;[^;]*;2;/);
-    expect(notes.filter((n) => n.code !== "drawing.warning")).toEqual([]);
+    // vlna 22, bod 19 (D1): výstup výkresu i kusovníku sestavy shrne výrobní dokumentaci (ℹ bom.docs) a vyráběné díly bez čísla
+    // výkresu (⚠ bom.make-incomplete) – Deska a Čep tu číslo nemají; nic jiného (STEP, .mncad) hlášku nepřidá
+    const docNotes = [{ code: "bom.docs", args: ["vyráběné 2, normálie 0, nakupované 0"] }, { code: "bom.make-incomplete", args: ["Deska (bez čísla), Čep (bez čísla)"] }];
+    expect(notes.filter((n) => n.code !== "drawing.warning")).toEqual([...docNotes, ...docNotes]);
     // opakovaný STEP sestavy: stejné bajty
     const again = await writeDocFormat({ kernel, files: sink }, ws, asm, "step", () => undefined);
     if (process.env.MNCAD_PROBE_DIR) {

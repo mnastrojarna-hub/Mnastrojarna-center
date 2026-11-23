@@ -75,7 +75,7 @@ Prvky:
 Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
 Vazby: 7 (7 ok)
-Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×) – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 4 ===
@@ -84,6 +84,7 @@ Pohybová studie: motorů 0 · kroků 36
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
 Pohybová studie: 334 kroků · 0,5 s · motory: 
+ stojí: 7 („Spodní deska“, „Stírací deska“, „Horní deska“ a další)
 Vazby splněny ve všech krocích
  ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 35 · L0 41 · Ln 16) · síla 30,4 N (max 30,4 N) (4×)
 Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
@@ -93,13 +94,11 @@ Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05
  doraz „Doraz stírače Stírací deska → Horní deska“ (max 25 mm): dotyk 0–0,5 s
  Kontrola energie: odchylka 0 % z 0,02288 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0,0229 J, dotyky -0,0229 J, zadané síly 0 J)
 ✓ motor 1: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
+ pohání: „Horní deska“ + 4 díly – spolu s ním kvůli pevné vazbě (zámku): „Pružina 2×19,5×41“, „Pružina 2×19,5×41“, „Pružina 2×19,5×41“ a další · směr −Z
 Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
- Stírací deska: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 45]
- Horní deska: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [0; 0; 85]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 30; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 90; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 30; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 90; 95]
+ „Horní deska“ + 4 díly (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm · na konci zpět ve výchozí poloze
+ „Stírací deska“: ΔZ −15 mm · na konci zpět ve výchozí poloze
+ stojí: 1 („Spodní deska“)
 Vazby splněny ve všech krocích
  ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
 Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
@@ -115,12 +114,9 @@ Pohybová studie: motorů 1 · kroků 36
  1. lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
 Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
 Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
- Stírací deska: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 45]
- Horní deska: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [0; 0; 85]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 30; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 90; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 30; 95]
- Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 90; 95]
+ „Horní deska“ + 4 díly (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm · na konci zpět ve výchozí poloze
+ „Stírací deska“: ΔZ −15 mm · na konci zpět ve výchozí poloze
+ stojí: 1 („Spodní deska“)
 Vazby splněny ve všech krocích
  ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
 Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
@@ -136,7 +132,7 @@ Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05
 Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
 Vazby: 7 (7 ok)
-Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×) – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Pohybová studie: motorů 1 · kroků 36 · 0,5 s – pohyb stav
 Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

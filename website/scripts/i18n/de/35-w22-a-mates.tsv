@@ -5,7 +5,6 @@
 {0} ztracená reference	{0} verlorene Referenz
 {0}: plocha {1} dílu „{2}“ – {3}	{0}: Fläche {1} des Teils „{2}“ – {3}
 → „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}{5} – stav vazeb níže	→ „{0}“ in die Baugruppe „{1}“ zurückgegeben (Komponenten mit der Änderung: {2}){3}{4}{5} – Verknüpfungsstatus unten
-⚠ vazba {0} ({1}): {2}{3}	⚠ Verknüpfung {0} ({1}): {2}{3}
 Díl se mezitím změnil – klikněte znovu na Zpět do sestavy.	Das Teil wurde inzwischen geändert – klicken Sie erneut auf Zurück zur Baugruppe.
 Díl vrácen do sestavy – POZOR: ztracené reference vazeb: {0}. Vazby jsou mimo řešení a komponenty se kvůli nim nehýbou – opravte je v seznamu vazeb (Vybrat plochu znovu / Smazat vazbu).	Teil in die Baugruppe zurückgegeben – ACHTUNG: verlorene Verknüpfungsreferenzen: {0}. Diese Verknüpfungen sind außerhalb der Lösung und Komponenten bewegen sich ihretwegen nicht – in der Verknüpfungsliste beheben (Fläche neu wählen / Verknüpfung löschen).
 Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.	Klicken Sie auf eine Fläche der Komponente „{0}“ (oder wählen Sie sie aus der Flächenliste) – sie ersetzt die verlorene Fläche der Verknüpfung.

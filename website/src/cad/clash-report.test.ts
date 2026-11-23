@@ -138,7 +138,8 @@ describe("pohybová studie: kroky s kolizí jen se skutečnou kolizí, první sk
   it("16 kroků se šrouby v závitu, skutečná kolize od kroku 9 → kroků s kolizí 7 z 16, thread=2, real=1, first.real=9", () => {
     const s = motionClashSummary(res, d);
     expect(s.stats).toMatchObject({ steps: 7, of: 16, thread: 2, real: 1, firstReal: 9 });
-    expect(motionClashKv(s.stats).join(" ")).toBe("clash.steps=7/16 thread=2 real=1 first.real=9");
+    // vlna 22, bod 6: na konci spojitost kontroly (výsledek bez údaje = diskrétně, kroky bez polohy → posun 0)
+    expect(motionClashKv(s.stats).join(" ")).toBe("clash.steps=7/16 thread=2 real=1 first.real=9 clash.mode=discrete clash.poses=16 clash.refined=0 clash.maxstep=0mm");
     expect(s.lines[0]).toBe("Kolize v pohybu: kroků s kolizí 7 z 16 · šroub v závitu 2 dvojic (kroky 0–15) · skutečné: 1 dvojic dílů v 7 krocích, první v kroku 9");
     expect(s.codes.map((c) => c.code)).toEqual(["clash.thread", "clash.real"]);
     expect(s.codes[1].text).toMatch(/^v pohybu „Doraz“ × „Šroub M12 \[S2\]“ od kroku 9 .* – místo \[80; 30; 100,5\] v kroku 9$/);
@@ -164,7 +165,7 @@ describe("pohybová studie: kroky s kolizí jen se skutečnou kolizí, první sk
     const ss = Array.from({ length: 5 }, (_, i) => ({ i, t: i * 0.5, motors: [26 - i], clashes: [det("pl", "r", 78.5, "real")] }));
     const s = motionClashSummary({ steps: ss, collisionsChecked: true }, st);
     expect(s.stats).toMatchObject({ steps: 2, of: 5, real: 1, firstReal: 3, work: 1 });
-    expect(motionClashKv(s.stats).join(" ")).toBe("clash.steps=2/5 thread=0 real=1 first.real=3 work=1");
+    expect(motionClashKv(s.stats).join(" ")).toBe("clash.steps=2/5 thread=0 real=1 first.real=3 work=1 clash.mode=discrete clash.poses=5 clash.refined=0 clash.maxstep=0mm");
     expect(s.codes.map((c) => c.code)).toEqual(["clash.real", "clash.work"]);
   });
   it("dvojice bez třídy (výsledek bez zařazení) se bere jako skutečná kolize", () => {

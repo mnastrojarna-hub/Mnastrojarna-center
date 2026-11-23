@@ -7,8 +7,15 @@ import { attachedFiles, attachedList } from "./attached-files";
 import type { DrawingMeta } from "./drawing";
 import { tr } from "./i18n";
 import { drawTitleBlock, generalTolDescribe, generalTolFields, generalTolOf, parseGeneralTol, parseTemplate, templateKeys, templateLabel, titleBlockSize, titleRevision, titleTemplateOf, type TitleFieldKey } from "./title-block";
-import { prepareLogo } from "./title-logo";
+import { prepareLogo, sniffImage, toDataUrl } from "./title-logo";
 import type { CadDoc } from "./types";
+
+/** MIME obrázku vstupu podle obsahu (PNG, JPEG, SVG …), jinak podle přípony */
+const mimeOf = (name: string, b: Uint8Array): string => {
+  const k = sniffImage(b);
+  if (k) return k === "svg" ? "image/svg+xml" : `image/${k}`;
+  return /\.svg$/i.test(name) ? "image/svg+xml" : /\.jpe?g$/i.test(name) ? "image/jpeg" : "image/png";
+};
 
 /** pole příkazu razítka: pole listu + logo a šablona */
 export type TitleCmdField = TitleFieldKey | "logo" | "template";
@@ -82,7 +89,7 @@ const NONE = new Set(["", "ne", "no", "nein", "none", "zadne", "zadna", "zadny",
  * obrys pro DXF / DWG); šablona: iso7200 / kompaktní / nástrojářská; nepředepsané: ISO 2768 třída, „desetinná …“ nebo text.
  * Vrací části řádku protokolu „✓ razítko: …“ a upozornění („! …“). Materiál nastavuje volající (do dokumentu).
  */
-export async function applyTitleFields(meta: Record<string, unknown>, f: Partial<Record<TitleCmdField, string>>): Promise<{ parts: string[]; warnings: string[] }> {
+export async function applyTitleFields(meta: Record<string, unknown>, f: Partial<Record<TitleCmdField, string>>, input?: (name: string) => Promise<{ name: string; bytes: Uint8Array } | null>): Promise<{ parts: string[]; warnings: string[] }> {
   const parts: string[] = [];
   const warnings: string[] = [];
   for (const k of Object.keys(f) as TitleCmdField[]) {
@@ -112,9 +119,16 @@ export async function applyTitleFields(meta: Record<string, unknown>, f: Partial
         const found = attachedFiles.matches(src);
         if (found.length > 1) throw new Error(tr("logo „{0}“: název odpovídá více připojeným souborům ({1}) – zadejte celý název s příponou, např. logo=\"{2}\"", src, found.map((x) => x.name).join(", "), found[0].name));
         const file = found[0];
-        if (!file) throw new Error(tr("logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ nebo zadejte data URL (data:image/png;base64,…); připojené: {1}", src, attachedList() || "—"));
-        src = file.dataUrl;
-        name = file.name;
+        // bez připojeného souboru: vstupy hostitele (CLI --files / složka skriptu, HTTP body.files – vlna 22, bod 22j)
+        const inp = file ? null : await input?.(src);
+        if (!file && !inp) throw new Error(tr("logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“, v CLI složkou --files, nebo zadejte data URL (data:image/png;base64,…); připojené: {1}", src, attachedList() || "—"));
+        if (file) {
+          src = file.dataUrl;
+          name = file.name;
+        } else {
+          src = toDataUrl(mimeOf(inp!.name, inp!.bytes), inp!.bytes);
+          name = inp!.name;
+        }
       }
       const r = await prepareLogo(src, name);
       meta.logo = r.logo;
@@ -176,7 +190,7 @@ export function titleStatusLines(doc: Pick<CadDoc, "kind">, m: Partial<DrawingMe
   const tpl = titleTemplateOf(m);
   const size = titleBlockSize(m);
   const L: string[] = [];
-  const logo = m.logo?.src ? tr(" · logo „{0}“ {1}×{2} px{3}", m.logo.name ?? tr("data URL"), m.logo.w, m.logo.h, m.logo.trace ? "" : tr(" (v DXF/DWG jen rámeček)")) : "";
+  const logo = (m.logo?.src ? tr(" · logo „{0}“ {1}×{2} px{3}", m.logo.name ?? tr("data URL"), m.logo.w, m.logo.h, m.logo.trace ? "" : tr(" (v DXF/DWG jen rámeček)")) + (m.logo.svg ? tr(" · SVG (vektor v SVG a PDF)") : "") : "") + (m.titleTpl ? tr(" · šablona hlavičky „{0}“", m.titleTpl) : "");
   L.push(tr("Šablona razítka: {0} {1}×{2} mm · promítání ISO {3} – značka ISO 5456-2 ({4}){5}", templateLabel(tpl), size.w, size.h, projection, projection === "E" ? tr("1. kvadrant, kružnice vpravo") : tr("3. kvadrant, kružnice vlevo"), logo));
   const extra: TitleCmdField[] = ["company", "customer", "project", "checkedBy", "approvedBy", "stock", "quantity", "heatTreatment", "surfaceTreatment", "angleTol", "chamferTol"];
   const filled = extra.filter((k) => typeof m[k as keyof DrawingMeta] === "string" && (m[k as keyof DrawingMeta] as string).trim());

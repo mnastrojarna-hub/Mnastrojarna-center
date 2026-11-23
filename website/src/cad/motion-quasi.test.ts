@@ -66,7 +66,7 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
     const sum = motionSummary(res, d);
     expect(sum[1]).toBe(levelLine(res.level!));
     expect(sum[1]).toMatch(/^Úroveň simulace: kvazistatika – .*zvoleno automaticky: sestava má pružinu „Pružina“/);
-    expect(motionKv(res, null, 2)).toMatch(/ level=quasi$/);
+    expect(motionKv(res, null, 2)).toMatch(/ level=quasi groups=\S+$/);
   });
 
   it("stejný výsledek nahoru i dolů (akceptace zprávy): krok se stejnou hodnotou motoru = stejná poloha", async () => {
@@ -97,16 +97,33 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
     expect(sum.join("\n")).toMatch(/⚠ vazby splněny ve všech krocích, ale polohu „H“ neurčují/);
     const u = motionFindings(res, d).find((x) => x.code === "motion.undetermined")!;
     expect(u.text).toMatch(/poloha „H“ není vazbami určena \(volná v mezi „Mez“ ⟨5; 25⟩ \(vazba 2\), „Dosed“ ⟨0; 500⟩ \(vazba 3\)\) – kinematika ji nechává, kde byla .* pružina „Pružina“ by ji tlačila: fyzikální poloha = pohyb kvazistatika/);
-    expect(motionKv(res, null, 2)).toMatch(/ undetermined=1 level=kin$/);
+    expect(motionKv(res, null, 2)).toMatch(/ undetermined=1 level=kin groups=\S+$/);
   });
 
   it("kinematika s preferovanou stranou meze: stejné polohy jako kvazistatika, nahoru i dolů", async () => {
     const down = await runMotion(rig({ prefer: "max", hz: 44.5 }), geo, study(57.5, 27.15, "kinematic"));
     const up = await runMotion(rig({ prefer: "max", az: 37.15, hz: 12 }), geo, study(27.15, 57.5, "kinematic"));
-    expect(down.undetermined?.map((u) => u.mates)).toEqual([["dosed"]]); // Mez určuje preference; Dosed bez preference zůstává neurčený
+    // fáze 2 (VĚDOMÁ změna): preference „Mez“ určuje Z přidržovače, a tím i mezeru „Dosed“ ve stejném směru – dřív se Dosed hlásil
+    // jako neurčený (falešné ⚠ motion.undetermined, přísný běh syntetického nástroje stál); neurčená zůstává jen mez v jiném, volném směru
+    expect(down.undetermined).toBeUndefined();
     expect(hz(down, 6)).toBeCloseTo(19.325, 4);
     expect(hz(down, 12)).toBeCloseTo(10, 4);
     expect(hz(up, 6)).toBeCloseTo(19.325, 4);
+  });
+
+  it("preference jedné meze neurčí mez v jiném volném směru (posuv v X zůstane ⚠ motion.undetermined)", async () => {
+    const d = rig({ prefer: "max", hz: 44.5 });
+    // boční mez přidržovače v X (rovina x = 20 přidržovače ↔ rovina x = 0 rámu): X přidržovače vazby neurčují ani s preferencí „Mez“
+    G.H.f2 = { kind: "plane", origin: [20, 30, 4], normal: [-1, 0, 0] };
+    G.R.f1 = { kind: "plane", origin: [0, 50, 5], normal: [1, 0, 0] };
+    try {
+      const side: Mate = { id: "bok", name: "Bok", type: "limitDistance", a: f("H", 2), b: f("R", 1), min: 0, max: 50 };
+      const res = await runMotion({ ...d, mates: [...d.mates!, side] }, geo, study(57.5, 27.15, "kinematic"));
+      expect(res.undetermined?.map((u) => u.mates)).toEqual([["bok"]]);
+    } finally {
+      delete G.H.f2;
+      delete G.R.f1;
+    }
   });
 
   it("preference nikdy nepřebije pevnou vazbu: přidržovač s pevnou vzdáleností 24,5 k rámu stojí na 34,5", async () => {

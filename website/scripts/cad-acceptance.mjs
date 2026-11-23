@@ -9,7 +9,8 @@
 // peak RSS (VmHWM of /proc/<pid>/status – the CLI job runs in worker_threads of the same process) measured outside):
 //   synth      scripts/cad-harness/synth-tool.txt + expected.json (generator check first: synth-tool.mjs --check), on every
 //              Node of --node: components, mates ok, Σ volume (V.sum or V.union, decision 15.1), clash classes (real 0),
-//              protocol ≤ 2048 B and every line in the grammar, < 120 s, ≤ 2048 MB, STEP check ok, PDF pages = sheets,
+//              protocol ≤ 2048 B and every line in the grammar, < 120 s, ≤ 2048 MB, STEP check ok + independent STEP check
+//              (scripts/cad-harness/step-check.ts: solids, free shells / faces, exact BRepCheck), PDF pages = sheets,
 //              short link (≤ 200 chars) that reopens in Node with the same components; then the strict run: exit 0, no STOP,
 //              overhead ≤ 25 % (wall, median of --runs), STEP bytes identical to the normal run
 //   ops        every text op headless on the session of the synth run (--resume): stav, sestava vazby, kolize, pohyb stav,
@@ -178,6 +179,15 @@ async function mncad(node, cli, argv) {
 
 const mainDoc = (r) => r?.docs?.find((d) => d.main) ?? [...(r?.docs ?? [])].reverse().find((d) => d.kind === "assembly");
 const problems = (r) => (r?.entries ?? []).filter((e) => e.level === "warn" || e.level === "error");
+/**
+ * ⚠ bom.make-incomplete, který jmenuje PŘESNĚ deklarované vyráběné díly bez výkresu (expected.json docGaps) – každý díl
+ * „(bez výkresu…)“ a žádný jiný; jiné texty / kódy nejsou známá mezera
+ */
+export function isDocGap(e, gaps) {
+  if (!gaps?.length || e.level !== "warn" || e.code !== "bom.make-incomplete") return false;
+  const t = String(e.text ?? "");
+  return gaps.every((n) => t.includes(`${n} (bez výkresu`)) && (t.match(/\(bez výkresu/g) ?? []).length === gaps.length;
+}
 const protoLines = (r) => String(r?.protocol ?? "").split("\n");
 
 /** ⚠/✗ of a run grouped by code and document (triage list) */
@@ -257,6 +267,20 @@ export async function checkRun(cs, run, exp, ctx) {
   if (ctx.formats.includes("step")) {
     const ok = !!step?.path && fs.existsSync(step.path) && fs.readFileSync(step.path).subarray(0, 13).toString() === "ISO-10303-21;";
     check(cs, "STEP written, check by re-reading = ok, F line check=ok", ok && step.check?.ok === true && lines.some((l) => l.startsWith("F step ") && l.includes("check=ok")), { file: step?.name, check: step?.check?.text });
+    // independent check (wave 22, 22c): the app's own check passed a STEP with 0 solids – read the file with a separate OCCT
+    // instance and the plain STEP reader: ≥ 1 solid (an assembly: at least one per component), no free shells / faces,
+    // valid by the exact BRepCheck; the time it takes is recorded next to the run
+    if (ok && ctx.lib.stepCheck) {
+      const t0 = Date.now();
+      try {
+        const c = await ctx.lib.stepCheck(new Uint8Array(fs.readFileSync(step.path)));
+        const minSolids = main?.kind === "assembly" ? Math.max(1, Math.min(main.components ?? 1, exp?.components ?? main.components ?? 1)) : 1;
+        const bad = ctx.lib.stepCheckProblems(c, { minSolids });
+        check(cs, `STEP independent check: ≥ ${minSolids} solid(s), no free shells / faces, valid by exact BRepCheck`, bad.length === 0, { problems: bad, solids: c.solids, shells: c.shells, freeShells: c.freeShells, freeFaces: c.freeFaces, validExact: c.validExact, ms: Date.now() - t0 });
+      } catch (e) {
+        check(cs, "STEP independent check: file read by a separate OCCT instance", false, { error: String(e?.message ?? e) });
+      }
+    }
   }
   if (ctx.formats.includes("pdf")) {
     const pdfs = files.filter((f) => f.format === "pdf");
@@ -282,10 +306,11 @@ async function checkLink(cs, r, main, ctx) {
 }
 
 /** strict mode passes ⇔ the normal run has no ⚠/✗; otherwise STOP on one of the normal run's codes, no --formats files */
-export function checkStrict(cs, normal, strict, expectClean) {
+export function checkStrict(cs, normal, strict, expectClean, except = []) {
   const r = strict.report;
   if (!check(cs, "strict run finished with a JSON report", !!r && !strict.aborted, { exit: strict.exit, aborted: strict.aborted })) return;
-  const dirty = problems(normal.report);
+  // výjimky přísného běhu (`--strict=kromě …`) – ⚠ s těmito kódy běh nezastaví
+  const dirty = problems(normal.report).filter((e) => e.level === "error" || !except.includes(e.code));
   if (expectClean !== undefined) check(cs, expectClean ? "normal run has no ⚠/✗ (a strict run must pass)" : "normal run has ⚠/✗", (dirty.length === 0) === expectClean, { problems: dirty.length });
   if (!dirty.length) check(cs, "strict run passes: exit 0, no STOP", strict.exit === 0 && !r.stopped && r.ok === true, { exit: strict.exit, stopped: r.stopped });
   else {
@@ -300,7 +325,11 @@ export function checkMotion(cs, r, exp) {
   if (!check(cs, "motion study: one summary line `= … motion steps=… travel=…` in the short protocol", !!line, line ?? protoLines(r).filter((l) => l.startsWith("= ")).slice(0, 4))) return;
   const travel = /travel=(\S+)/.exec(line)?.[1] ?? "";
   const groups = travel.split(",").filter(Boolean).map((g) => ({ mm: Number(g.split("mm:")[0]), n: Number(g.split(":")[1]) }));
-  note(cs, "motion", { line, groups });
+  // vlna 22, M3: na konci řádku tuhé skupiny `groups=<n>:<osy±Δ>` (stejné skupiny jako travel=, se směrem) a fáze `phases=a/b`
+  const rigid = (/ groups=(\S+)/.exec(line)?.[1] ?? "").split(",").filter(Boolean).map((g) => ({ n: Number(g.split(":")[0]), axes: g.split(":")[1] }));
+  const phases = / phases=(\d+)\/(\d+)/.exec(line);
+  note(cs, "motion", { line, groups, rigid, ...(phases ? { phases: { reached: Number(phases[1]), total: Number(phases[2]) } } : {}) });
+  if (rigid.length) check(cs, "motion: groups= agrees with travel= (same rigid groups, same counts)", rigid.map((g) => g.n).join(",") === groups.map((g) => g.n).join(","), { rigid, groups });
   for (const t of exp?.travel_mm ?? []) check(cs, `motion: a rigid group travels ${t} mm`, groups.some((g) => near(g.mm, t, 0.05)), groups);
 }
 
@@ -319,7 +348,9 @@ async function synthCase(node, cli, ctx) {
     for (const mode of i % 2 ? ["strict", "normal"] : ["normal", "strict"]) {
       if (mode === "strict" && flag("--no-strict")) continue;
       const out = path.join(ctx.tmp, `${cs.replace(/\W+/g, "-")}-${mode}-${i}`);
-      const run = await mncad(node, cli, ["run", script, ...OUT_ARGS(out, ctx), ...(mode === "strict" ? ["--strict"] : [])]);
+      // přísný běh: výjimky jen pro kódy, které expected.json deklaruje jako známé mezery (dokumentace – vlna 22, bod 19)
+      const strictArg = exp.strictExcept?.length ? `--strict=kromě ${exp.strictExcept.join(",")}` : "--strict";
+      const run = await mncad(node, cli, ["run", script, ...OUT_ARGS(out, ctx), ...(mode === "strict" ? [strictArg] : [])]);
       run.out = out;
       say(`# [${cs}] ${mode} #${i + 1}: exit ${run.exit}, ${(run.wallMs / 1000).toFixed(1)} s, peak ${run.peakMB} MB`);
       (mode === "strict" ? strict : normal).push(run);
@@ -328,11 +359,14 @@ async function synthCase(node, cli, ctx) {
   }
   const n0 = normal[0];
   if (!(await checkRun(cs, n0, exp, ctx))) return null;
-  check(cs, "no ⚠ in the synthetic run (expected.json: a strict run passes)", n0.report.counts.warnings === 0, problems(n0.report).slice(0, 3).map((e) => `L${e.line} ${e.code} ${e.text}`.slice(0, 200)));
+  // známé mezery výrobní dokumentace (expected.json docGaps): ⚠ bom.make-incomplete se PŘESNĚ těmito díly „bez výkresu“
+  const gap = (e) => isDocGap(e, exp.docGaps);
+  check(cs, "no ⚠ in the synthetic run except the declared documentation gaps (expected.json: a strict run passes)", problems(n0.report).filter((e) => !gap(e)).length === 0, problems(n0.report).filter((e) => !gap(e)).slice(0, 3).map((e) => `L${e.line} ${e.code} ${e.text}`.slice(0, 200)));
+  if (exp.docGaps?.length) check(cs, `documentation gaps reported exactly: ⚠ bom.make-incomplete with the ${exp.docGaps.length} manufactured parts without a drawing`, problems(n0.report).some(gap), problems(n0.report).filter((e) => e.code === "bom.make-incomplete").map((e) => e.text.slice(0, 200)));
   checkMotion(cs, n0.report, { travel_mm: [exp.motion.stroke_mm, exp.motion.stripperTravel_mm] });
   triage(cs, n0.report);
   if (strict.length) {
-    checkStrict(cs, n0, strict[0], true);
+    checkStrict(cs, n0, strict[0], true, exp.strictExcept ?? []);
     const nMs = median(normal.map((x) => x.wallMs));
     const sMs = median(strict.map((x) => x.wallMs));
     const over = sMs / nMs - 1;

@@ -1,0 +1,31 @@
+# vlna 22, bod 10: motor při definici – co pohání (přidržovač + šroub zámkem, směr −Z), druhý motor na tomtéž stupni volnosti = ⚠
+# motion.motor-conflict hned při zadání (dřív ✓ motor 2 a konflikt až ve výpočtu), nahrazení motoru na téže vazbě s ℹ motion.motor-replaced,
+# navázání úseku (navázat) a souhrn po tuhých skupinách.
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl Přidržovač
+kvádr 60 60 8
+díra 20 skrz v 30 30
+nový díl Vodítko
+válec 20 120
+nový díl Šroub M12
+válec 12 20
+nová sestava S1
+vložit "Deska A" ukotvit
+vložit "Vodítko" v 50 50 -20
+sestava vazba souosost "Vodítko" válcová "Deska A" Ø20,2
+sestava vazba ukotvit "Vodítko"
+vložit "Přidržovač" v 20 20 67,5
+vložit "Šroub M12" v 70 70 75,5
+sestava vazba zámek "Šroub M12" "Přidržovač"
+sestava vazba souosost "Přidržovač" Ø20 "Vodítko" válcová název "VEDENÍ"
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 57,5 název "ZDVIH"
+# a) motor zadaný komponentou: kterou vazbu vybere? (Vzdálenost má přednost před Souosostí) – protokol ji jmenuje
+pohyb motor lineární "Přidržovač" 57,5..27,15 kroky 4
+pohyb motor lineární vazba "VEDENÍ" 0..-10 kroky 4
+#--- run
+pohyb motor smazat 2
+pohyb motor lineární vazba "ZDVIH" 57,5..37,15 kroky 4
+pohyb motor lineární vazba "ZDVIH" navázat pak 57,5 čas 1
+pohyb stav

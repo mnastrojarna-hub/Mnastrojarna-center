@@ -1,0 +1,70 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 12000 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 10 mm (X 0…40, Y 0…30, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 40 × 30 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Nástroj“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3 – výsledek po vyhodnocení listu níže
+→ list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ export STEP: Nastroj.step · 32 kB · STEP AP214 – staženo (bez dialogu)
+  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 12
+  ✓ kontrola STEP: soubor znovu načten jádrem – těles: 2, objem 132 000 mm³ (rozdíl 0,0000 %), obálka 100,00 × 60,00 × 30,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 132 cm³ · hmotnost Σ 1,036 kg
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
+Revize modelu: r·?
+Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) – odpovídá modelu
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
+=== run 3 ===
+✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
+→ Kvádr 1: size [100; 60; 20] → [100; 60; 25] – výsledek po výpočtu níže
+⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – změna (geometrie) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Deska A"
+✓ záložka „Nástroj“ (sestava) je aktivní – další příkazy pracují s ní
+Zastaralé výstupy (1) · model je teď r·?:
+  1. ⚠ Deska A – komponenta „Deska A“ je starší než díl „Deska A“ v záložce (geometrie) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1 → sestava obnovit #1 (přepočítat vše)
+✓ komponenta „Deska A“ obnovena z dílu (geometrie)
+✓ komponenta „Přidržovač“ už odpovídá dílu v záložce
+kolize: 1 – šroub v závitu 0, skutečné 1
+⚠ řádek 6: kolize „Deska A“ × „Přidržovač“ (6 000,0 mm³) – místo [30; 25; 22,5] · obálka 40 × 30 × 5 mm
+Přepočítat vše – dokument „Nástroj“, revize modelu r·?:
+Přepočteno (3):
+  ✓ kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)
+  ✓ kontrola kolizí znovu (kolize)
+  ✓ list „List 1“ přepočten z modelu r·?
+Zbývá udělat ručně (2) – program to sám neudělá:
+  ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? → výkres vydat B
+  ⚠ STEP „Nastroj.step“ – exportováno z modelu r·? (?.?.????), model je teď r·? → export step
+⚠ řádek 6: vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
+Výstupy dokumentu „Nástroj“ · revize modelu r·?
+Listy (1):
+  List 1: ⚠ Vydání: rev. A z modelu r·? (?.?.????) – model je teď r·?: list je ZASTARALÝ – vydejte novou revizi: výkres vydat B
+Exporty (1, zastaralých 1) · model je teď r·?:
+  1. ⚠ STEP „Nastroj.step“ · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·?, exportujte znovu: export step
+Zastaralé výstupy (2) · model je teď r·?:
+  1. ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? → výkres vydat B
+  2. ⚠ STEP „Nastroj.step“ – exportováno z modelu r·? (?.?.????), model je teď r·? → export step
+ℹ Kvádr 1 (box) · přidáno 150000 mm³ · těleso platné
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 162 cm³ · hmotnost Σ 1,272 kg
+Kolize: 1 – skutečné 1: Deska A × Přidržovač (6 000,0 mm³) v místě [30; 25; 22,5] (zkontrolováno ?)
+Revize modelu: r·?
+⚠ Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
+⚠ Exporty: 1 z 1 ze starší revize modelu – STEP „Nastroj.step“ r·? (výpis: exporty)

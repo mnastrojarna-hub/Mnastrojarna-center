@@ -24,7 +24,9 @@ import { openShareLink, parseShareHash, resetShareProbe, setUploadTimeoutBase } 
 import { emptyDoc, type AsmComponent, type CadDoc } from "../types";
 import { shareWithPolicy, type ShareNote } from "./share-out";
 
-const PHP_OK = spawnSync("php", ["-v"], { stdio: "ignore" }).status === 0;
+/** PHP: místní `php`, nebo MN_SHARE_PHP (např. scripts/php-docker.sh – PHP 5.6 z Dockeru jako na hostingu) */
+const PHP = process.env.MN_SHARE_PHP || "php";
+const PHP_OK = spawnSync(PHP, ["-v"], { stdio: "ignore" }).status === 0;
 const SCRIPT = path.resolve(__dirname, "../../../public/cad/share/index.php");
 const VERSION = "0.0.0-contract";
 const T = 60_000;
@@ -146,7 +148,7 @@ describe.skipIf(!PHP_OK)("smluvní test: php -S s public/cad/share/index.php", (
     // index.php je jen zavaděč – logika úložiště je ve store.php vedle (oprava úložiště sdílení na hlavní větvi)
     fs.copyFileSync(path.join(path.dirname(SCRIPT), "store.php"), path.join(docroot, "cad", "share", "store.php"));
     const port = await freePort();
-    const proc = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", docroot], { stdio: "ignore" });
+    const proc = spawn(PHP, ["-S", `127.0.0.1:${port}`, "-t", docroot], { stdio: "ignore" });
     procs.push(proc);
     const base = `http://127.0.0.1:${port}/cad/share/`;
     for (let i = 0; i < 200; i++) {

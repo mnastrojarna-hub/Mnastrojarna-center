@@ -5,7 +5,6 @@
 {0} ztracená reference	{0} lost reference
 {0}: plocha {1} dílu „{2}“ – {3}	{0}: face {1} of part “{2}” – {3}
 → „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}{5} – stav vazeb níže	→ “{0}” returned to assembly “{1}” (components that took the change: {2}){3}{4}{5} – mate status below
-⚠ vazba {0} ({1}): {2}{3}	⚠ mate {0} ({1}): {2}{3}
 Díl se mezitím změnil – klikněte znovu na Zpět do sestavy.	The part has changed in the meantime – click Back to assembly again.
 Díl vrácen do sestavy – POZOR: ztracené reference vazeb: {0}. Vazby jsou mimo řešení a komponenty se kvůli nim nehýbou – opravte je v seznamu vazeb (Vybrat plochu znovu / Smazat vazbu).	Part returned to the assembly – WARNING: lost mate references: {0}. These mates are out of the solve and components do not move because of them – fix them in the mate list (Pick face again / Delete mate).
 Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.	Click a face of component “{0}” (or pick it from the face list) – it replaces the lost face of the mate.

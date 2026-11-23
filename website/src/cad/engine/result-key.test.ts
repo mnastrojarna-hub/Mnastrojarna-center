@@ -33,6 +33,35 @@ describe("otisky a revize modelu", () => {
     expect(geometrySig(a)).toBe(sourceKey({ kind: "part", doc: a }));
   });
 
+  it("revize nezávisí na náhodných id (fáze 2: stejný skript = stejná revize v prohlížeči i v CLI), odkazy na id ano", () => {
+    // tentýž díl, jen jiná náhodná id prvků (každý běh skriptu, prohlížeč × CLI) – odkaz zaoblení na kvádr zůstává
+    const withIds = (box: string, fil: string, target = box): CadDoc => ({
+      ...emptyDoc("Deska A"),
+      features: [
+        { id: box, type: "box", name: "Kvádr 1", size: [10, 20, 5] },
+        { id: "k9x2m1q", type: "box", name: "Kvádr 2", size: [4, 4, 4] },
+        { id: fil, type: "fillet", name: "Zaoblení 1", radius: 1, edges: [`${target}:e3`] },
+      ] as unknown as CadDoc["features"],
+    });
+    const a = withIds("a1b2c3d", "z9y8x7w");
+    const b = withIds("q0w9e8r", "t5y6u7i");
+    expect(geometrySig(a)).not.toBe(geometrySig(b)); // shodu výsledků dál určuje otisk s id (přísnější)
+    expect(modelRev(b)).toBe(modelRev(a));
+    expect(resultId("measure", "k", b).rev).toBe(resultId("measure", "k", a).rev);
+    // odkaz na jiný prvek (Kvádr 2 místo Kvádr 1) = jiná revize, i když se id přejmenovala
+    expect(modelRev(withIds("a1b2c3d", "z9y8x7w", "k9x2m1q"))).not.toBe(modelRev(a));
+    // jiný rozměr = jiná revize
+    expect(modelRev({ ...a, features: a.features.map((f, i) => (i === 0 ? ({ ...f, size: [10, 20, 6] } as typeof f) : f)) })).not.toBe(modelRev(a));
+    // sestava: jiná náhodná id komponent i prvků dílů, stejné díly a polohy = stejná revize; jiná poloha = jiná
+    const s1 = asm("Sestava A", [{ ...comp("c1aaaaa", "Deska A", 0), source: { kind: "part", doc: a } } as AsmComponent, comp("c2bbbbb", "Přidržovač", 30)]);
+    const s2 = asm("Sestava A", [{ ...comp("d7zzzzz", "Deska A", 0), source: { kind: "part", doc: b } } as AsmComponent, comp("e8yyyyy", "Přidržovač", 30)]);
+    expect(clashSig(s1)).not.toBe(clashSig(s2));
+    expect(modelRev(s2)).toBe(modelRev(s1));
+    expect(modelRev(asm("Sestava A", [{ ...comp("d7zzzzz", "Deska A", 0), source: { kind: "part", doc: b } } as AsmComponent, comp("e8yyyyy", "Přidržovač", 31)]))).not.toBe(modelRev(s1));
+    // pořadí komponent je součást modelu (pozice v kusovníku) – prohozené komponenty = jiná revize
+    expect(modelRev(asm("Sestava A", [comp("c2bbbbb", "Přidržovač", 30), { ...comp("c1aaaaa", "Deska A", 0), source: { kind: "part", doc: a } } as AsmComponent]))).not.toBe(modelRev(s1));
+  });
+
   it("otisk sestavy = clashSig: poloha, skrytí i revize dílu ho mění (poloha mechanismu je součást identity)", () => {
     const s = asm("Sestava A", [comp("a", "Deska A", 0), comp("b", "Přidržovač", 30)]);
     expect(geometrySig(s)).toBe(clashSig(s));

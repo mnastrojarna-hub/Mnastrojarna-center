@@ -4,7 +4,7 @@
  * na listu je; přehled klíčů a úprav pro protokol a `výkres stav`.
  */
 import { GEN_KEY, type GenCmd } from "./agent-drawing-gen";
-import { genEditCount, hideGenerated, moveGenerated, GEN_PREFIX } from "./drawing-boxsel";
+import { genEditCount, hideGenerated, lockGenerated, moveGenerated, GEN_PREFIX } from "./drawing-boxsel";
 import type { DrawingOptions, DrawingResult, GenEdit } from "./drawing";
 import { tr } from "./i18n";
 import type { DrawingDoc } from "./types";
@@ -22,7 +22,8 @@ export function genKeyText(k: string): string {
 export function genEditText(g: GenEdit | undefined): string {
   const off = g?.off ?? [];
   const mv = Object.entries(g?.move ?? {});
-  return [off.length ? tr("skryté {0}", off.join(", ")) : "", mv.length ? tr("posunuté {0}", mv.map(([k, d]) => `${k} [${fmtN(d[0])}; ${fmtN(-d[1])}]`).join(", ")) : ""].filter(Boolean).join(" · ");
+  const lk = Object.keys(g?.lock ?? {});
+  return [off.length ? tr("skryté {0}", off.join(", ")) : "", mv.length ? tr("posunuté {0}", mv.map(([k, d]) => `${k} [${fmtN(d[0])}; ${fmtN(-d[1])}]`).join(", ")) : "", lk.length ? tr("zamčené {0}", lk.join(", ")) : ""].filter(Boolean).join(" · ");
 }
 
 /** Provede `výkres vygenerované …` nad aktivním listem. */
@@ -65,6 +66,19 @@ export async function applyGenCmd(ctx: Ctx, cmd: GenCmd): Promise<{ log: string[
       const d = next?.move?.[k] ?? [0, 0];
       return { log: [tr("✓ vygenerované {0} posunuto: celkem [{1}; {2}] mm listu{3}", k, fmtN(d[0]), fmtN(-d[1]), k.startsWith("dim:") ? tr(" (kóta jen kolmo k sobě)") : "")], changed: true, open: true };
     }
+    case "lock":
+    case "unlock": {
+      cmd.keys.forEach(known);
+      // zámek = absolutní střed balónku z právě spočítaného listu (vlna 22, bod 17)
+      const at = (k: string) => {
+        if (cmd.act === "unlock") return null;
+        if (cmd.at) return cmd.at;
+        const b = res.balloons?.find((x) => (x.id ?? `pos:${x.pos}`) === k);
+        return b ? ([b.x, b.y] as [number, number]) : null;
+      };
+      setGen(lockGenerated(gen, cmd.keys, at));
+      return { log: [cmd.act === "lock" ? tr("✓ vygenerované zamčené na místě: {0}", cmd.keys.join(", ")) : tr("✓ vygenerované odemčené: {0}", cmd.keys.join(", "))], changed: true, open: true };
+    }
     case "restore": {
       if (!cmd.keys.length) {
         const n = genEditCount(gen);
@@ -72,11 +86,15 @@ export async function applyGenCmd(ctx: Ctx, cmd: GenCmd): Promise<{ log: string[
         return { log: [tr("✓ vygenerované objekty na výchozím místě ({0} obnoveno)", n)], changed: n > 0, open: true };
       }
       // klíč musí být na listu nebo mezi úpravami (i zastaralý – skrytý / posunutý objekt, který už na listu není, jde takto uklidit)
-      const edited = new Set([...(gen?.off ?? []), ...Object.keys(gen?.move ?? {})]);
+      const edited = new Set([...(gen?.off ?? []), ...Object.keys(gen?.move ?? {}), ...Object.keys(gen?.lock ?? {})]);
       for (const k of cmd.keys) if (!edited.has(k)) known(k);
       const move = { ...(gen?.move ?? {}) };
-      for (const k of cmd.keys) delete move[k];
-      setGen({ ...(gen?.off ? { off: gen.off.filter((k) => !cmd.keys.includes(k)) } : {}), ...(Object.keys(move).length ? { move } : {}) });
+      const lock = { ...(gen?.lock ?? {}) };
+      for (const k of cmd.keys) {
+        delete move[k];
+        delete lock[k];
+      }
+      setGen({ ...(gen?.off ? { off: gen.off.filter((k) => !cmd.keys.includes(k)) } : {}), ...(Object.keys(move).length ? { move } : {}), ...(Object.keys(lock).length ? { lock } : {}) });
       return { log: [tr("✓ vygenerované obnoveno: {0}", cmd.keys.join(", "))], changed: true, open: true };
     }
   }

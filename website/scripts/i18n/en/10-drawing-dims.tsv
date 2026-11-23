@@ -42,8 +42,6 @@ Chytré kóty jsou pro díly – u sestavy použijte „kótovat celkově“ a p
 Chytré kóty přegenerovány: {0}{1}	Smart dimensions regenerated: {0}{1}
 jádro nevrátilo Chytré kóty	the kernel returned no Smart dimensions
 jen celkové (zapečené)	overall only (baked in)
-Kontrola kót: chybí {0} z {1}: {2}	Dimension check: {0} of {1} missing: {2}
-Kontrola kót: všech {0} očekávaných rozměrů je na listu	Dimension check: all {0} expected sizes are on the sheet
 Kóty a popisy ({0}, z toho vygenerovaných {1}):	Dimensions and callouts ({0}, generated {1}):
 kuželové plochy ({0}): úhel a průměry kuželů kótujte ručně	conical faces ({0}): dimension cone angles and diameters manually
 měřítko {0}	scale {0}

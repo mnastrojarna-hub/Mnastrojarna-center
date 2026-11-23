@@ -13,6 +13,21 @@
 //  7) `stav` / `kolize seznam`: třídy a instance stejně jako v panelu (text = GUI)
 //  8) EN a DE: titulek a přepínače tříd přeložené
 //  9) totéž (1–2) v náhledu bez WebGL (majitel testoval bez WebGL)
+// Etapa C2 – bod 6 (vůle a spojitá kontrola v pohybu), s WebGL i bez něj:
+// 10) střižník Ø10 ve vedení Ø10,02 (korpus 74c): panel Kolize bez průniku = „Bez průniku · vůle nekontrolována“ (žádné ✓,
+//     data-clash-clearance=unchecked); `pohyb vůle … min 0,05` → sekce Vůle s dvojicí a limitem, výsledek 0,01 mm pod limitem
+//     (data-clearance-min / -below), graf vůle, „Na minimum“ → úsečka vůle ve 3D / v náhledu (data-gap-label „min 0,01 mm“,
+//     pod limitem červená; bez WebGL červené pixely v překryvné vrstvě)
+// 11) nůž přes kolík (korpus 74b): spojitě = tlačítko „Kolize mezi kroky 17 a 18“, window.mncad.motion(): between, sweep.mode
+//     continuous, collisions.between=1; odškrtnout „Kolize i mezi kroky“ + Vypočítat → data-motion-sweep=discrete a text
+//     „mezi polohami nekontrolováno“, žádný kontakt mezi kroky; přidání dvojice v GUI zapíše doc.motion.clearance
+// Etapa C3 – bod 4 (procesní vrstva: střih a otisk během pohybu), s WebGL i bez něj:
+// 12) razník Ø20 × plech 1 mm (korpus 74d): `pohyb proces střih` → panel pohybu oddíl Procesní vrstva s operací, věta „geometrická
+//     aproximace … ne simulace materiálu“; krok 0 = data-process-state=full (plný plech, žádná náhrada sítě), krok 19 = engaged
+//     (157 mm³), krok 21 = pierced, data-process-scrapped=1, data-process-removed≈314,159; 3D okno / softwarový náhled ukazuje plech
+//     po střihu a odpad (main[data-process-view] ≥ 2, síť „proc:…“); úroveň „kinematika + geometrická aproximace“; window.mncad
+//     .motion().process (stav po krocích, removed); pracovní záběr bez štítku „· kolize“; přidání operace otisk v GUI zapíše
+//     doc.motion.process; export PNG snímků obsahuje plech po operaci (snímek kroku 21 se liší od kroku 0)
 // Spuštění: E2E_BASE=http://localhost:3535 node e2e/cad-w22-c.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -104,6 +119,153 @@ async function classesFlow(p, tag) {
   ok(/^Kolize: 5 – skutečné 2: Přidržovač × Šroub M12 \[S2\] \(365,2 mm³\) v místě \[50; 30; 28,5\]/m.test(st) && /šroub v závitu 3/.test(st), `[${tag}] stav: třídy a instance jako panel\n   ${(/^Kolize: .*$/m.exec(st) || [''])[0]}`);
 }
 
+/** 10–11 (C2, bod 6): vůle v pohybu, úsečka minima, spojitě × diskrétně – s WebGL i bez něj */
+async function clearanceFlow(p, tag, soft) {
+  const { run, idle, panel, waitState, kolizeBtn } = helpers(p);
+  const mp = p.locator('[data-motion-panel]');
+  const openMotion = async () => {
+    if (await mp.count()) return;
+    await p.locator('button', { hasText: /^Pohybová studie$/ }).first().click().catch(() => {});
+    await mp.waitFor({ timeout: 30000 }).catch(() => {});
+  };
+  const motionDone = () => p.waitForFunction(() => document.querySelector('[data-motion-panel]')?.getAttribute('data-motion-state') === 'ok', null, { timeout: 180000 }).then(() => true, () => false);
+  // ── 10. vedení 0,01 mm ──
+  const setup = corpus('74c-clearance-guide').split('\n').filter((l) => !/^(#|kolize|pohyb|stav)/.test(l)).join('\n');
+  ok(!/^✗/m.test(await run(setup)), `[${tag}] 74c: sestava 6b založena`);
+  await idle();
+  await kolizeBtn();
+  ok(await waitState('ok'), `[${tag}] kolize bez průniku → stav ok`);
+  const a = await panel();
+  ok(a && /Bez průniku · vůle nekontrolována/.test(a.text) && !/✓|Bez kolizí/.test(a.text), `[${tag}] panel Kolize: „Bez průniku · vůle nekontrolována“, žádné ✓\n   ${a && a.text.split('\n')[0]}`);
+  ok((await p.locator('[data-clash-clearance="unchecked"]').count()) === 1, `[${tag}] panel Kolize výslovně: vůle se tu nekontroluje`);
+  await run('pohyb motor lineární vazba 1 0..20 kroky 10 kolize\npohyb vůle "Střižník" "Vodítko" min 0,05');
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] studie s vůlí spočítána (data-motion-state=ok)`);
+  const pairs = await p.locator('[data-clearance-pair]').allTextContents();
+  ok(pairs.length === 1 && /Střižník/.test(pairs[0]) && /Vodítko/.test(pairs[0]), `[${tag}] sekce Vůle: sledovaná dvojice ${JSON.stringify(pairs)}`);
+  const min = await p.locator('[data-clearance-min]').getAttribute('data-clearance-min').catch(() => null);
+  const below = await p.locator('[data-clearance-min]').getAttribute('data-clearance-below').catch(() => null);
+  ok(min === '0,01' && below === '1', `[${tag}] nejmenší vůle 0,01 mm pod limitem (min=${min}, below=${below})`);
+  ok((await p.locator('[data-clearance-chart]').count()) === 1 && (await p.locator('[data-clearance-limit-line]').count()) === 1, `[${tag}] graf vůle po krocích s čarou limitu`);
+  ok((await p.locator('[data-motion-sweep="continuous"]').count()) === 1, `[${tag}] štítek kontroly: spojitě i mezi polohami`);
+  await p.locator('[data-clearance-jump]').click();
+  await p.waitForTimeout(800);
+  const gl = p.locator('[data-gap-label]').first();
+  ok(await gl.isVisible().catch(() => false), `[${tag}] úsečka vůle: popisek ve ${soft ? 'softwarovém náhledu' : '3D okně'}`);
+  ok(/min 0,01 mm/.test((await gl.textContent().catch(() => '')) || '') && (await gl.getAttribute('data-gap-below')) === '1', `[${tag}] popisek „min 0,01 mm“, pod limitem`);
+  if (soft) {
+    const red = await p.evaluate(() => {
+      const c = document.querySelector('[data-soft-overlay]');
+      const g = c && c.getContext('2d');
+      if (!g) return 0;
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && d[i] > 190 && d[i + 1] < 110 && d[i + 2] < 110) n++;
+      return n;
+    });
+    ok(red > 0, `[${tag}] úsečka vůle nakreslená v překryvné vrstvě náhledu bez WebGL (${red} px)`);
+  }
+  await p.screenshot({ path: `${S}w22c-${tag}-10-clearance.png` });
+  const api = await p.evaluate(() => window.mncad.motion());
+  ok(api.clearance && api.clearance.limit === 0.05 && Math.abs(api.clearance.min.d - 0.01) < 1e-6 && api.clearance.pairs[0].below.length === 11, `[${tag}] window.mncad.motion().clearance: limit, minimum, kroky pod limitem`);
+  // ── 11. nůž přes kolík: spojitě × diskrétně ──
+  const knife = corpus('74b-clearance-knife-pin').split('\n').filter((l) => !/^(#|pohyb)/.test(l)).join('\n');
+  ok(!/^✗/m.test(await run(knife + '\npohyb motor lineární vazba "POSUV" 12..192 kroky 36 kolize')), `[${tag}] 74b: sestava 6 a studie 36 kroků`);
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] studie nože spočítána`);
+  ok((await p.locator('[data-clearance-between="17-18"]').count()) === 1, `[${tag}] „Kolize mezi kroky 17 a 18“ v panelu (dřív „Kolize: žádné ve všech krocích“)`);
+  const m1 = await p.evaluate(() => window.mncad.motion());
+  ok(m1.sweep && m1.sweep.mode === 'continuous' && m1.between && m1.between[0].k0 === 17 && m1.collisions && m1.collisions.between === 1 && m1.collision && m1.collision.between, `[${tag}] API: sweep.mode=continuous, between[0].k0=17, collisions.between=1, collision mezi kroky`);
+  await p.locator('[data-motion-continuous]').uncheck();
+  await p.waitForTimeout(400);
+  await p.locator('[data-motion-run]').click();
+  ok(await motionDone(), `[${tag}] diskrétně přepočítáno`);
+  const sweepTxt = (await p.locator('[data-motion-sweep]').textContent().catch(() => '')) || '';
+  ok((await p.locator('[data-motion-sweep="discrete"]').count()) === 1 && /mezi polohami nekontrolováno/.test(sweepTxt) && (await p.locator('[data-clearance-between]').count()) === 0, `[${tag}] diskrétně: výslovně „mezi polohami nekontrolováno“, žádný kontakt mezi kroky\n   ${sweepTxt}`);
+  // přidání dvojice v GUI
+  await p.locator('[data-clearance-mode="pairs"]').click();
+  await p.locator('[data-clearance-comp="a"]').selectOption({ label: 'Nůž' });
+  await p.locator('[data-clearance-comp="b"]').selectOption({ label: 'Kolík' });
+  await p.locator('[data-clearance-add]').click().catch(() => {});
+  await p.waitForTimeout(600);
+  const st = await p.evaluate(() => JSON.stringify(window.mncad.doc ? window.mncad.doc().motion?.clearance ?? null : null));
+  const pairs2 = await p.locator('[data-clearance-pair]').allTextContents();
+  ok(pairs2.some((x) => /Nůž/.test(x) && /Kolík/.test(x)), `[${tag}] dvojice přidaná v GUI je ve studii (${pairs2.join(' | ')} ${st})`);
+}
+
+/** 12 (C3, bod 4): procesní vrstva – střih plechu během pohybu, stav výrobku, plech po střihu ve 3D / náhledu */
+async function processFlow(p, tag, soft) {
+  const { run, idle } = helpers(p);
+  const mp = p.locator('[data-motion-panel]');
+  const openMotion = async () => {
+    if (await mp.count()) return;
+    await p.locator('button', { hasText: /^Pohybová studie$/ }).first().click().catch(() => {});
+    await mp.waitFor({ timeout: 30000 }).catch(() => {});
+  };
+  const motionDone = () => p.waitForFunction(() => document.querySelector('[data-motion-panel]')?.getAttribute('data-motion-state') === 'ok', null, { timeout: 240000 }).then(() => true, () => false);
+  const setup = corpus('74d-process-cut').split('\n').filter((l) => !/^(#|pohyb (krok|proces|stav)|stav)/.test(l)).join('\n');
+  ok(!/^✗/m.test(await run(setup)), `[${tag}] 74d: lis s razníkem a plechem, studie 48 kroků`);
+  const log = await run('pohyb proces střih "Razník" "Plech"');
+  ok(!/^✗/m.test(log) && /geometrická aproximace/.test(log) && /odebráno 314,1\d* mm³/.test(log), `[${tag}] pohyb proces střih: protokol s úrovní a odebraným objemem`);
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] studie s procesní vrstvou spočítána`);
+  ok((await p.locator('[data-process-op]').count()) === 1, `[${tag}] panel: oddíl Procesní vrstva s 1 operací`);
+  const note = (await p.locator('[data-process-level-note]').textContent().catch(() => '')) || '';
+  ok(/geometrická aproximace/.test(note) && /není to simulace materiálu/.test(note), `[${tag}] panel: věta o úrovni (geometrická aproximace, ne simulace materiálu)`);
+  const lvl = await p.locator('[data-motion-level]').textContent().catch(() => '');
+  ok(/kinematika \+ geometrická aproximace/.test(lvl || ''), `[${tag}] štítek úrovně „kinematika + geometrická aproximace“\n   ${lvl}`);
+  const state = () => p.evaluate(() => {
+    const el = document.querySelector('[data-process-state]');
+    const main = document.querySelector('main[data-process-view]') || document.querySelector('[data-process-view]');
+    return el ? { state: el.getAttribute('data-process-state'), removed: Number(el.getAttribute('data-process-removed')), scrap: Number(el.getAttribute('data-process-scrapped')), view: main ? Number(main.getAttribute('data-process-view')) : 0 } : null;
+  });
+  const step = async (n) => {
+    await run(`pohyb krok ${n}`);
+    await p.waitForTimeout(1200);
+  };
+  await step(0);
+  const s0 = await state();
+  ok(s0 && s0.state === 'full' && s0.removed === 0 && s0.view === 0, `[${tag}] krok 0: plný plech, žádná náhrada sítě (${JSON.stringify(s0)})`);
+  await p.screenshot({ path: `${S}w22c-${tag}-12-step0.png` });
+  await step(19);
+  const s19 = await state();
+  ok(s19 && s19.state === 'engaged' && Math.abs(s19.removed - 157.08) < 2 && s19.view >= 1, `[${tag}] krok 19: v záběru, odebráno ≈157 mm³, síť plechu nahrazena (${JSON.stringify(s19)})`);
+  await step(21);
+  const s21 = await state();
+  ok(s21 && s21.state === 'pierced' && Math.abs(s21.removed - 314.159) < 3.2 && s21.scrap === 1 && s21.view >= 2, `[${tag}] krok 21: děrovaný, 314,16 mm³ ± 1 %, odpad 1 – plech i odpad ve ${soft ? 'softwarovém náhledu' : '3D okně'} (${JSON.stringify(s21)})`);
+  ok((await p.locator('[data-motion-step-flag], [data-motion-panel] .text-brand', { hasText: /kolize/ }).count()) === 0, `[${tag}] pracovní záběr: krok bez štítku „· kolize“`);
+  await p.screenshot({ path: `${S}w22c-${tag}-12-step21.png` });
+  const api = await p.evaluate(() => window.mncad.motion());
+  ok(api.process && api.process.level === 'geometric-approximation' && Math.abs(api.process.ops[0].removed - 314.159) < 3.2 && api.process.ops[0].through && api.process.steps[0].states[0].state === 'full' && api.process.steps[21].states[0].state === 'pierced', `[${tag}] window.mncad.motion().process: úroveň, removed, prostřižení, stav po krocích`);
+  ok(!api.collision && api.collisions && api.collisions.real === 0 && api.collisions.work === 1, `[${tag}] API: žádná skutečná kolize, pracovní kontakt 1 (${JSON.stringify(api.collisions)})`);
+  // dokument se nemění: plech v dokumentu má dál plný objem (restart = plný)
+  await step(0);
+  ok((await state())?.state === 'full', `[${tag}] návrat na krok 0 = plný plech`);
+  // GUI: přidat otisk
+  await p.locator('[data-process-new-kind="imprint"]').click();
+  await p.locator('[data-process-tool]').selectOption({ label: 'Razník' });
+  await p.locator('[data-process-target]').selectOption({ label: 'Plech' });
+  await p.locator('[data-process-depth] input').first().fill('0,3');
+  await p.locator('[data-process-depth] input').first().press('Enter').catch(() => {});
+  await p.locator('[data-process-add]').click();
+  await p.waitForTimeout(800);
+  const ops = await p.evaluate(() => (window.mncad.getDocument().motion?.process || []).map((o) => [o.kind, o.depth]));
+  ok(ops.length === 2 && ops[1][0] === 'imprint' && Math.abs(ops[1][1] - 0.3) < 1e-9, `[${tag}] otisk přidaný v GUI je ve studii (${JSON.stringify(ops)})`);
+  await p.locator('[data-process-remove="2"]').click();
+  await p.waitForTimeout(400);
+  // export PNG po krocích: snímek kroku 21 se liší od kroku 0 (plech po střihu je v exportu)
+  if (!soft) {
+    const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);
+    await p.locator('[data-motion-export="png"]').click().catch(() => {});
+    const d = await dl;
+    ok(!!d, `[${tag}] export snímků PNG proběhl (${d ? d.suggestedFilename() : 'bez stažení'})`);
+    if (d) await d.saveAs(`${S}w22c-${tag}-12-frames.zip`).catch(() => {});
+  }
+}
+
 (async () => {
   const browsers = [];
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -156,8 +318,11 @@ async function classesFlow(p, tag) {
   await p.waitForFunction(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-work') === '1', null, { timeout: 30000 }).catch(() => {});
   const w1 = await panel();
   ok(w1 && w1.work === '1' && w1.real === '0' && w1.hl.length === 0, `5: pracovní kontakt v okně hodnoty vazby 26–24 → ℹ, nic nesvítí (${w1 && [w1.work, w1.real, w1.hl.length].join('/')})`);
-  ok(w1 && /pracovní kontakt/.test(w1.text) && /ZDVIH/.test(w1.text), '5: pravidlo vypsané v panelu (ZDVIH)');
+  // seznam pravidel je ve sbaleném oddílu „Pravidla kolizí (N)“ – souhrn ukáže počet, po rozbalení text pravidla
+  ok(w1 && /Pravidla kolizí \(1\)/.test(w1.text), '5: souhrn „Pravidla kolizí (1)“ v panelu');
   await p.locator('[data-clash-rules] summary').click().catch(() => {});
+  const ruleTxt = (await p.locator('[data-clash-rule]').first().innerText().catch(() => '')) || '';
+  ok(/pracovní kontakt/.test(ruleTxt) && /ZDVIH/.test(ruleTxt), `5: pravidlo vypsané v panelu (ZDVIH) – ${ruleTxt}`);
   await p.locator('[data-clash-rule-del]').first().click();
   await p.waitForFunction(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-real') === '1', null, { timeout: 30000 }).catch(() => {});
   const w2 = await panel();
@@ -177,11 +342,27 @@ async function classesFlow(p, tag) {
   await run(corpus('73-clash-motion-sub').split('#--- run')[0] + '\n' + corpus('73-clash-motion-sub').split('#--- run')[2]);
   await idle();
   const api2 = await p.evaluate(() => window.mncad.motion());
-  ok(api2 && api2.collision && api2.collision.step === 9 && api2.collision.b === 'Šroub M12 [S2]' && api2.collision.cls === 'real' && Array.isArray(api2.collision.at), `6: collision = první skutečná (krok 9, S2, místo) ${api2 && JSON.stringify(api2.collision)}`);
+  // dvojice je neuspořádaná (pořadí a/b dává pořadí listů v jádře) – musí to být doraz × šroub S2
+  ok(api2 && api2.collision && api2.collision.step === 9 && [api2.collision.a, api2.collision.b].sort().join(' × ') === 'Doraz × Šroub M12 [S2]' && api2.collision.cls === 'real' && api2.collision.volume > 0 && Array.isArray(api2.collision.at), `6: collision = první skutečná (krok 9, S2, místo) ${api2 && JSON.stringify(api2.collision)}`);
   ok(api2 && api2.collisions.steps === 7 && api2.collisions.of === 16, `6: kroků s kolizí 7 z 16 (${api2 && JSON.stringify(api2.collisions)})`);
   await p.screenshot({ path: `${S}w22c-6-motion.png` });
   ok(errs.length === 0, 'žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
   await ctx.close();
+
+  // ── 10–11. vůle a spojitá kontrola (C2, bod 6) s WebGL ──
+  {
+    const cx = await b.newContext({ viewport: { width: 1430, height: 900 } });
+    const pc = await cx.newPage();
+    const errs = [];
+    pc.on('pageerror', (e) => errs.push(e.message));
+    pc.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await start(pc, BASE + '/cad');
+    await clearanceFlow(pc, 'webgl', false);
+    ok(errs.length === 0, 'C2: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
+    await processFlow(pc, 'webgl', false); // C3: procesní vrstva (bod 4)
+    ok(errs.length === 0, 'C3: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
+    await cx.close();
+  }
 
   // ── 8. EN / DE ──
   for (const [lang, title, cls] of [['en', /Interferences \(5\) · real 2 · screw in thread 3/, /screw in thread 3/], ['de', /Kollision\w* \(5\) · echte 2 · Schraube im Gewinde 3/, /Schraube im Gewinde 3/]]) {
@@ -210,6 +391,8 @@ async function classesFlow(p, tag) {
   const noGl = await p2.evaluate(() => { try { const c = document.createElement('canvas'); return !(c.getContext('webgl2') || c.getContext('webgl')); } catch { return true; } });
   ok(noGl, 'druhý průchod běží bez WebGL (softwarový náhled)');
   await classesFlow(p2, 'nowebgl');
+  await clearanceFlow(p2, 'nowebgl', true); // C2: úsečka vůle v softwarovém náhledu (majitel testoval bez WebGL)
+  await processFlow(p2, 'nowebgl', true); // C3: plech po střihu a odpad v softwarovém náhledu
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

@@ -93,8 +93,10 @@ const run = (p, text) => p.evaluate((t) => window.mncad.run(t), text);
       const { ctx, p, errs } = await fresh(browser);
       const off = await run(p, 'přísně\nnový díl F\nkvádr 40 40 20\npřísně vyp\ndíra 5 v 10 10');
       ok(/⚠ řádek 5: díra bez hloubky/.test(off) && !/■ přísný režim/.test(off), 'přísně vyp: ⚠ za vypnutím nezastaví');
-      const block = await run(p, 'přísně\nnový díl G\nkvádr 20 20 10\nvýkres A4\nvýkres značka text "KALIT 58 HRC KALIT" v 240 20 výška 5\nvýkres upravit a4 posun="-150 120"\nválec 2 2');
-      ok(!/■ přísný režim/.test(block) && !/překryv na listu/.test(block), 'výkres: překryv opravený v témže bloku nezastaví ani nehlásí ⚠');
+      // list kvádru bez úplných kót hlásí i kontrolu kót (vlna 22, bod 18 – ⚠ drawing.dims-incomplete); případ zkoumá překryv,
+      // proto přísný režim s výjimkou pro neúplné kóty (ta se ohlásí jako ⚠, nezastaví)
+      const block = await run(p, 'přísně kromě drawing.dims-incomplete\nnový díl G\nkvádr 20 20 10\nvýkres A4\nvýkres značka text "KALIT 58 HRC KALIT" v 240 20 výška 5\nvýkres upravit a4 posun="-150 120"\nválec 2 2');
+      ok(!/■ přísný režim/.test(block) && !/překryv na listu/.test(block) && /kóty neúplné/.test(block), 'výkres: překryv opravený v témže bloku nezastaví ani nehlásí ⚠');
       const miss = await run(p, 'nový díl H\nkvádr 20 20 10\nvýkres A4 řez XZ odsazení 500\nvýkres měřítko 1:1\nválec 2 2');
       ok(/✗ řádek 4: rovina řezu neprotíná těleso/.test(miss), `řez mimo těleso = ✗ v normálním běhu (${(miss.match(/.*neprotíná.*/) || ['—'])[0]})`);
       const json = JSON.stringify({ app: 'mnastrojarna-cad', version: 2, name: 'J', material: 'ocel', features: [{ id: 'k1', name: 'Kvádr 1', type: 'box', size: [10, 10, 10], position: [0, 0, 0], centered: false, mode: 'new' }, { id: 'z1', name: 'Zaoblení 1', type: 'fillet', radius: 40, edges: 'all' }] });

@@ -11,6 +11,7 @@
 {0}: čekám číslo, ne „{1}“	{0}: expected a number, not “{1}”
 {0}: čekám tři čísla	{0}: expected three numbers
 ⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)	⚠ the picture changed in {0} of {1} frames with motion (rest: moving part out of view or hidden by the section?)
+⚠ v pohledu {0} se obraz nezměnil v žádném snímku s pohybem (pohyb ve směru pohledu, nebo pohyblivý díl mimo záběr či schovaný řezem?) – ostatní pohledy pohyb ukazují	⚠ in view {0} the picture did not change in any frame with motion (motion along the view direction, or the moving part out of view or hidden by the section?) – the other views show the motion
 ✓ aktivní pohled studie „{0}“: {1} · {2} (použije se při přehrávání a exportu)	✓ active study view “{0}”: {1} · {2} (used for playback and export)
 ✓ anotace polohy vypnuté	✓ pose annotations off
 ✓ anotace polohy zapnuté (čas, krok, motory{0}) – v okně i v exportu PNG / WebM	✓ pose annotations on (time, step, motors{0}) – in the view and in PNG / WebM exports

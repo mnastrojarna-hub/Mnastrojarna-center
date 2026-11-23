@@ -9,7 +9,7 @@ Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
-✓ uloženo: Vystupy.mncad · 299 B · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
+✓ uloženo: Vystupy.mncad · 325 B · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
   ✓ kontrola: projekt jde znovu otevřít – „Výstupy“, 1 prvků
 ✓ export STEP: Vystupy.step · 15 kB · STEP AP214 – staženo (bez dialogu)
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6
@@ -18,5 +18,7 @@ Prvky:
 Dokument: „Výstupy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 20 × 10 mm (X 0…30, Y 0…20, Z 0…10) · objem 6 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso · přesná kontrola
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]

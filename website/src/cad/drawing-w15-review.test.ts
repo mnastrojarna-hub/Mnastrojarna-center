@@ -215,7 +215,7 @@ describe("Kontrola kót desek: díra zespodu, šikmá díra / skica, kvádry, pr
     expect(log.filter((l) => l.includes("vynech"))).toEqual([]);
     const st = await statusOf(doc);
     expect(viewLine(st, "horní")).toMatch(/4× M6 ↧12( \([A-Z]\))? \/ Ø5 ↧18 \/ ze spodní strany/);
-    expect(st).toMatch(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/);
+    expect(st).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
   }, 240_000);
   it("šikmá díra: rada pomocného pohledu se směrem (ne „zapněte pohled —“)", async () => {
     const { log } = await runText("nový díl Sikma\nkvádr 100 80 40\ndíra 12 skrz v 30 40 40 směr 0,5 0 -0,866025\nvýkres A3 na šířku pohledy přední,horní,pravý\nkótovat");
@@ -223,11 +223,13 @@ describe("Kontrola kót desek: díra zespodu, šikmá díra / skica, kvádry, pr
     expect(line).toMatch(/^! vynecháno: Ø12 skrz: šikmá díra – osa není ve směru žádného pohledu; kótujte ji v pomocném pohledu kolmém na osu \(výkres pohled pomocný směr -0,5 0 0,866\) ručně$/);
     expect(log.some((l) => l.includes("zapněte pohled —"))).toBe(false);
   }, 240_000);
-  it("osazená deska ze dvou kvádrů + průchozí okno kvádrem: rozměry kvádrů na listu, Kontrola kót úplná", async () => {
+  // vlna 22, bod 18 (vědomá změna): kontrola kót chce i POLOHY prvků – osazení 130 v desce 150 je souměrné, ale na listu
+  // ho nefixuje kóta polohy (10) ani osa souměrnosti → Kontrola kót to poctivě řekne (Chytré kóty polohu osazení nekótují)
+  it("osazená deska ze dvou kvádrů + průchozí okno kvádrem: rozměry kvádrů na listu; chybí jen poloha osazení (X 10)", async () => {
     const { doc, log } = await runText("nový díl Osazena\nkvádr 150 120 15 v 0 -120 20\nkvádr 130 120 20 v 10 -120 0\nkvádr 24 12 40 v 60 -50 -2 odebrat\nvýkres A3 na šířku pohledy přední,horní,pravý\nkótovat");
     expect(log.filter((l) => l.includes("vynech"))).toEqual([]);
     const st = await statusOf(doc);
-    expect(st).toContain("Kontrola kót: všech");
+    expect(st).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy 2\/3 – chybí: poloha Kvádr 2 – X 10 · /);
     const all = `${viewLine(st, "přední")} ${viewLine(st, "horní")} ${viewLine(st, "pravý")}`;
     for (const v of ["130", "20", "(15)", "24", "12"]) expect(all).toContain(v);
     expect(all).not.toContain("40");

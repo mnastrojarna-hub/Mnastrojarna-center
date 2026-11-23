@@ -1,0 +1,36 @@
+# vlna 22, bod 22c: objemový export (STEP, STL) modelu bez objemového tělesa – nikdy „✓ … věrná kopie modelu“ s 0 tělesy;
+# objem a hmotnost jen z těles (skořepina / plocha objem nemá: „objem –“, D V=- m=-); volná plocha vedle tělesa = ⚠ s počty;
+# forma s kanálem po spline (oprava 4. 11.) zůstává platné těleso a „věrná kopie“. Jména dílů neutrální (NDA).
+# C1) jen otevřená plocha: ✗ out.no-solid, zápis souboru jen ℹ, stav „objem – (žádné těleso)“
+nový díl "Plech"
+skica XY: čára 0 0 50 0 50 30 otevřená
+prvek surf.extrude sketchId="Skica 1" distance=20
+stav
+export step c1-plocha
+# C2) šest ploch sešitých do uzavřené skořepiny, bez „Uzavřít do tělesa“: ✗ out.no-solid „(uzavřených 1)“; STL i „bez kontroly“ ✗
+nový díl "Deska A"
+skica XY: obdélník 40 30
+prvek surf.extrude sketchId="Skica 2" distance=20
+skica XY: obdélník 40 30
+prvek surf.planar sketchId="Skica 3"
+skica XY odsazení 20: obdélník 40 30
+prvek surf.planar sketchId="Skica 4"
+prvek surf.sew tolerance=0.01
+stav
+export step c2-skorepina
+export stl c2-skorepina
+export step c2-bez bez kontroly
+# C3) kvádr + volná plocha: objem jen z tělesa 24 cm³ (ne 29,14), ⚠ out.free-surfaces s počty
+nový díl "Deska B"
+kvádr 40 30 20
+skica XZ: čára -10 5 50 5 otevřená
+prvek surf.extrude sketchId="Skica 5" distance=60 symmetric=ano
+stav
+export step c3-teleso-plocha
+# C4) forma: blok s kanálem taženým po spline (oprava 4. 11.) – platné těleso, ✓ věrná kopie
+nový díl "Deska C"
+kvádr 120 100 40 v -60 -50 0
+skica XY odsazení 35: spline -60 45 -20 30 20 45 60 30
+prvek sweep pathId="Skica 6" circleRadius=3 mode=cut
+stav
+export step c4-forma

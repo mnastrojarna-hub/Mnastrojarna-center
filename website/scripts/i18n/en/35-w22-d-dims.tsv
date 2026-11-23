@@ -1,0 +1,99 @@
+# vlna 22, balík D, etapa D3 – kontrola kót pro výrobní úplnost, funkční prvky a základny (bod 18)
+  (geometrie plochy je z doby označení – po změně modelu plochu označte znovu)	  (face geometry is from the time of marking – mark the face again after a model change)
+  ℹ přesná tolerance {0} u kóty {1}, která není funkční – je opravdu potřeba?	  ℹ tight tolerance {0} on dimension {1}, which is not functional – is it really needed?
+ – chybí: {0}	 – missing: {0}
+ – na listu {0}/{1}	 – on the sheet {0}/{1}
+ · funkční prvky: tolerance {0}/{1}	 · functional features: tolerance {0}/{1}
+ · funkční, bez tolerance	 · functional, no tolerance
+ · funkční, tolerance {0}	 · functional, tolerance {0}
+ · funkční, tolerance {0} ≠ předepsaná {1}	 · functional, tolerance {0} ≠ required {1}
+ · nejde automaticky: {0}	 · not possible automatically: {0}
+ · nezkontrolováno: {0}	 · not checked: {0}
+ · pomocná tělesa (nekótují se): {0}	 · auxiliary bodies (not dimensioned): {0}
+ · přesná tolerance na nefunkčním rozměru: {0}	 · tight tolerance on a non-functional size: {0}
+ · tolerance {0}	 · tolerance {0}
+ · tolerance neověřeny (funkční prvky nevyznačeny)	 · tolerances not verified (functional features not marked)
+ od základny	 from the datum
+; a dalších {0}	; and {0} more
+! nejde doplnit automaticky: {0} – zadejte kótu sami (výkres kóta …)	! cannot be added automatically: {0} – add the dimension yourself (drawing dim …)
+· chybí {0}	· {0} missing
+{0}: co zrušit? – {1}	{0}: what to clear? – {1}
+✓ doplněno kót: {0} – {1}	✓ dimensions added: {0} – {1}
+✓ funkční {0}{1}{2} – kontrola kót chce velikost, polohu{3} a toleranci	✓ functional {0}{1}{2} – the dimension check requires size, position{3} and tolerance
+✓ základna {0} = F{1} ({2}) – polohy funkčních prvků se kontrolují od ní	✓ datum {0} = F{1} ({2}) – positions of functional features are checked from it
+✓ zrušeno {0} – zbývá {1}	✓ cleared {0} – {1} left
+a dalších {0}	and {0} more
+funkční 	functional 
+funkční · bez tolerance	functional · no tolerance
+funkční · tol. {0}	functional · tol. {0}
+funkční · tol. ≠ {0}	functional · tol. ≠ {0}
+funkční „{0}“: kontrola kót rozměry prvku typu {1} nezná – označte jeho plochu (funkční F…)	functional “{0}”: the dimension check does not know the sizes of a {1} feature – mark its face (functional F…)
+funkční {0}: kóta bez tolerance – výkres tolerance <kóta> <tolerance>	functional {0}: dimension without tolerance – drawing tolerance <dim> <tolerance>
+funkční {0}: kóta na listu chybí – doplňte ji s tolerancí	functional {0}: the dimension is missing on the sheet – add it with a tolerance
+funkční {0}: plochu nejde zkontrolovat (tvar)	functional {0}: the face cannot be checked (shape)
+funkční {0}: prvek nemá rozměry, které kontrola zná	functional {0}: the feature has no sizes the check knows
+funkční {0}: šikmá plocha	functional {0}: inclined face
+funkční {0}: tolerance {1} se liší od předepsané {2}	functional {0}: tolerance {1} differs from the required {2}
+funkční F7 [H7] · funkční "Díra 1" [±0,02] · základna A F3 · funkční [seznam] · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	functional F7 [H7] · functional "Hole 1" [±0.02] · functional datum A F3 · functional [list] · functional clear F7|"Hole 1"|all · functional datum clear A|all
+funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu	functional feature {0} of part “{1}” cannot be written as a script line
+Funkční prvky a základny ({0}):	Functional features and datums ({0}):
+funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)	functional features and datums are marked in a part – open the part (part tab)
+Funkční prvky a základny: {0} · tolerance {1}/{2}	Functional features and datums: {0} · tolerance {1}/{2}
+funkční prvky ani základny nejsou vyznačené – funkční F7 [H7] · funkční "Díra 1" · základna A F3 (kontrola kót pak ověří velikost, polohu a toleranci)	no functional features or datums are marked – functional F7 [H7] · functional "Hole 1" · functional datum A F3 (the dimension check then verifies size, position and tolerance)
+funkční: „{0}“ není plocha (F7) ani prvek dílu – prvky: {1}	functional: “{0}” is neither a face (F7) nor a feature of the part – features: {1}
+chybí {0} (velikosti {1}/{2}, polohy {3}/{4}): {5}	{0} missing (sizes {1}/{2}, positions {3}/{4}): {5}
+ℹ Přesná tolerance na rozměru, který není funkční: {0}	ℹ Tight tolerance on a size that is not functional: {0}
+ℹ žádná kóta nedoplněna	ℹ no dimension added
+kontrola kót pro výrobu (bod 18): velikosti i polohy prvků výsledného dílu podle geometrie kót (pomocná tělesa sloučit … odebrat se nekótují), díry po skupinách s počtem n×, funkční prvky a základny vyznačené v modelu (velikost, poloha od základny, tolerance; přesná tolerance na nefunkčním rozměru = ℹ drawing.tol-nonfunctional); chybějící = ⚠ drawing.dims-incomplete ve výkres stav, na konci běhu a při exportu; nikdy „kompletní“ – výkres doplnit kóty přidá navržené kóty (jako tlačítko Přidat kótu)	manufacturing dimension check: sizes and positions of the features of the final part matched by dimension geometry (auxiliary bodies consumed by combine … cut are not dimensioned), holes in groups with count n×, functional features and datums marked in the model (size, position from the datum, tolerance; tight tolerance on a non-functional size = ℹ drawing.tol-nonfunctional); missing = ⚠ drawing.dims-incomplete in drawing status, at the end of the run and on export; never “complete” – drawing complete dims adds the suggested dimensions (like the Add dimension button)
+Kontrola kót: {0}	Dimension check: {0}
+Kontrola kót: celkové rozměry {0}/{1} (sestava – rozměry dílů se kontrolují na výkresech dílů)	Dimension check: overall sizes {0}/{1} (assembly – part sizes are checked on the part drawings)
+kontrola kót: list sestavy – rozměry dílů se kontrolují na výkresech dílů	dimension check: assembly sheet – part sizes are checked on the part drawings
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.	The check only knows sizes derived from the model history and marked functional features – the designer confirms that the manufacturing drawing is complete.
+kóta polohy není od základny {0}	the position dimension is not from datum {0}
+Kótu nejde navrhnout automaticky: {0} – použijte nástroj Kóta	The dimension cannot be suggested automatically: {0} – use the Dimension tool
+kóty zapečené v pohledu – polohu nejde ověřit	dimensions baked into the view – the position cannot be verified
+List sestavy – rozměry dílů se kontrolují na výkresech dílů.	Assembly sheet – part sizes are checked on the part drawings.
+na listu {0}× z {1}×	{0}× of {1}× on the sheet
+Nezkontrolováno: {0}	Not checked: {0}
+nic ke zrušení: {0} – {1}	nothing to clear: {0} – {1}
+odebráno	subtracted
+Označit jako funkční	Mark as functional
+Označit jako základnu	Mark as datum
+plocha, střed {0}	face, center {0}
+plochu F{0} se nepodařilo změřit	face F{0} could not be measured
+poloha {0} – {1} {2}	position {0} – {1} {2}
+poloha {0} (body zadané odkazem na geometrii)	position {0} (points given by reference to geometry)
+poloha {0} (kvádr natočený nebo zadaný odkazem)	position {0} (box rotated or given by reference)
+poloha {0} (skica v obecné rovině)	position {0} (sketch on a general plane)
+poloha {0} (šikmá osa díry)	position {0} (inclined hole axis)
+poloha {0} (šikmá osa nebo odkaz)	position {0} (inclined axis or reference)
+poloha obecného obrysu {0} (lomená čára, oblouk, spline)	position of the general profile {0} (polyline, arc, spline)
+Polohy	Positions
+polohy {0}/{1}	positions {0}/{1}
+polohy nezkontrolovány	positions not checked
+polohy prvků (kóty zapečené v pohledu – přepněte na Chytré kóty nebo vlastní kóty)	feature positions (dimensions baked into the view – switch to Smart dimensions or your own dimensions)
+Polohy:	Positions:
+Pomocná tělesa (nekótují se): {0}	Auxiliary bodies (not dimensioned): {0}
+Přidáno kót: {0}{1}	Dimensions added: {0}{1}
+Přidat kótu	Add dimension
+Přidat navrženou kótu (od hrany dílu / základny) – upravíte ji v seznamu kót	Add the suggested dimension (from the part edge / datum) – edit it in the dimension list
+Přidat všechny navržené kóty ({0})	Add all suggested dimensions ({0})
+rovina, normála {0}, bod {1}	plane, normal {0}, point {1}
+Tolerance neověřeny – funkční prvky nejsou vyznačené (pravým tlačítkem na plochu v modelu: Označit jako funkční / základnu; textem funkční F7 H7, základna A F3).	Tolerances not verified – functional features are not marked (right-click a face in the model: Mark as functional / datum; as text functional F7 H7, functional datum A F3).
+válec Ø{0}, osa {1}, bod {2}	cylinder Ø{0}, axis {1}, point {2}
+Velikosti	Sizes
+velikosti {0}/{1}	sizes {0}/{1}
+Velikosti {0}/{1} · polohy {2}/{3}	Sizes {0}/{1} · positions {2}/{3}
+Velikosti:	Sizes:
+výkres doplnit kóty [polohy | velikosti | vše | čísla položek z výkres kontrola kót]	drawing complete dims [positions | sizes | all | item numbers from drawing check dims]
+výkres doplnit kóty: jen u výkresu dílu	drawing complete dims: only for a part drawing
+základna {0} ({1})	datum {0} ({1})
+základna {0}: plocha F{1} není rovinná – základnou může být jen rovinná plocha	datum {0}: face F{1} is not planar – only a planar face can be a datum
+základna: písmeno a rovinná plocha, např. základna A F3 – {0}	datum: a letter and a planar face, e.g. functional datum A F3 – {0}
+základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu	datum {0} of part “{1}” cannot be written as a script line
+žádné polohy k ověření	no positions to verify
+podle textu kóty – poloha popisu neověřena	by the dimension text – position of the callout not verified
+#!dynamic – texty kódů (src/cad/engine/codes.ts) a klíč varování (drawing-issues.ts DIMS_INCOMPLETE_KEY) se překládají za běhu
+kóty neúplné – {0}	dimensions incomplete – {0}
+list {0}: přesná tolerance na rozměru, který není funkční – {1}	sheet {0}: tight tolerance on a size that is not functional – {1}
+list bez kót – rozměry dílu nese list „{0}“	sheet without dimensions – the part dimensions are on sheet “{0}”

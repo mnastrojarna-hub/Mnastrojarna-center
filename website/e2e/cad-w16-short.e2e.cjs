@@ -17,7 +17,8 @@
 // s NEXT_PUBLIC_CAD_SHARE_SHORT téže hodnoty) ověří jen vytvoření a otevření odkazu přes krátkou doménu.
 // Spuštění: E2E_BASE=http://localhost:3431 node e2e/cad-w16-short.e2e.cjs <složka pro snímky>
 //   E2E_ONLY=http,cross … jen vybrané části (viz ONLY níže)
-//   (server = next start nad produkčním sestavením; potřebuje příkazy php ≥ 7.4 a openssl; starší skript úložiště bere z gitu)
+//   (server = next start nad produkčním sestavením; potřebuje příkazy php ≥ 5.6 a openssl; starší skript úložiště bere z gitu
+//   a spustí ho jen na PHP ≥ 7.0; MN_SHARE_PHP=<cesta>/scripts/php-docker.sh = úložiště na PHP 5.6 z Dockeru)
 const { chromium } = require('playwright');
 const { spawn, execFileSync } = require('child_process');
 const crypto = require('crypto');
@@ -34,6 +35,9 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 const BASE = (process.env.E2E_BASE || 'http://localhost:3431').replace(/\/$/, '');
 const WEB = path.join(__dirname, '..');
 const SCRIPT = path.join(WEB, 'public', 'cad', 'share', 'index.php');
+// PHP úložiště: místní `php`, nebo MN_SHARE_PHP (scripts/php-docker.sh = PHP 5.6 z Dockeru jako na hostingu)
+const PHP = process.env.MN_SHARE_PHP || 'php';
+const PHP_ID = Number(String(execFileSync(PHP, ['-r', 'echo PHP_VERSION_ID;'])).trim()) || 0;
 const WWW = 'https://www.mnastrojarna.cz';
 const APEX = 'https://mnastrojarna.cz';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -82,7 +86,7 @@ async function startPhp(script, env = {}) {
     fs.copyFileSync(path.join(path.dirname(script), 'store.php'), path.join(docroot, 'cad', 'share', 'store.php'));
   }
   const port = await freePort();
-  const proc = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', docroot], { env: { ...process.env, ...env }, stdio: 'ignore' });
+  const proc = spawn(PHP, ['-S', `127.0.0.1:${port}`, '-t', docroot], { env: { ...process.env, ...env }, stdio: 'ignore' });
   const origin = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 200; i++) { try { if ((await fetch(origin + '/cad/share/?ping')).ok) break; } catch { /* start */ } await sleep(50); }
   const srv = { origin, root, data: path.join(root, 'cad-share-data'), proc };
@@ -248,7 +252,9 @@ let prod = null;
   ok((await (await fetch(php.origin + '/cad/share/?ping')).json()).v === 2, `PHP úložiště běží (${php.origin}, ?ping v = 2)`);
   let oldScript = null;
   try { oldScript = execFileSync('git', ['show', 'bf91b0b:website/public/cad/share/index.php'], { cwd: WEB, maxBuffer: 1 << 22 }); } catch { /* bez gitu */ }
-  const phpOld = oldScript ? await startPhp(oldScript, { MN_SHARE_RATE: '1000' }) : null;
+  // starší skript (bf91b0b) potřeboval PHP 7.0+ – na PHP 5.6 se ta část přeskočí
+  const phpOld = oldScript && PHP_ID >= 70000 ? await startPhp(oldScript, { MN_SHARE_RATE: '1000' }) : null;
+  ok(true, `PHP úložiště: ${PHP} (PHP_VERSION_ID ${PHP_ID})`);
   const state = { php };
   prod = await startProd(rules, state);
   // přímo proti sestavené aplikaci (Vercel / next start): přesměrování z next.config.mjs
@@ -719,7 +725,7 @@ let prod = null;
     ok(await sharedOpen(lr) && (await lr.evaluate(() => window.mncad.getDocument().name)) === 'Stará deska', 'odkaz ze staršího úložiště jde otevřít');
     await lr.close();
     state.php = php;
-  } else console.log('# git není k dispozici – zkouška proti staršímu skriptu úložiště přeskočena');
+  } else console.log(PHP_ID < 70000 ? `# PHP ${PHP_ID} < 7.0 – starší skript úložiště (bf91b0b, PHP 7+) se nezkouší` : '# git není k dispozici – zkouška proti staršímu skriptu úložiště přeskočena');
   }
 
   ok(errs.length === 0, 'bez JS chyb ' + errs.join(' | '));

@@ -1,0 +1,22 @@
+# vlna 22, bod 22j: pojmenovaná šablona hlavičky s logem SVG (vektor) – uložit do dokumentu i Nastavení, použít, výchozí
+# pro nový dokument, razítko šablona="…", přehled; logo SVG bez prohlížeče (náhled + obrys z tvarů); EN / DE
+nový díl "Deska T"
+kvádr 100 60 20
+výkres A4 na šířku pohledy přední,horní
+výkres hlavička uložit "Firma" výchozí šablona=nástrojářská logo="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iNDAiPjxyZWN0IHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2UwMzkzMCIvPjxjaXJjbGUgY3g9IjgwIiBjeT0iMjAiIHI9IjE1IiBmaWxsPSIjMjcyNDI1Ii8+PC9zdmc+" firma="Firma s.r.o." kontroloval="Novák"
+výkres hlavička použít "Firma"
+výkres razítko číslo="DT-001"
+výkres razítko
+výkres hlavička
+nový díl "Deska U"
+kvádr 50 40 10
+výkres A4 na šířku pohledy přední,horní
+výkres razítko
+výkres razítko šablona=kompaktní
+výkres razítko šablona="Firma"
+výkres hlavička smazat "Firma"
+výkres hlavička
+#--- run
+drawing title-template save "Firma EN" company="X"
+zeichnung kopfvorlage verwenden "Firma EN"
+výkres hlavička použít "Neexistuje"

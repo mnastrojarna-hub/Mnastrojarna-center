@@ -257,7 +257,7 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   // Chytré kóty a vysoké razítko (nástrojářská 180×64): žádná kótovací čára v razítku (dřív kóta 200 na y 140 uvnitř)
   log = await run('nový díl Deska Q1\nkvádr 200 120 20 střed\ndíra 8 skrz v -80 -45 20 v 80 -45 20 v -80 45 20 v 80 45 20\ndíra 25 skrz v 0 0 20\nvýkres A4\nvýkres razítko šablona=nástrojářská\nkótovat\nvýkres stav\nvýkres export svg');
   fs.writeFileSync(S + 'log10.txt', log);
-  ok(/Kontrola kót: všech 5 očekávaných rozměrů je na listu/.test(log) && !/^!(?!.*nepředepsané tolerance)/m.test(log), 'nástrojářská šablona A4: kontrola kót 5/5, žádné „!“ (kromě chybějících nepředepsaných tolerancí)' + (first(log, /^!(?!.*nepředepsané tolerance).*$/m) ? ' – ' + first(log, /^!(?!.*nepředepsané tolerance).*$/m) : ''));
+  ok(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/.test(log) && !/^!(?!.*nepředepsané tolerance)/m.test(log), 'nástrojářská šablona A4: kontrola kót 5/5, žádné „!“ (kromě chybějících nepředepsaných tolerancí)' + (first(log, /^!(?!.*nepředepsané tolerance).*$/m) ? ' – ' + first(log, /^!(?!.*nepředepsané tolerance).*$/m) : ''));
   const fq = await nextDownload(5);
   const sq = fq ? fq.data.toString('utf8') : '';
   const dimPolys = [...sq.matchAll(/<polyline fill="none" stroke="#111" stroke-width="0\.18" points="([^"]+)"\/>/g)].map((m) => m[1].trim().split(/\s+/).map((q) => q.split(',').map(Number)));

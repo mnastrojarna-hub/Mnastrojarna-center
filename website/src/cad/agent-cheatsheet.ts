@@ -25,7 +25,7 @@ Velká sestava: všechny díly jako bloky \`nový díl "…"\`, pak v záložce 
 
 ## Díl (záložka „Deska“)
 \`kvádr 100 60 12\` · \`skica XY: obdélník 30 18 roh 60 36\` · \`vazba pevně e1.c0\` · \`kóta délka e1.s0 30\` → \`vysunout 4 odebrat\`
-\`zaoblit 2 hrany svislé\` · \`srazit 1 hrany horní\` · \`materiál ocel\` · \`proměnná t = 12\` · úpravy: \`upravit "Zaoblení 1" radius=3\` · \`potlačit "Sražení 1"\` · \`smazat poslední\`
+\`zaoblit 2 hrany svislé\` · \`srazit 1 hrany horní\` · \`materiál 1.2379\` · \`proměnná t = 12\` · úpravy: \`upravit "Zaoblení 1" radius=3\` · \`potlačit "Sražení 1"\` · \`smazat poslední\`
 Jinde: \`válec 20 30 v 50 30 12\` · \`skica XZ: obdélník 10 30 roh 0 0\` → \`rotovat 360 osa Z\` · \`pole kruhové 6 osa Z v 50 30 0\` · \`zrcadlit YZ\` · \`normálie M8x30\` · \`pružina tlačná d 2 De 20 L0 50 n 8\` (díl z tabulky) · \`zpět\` (jen mezi běhy – vrací celý běh, ne řádek)
 
 ## Díry a závity
@@ -33,17 +33,17 @@ Jinde: \`válec 20 30 v 50 30 12\` · \`skica XZ: obdélník 10 30 roh 0 0\` →
 Kontrola dílu: \`stav\` · \`měřit těleso\` · \`měřit díry\` · \`kontrola\`
 
 ## Sestava (záložka „Nástroj“)
-\`nový díl "Čep"\` · \`válec 20 30\` · \`záložka "Nástroj"\` · \`vložit "Deska" v 0 0 0 ukotvit jako "D1"\` · \`vložit "Čep" v 25 30 40\` · \`sestava komponenta #2 přezdívka "K48"\` · \`sestava\` (komponenty, počet) · \`sestava plochy "K48"\`
+\`nový díl "Čep"\` · \`válec 20 30\` · \`materiál 1.0503\` · \`záložka "Nástroj"\` · \`vložit "Deska" v 0 0 0 ukotvit jako "D1"\` · \`vložit "Čep" v 25 30 40\` · \`sestava komponenta #2 přezdívka "K48" číslo "MN-2"\` · \`sestava komponenta "D1" číslo "MN-1"\` · \`sestava\` (komponenty, počet) · \`sestava plochy "K48"\`
 \`sestava vazba souosost "K48" Ø20 "D1" Ø21\` · \`sestava vazba vzdálenost "K48" -Z "D1" horní hodnota 20\` · \`sestava vazby\` · \`kolize\` · \`kusovník\` · \`kontrola sestava\`. Jinde: \`sestava vazba kontakt "K48" -Z "D1" horní\`
 
 ## Pružiny a pohyb
 \`sestava pružina nová d 2 De 20 L0 35 n 6 mezi "D1" Ø21 "K48" spodní\` (na konci „do děr vzoru“ = do všech děr vzoru) · \`sestava pružiny\`
-\`pohyb motor lineární vazba 2 12..20 krok 4 kolize\` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · \`pohyb stav\` · \`pohyb dynamika čas 0,1 gravitace -Z\` · \`pohyb hmotnost "K48" 2,5\` · \`pohyb kinematika\`
+\`pohyb motor lineární vazba 2 20..12 krok 4 kolize\` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · \`pohyb stav\` · \`pohyb dynamika čas 0,1 gravitace -Z\` · \`pohyb hmotnost "K48" 2,5\` · \`pohyb kinematika\`
 Šroub do díry až po dynamice (volný díl by v gravitaci spadl): \`sestava šroub "D1" Ø9\`. Jinde: \`pohyb motor rotační "K48" 0..360 krok 5\`
 
 ## Výkres (záložka dílu)
 \`záložka "Deska"\` · \`výkres A3 měřítko 1:1 pohledy přední,horní,iso\` · \`výkres řez XZ odsazení -30\` (rovina Y = 30; bez odsazení leží na stěně) · \`kótovat chytře funkční 100\` · \`výkres tolerance 100 ±0,05\` · \`výkres tolerance Ø21 H7\`
-\`výkres razítko šablona=iso7200 číslo="MN-1"\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres list nový "Detail"\` · \`kótovat nic\` · \`výkres detail přední v 25 8 poloměr 6\` · \`výkres stav vše\` · \`výkres export pdf vše\`. Jinde (výkres sestavy): \`výkres kusovník ano\`
+\`výkres razítko šablona=iso7200\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres list nový "Detail"\` · \`kótovat nic\` · \`výkres detail přední v 25 8 poloměr 6\` · \`výkres stav vše\` · \`výkres export pdf vše\`. Jinde (výkres sestavy): \`výkres kusovník ano\`
 
 ## Výstupy a odkazy
 \`uložit\` · \`export step\` · \`export skript\` · \`sdílet\` · \`odkaz\` (adresa znovu) · v CLI \`--formats step,pdf,dxf\` a \`--share\`. Jinde (úložiště): \`sdílet dní 30\` · \`export step odkaz\`
@@ -71,7 +71,7 @@ Large assembly: every part as a block \`new part "…"\`, then in the assembly t
 
 ## Part (tab “Plate”)
 \`box 100 60 12\` · \`sketch XY: rect 30 18 corner 60 36\` · \`constraint fixed e1.c0\` · \`dim length e1.s0 30\` → \`extrude 4 cut\`
-\`fillet 2 edges vertical\` · \`chamfer 1 edges top\` · \`material steel\` · \`variable t = 12\` · edits: \`edit "Fillet 1" radius=3\` · \`suppress "Chamfer 1"\` · \`delete last\`
+\`fillet 2 edges vertical\` · \`chamfer 1 edges top\` · \`material 1.2379\` · \`variable t = 12\` · edits: \`edit "Fillet 1" radius=3\` · \`suppress "Chamfer 1"\` · \`delete last\`
 Elsewhere: \`cylinder 20 30 at 50 30 12\` · \`sketch XZ: rect 10 30 corner 0 0\` → \`revolve 360 axis Z\` · \`pattern circular 6 axis Z at 50 30 0\` · \`mirror YZ\` · \`library M8x30\` · \`spring compression d 2 De 20 L0 50 n 8\` (part from the table) · \`undo\` (between runs only – undoes a whole run, not a line)
 
 ## Holes and threads
@@ -79,17 +79,17 @@ Elsewhere: \`cylinder 20 30 at 50 30 12\` · \`sketch XZ: rect 10 30 corner 0 0\
 Part check: \`status\` · \`measure body\` · \`measure holes\` · \`check\`
 
 ## Assembly (tab “Tool”)
-\`new part "Pin"\` · \`cylinder 20 30\` · \`tab "Tool"\` · \`insert "Plate" at 0 0 0 fixed as "D1"\` · \`insert "Pin" at 25 30 40\` · \`assembly component #2 alias "K48"\` · \`assembly\` (components, count) · \`assembly faces "K48"\`
+\`new part "Pin"\` · \`cylinder 20 30\` · \`material 1.0503\` · \`tab "Tool"\` · \`insert "Plate" at 0 0 0 fixed as "D1"\` · \`insert "Pin" at 25 30 40\` · \`assembly component #2 alias "K48" number "MN-2"\` · \`assembly component "D1" number "MN-1"\` · \`assembly\` (components, count) · \`assembly faces "K48"\`
 \`assembly mate concentric "K48" Ø20 "D1" Ø21\` · \`assembly mate distance "K48" -Z "D1" top value 20\` · \`assembly mates\` · \`clash\` · \`bom\` · \`check assembly\`. Elsewhere: \`assembly mate contact "K48" -Z "D1" top\`
 
 ## Springs and motion
 \`assembly spring new d 2 De 20 L0 35 n 6 between "D1" Ø21 "K48" bottom\` (“all holes” at the end = into every hole of the pattern) · \`assembly springs\`
-\`motion motor linear mate 2 12..20 step 4 collisions\` (mate 2 = Distance; no motor on a Contact mate) · \`motion status\` · \`motion dynamics time 0.1 gravity -Z\` · \`motion mass "K48" 2.5\` · \`motion kinematics\`
+\`motion motor linear mate 2 20..12 step 4 collisions\` (mate 2 = Distance; no motor on a Contact mate) · \`motion status\` · \`motion dynamics time 0.1 gravity -Z\` · \`motion mass "K48" 2.5\` · \`motion kinematics\`
 Bolt into a hole only after the dynamics (a free part would fall under gravity): \`assembly bolt "D1" Ø9\`. Elsewhere: \`motion motor rotary "K48" 0..360 step 5\`
 
 ## Drawing (part tab)
 \`tab "Plate"\` · \`drawing A3 scale 1:1 views front,top,iso\` · \`drawing section XZ offset -30\` (plane Y = 30; without the offset it lies on the face) · \`dimension smart functional 100\` · \`drawing tolerance 100 ±0.05\` · \`drawing tolerance Ø21 H7\`
-\`drawing titleblock template=iso7200 number="MN-1"\` · \`drawing general ISO 2768-mK\` · \`drawing sheet new "Detail"\` · \`dimension none\` · \`drawing detail front at 25 8 radius 6\` · \`drawing status all\` · \`drawing export pdf all\`. Elsewhere (assembly drawing): \`drawing bom yes\`
+\`drawing titleblock template=iso7200\` · \`drawing general ISO 2768-mK\` · \`drawing sheet new "Detail"\` · \`dimension none\` · \`drawing detail front at 25 8 radius 6\` · \`drawing status all\` · \`drawing export pdf all\`. Elsewhere (assembly drawing): \`drawing bom yes\`
 
 ## Outputs and links
 \`save\` · \`export step\` · \`export script\` · \`share\` · \`link\` (address again) · CLI \`--formats step,pdf,dxf\` and \`--share\`. Elsewhere (storage): \`share days 30\` · \`export step link\`
@@ -117,7 +117,7 @@ Große Baugruppe: jedes Teil als Block \`neues teil "…"\`, dann in der Registe
 
 ## Teil (Registerkarte „Platte“)
 \`quader 100 60 12\` · \`skizze XY: rechteck 30 18 ecke 60 36\` · \`bedingung fest e1.c0\` · \`bemaßung länge e1.s0 30\` → \`extrudieren 4 abziehen\`
-\`verrunden 2 kanten senkrecht\` · \`fase 1 kanten oben\` · \`werkstoff stahl\` · \`variable t = 12\` · Änderungen: \`bearbeiten "Verrundung 1" radius=3\` · \`unterdrücken "Fase 1"\` · \`löschen letzte\`
+\`verrunden 2 kanten senkrecht\` · \`fase 1 kanten oben\` · \`werkstoff 1.2379\` · \`variable t = 12\` · Änderungen: \`bearbeiten "Verrundung 1" radius=3\` · \`unterdrücken "Fase 1"\` · \`löschen letzte\`
 Sonst: \`zylinder 20 30 bei 50 30 12\` · \`skizze XZ: rechteck 10 30 ecke 0 0\` → \`drehen 360 achse Z\` · \`muster kreisförmig 6 achse Z bei 50 30 0\` · \`spiegeln YZ\` · \`normteil M8x30\` · \`feder druck d 2 De 20 L0 50 n 8\` (Teil aus der Tabelle) · \`rückgängig\` (nur zwischen Läufen – nimmt einen ganzen Lauf zurück, keine Zeile)
 
 ## Bohrungen und Gewinde
@@ -125,17 +125,17 @@ Sonst: \`zylinder 20 30 bei 50 30 12\` · \`skizze XZ: rechteck 10 30 ecke 0 0\`
 Teil prüfen: \`status\` · \`messen körper\` · \`messen bohrungen\` · \`prüfen\`
 
 ## Baugruppe (Registerkarte „Werkzeug“)
-\`neues teil "Stift"\` · \`zylinder 20 30\` · \`registerkarte "Werkzeug"\` · \`einfügen "Platte" bei 0 0 0 fixieren als "D1"\` · \`einfügen "Stift" bei 25 30 40\` · \`baugruppe komponente #2 alias "K48"\` · \`baugruppe\` (Komponenten, Anzahl) · \`baugruppe flächen "K48"\`
+\`neues teil "Stift"\` · \`zylinder 20 30\` · \`werkstoff 1.0503\` · \`registerkarte "Werkzeug"\` · \`einfügen "Platte" bei 0 0 0 fixieren als "D1"\` · \`einfügen "Stift" bei 25 30 40\` · \`baugruppe komponente #2 alias "K48" nummer "MN-2"\` · \`baugruppe komponente "D1" nummer "MN-1"\` · \`baugruppe\` (Komponenten, Anzahl) · \`baugruppe flächen "K48"\`
 \`baugruppe verknüpfung konzentrisch "K48" Ø20 "D1" Ø21\` · \`baugruppe verknüpfung abstand "K48" -Z "D1" oben wert 20\` · \`baugruppe verknüpfungen\` · \`kollision\` · \`stückliste\` · \`prüfen baugruppe\`. Sonst: \`baugruppe verknüpfung kontakt "K48" -Z "D1" oben\`
 
 ## Federn und Bewegung
 \`baugruppe feder neu d 2 De 20 L0 35 n 6 zwischen "D1" Ø21 "K48" unten\` („alle bohrungen“ am Ende = in jede Bohrung des Musters) · \`baugruppe federn\`
-\`bewegung antrieb linear verknüpfung 2 12..20 schritt 4 kollision\` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · \`bewegung status\` · \`bewegung dynamik zeit 0,1 schwerkraft -Z\` · \`bewegung masse "K48" 2,5\` · \`bewegung kinematik\`
+\`bewegung antrieb linear verknüpfung 2 20..12 schritt 4 kollision\` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · \`bewegung status\` · \`bewegung dynamik zeit 0,1 schwerkraft -Z\` · \`bewegung masse "K48" 2,5\` · \`bewegung kinematik\`
 Schraube erst nach der Dynamik in die Bohrung (ein freies Teil fiele unter Schwerkraft): \`baugruppe schraube "D1" Ø9\`. Sonst: \`bewegung antrieb dreh "K48" 0..360 schritt 5\`
 
 ## Zeichnung (Registerkarte des Teils)
 \`registerkarte "Platte"\` · \`zeichnung A3 maßstab 1:1 ansichten vorne,oben,iso\` · \`zeichnung schnitt XZ versatz -30\` (Ebene Y = 30; ohne Versatz liegt sie auf der Fläche) · \`bemaßen intelligent funktional 100\` · \`zeichnung toleranz 100 ±0,05\` · \`zeichnung toleranz Ø21 H7\`
-\`zeichnung schriftfeld vorlage=iso7200 nummer="MN-1"\` · \`zeichnung allgemein ISO 2768-mK\` · \`zeichnung blatt neu "Detail"\` · \`bemaßen keine\` · \`zeichnung einzelheit vorne bei 25 8 radius 6\` · \`zeichnung status alle\` · \`zeichnung export pdf alle\`. Sonst (Baugruppenzeichnung): \`zeichnung stückliste ja\`
+\`zeichnung schriftfeld vorlage=iso7200\` · \`zeichnung allgemein ISO 2768-mK\` · \`zeichnung blatt neu "Detail"\` · \`bemaßen keine\` · \`zeichnung einzelheit vorne bei 25 8 radius 6\` · \`zeichnung status alle\` · \`zeichnung export pdf alle\`. Sonst (Baugruppenzeichnung): \`zeichnung stückliste ja\`
 
 ## Ausgaben und Links
 \`speichern\` · \`exportieren step\` · \`export skript\` · \`freigeben\` · \`link\` (Adresse erneut) · CLI \`--formats step,pdf,dxf\` und \`--share\`. Sonst (Speicher): \`freigeben tage 30\` · \`exportieren step link\`

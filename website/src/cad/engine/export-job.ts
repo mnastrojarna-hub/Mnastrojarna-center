@@ -16,6 +16,7 @@
 import { CadCancelled } from "../kernel-client";
 import type { Export3dFormat, ExportCheck } from "../agent-out";
 import type { CadDoc } from "../types";
+import type { SolidParts } from "../solid-export";
 import { embedBlobs } from "../blobs";
 import { isEmptyDoc, modelBytes, verifyExport } from "./files";
 import type { KernelApi } from "./kernel";
@@ -42,6 +43,8 @@ export type ExportJobOptions = {
   rebuild?: boolean;
   /** zápis až po kontrole (výchozí) – false = zapsat hned po převodu a kontrolovat potom (pořadí řádků protokolu textu) */
   verifyFirst?: boolean;
+  /** komponenty sestavy bez tělesa / s volnými plochami – jména do hlášky kontroly (vlna 22, bod 22c – solid-check.ts) */
+  parts?: SolidParts;
 };
 
 export type ExportJobResult<T> = {
@@ -90,12 +93,12 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
     out = await deps.write(data);
     if (wantCheck) {
       step("verify");
-      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep");
+      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts);
     }
   } else {
     if (wantCheck) {
       step("verify");
-      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep");
+      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts);
     }
     step("write");
     out = await deps.write(data);

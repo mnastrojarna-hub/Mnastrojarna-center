@@ -100,6 +100,10 @@ export function ClashPanel({
             <p data-clash-result className="mb-1 text-[11px] leading-snug text-[#5b6776]">
               {n ? `${n} ${n === 1 ? tr("průnik") : n < 5 ? tr("průniky") : tr("průniků")}` : tr("Žádný průnik komponent")} {tr("· zkontrolováno")} {clashHeader(entry, id, doc.name)}
             </p>
+            {/* vlna 22, bod 6: nulový průnik není důkaz, že nic nedře – vůli měří pohybová studie */}
+            <p data-clash-clearance="unchecked" className="mb-1 text-[10.5px] leading-snug text-[#8a5300]">
+              {tr("Vůle (nejmenší vzdálenost dílů) se tu nekontroluje – průnik pod 0,001 mm³ a dotyk se nehlásí. Vůli s limitem sleduje pohybová studie: sekce Vůle, nebo pohyb vůle \"A\" \"B\" min 0,05.")}
+            </p>
             {n > 0 && (
               <div className="mb-1.5 flex flex-wrap gap-1" role="group" aria-label={tr("Třídy kolizí")}>
                 {CLASS_ORDER.map((c) => {

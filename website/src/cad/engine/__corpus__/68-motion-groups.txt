@@ -1,0 +1,76 @@
+# vlna 22, bod 15 (pohybová část): 58 šroubů zamčených k horní desce = JEDNA tuhá skupina 59 dílů. Zdvih 40 → 9,65 ve 112 krocích
+# dřív rozdělil zaokrouhlením na „58 + 1“ (travel=30.35mm:58,30.35mm:1); souhrn je teď jeden řádek skupiny místo 59 řádků po dílech,
+# strojově travel=30.35mm:59 … groups=59:z-30.35.
+nový díl Deska A
+kvádr 600 100 10
+nový díl Horní deska
+kvádr 600 100 10
+nový díl Šroub M12
+válec 8 20
+nová sestava Skupina
+vložit "Deska A" ukotvit
+vložit "Horní deska" v 0 0 50
+sestava vazba vzdálenost "Horní deska" spodní "Deska A" horní hodnota 40
+sestava vazba rovnoběžně "Horní deska" +X "Deska A" +X
+sestava vazba rovnoběžně "Horní deska" +Y "Deska A" +Y
+vložit "Šroub M12" v 10 10 60
+sestava pole "Šroub M12" 58 rozteč 10 směr X
+sestava vazba zámek "Šroub M12" "Horní deska"
+sestava vazba zámek "Šroub M12 (2)" "Horní deska"
+sestava vazba zámek "Šroub M12 (3)" "Horní deska"
+sestava vazba zámek "Šroub M12 (4)" "Horní deska"
+sestava vazba zámek "Šroub M12 (5)" "Horní deska"
+sestava vazba zámek "Šroub M12 (6)" "Horní deska"
+sestava vazba zámek "Šroub M12 (7)" "Horní deska"
+sestava vazba zámek "Šroub M12 (8)" "Horní deska"
+sestava vazba zámek "Šroub M12 (9)" "Horní deska"
+sestava vazba zámek "Šroub M12 (10)" "Horní deska"
+sestava vazba zámek "Šroub M12 (11)" "Horní deska"
+sestava vazba zámek "Šroub M12 (12)" "Horní deska"
+sestava vazba zámek "Šroub M12 (13)" "Horní deska"
+sestava vazba zámek "Šroub M12 (14)" "Horní deska"
+sestava vazba zámek "Šroub M12 (15)" "Horní deska"
+sestava vazba zámek "Šroub M12 (16)" "Horní deska"
+sestava vazba zámek "Šroub M12 (17)" "Horní deska"
+sestava vazba zámek "Šroub M12 (18)" "Horní deska"
+sestava vazba zámek "Šroub M12 (19)" "Horní deska"
+sestava vazba zámek "Šroub M12 (20)" "Horní deska"
+sestava vazba zámek "Šroub M12 (21)" "Horní deska"
+sestava vazba zámek "Šroub M12 (22)" "Horní deska"
+sestava vazba zámek "Šroub M12 (23)" "Horní deska"
+sestava vazba zámek "Šroub M12 (24)" "Horní deska"
+sestava vazba zámek "Šroub M12 (25)" "Horní deska"
+sestava vazba zámek "Šroub M12 (26)" "Horní deska"
+sestava vazba zámek "Šroub M12 (27)" "Horní deska"
+sestava vazba zámek "Šroub M12 (28)" "Horní deska"
+sestava vazba zámek "Šroub M12 (29)" "Horní deska"
+sestava vazba zámek "Šroub M12 (30)" "Horní deska"
+sestava vazba zámek "Šroub M12 (31)" "Horní deska"
+sestava vazba zámek "Šroub M12 (32)" "Horní deska"
+sestava vazba zámek "Šroub M12 (33)" "Horní deska"
+sestava vazba zámek "Šroub M12 (34)" "Horní deska"
+sestava vazba zámek "Šroub M12 (35)" "Horní deska"
+sestava vazba zámek "Šroub M12 (36)" "Horní deska"
+sestava vazba zámek "Šroub M12 (37)" "Horní deska"
+sestava vazba zámek "Šroub M12 (38)" "Horní deska"
+sestava vazba zámek "Šroub M12 (39)" "Horní deska"
+sestava vazba zámek "Šroub M12 (40)" "Horní deska"
+sestava vazba zámek "Šroub M12 (41)" "Horní deska"
+sestava vazba zámek "Šroub M12 (42)" "Horní deska"
+sestava vazba zámek "Šroub M12 (43)" "Horní deska"
+sestava vazba zámek "Šroub M12 (44)" "Horní deska"
+sestava vazba zámek "Šroub M12 (45)" "Horní deska"
+sestava vazba zámek "Šroub M12 (46)" "Horní deska"
+sestava vazba zámek "Šroub M12 (47)" "Horní deska"
+sestava vazba zámek "Šroub M12 (48)" "Horní deska"
+sestava vazba zámek "Šroub M12 (49)" "Horní deska"
+sestava vazba zámek "Šroub M12 (50)" "Horní deska"
+sestava vazba zámek "Šroub M12 (51)" "Horní deska"
+sestava vazba zámek "Šroub M12 (52)" "Horní deska"
+sestava vazba zámek "Šroub M12 (53)" "Horní deska"
+sestava vazba zámek "Šroub M12 (54)" "Horní deska"
+sestava vazba zámek "Šroub M12 (55)" "Horní deska"
+sestava vazba zámek "Šroub M12 (56)" "Horní deska"
+sestava vazba zámek "Šroub M12 (57)" "Horní deska"
+sestava vazba zámek "Šroub M12 (58)" "Horní deska"
+pohyb motor lineární vazba 1 40..9,65 kroky 112 čas 0,65

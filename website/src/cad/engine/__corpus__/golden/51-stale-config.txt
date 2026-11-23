@@ -23,13 +23,13 @@ Konfigurace: Bez výstupku (aktivní)
 ✓ nová sestava „Sestava K“ – nová záložka
 ✓ komponenta „Deska K“ vložena do sestavy (ukotvená)
 ✓ komponenta „Přidržovač“ vložena do sestavy
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 ✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
 
 Dokument: „Sestava K“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska K [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 3 ===
 ✓ úprava dílu „Deska K“ v kontextu sestavy „Sestava K“ – další příkazy pracují s ním; návrat: sestava hotovo
 → aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací) – výsledek po výpočtu níže
@@ -39,7 +39,7 @@ Kolize: žádné (zkontrolováno ?)
 Dokument: „Sestava K“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska K [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 28 cm³ · hmotnost Σ 0,220 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
 === run 4 ===
 kolize: 1 – šroub v závitu 0, skutečné 1
 ⚠ řádek 2: kolize „Deska K“ × „Přidržovač“ (1 000,0 mm³) – místo [45; 15; 35] · obálka 10 × 10 × 10 mm

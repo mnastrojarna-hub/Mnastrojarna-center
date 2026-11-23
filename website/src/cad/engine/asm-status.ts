@@ -200,13 +200,15 @@ export async function drawExtras(ws: Workspace, kernel: KernelApi, doc: CadDoc, 
   const leaves = await ensureLeaves(ws, kernel, doc, o);
   const cache = ws.asm.cache;
   const bom = bomOf(doc, o.flat ?? true, (c) => partInfo(cache, c));
-  const balloons: { pos: number; name: string; bbox: [Vec3, Vec3] }[] = [];
+  const balloons: { pos: number; name: string; bbox: [Vec3, Vec3]; boxes?: [Vec3, Vec3][] }[] = [];
   for (const r of bom) {
     const bb = leavesBox(
       cache,
       leaves.filter((l) => r.ids.includes(l.topId) && !l.hidden),
     );
-    if (bb) balloons.push({ pos: r.pos, name: r.name, bbox: bb });
+    // obálky jednotlivých výskytů (kotva odkazové čáry na prvním, ne ve středu obálky všech kusů – vlna 22, bod 17)
+    const boxes = r.ids.map((id) => leavesBox(cache, leaves.filter((l) => l.topId === id && !l.hidden))).filter((b): b is [Vec3, Vec3] => !!b);
+    if (bb) balloons.push({ pos: r.pos, name: r.name, bbox: bb, ...(boxes.length ? { boxes } : {}) });
   }
   return {
     massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0),

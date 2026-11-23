@@ -48,13 +48,38 @@ export function moveGenerated(edit: GenEdit | undefined, ids: readonly string[],
   const g = ids.filter(isGenId);
   if (!g.length || (!d[0] && !d[1])) return edit;
   const move: Record<string, Vec2> = { ...(edit?.move ?? {}) };
+  const lock: Record<string, Vec2> = { ...(edit?.lock ?? {}) };
   for (const id of g) {
     const k = genKey(id);
     const dd = genDelta(id, d);
+    // zamčená pozice se táhne i s zámkem (absolutní poloha na listu – vlna 22, bod 17)
+    if (lock[k]) {
+      lock[k] = [r2(lock[k][0] + dd[0]), r2(lock[k][1] + dd[1])];
+      continue;
+    }
     const m = move[k] ?? [0, 0];
     move[k] = [r2(m[0] + dd[0]), r2(m[1] + dd[1])];
   }
-  return { ...edit, move };
+  return { ...edit, move, ...(Object.keys(lock).length ? { lock } : {}) };
+}
+
+/**
+ * Zamčení pozic (vlna 22, bod 17): střed balónku na listu (`at` z výsledku výkresu) se uloží absolutně – po přepočtu modelu
+ * i novém rozmístění ostatních pozic zůstane na místě; relativní posun se tím nahradí. `at` = null → odemknout.
+ */
+export function lockGenerated(edit: GenEdit | undefined, keys: readonly string[], at: (k: string) => Vec2 | null): GenEdit | undefined {
+  const lock: Record<string, Vec2> = { ...(edit?.lock ?? {}) };
+  const move: Record<string, Vec2> = { ...(edit?.move ?? {}) };
+  for (const k0 of keys) {
+    const k = isGenId(k0) ? genKey(k0) : k0;
+    const p = at(k);
+    if (p) {
+      lock[k] = [r2(p[0]), r2(p[1])];
+      delete move[k];
+    } else delete lock[k];
+  }
+  const out: GenEdit = { ...(edit?.off?.length ? { off: edit.off } : {}), ...(Object.keys(move).length ? { move } : {}), ...(Object.keys(lock).length ? { lock } : {}) };
+  return genEditCount(out) ? out : undefined;
 }
 
 /** vybrané vygenerované objekty skryté (Delete); obnoví je „Obnovit vygenerované“ v panelu výkresu */
@@ -65,7 +90,7 @@ export function hideGenerated(edit: GenEdit | undefined, ids: readonly string[])
 }
 
 /** počet upravených vygenerovaných objektů (skryté + posunuté) – tlačítko Obnovit */
-export const genEditCount = (edit: GenEdit | undefined): number => new Set([...(edit?.off ?? []), ...Object.keys(edit?.move ?? {})]).size;
+export const genEditCount = (edit: GenEdit | undefined): number => new Set([...(edit?.off ?? []), ...Object.keys(edit?.move ?? {}), ...Object.keys(edit?.lock ?? {})]).size;
 
 /** poznámky ve výběrovém okně listu (mm listu) */
 export const annotationsInBox = (shapes: readonly BoxShape[], r: Rect2, crossing: boolean): string[] => selectShapes(shapes, r, crossing);
@@ -89,6 +114,11 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  */
 export function moveAnnotation(views: PlacedView[], a: DrawingAnnotation, d: Vec2): DrawingAnnotation {
   if (!d[0] && !d[1]) return a;
+  const m = moveAnnotation0(views, a, d);
+  // vygenerovaná kóta / popis posunutý ručně: poloha přežije přegenerování po změně modelu (vlna 22, bod 17)
+  return m !== a && a.auto ? ({ ...m, placed: "user" } as DrawingAnnotation) : m;
+}
+function moveAnnotation0(views: PlacedView[], a: DrawingAnnotation, d: Vec2): DrawingAnnotation {
   switch (a.type) {
     case "note":
     case "roughness":

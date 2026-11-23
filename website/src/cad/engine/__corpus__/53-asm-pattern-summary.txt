@@ -1,0 +1,13 @@
+# vlna 22, bod 15 (konzole příliš ukecaná): `sestava pole` s 19 kopiemi vypíše SOUHRN – počet, první a poslední kopii
+# s polohou a odkaz na úplný výpis (`sestava komponenty`) – místo polohy každé kopie na jednom řádku; do 3 kopií všechny.
+nový díl "Deska A"
+kvádr 200 40 10
+nový díl "Šroub"
+válec 6 20
+#--- run
+nová sestava "Pole A"
+vložit "Deska A" ukotvit
+vložit "Šroub" v 10 10 10
+sestava pole "Šroub" 19 rozteč 9 směr X
+sestava pole "Šroub (19)" 3 rozteč 10 směr Y
+sestava komponenty

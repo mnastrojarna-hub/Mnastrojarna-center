@@ -17,7 +17,7 @@
  * export PDF (CLI `--formats`) téhož listu se nepočítají dvakrát (projekce sestavy trvá desítky sekund).
  */
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
-import { SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
+import { DIMS_INCOMPLETE_KEY, SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
 import { tr } from "../i18n";
 import type { CadDoc, DrawingAnnotation } from "../types";
 import { codeText, type Code, type CodeLevel } from "./codes";
@@ -46,6 +46,7 @@ export const clearDrawingMemo = (): void => void (memo = []);
 /** kód varování listu podle textu jádra (drawing.ts) – porovnáním s přeloženým klíčem, stejně v cs/en/de */
 export function sheetWarningCode(text: string): Code {
   if (isTextOfKey(text, SECTION_MISS_BADGE)) return "drawing.section-miss";
+  if (isTextOfKey(text, DIMS_INCOMPLETE_KEY)) return "drawing.dims-incomplete"; // kontrola kót (bod 18)
   return "drawing.warning";
 }
 
@@ -85,7 +86,7 @@ export const sameSheetFinding = (a: { code?: string; doc?: string; text: string 
  * strukturovaná hlášení jádra (cad/drawing-issues.ts: řez mimo těleso, pohledy se nevejdou, ztracený pohled, tabulka děr
  * přes pohled, ostatní varování) a vynechané Chytré kóty (jeden záznam za list). Bez listů / 2D výkres → prázdný seznam.
  */
-export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCompute, extras: () => Promise<DrawingExtras>): Promise<SheetIssue[]> {
+export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCompute, extras: () => Promise<DrawingExtras>, o2: { knownTexts?: Iterable<string> } = {}): Promise<SheetIssue[]> {
   if (doc.kind === "draft" || !doc.drawings?.length) return [];
   const s = doc.drawings[idx];
   if (!s) return [];
@@ -96,7 +97,56 @@ export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCo
   const out: SheetIssue[] = issuesOf(res).map((i) => sheetIssue(i, name));
   const skipped = o.dimensions === "smart" ? (res.smart?.report.skipped ?? []) : [];
   if (skipped.length) out.push({ code: "drawing.warning", sheet: name, text: tr("vynecháno: {0}", skipped.join("; ")) });
+  // kontrola kót pro výrobní úplnost (vlna 22, bod 18): ⚠ drawing.dims-incomplete, ℹ drawing.tol-nonfunctional
+  out.push(...(await dimSheetIssues(doc, s, res, o)).map((i) => sheetIssue(i, name)));
+  // překryvy celého listu (vlna 22, bod 17): balónky, odkazy, texty, kóty, geometrie, tabulky, rám → ⚠ drawing.overlap s počtem a radou
+  const ov = await sheetOverlapIssue(doc, s, res, o, o2.knownTexts);
+  if (ov) out.push(sheetIssue(ov, name));
   return out;
+}
+
+/** výsledky kontroly překryvů listů v tomto běhu: id listu → otisk stavu listu a počet překryvů (řádek D `overlaps=`) */
+const overlapMemo = new Map<string, { key: string; total: number }>();
+/** otisk listu pro kontrolu překryvů (revize modelu + volby, údaje a poznámky listu) */
+function sheetKey(doc: CadDoc, s: NonNullable<CadDoc["drawings"]>[number]): string {
+  const txt = JSON.stringify([doc.features, doc.components, doc.mates, s.options, s.meta, s.annotations]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < txt.length; i++) h = Math.imul(h ^ txt.charCodeAt(i), 0x01000193) >>> 0;
+  return `${txt.length}:${h.toString(16)}`;
+}
+/** součet překryvů na listech dokumentu, když byly v tomto běhu zkontrolované všechny (jinak null – „nezkontrolováno“) */
+export function sheetOverlapsOf(doc: CadDoc): number | null {
+  if (!doc.drawings?.length) return null;
+  let n = 0;
+  for (const s of doc.drawings) {
+    const m = overlapMemo.get(s.id);
+    if (!m || m.key !== sheetKey(doc, s)) return null;
+    n += m.total;
+  }
+  return n;
+}
+/** zapomene výsledky kontroly překryvů (nový běh CLI, testy) */
+export const clearOverlapMemo = (): void => overlapMemo.clear();
+
+/** kontrola překryvů hotového listu (poznámky listu se sloučenými Chytrými kótami jako ve `výkres stav`) → hlášení nebo null */
+export async function sheetOverlapIssue(doc: CadDoc, s: NonNullable<CadDoc["drawings"]>[number], res: Awaited<ReturnType<DrawingCompute>>, o: ReturnType<typeof import("../drawing-agent").sheetOptions>, knownTexts: Iterable<string> = []): Promise<DrawingIssue | null> {
+  const [{ mergeSmart }, { sheetOverlaps, overlapIssueText, withoutKnownTexts }, { withAnnotations }] = await Promise.all([import("../drawing-agent"), import("../drawing-overlaps"), import("../drawing")]);
+  let anns = s.annotations;
+  if (o.dimensions === "smart" && res.smart) anns = mergeSmart(anns, o, res.smart)?.annotations ?? anns;
+  const all = sheetOverlaps(withAnnotations(res, anns));
+  overlapMemo.set(s.id, { key: sheetKey(doc, s), total: all.total }); // řádek D `overlaps=` = všechny překryvy listu
+  // poznámky, jejichž překryv / přesah už ohlásil příkaz výkresu (s id poznámky), se v hlášení listu neopakují
+  const ov = withoutKnownTexts(all, knownTexts);
+  const text = overlapIssueText(ov);
+  return text ? { level: "warn", code: "drawing.overlap", kind: "sheet-overlap", text, sheetId: s.id, data: { total: ov.total, byKind: ov.byKind, crossings: ov.crossings, balloons: ov.balloons } } : null;
+}
+
+/** hlášení kontroly kót listu (poznámky listu se sloučenými Chytrými kótami jako ve `výkres stav`) */
+async function dimSheetIssues(doc: CadDoc, s: NonNullable<CadDoc["drawings"]>[number], res: Awaited<ReturnType<DrawingCompute>>, o: ReturnType<typeof import("../drawing-agent").sheetOptions>): Promise<DrawingIssue[]> {
+  const [{ mergeSmart }, { sheetDimCheck, dimCheckIssues }, { withAnnotations }] = await Promise.all([import("../drawing-agent"), import("../drawing-dimcheck"), import("../drawing")]);
+  let anns = s.annotations;
+  if (o.dimensions === "smart" && res.smart) anns = mergeSmart(anns, o, res.smart)?.annotations ?? anns;
+  return dimCheckIssues(sheetDimCheck(doc, withAnnotations(res, anns), anns, o), { sheetId: s.id });
 }
 
 /**

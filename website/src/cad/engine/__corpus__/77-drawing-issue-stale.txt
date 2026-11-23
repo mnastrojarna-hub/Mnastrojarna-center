@@ -1,0 +1,20 @@
+# vlna 22, bod 20 (výkresy): vydaný list nese revizi modelu; po změně modelu ⚠ drawing.stale (výkres stav, stav, konec běhu,
+# export se stejným písmenem revize), nová revize ho vyřeší; záznamy exportů s revizí modelu, zastaralé po změně
+nový díl "Deska A"
+kvádr 60 40 10
+výkres A4
+výkres nepředepsané ISO 2768-mK
+výkres vydat
+výkres export pdf
+#--- run
+# změna modelu po vydání (list rev. A neplatí pro změněný díl)
+upravit "Kvádr 1" size=30;40;10
+#--- run
+výkres stav
+stav
+exporty
+výkres export pdf jako "Deska A znovu"
+#--- run
+výkres vydat
+výkres stav
+výstupy

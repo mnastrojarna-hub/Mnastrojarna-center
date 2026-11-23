@@ -66,8 +66,15 @@ describe("tahák pro agenty ve skutečném jádře", async () => {
         expect(files).toEqual(["dwg", "mncad", "pdf", "script", "step"]);
         // hledání v nápovědě z taháku vrací výsledky
         expect(eq.filter((l) => / help hits=[1-8]/.test(l)).length).toBeGreaterThanOrEqual(2);
+        // odkaz ke sdílení: řádek `= L<n> link` je v každém jazyce, url nese model; délka url / bytes / chars závisí na
+        // jazykových názvech prvků a popiscích děr ve sdíleném dokumentu (Kvádr 1 / Box 1, Ø9 skrz / Ø9 thru, desetinná čárka)
+        const links = eq.filter((l) => / link /.test(l));
+        expect(links.length).toBeGreaterThanOrEqual(1);
+        for (const l of links) expect(l).toMatch(/ url=\/cad#s=\S+ mode=link .* bytes=[1-9]\d* chars=[1-9]\d* .*features=\d+/);
+        /** jen tyto tři délkové údaje se nahradí – vše ostatní na řádku (mode, exp, view, pw, content, comp, parts, sheets, files, features) se porovnává */
+        const linkNorm = (l: string) => (/ link /.test(l) ? l.replace(/ url=\S+/, " url=…").replace(/ bytes=\d+/, " bytes=…").replace(/ chars=\d+/, " chars=…") : l);
         // souhrn nezávislý na jazyce: strojové řádky výpisů bez názvů a bez nápovědy, soubory, počet ✓
-        summary[lang] = [...eq.filter((l) => !/ help /.test(l)).map((l) => l.replace(/"[^"]*"/g, '"…"')), files.join(","), `ok=${r.entries.filter((e) => e.level === "ok").length}`].join("\n");
+        summary[lang] = [...eq.filter((l) => !/ help /.test(l)).map((l) => linkNorm(l.replace(/"[^"]*"/g, '"…"'))), files.join(","), `ok=${r.entries.filter((e) => e.level === "ok").length}`].join("\n");
       } finally {
         setLang(lang0);
       }

@@ -132,8 +132,13 @@ describe("návod pro AI – kapitola Pružiny", () => {
   it("bloky příkladů se přečtou bez chyb", async () => {
     const { AGENT_GUIDE } = await import("./agent-guide");
     const start = AGENT_GUIDE.indexOf("### Pružiny z tabulky");
-    const end = AGENT_GUIDE.indexOf("### Příklad – příruba DN50");
+    // kapitola končí za druhým příkladem pružin (za ní je od vlny 19 kapitola Kola a ozubení s vlastními bloky – ty kontroluje agent-gears.test.ts)
+    const lastEx = AGENT_GUIDE.indexOf("### Příklad – tažná pružina upínky");
+    expect(start).toBeGreaterThan(0);
+    expect(lastEx).toBeGreaterThan(start);
+    const end = AGENT_GUIDE.indexOf("\n### ", lastEx + 4);
     const part = AGENT_GUIDE.slice(start, end);
+    expect(part).toContain("### Příklad – stírací pružiny");
     const blocks = [...part.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
     expect(blocks.length).toBe(2);
     for (const b of blocks) expect(parseAgentText(b).errors.map((e) => e.message)).toEqual([]);

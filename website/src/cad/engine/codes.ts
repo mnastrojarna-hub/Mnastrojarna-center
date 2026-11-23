@@ -36,12 +36,18 @@ export const CODES = [
   { code: "share.rejected", level: "error", key: "úložiště odkazů odmítlo zápis: {0}" },
   { code: "share.fallback-link", level: "warn", key: "krátký odkaz se nepodařil – použit dlouhý odkaz" },
   { code: "share.uncompressed", level: "note", key: "odkaz není komprimovaný (prostředí neumí deflate-raw)" },
+  // vlna 22, bod 16: vypnuté úložiště je vidět (ℹ, ne tichý dlouhý odkaz) a ověření odkazu textem (`odkaz ověřit`)
+  { code: "share.store-off", level: "note", short: true, key: "úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu ({0} znaků)" },
+  { code: "share.link-broken", level: "error", key: "odkaz se neotevře ({0}): {1}" },
   // ── výstupy textem (balík B3 outputs) ──
   { code: "share.store-unavailable", level: "error", key: "úložiště krátkých odkazů není dostupné: {0}" },
   { code: "share.long-link", level: "warn", key: "odkaz má {0} znaků – prohlížeč agenta v cloudu přijme nejvýš 4096; krátký odkaz dá „sdílet úložiště“" },
   { code: "share.days-clamped", level: "warn", key: "platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})" },
   { code: "share.days-unlimited", level: "error", key: "odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“" },
   { code: "out.check-failed", level: "warn", key: "kontrola souboru: {0}" },
+  // objemový export (STEP, BREP, STL, 3MF) bez tělesa / s plochami mimo tělesa – vlna 22, bod 22c (solid-export.ts)
+  { code: "out.no-solid", level: "error", key: "objemový export bez tělesa: {0}" },
+  { code: "out.free-surfaces", level: "warn", key: "objemový export s plochami mimo tělesa: {0}" },
   { code: "out.unsupported", level: "warn", key: "výstup {0} není k dispozici: {1}" },
   { code: "out.too-big", level: "error", key: "soubor „{0}“ má {1} B – jako base64 do protokolu nejvýš {2} B (soubor zapište bez „base64“)" },
   { code: "out.lost-imports", level: "warn", key: "projekt odkazuje na importované soubory bez dat: {0} – tyto prvky se nepostaví" },
@@ -122,6 +128,10 @@ export const CODES = [
   // vlna 22, bod 5 (clash-rules.ts): numerický dotyk pod tolerancí a pracovní kontakt podle pravidla operace – počítají se, nejsou závadou
   { code: "clash.touch", level: "note", key: "dotyk „{0}“ × „{1}“ (průnik tenčí než tolerance dotyku)" },
   { code: "clash.work", level: "note", key: "pracovní kontakt „{0}“ × „{1}“ podle pravidla kolizí" },
+  // vlna 22, bod 6 (motion-clearance.ts): vůle pod limitem v pohybu, kolize mezi polohami nepotvrzené, kontrola jen v polohách
+  { code: "clash.clearance", level: "warn", key: "vůle „{0}“ × „{1}“ {2} mm < {3} mm" },
+  { code: "clash.uncertain", level: "warn", key: "kolize mezi polohami nepotvrzeny v {0} úsecích – tam jen v polohách" },
+  { code: "clash.discrete", level: "note", key: "kolize kontrolovány jen v {0} polohách (diskrétně) – mezi polohami nekontrolováno" },
   { code: "clash.stale", level: "warn", key: "výpis kolizí platí pro dřívější stav sestavy (zkontrolováno {0}) – spusťte „kolize“ znovu" },
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
@@ -130,6 +140,15 @@ export const CODES = [
   { code: "motion.motor-limit", level: "warn", key: "motor {0} stojí na mezi v krocích {1} – brání: {2}" },
   { code: "motion.invalid", level: "warn", key: "neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}); konflikt: {2}" },
   { code: "motion.undetermined", level: "warn", key: "poloha „{0}“ není vazbami určena (volná v mezi {1})" },
+  // vlna 22, body 3 a 10: fáze studie, motor nahrazený / v konfliktu už při definici
+  { code: "motion.phase-unreached", level: "warn", key: "fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2})" },
+  { code: "motion.motor-conflict", level: "warn", key: "motor {0} je v konfliktu s motorem {1} – pohánějí tentýž stupeň volnosti od stejného okamžiku" },
+  { code: "motion.motor-replaced", level: "note", key: "motor {0} na vazbě „{1}“ nahrazen novým zadáním" },
+  // vlna 22, bod 4: procesní vrstva (střih / otisk jako geometrická aproximace – cad/motion-process.ts)
+  { code: "motion.process-miss", level: "warn", key: "procesní operace {0}: nástroj „{1}“ obrobek „{2}“ v okně operace nezasáhl – obrobek beze změny" },
+  { code: "motion.process-partial", level: "note", key: "procesní operace {0}: obrobek „{1}“ neprostřižen – hloubka {2} mm" },
+  { code: "motion.process-approx", level: "note", key: "procesní operace {0}: booleovsky spočítáno {1} z {2} kroků se záběrem (strop výkonu) – mezikroky převzaty" },
+  { code: "motion.process-failed", level: "warn", key: "procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu" },
   { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },
   // pružina po načtení dokumentu (vlna 22, bod 7): délka se odvozuje z dosedacích ploch – cad/asm-spring.ts springDrift
   { code: "spring.stale", level: "warn", key: "pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch" },
@@ -156,7 +175,12 @@ export const CODES = [
   /** odsazení řezu ve starším zápisu (souřadnice na ose) vyloženo postaru – automatický výklad vstupu (přísný režim = ✗) */
   { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
+  // kusovník se na list nevejde ani ve sloupcích (vlna 22, bod 17) – rada: větší formát / kusovník na samostatném listu
+  { code: "drawing.bom-overflow", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
+  // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
+  { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },

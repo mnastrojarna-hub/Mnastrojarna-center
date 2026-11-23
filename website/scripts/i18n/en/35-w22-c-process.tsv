@@ -1,0 +1,101 @@
+# Vlna 22, balík C3 (bod 4): procesní vrstva – střih / otisk řízený pohybem, stav výrobku, geometrická aproximace
+ stav výrobku „{0}“: {1}{2}	 product state "{0}": {1}{2}
+ studie zatím nemá motor – operace se spočítá s pohybem (pohyb motor …)	 the study has no motor yet – the operation is computed with the motion (motion motor …)
+ zásah {0}: {1} mm (geometrická aproximace)	 engagement {0}: {1} mm (geometric approximation)
+, odebráno {0} mm³	, removed {0} mm³
+, odpad {0}	, scrap {0}
+✓ procesní operace smazána: {0}	✓ process operation deleted: {0}
+✓ procesní operace smazány: {0}	✓ process operations deleted: {0}
+bez záběru – nástroj obrobek nezasáhl, obrobek beze změny	no engagement – the tool did not reach the workpiece, workpiece unchanged
+čas [s]	time [s]
+děrovaný	pierced
+děrovaný + označený	pierced + marked
+do prostřižení	until cut through
+Druh operace	Operation type
+drží na nástroji	stays on the tool
+Fáze	Phase
+fáze operace ve studii není	the phase of the operation is not in the study
+geometrická aproximace – ne simulace materiálu	geometric approximation – not a material simulation
+Geometrická aproximace (booleovské odebrání objemu) – ne simulace materiálu: žádné síly, otřep ani odpružení. Restart = plný obrobek, dokument se nemění.	Geometric approximation (Boolean volume removal) – not a material simulation: no forces, burr or springback. Restart = full workpiece, the document does not change.
+Hloubka (0 = do prostřižení)	Depth (0 = until cut through)
+hloubka [mm]	depth [mm]
+hloubka {0} mm	depth {0} mm
+Hloubka otisku	Imprint depth
+hloubka podle nástroje	depth given by the tool
+ℹ procesní operace {0}	ℹ process operation {0}
+jádro bez procesní operace	kernel without the process operation
+kroku {0} (t = {1} s)	step {0} (t = {1} s)
+kroky {0}	steps {0}
+motor podmínky ve studii není	the motor of the condition is not in the study
+naříznutý	notched
+Nástroj	Tool
+neprostřiženo	not cut through
+nespočítáno – {0}	not computed – {0}
+Obrobek	Workpiece
+od času	from time
+od dotyku nástroje	from tool contact
+odebráno {0} mm³	removed {0} mm³
+Odebrat operaci	Remove operation
+Odpad	Scrap
+odpad {0} ks, {1} mm³ ({2})	scrap {0} pcs, {1} mm³ ({2})
+odpad {0} oddělen	scrap {0} separated
+odpad: {0}	scrap: {0}
+odpad: drží na nástroji	scrap: stays on the tool
+odpad: s nástrojem, pak padá	scrap: with the tool, then falls
+odpad: zůstane na místě	scrap: stays in place
+otisk	imprint
+Otisk / ražení	Imprint / stamping
+označený	marked
+plný	full
+podmínka vazby: vazbu nepohání žádný motor – zadejte motor, čas nebo fázi (fáze "…")	mate condition: no motor drives the mate – give a motor, a time or a phase (phase "…")
+pohyb proces střih|ražení "<nástroj>" "<obrobek>" [hloubka H] [při vazba "X" <= v | při motor N <= v | od T s | fáze "F"] [odpad padá|s nástrojem|zůstane] [název "…"] · pohyb proces [seznam] · pohyb proces [N] smazat	motion process cut|imprint "<tool>" "<workpiece>" [depth H] [when mate "X" <= v | when motor N <= v | from T s | phase "F"] [scrap fall|tool|stay] [name "…"] · motion process [list] · motion process [N] delete
+proces {0}	process {0}
+proces ražení: zadejte hloubku otisku – hloubka 0,3	process imprint: give the imprint depth – depth 0.3
+proces smazat: nečekané „{0}“ – {1}	process delete: unexpected "{0}" – {1}
+proces: {0}	process: {0}
+proces: hloubka musí být kladná (mm), např. hloubka 0,3	process: the depth must be positive (mm), e.g. depth 0.3
+proces: hodnota podmínky „{0}“ není číslo	process: the condition value "{0}" is not a number
+proces: nástroj a obrobek musí být různé komponenty – „{0}“	process: tool and workpiece must be different components – "{0}"
+proces: neznámá volba „{0}“ – {1}	process: unknown option "{0}" – {1}
+proces: odpad padá | s nástrojem | zůstane	process: scrap fall | tool | stay
+proces: operace „{0}“ ve studii není – operací: {1}	process: operation "{0}" is not in the study – operations: {1}
+proces: podmínka – při vazba "X" <= v | při motor N <= v | od T s | fáze "F"	process: condition – when mate "X" <= v | when motor N <= v | from T s | phase "F"
+proces: podmínka potřebuje operátor <= nebo >= a hodnotu – při vazba "ZDVIH" <= 1	process: the condition needs an operator <= or >= and a value – when mate "STROKE" <= 1
+proces: při motor <N> <= hodnota	process: when motor <N> <= value
+proces: při vazba <N|"název"> <= hodnota	process: when mate <N|"name"> <= value
+proces: studie nemá procesní operace	process: the study has no process operations
+proces: zadejte nástroj a obrobek – {0}	process: give the tool and the workpiece – {0}
+proces: zadejte střih nebo ražení – {0}	process: give cut or imprint – {0}
+procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu	process operation {0}: the Boolean operation failed ({1}) – result only up to the last valid state
+procesní operace {0}: booleovsky spočítáno {1} z {2} kroků se záběrem (strop výkonu) – mezikroky převzaty	process operation {0}: {1} of {2} engaged steps computed with Booleans (performance cap) – intermediate steps carried over
+procesní operace {0}: nástroj „{1}“ obrobek „{2}“ v okně operace nezasáhl – obrobek beze změny	process operation {0}: tool "{1}" did not reach workpiece "{2}" in the operation window – workpiece unchanged
+procesní operace {0}: obrobek „{1}“ neprostřižen – hloubka {2} mm	process operation {0}: workpiece "{1}" not cut through – depth {2} mm
+procesní operace s komponentou mimo skript se do skriptu nepřenáší ({0})	process operations with a component outside the script are not written to the script ({0})
+Procesní operace: {0}	Process operations: {0}
+procesní operace: komponenta „{0}“ v sestavě není	process operation: component "{0}" is not in the assembly
+procesní operace: nástroj „{0}“ musí být díl, ne podsestava	process operation: tool "{0}" must be a part, not a subassembly
+procesní operace: obrobek „{0}“ musí být díl, ne podsestava	process operation: workpiece "{0}" must be a part, not a subassembly
+procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci {0}	process layer (geometric approximation, not a material simulation): at the end {0}
+Procesní vrstva (střih, otisk)	Process layer (cut, imprint)
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)	Process layer: geometric approximation – Boolean removal of the tool volume from the workpiece; this is not a material simulation (no forces, burr, springback or material flow)
+Procesní vrstva: žádné operace – pohyb proces střih "Razník" "Plech"	Process layer: no operations – motion process cut "Punch" "Sheet"
+prostřiženo v {0}	cut through in {0}
+Průběh operací	Operation progress
+Přidat operaci	Add operation
+s nástrojem, pak padá	with the tool, then falls
+se začátkem fáze	with the start of a phase
+se začátkem fáze „{0}“	with the start of phase "{0}"
+Skrýt průběh operací	Hide operation progress
+Stav výrobku „{0}“: {1}	Product state "{0}": {1}
+střih	cut
+Střih / děrování	Cut / punching
+v záběru	engaged
+záběr od {0}	engaged from {0}
+Začátek operace	Operation start
+začátek operace nenastal – obrobek beze změny	the operation did not start – workpiece unchanged
+zůstane na místě	stays in place
+procesní vrstva pohybové studie: postupný střih / děrování a otisk s řízenou hloubkou jako geometrická aproximace (booleovské odebrání, ne simulace materiálu), oddělený odpad, stav výrobku po krocích (plný → v záběru → děrovaný / označený), pracovní záběr = ℹ clash.work; strojová pole level=kin+geo proc= removed= scrap= through=	process layer of the motion study: progressive cut / punching and imprint with controlled depth as a geometric approximation (Boolean removal, not a material simulation), separated scrap, product state per step (full → engaged → pierced / marked), working contact = ℹ clash.work; machine fields level=kin+geo proc= removed= scrap= through=
+ + geometrická aproximace (procesní operace – spočítá se s pohybem)	 + geometric approximation (process operation – computed with the motion)
+pohyb událost … odeber "<nástroj>" z "<obrobek>" – {0}	motion event … remove "<tool>" from "<workpiece>" – {0}
+pohyb úroveň: úroveň se nevolí – kinematika / kvazistatika / dynamika = pohyb kinematika | kvazistatika | dynamika; „+ geometrická aproximace“ = procesní operace (pohyb proces střih …); „{0}“ není volba	motion level: the level is not chosen – kinematics / quasi-statics / dynamics = motion kinematic | quasistatic | dynamic; "+ geometric approximation" = a process operation (motion process cut …); "{0}" is not an option
+krok {0}	step {0}

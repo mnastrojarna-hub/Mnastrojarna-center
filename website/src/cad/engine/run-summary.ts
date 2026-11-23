@@ -10,6 +10,7 @@
  * * dokumenty z dřívějších běhů relace, které běh nezměnil, zůstávají bez stavby (`V=-`) – relace se 70 díly nestaví 70×;
  * * prázdný dokument, který běh založil (prázdná sestava, B1), má řádek D vždy; prázdný úvodní díl relace ne.
  */
+import { sheetOverlapsOf } from "./sheet-eval";
 import { flattenLeaves } from "../asm-flatten";
 import { sourceKey } from "../assembly";
 import { clashStale } from "../clash-class";
@@ -82,6 +83,11 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
   if (d.drawings?.length) s.sheets = d.drawings.length;
   // revize modelu u dokumentu s výstupy (listy, záznamy exportů) – řádek D `rev=`, JSON `docs[].rev` (vlna 22, bod 20)
   if (d.kind !== "draft" && (d.drawings?.length || d.outputs?.length)) s.rev = modelId(d).rev;
+  // překryvy na listech (vlna 22, bod 17): jen když vyhodnocení listů v tomto běhu zkontrolovalo všechny listy dokumentu
+  if (d.kind !== "draft" && d.drawings?.length) {
+    const ov = sheetOverlapsOf(d);
+    if (ov !== null) s.overlaps = ov;
+  }
   if (s.kind === "assembly") {
     s.components = d.components?.length ?? 0;
     s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;
@@ -144,7 +150,9 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
     // prvek bez kontroly platnosti tělesa se mezi ✓ nepočítá (vlastní počet `unchecked`, feature-levels.ts)
     s.features = featureCounts(res.status);
     if (res.metrics) {
-      s.volume_mm3 = res.metrics.volume;
+      // bez objemového tělesa (22c) objem ani hmotnost nejsou – řádek D `V=- m=-`, JSON bez `volume_mm3` / `mass_kg`
+      const noSolid = res.metrics.solids === 0;
+      if (!noSolid) s.volume_mm3 = res.metrics.volume;
       s.bbox = res.metrics.bbox;
       if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
       if (res.metrics.free) s.free = res.metrics.free;
@@ -159,7 +167,7 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
       const mt = MATERIALS.find((m) => m.id === d.material);
       if (mt) {
         s.density = mt.density;
-        s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
+        if (!noSolid) s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
       }
     }
     const error = s.features.error;

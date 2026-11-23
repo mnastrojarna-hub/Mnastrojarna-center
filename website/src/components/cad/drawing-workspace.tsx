@@ -16,7 +16,7 @@ import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
-import { dimCheck } from "@/cad/dim-check";
+import { DimCheckPanel } from "./dim-check-panel";
 import { activeSheet, mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
 import { drawingBase, drawingFile, drawingFileSheets, drawingSheetsOut, type DrawingExportFormat } from "@/cad/drawing-export";
 import { drawingKey, drawingSets, inDrawing, nextDrawingName } from "@/cad/drawing-sets";
@@ -30,6 +30,7 @@ import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSectio
 import { useDrawingSelection } from "./drawing-select";
 import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
+import { OverlapMarkers, PositionsPanel } from "./drawing-positions-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
 import { registerFlush } from "./flush-barrier";
@@ -51,6 +52,8 @@ type Props = {
   bbox?: [Vec3, Vec3];
   /** uložení údajů razítka zpět do dokumentu */
   onPropsChange?: (p: NonNullable<CadDoc["props"]>) => void;
+  /** pojmenované šablony hlavičky dokumentu (vlna 22, bod 22j) */
+  onTitleTemplates?: (t: CadDoc["titleTemplates"]) => void;
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
   /**
@@ -167,7 +170,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
   /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
   const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
@@ -199,6 +202,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     }
   });
   const [res, setRes] = useState<DrawingResult | null>(null);
+  // značky překryvů přes list (panel Pozice a překryvy – vlna 22, bod 17)
+  const [showOv, setShowOv] = useState(true);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ms, setMs] = useState(0);
@@ -533,7 +538,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [doc, meta, threads, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
+  }, [doc, mid, meta, threads, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
 
   const set = <K extends keyof DrawingOptions>(k: K, v: DrawingOptions[K]) => {
     markDirty();
@@ -618,7 +623,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** listy exportu (id) */
   const exportedIds = () => (exportAll ? sheets.map((x) => x.id) : [saved?.id ?? ""]).filter(Boolean);
   /** záznam exportu do dokumentu (revize modelu, čas) – vlna 22, bod 20 */
-  const noteExport = (format: DrawingExportFormat, file: string) => onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}) });
+  const noteExport = (format: DrawingExportFormat, file: string) => {
+    const revStale = !!mid && (exportAll ? sheets : saved ? [saved] : []).some((x) => x.issued && x.issued.sig !== mid.sig);
+    onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}), ...(revStale ? { revStale } : {}) });
+  };
   /** vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → upozornění u exportu */
   const staleNote = () => {
     if (!mid) return "";
@@ -1245,29 +1253,22 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <button type="button" onClick={() => setCheckOpen((v) => !v)} className="w-full rounded-md border border-ink-700/15 px-2 py-1 text-[11.5px] hover:bg-steel-100">
                 {checkOpen ? tr("Skrýt kontrolu kót") : tr("Kontrola kót – co chybí")}
               </button>
-              {checkOpen &&
-                (() => {
-                  const items = dimCheck(doc, bbox ?? null, out?.texts ?? []);
-                  const missing = items.filter((i) => !i.present);
-                  return (
-                    <div data-dim-check className="mt-1 rounded-md border border-ink-700/10 bg-steel-100/60 p-2 text-[11px]">
-                      <p className="font-semibold">{missing.length ? tr("Chybí {0} z {1} očekávaných kót", missing.length, items.length) : tr("Všech {0} očekávaných kót je na listu", items.length)}</p>
-                      <TolCheckBlock views={out?.views ?? []} ann={ann} opts={opts} />
-                      {missing.length > 0 && (
-                        <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
-                          {missing.map((m, i) => (
-                            <li key={i} className="flex gap-1">
-                              <span className="text-brand">✗</span>
-                              <span className="min-w-0 flex-1 truncate">{m.label}</span>
-                              <span className="shrink-0 text-ink-700/45">{m.source}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <p className="mt-1 leading-snug text-ink-700/55">{tr("Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.")}</p>
-                    </div>
-                  );
-                })()}
+              {checkOpen && (
+                // kontrola kót pro výrobu (vlna 22, bod 18): velikosti / polohy, „Přidat kótu“, funkční prvky – cad/dim-complete.ts
+                <DimCheckPanel
+                  doc={doc}
+                  out={out}
+                  ann={ann}
+                  opts={opts}
+                  flash={flash}
+                  onAdd={(made) => {
+                    setAnn((l) => [...l, ...made]);
+                    markDirty();
+                  }}
+                >
+                  <TolCheckBlock views={out?.views ?? []} ann={ann} opts={opts} />
+                </DimCheckPanel>
+              )}
             </div>
             {ann.length > 0 && (
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
@@ -1462,6 +1463,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {tr("Pozice komponent – balónky (")}{balloons.length})
               </Check>
             ) : null}
+            {/* pozice po pohledech, zámek, umístění kusovníku, překryvy listu (vlna 22, bod 17) */}
+            {balloons?.length || bom?.length ? <PositionsPanel res={res} out={out} opts={opts} set={set} showMarkers={showOv} onShowMarkers={setShowOv} hasBom={!!bom?.length && showBom} /> : null}
             {genEditCount(opts.genEdit) > 0 && (
               // vygenerované kóty celkových rozměrů a pozice skryté (Delete) nebo posunuté výběrem na listu
               <button type="button" data-gen-restore onClick={() => set("genEdit", undefined)} title={tr("Vrátí vygenerované kóty celkových rozměrů a pozice na výchozí místo – i skryté klávesou Delete")} className="mb-1.5 rounded-md border border-ink-700/15 px-2 py-1 text-[11px] hover:bg-steel-100">
@@ -1509,7 +1512,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
 
           <Section title={tr("Razítko")}>
             {/* šablona, logo, firma, všechna pole a nepředepsané tolerance (drawing-title-panel.tsx – jako výkres razítko …) */}
-            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} />
+            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} docTemplates={doc.titleTemplates} onDocTemplates={onTitleTemplates} />
             <Row label={tr("Opracování hran")}>
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>
@@ -1630,6 +1633,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             </svg>
           )}
           {res && <ViewToolsOverlay vt={vt} res={res} tf={view} />}
+          {showOv && <OverlapMarkers out={out} tf={view} />}
           {bsel.overlay}
           {bsel.hint}
           {res && lostGeom && (

@@ -11,7 +11,7 @@ Large assembly: every part as a block `new part "…"`, then in the assembly tab
 
 ## Part (tab “Plate”)
 `box 100 60 12` · `sketch XY: rect 30 18 corner 60 36` · `constraint fixed e1.c0` · `dim length e1.s0 30` → `extrude 4 cut`
-`fillet 2 edges vertical` · `chamfer 1 edges top` · `material steel` · `variable t = 12` · edits: `edit "Fillet 1" radius=3` · `suppress "Chamfer 1"` · `delete last`
+`fillet 2 edges vertical` · `chamfer 1 edges top` · `material 1.2379` · `variable t = 12` · edits: `edit "Fillet 1" radius=3` · `suppress "Chamfer 1"` · `delete last`
 Elsewhere: `cylinder 20 30 at 50 30 12` · `sketch XZ: rect 10 30 corner 0 0` → `revolve 360 axis Z` · `pattern circular 6 axis Z at 50 30 0` · `mirror YZ` · `library M8x30` · `spring compression d 2 De 20 L0 50 n 8` (part from the table) · `undo` (between runs only – undoes a whole run, not a line)
 
 ## Holes and threads
@@ -19,17 +19,17 @@ Elsewhere: `cylinder 20 30 at 50 30 12` · `sketch XZ: rect 10 30 corner 0 0` �
 Part check: `status` · `measure body` · `measure holes` · `check`
 
 ## Assembly (tab “Tool”)
-`new part "Pin"` · `cylinder 20 30` · `tab "Tool"` · `insert "Plate" at 0 0 0 fixed as "D1"` · `insert "Pin" at 25 30 40` · `assembly component #2 alias "K48"` · `assembly` (components, count) · `assembly faces "K48"`
+`new part "Pin"` · `cylinder 20 30` · `material 1.0503` · `tab "Tool"` · `insert "Plate" at 0 0 0 fixed as "D1"` · `insert "Pin" at 25 30 40` · `assembly component #2 alias "K48" number "MN-2"` · `assembly component "D1" number "MN-1"` · `assembly` (components, count) · `assembly faces "K48"`
 `assembly mate concentric "K48" Ø20 "D1" Ø21` · `assembly mate distance "K48" -Z "D1" top value 20` · `assembly mates` · `clash` · `bom` · `check assembly`. Elsewhere: `assembly mate contact "K48" -Z "D1" top`
 
 ## Springs and motion
 `assembly spring new d 2 De 20 L0 35 n 6 between "D1" Ø21 "K48" bottom` (“all holes” at the end = into every hole of the pattern) · `assembly springs`
-`motion motor linear mate 2 12..20 step 4 collisions` (mate 2 = Distance; no motor on a Contact mate) · `motion status` · `motion dynamics time 0.1 gravity -Z` · `motion mass "K48" 2.5` · `motion kinematics`
+`motion motor linear mate 2 20..12 step 4 collisions` (mate 2 = Distance; no motor on a Contact mate) · `motion status` · `motion dynamics time 0.1 gravity -Z` · `motion mass "K48" 2.5` · `motion kinematics`
 Bolt into a hole only after the dynamics (a free part would fall under gravity): `assembly bolt "D1" Ø9`. Elsewhere: `motion motor rotary "K48" 0..360 step 5`
 
 ## Drawing (part tab)
 `tab "Plate"` · `drawing A3 scale 1:1 views front,top,iso` · `drawing section XZ offset -30` (plane Y = 30; without the offset it lies on the face) · `dimension smart functional 100` · `drawing tolerance 100 ±0.05` · `drawing tolerance Ø21 H7`
-`drawing titleblock template=iso7200 number="MN-1"` · `drawing general ISO 2768-mK` · `drawing sheet new "Detail"` · `dimension none` · `drawing detail front at 25 8 radius 6` · `drawing status all` · `drawing export pdf all`. Elsewhere (assembly drawing): `drawing bom yes`
+`drawing titleblock template=iso7200` · `drawing general ISO 2768-mK` · `drawing sheet new "Detail"` · `dimension none` · `drawing detail front at 25 8 radius 6` · `drawing status all` · `drawing export pdf all`. Elsewhere (assembly drawing): `drawing bom yes`
 
 ## Outputs and links
 `save` · `export step` · `export script` · `share` · `link` (address again) · CLI `--formats step,pdf,dxf` and `--share`. Elsewhere (storage): `share days 30` · `export step link`

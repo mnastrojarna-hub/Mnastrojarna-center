@@ -119,7 +119,6 @@ porovnání: díl nemá těleso	comparison: the part has no body
 Prázdný dokument nelze sdílet – nejdřív vytvořte nebo otevřete díl.	An empty document cannot be shared – create or open a part first.
 prvek „{0}“ v historii není – prvky: {1}	feature “{0}” is not in the history – features: {1}
 řez má jednu polohu – {0}	a section has one position – {0}
-řez modelem rovinou kolmou na osu v poloze (mm, bez polohy střed modelu); obráceně = druhá strana; protokol vypíše rozsah modelu v ose	model section by a plane normal to the axis at a position (mm, without a position the model centre); flip = the other side; the log prints the model range along the axis
 řez potřebuje osu, na kterou je rovina kolmá: {0}	section needs the axis the plane is normal to: {0}
 řez vyp nemá další volby – {0}	section off has no further options – {0}
 řez X|Y|Z [poloha] [obráceně] · řez vyp	section X|Y|Z [offset] [flip] · section off

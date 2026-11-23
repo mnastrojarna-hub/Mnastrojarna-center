@@ -1,0 +1,111 @@
+=== run 1 ===
+✓ nový díl „Plech“ – nová záložka
+→ Skica 1 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 1“ (e1)
+→ Plošné vysunutí (ext) přidán – výsledek po výpočtu níže
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 50 × 30 × 20 mm (X 0…50, Y 0…30, Z 0…20) · objem – (žádné těleso) · ploch 2 · hran 7
+Geometrie: ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid
+Prvky:
+ 1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: čára 3 b.
+    entity: e1 čára 3 b. [0; 0]→[50; 0]→[50; 30] otevřená
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [0; 0] a [50; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 2. Plošné vysunutí [ext, id #] ✓ žádné objemové těleso – 
+ℹ export STEP: c1-plocha.step · 6,9 kB · STEP AP214 – staženo (bez dialogu)
+  ✗ kontrola STEP: soubor neobsahuje objemové těleso (těles 0, volných skořepin 1, volných ploch 0) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě
+✓ nový díl „Deska A“ – nová záložka
+→ Skica 2 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 2“ (e1)
+→ Plošné vysunutí (ext) přidán – výsledek po výpočtu níže
+→ Skica 3 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 3“ (e1)
+→ Rovinná plocha (ext) přidán – výsledek po výpočtu níže
+→ Skica 4 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 4“ (e1)
+→ Rovinná plocha (ext) přidán – výsledek po výpočtu níže
+→ Sešít plochy (ext) přidán – výsledek po výpočtu níže
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 7 (7 ✓, 0 ✗)
+Rozměry: 40 × 30 × 20 mm (X -20…20, Y -15…15, Z 0…20) · objem – (žádné těleso) · ploch 6 · hran 12
+Geometrie: ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid
+Prvky:
+ 1. Skica 2 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 40×30
+    entity: e1 obdélník 40×30 [0; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 2. Plošné vysunutí [ext, id #] ✓ žádné objemové těleso – 
+ 3. Skica 3 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 40×30
+    entity: e1 obdélník 40×30 [0; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 4. Rovinná plocha [ext, id #] ✓ žádné objemové těleso – 
+ 5. Skica 4 [sketch, id #] ✓ – rovina XY +20, 1 entit: obdélník 40×30
+    entity: e1 obdélník 40×30 [0; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 6. Rovinná plocha [ext, id #] ✓ žádné objemové těleso – 
+ 7. Sešít plochy [ext, id #] ✓ žádné objemové těleso – 
+ℹ export STEP: c2-skorepina.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+  ✗ kontrola STEP: soubor neobsahuje objemové těleso (těles 0, volných skořepin 1 (uzavřených 1), volných ploch 0) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě
+ℹ export STL: c2-skorepina.stl · 684 B · STL (síť) – staženo (bez dialogu)
+  ✗ STL: model nemá objemové těleso (těles 0, ploch mimo tělesa 6) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)
+ℹ export STEP: c2-bez.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+  – kontrola STEP vynechána („bez kontroly“)
+  ✗ STEP: model nemá objemové těleso (těles 0, ploch mimo tělesa 6) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)
+✓ nový díl „Deska B“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Skica 5 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 5“ (e1)
+→ Plošné vysunutí (ext) přidán – výsledek po výpočtu níže
+Dokument: „Deska B“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 60 × 60 × 20 mm (X -10…50, Y -30…30, Z 0…20) · objem 24 cm³ · ploch 7 · hran 16
+Geometrie: platná · 1 těleso · ploch mimo tělesa 1 (objem jen z těles) · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 40 × 30 × 20 mm, new, roh [0; 0; 0]
+ 2. Skica 5 [sketch, id #] ✓ – rovina XZ, 1 entit: čára 2 b.
+    entity: e1 čára 2 b. [-10; 5]→[50; 5] otevřená
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-10; 5] a [50; 5]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 3. Plošné vysunutí [ext, id #] ✓ těleso platné + 1 volná plocha – 
+✓ export STEP: c3-teleso-plocha.step · 21 kB · STEP AP214 – staženo (bez dialogu)
+  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 7
+  ⚠ kontrola STEP: soubor obsahuje vedle těles (1) i plochy mimo tělesa (volných skořepin 1, volných ploch 0) – nejsou objemem, objem a hmotnost jsou jen z těles
+✓ nový díl „Deska C“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Skica 6 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 6“ (e1)
+→ Tažení 1 (sweep) přidán – výsledek po výpočtu níže
+Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 120 × 100 × 40 mm (X -60…60, Y -50…50, Z 0…40) · objem 476,36 cm³ · ploch 9 · hran 21
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 480000 mm³ · těleso platné – 120 × 100 × 40 mm, new, roh [-60; -50; 0]
+ 2. Skica 6 [sketch, id #] ✓ – rovina XY +35, 1 entit: spline
+    entity: e1 spline 4 b. [-60; 45]→[-20; 30]→[20; 45]→[60; 30]
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-60; 45] a [60; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 3. Tažení 1 [sweep, id #] ✓ úběr 3643,6 mm³ (>99 % nástroje) · těleso platné – 
+✓ export STEP: c4-forma.step · 133 kB · STEP AP214 – staženo (bez dialogu)
+  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 9
+  ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 476 356 mm³ (rozdíl 0,0000 %), obálka 120,00 × 100,00 × 40,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
+✓ Skica 1 (sketch)
+✓ Plošné vysunutí (ext) · žádné objemové těleso
+✓ Skica 2 (sketch)
+✓ Plošné vysunutí (ext) · žádné objemové těleso
+✓ Skica 3 (sketch)
+✓ Rovinná plocha (ext) · žádné objemové těleso
+✓ Skica 4 (sketch)
+✓ Rovinná plocha (ext) · žádné objemové těleso
+✓ Sešít plochy (ext) · žádné objemové těleso
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Skica 5 (sketch)
+✓ Plošné vysunutí (ext) · těleso platné + 1 volná plocha
+✓ Kvádr 2 (box) · přidáno 480000 mm³ · těleso platné
+✓ Skica 6 (sketch)
+✓ Tažení 1 (sweep) · úběr 3643,6 mm³ (>99 % nástroje) · těleso platné
+
+Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 120 × 100 × 40 mm (X -60…60, Y -50…50, Z 0…40) · objem 476,36 cm³ · ploch 9 · hran 21
+Geometrie: platná · 1 těleso · přesná kontrola
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 480000 mm³ · těleso platné – 120 × 100 × 40 mm, new, roh [-60; -50; 0]
+ 2. Skica 6 [sketch, id #] ✓ – rovina XY +35, 1 entit: spline
+    entity: e1 spline 4 b. [-60; 45]→[-20; 30]→[20; 45]→[60; 30]
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-60; 45] a [60; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 3. Tažení 1 [sweep, id #] ✓ úběr 3643,6 mm³ (>99 % nástroje) · těleso platné –

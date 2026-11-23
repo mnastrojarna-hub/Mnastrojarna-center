@@ -21,7 +21,7 @@
  * a řídicí znaky jsou v textech a názvech nahrazené mezerou – každý řádek projde právě jedním regexem `GRAMMAR`.
  *
  * Priorita zařazení do rozpočtu: hlavička + Σ + řádek O (odkaz; delší než 200 znaků zkrácený na začátek adresy a délku)
- * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > jednořádkové `=` > D (hlavní dokument a dokumenty s ✗/⚠) > víceřádkové
+ * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > D hlavního dokumentu > jednořádkové `=` > D dokumentů s ✗/⚠ > víceřádkové
  * výpisy > ℹ převzetí záložky (`doc.reused`, `doc.name-taken` – i bez `notes`, víc dokumentů jedním řádkem `×N` –
  * `mergeTakeovers`) > ostatní ℹ (jen `notes`). Pořadí tisku:
  * hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
@@ -41,6 +41,7 @@ import { CODE_RE, codeArgs, codeDef, codeEntry, fallbackCode, type Code, type Co
 import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
 import type { RunStamp } from "./run-queue";
+import { withEntryIds } from "./entry-ids";
 
 export const PROTOCOL_HEAD = "MNCAD/1";
 export const OVERFLOW_FILE = "protocol-full.txt";
@@ -405,6 +406,7 @@ export function docKv(d: DocSummary): string {
     if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
     kv.push(`V=${volCm3(d.volume_mm3)}`);
     if (d.mass_kg !== undefined) kv.push(`m=${fmtNum(d.mass_kg, 3)}kg`);
+    else if (d.solids === 0) kv.push("m=-"); // bez tělesa hmotnost není (22c)
     kv.push(`bbox=${bboxSize(d.bbox)}`);
   } else if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
@@ -419,6 +421,7 @@ export function docKv(d: DocSummary): string {
   if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓
   if (d.rev) kv.push(`rev=${d.rev}`); // revize modelu dokumentu s výkresy / exporty (vlna 22, bod 20 – před `stale=`)
   if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
+  if (d.overlaps !== undefined) kv.push(`overlaps=${d.overlaps}`); // překryvy na listech zkontrolovaných v běhu (vlna 22, bod 17 – jen po kontrole)
   return `${kind} ${kv.join(" ") || "-"}`;
 }
 
@@ -492,6 +495,7 @@ export function sigmaLine(r: RunReport): string {
   } else if (m?.kind === "part") {
     kv.push(`V=${volCm3(m.volume_mm3)}`);
     if (m.mass_kg !== undefined) kv.push(`m=${fmtNum(m.mass_kg, 3)}kg`);
+    else if (m.solids === 0) kv.push("m=-");
   }
   kv.push(`files=${r.files.length}`);
   // opakovaný běh (engine/runs.ts): převzaté záložky a nové záložky vedle záložky téhož názvu – vždy vidět, i když se
@@ -521,7 +525,7 @@ export type ShortOptions = { budget?: number; notes?: boolean };
 export type ShortProtocol = { text: string; bytes: number; budget: number; overflow?: Overflow };
 
 /** priorita zařazení (menší = dřív); `shownNote` = ℹ s `short` v registru kódů (převzetí záložky) – i bez volby `notes` */
-const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, shownNote: 6, note: 7 } as const;
+const PRIO = { error: 0, warn: 1, out: 2, mainDoc: 3, req: 4, doc: 5, listing: 6, shownNote: 7, note: 8 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
 /**
@@ -570,6 +574,8 @@ function candidates(r: RunReport, notes: boolean): Item[] {
     if (e.level === "error") add(PRIO.error, GROUP.error, i, msgLine(e, false));
     else if (e.level === "warn") add(PRIO.warn, GROUP.warn, i, msgLine(e, false));
     else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
+    // vypnuté úložiště odkazů (vlna 22, bod 16): ℹ se nesmí ztratit v přebytku za výpisy odkazů – priorita jako F / O
+    else if (e.level === "note" && e.code === "share.store-off") add(PRIO.out, GROUP.note, i, msgLine(e, false));
     else if (e.level === "note" && e.code && codeDef(e.code)?.short) add(PRIO.shownNote, GROUP.note, i, msgLine(e, false));
     else if (e.level === "measure") {
       const t = measureText(e);
@@ -584,7 +590,9 @@ function candidates(r: RunReport, notes: boolean): Item[] {
   const flagged = new Set(entries.filter((e) => (e.level === "error" || e.level === "warn") && e.doc).map((e) => e.doc as string));
   r.docs.forEach((d, i) => {
     const bad = (d.features?.error ?? 0) > 0 || (d.features?.warn ?? 0) > 0 || flagged.has(d.name) || flagged.has(d.ref);
-    if (d === main || bad) add(PRIO.doc, GROUP.doc, d === main ? -1 : i, docLine(d));
+    // řádek D hlavního dokumentu (co běh postavil: komponenty, vazby, objemy, hmotnost, obálka, kolize, revize) má přednost
+    // před výpisy `=` – skript jich může vyžádat libovolně mnoho a hlavní souhrn by vytlačily do přebytku (vlna 22, brána synth)
+    if (d === main || bad) add(d === main ? PRIO.mainDoc : PRIO.doc, GROUP.doc, d === main ? -1 : i, docLine(d));
   });
   r.files.forEach((f, i) => add(PRIO.out, GROUP.file, i, fileLine(f)));
   return items; // řádek O (odkaz) je pevný jako hlavička a Σ (shortProtocol)
@@ -698,7 +706,10 @@ export function formatFull(r: RunReport): string {
   for (const e of sorted) out.push(e.level === "measure" ? measureText(e, true) : msgLine(e, true));
   for (const d of r.docs) out.push(docLine(d));
   for (const f of r.files) out.push(fileLine(f));
-  if (r.share) out.push(linkLine(r.share));
+  // každý odkaz běhu celý (vlna 22, bod 16); poslední = `share`
+  const links = r.shares?.length ? [...r.shares] : [];
+  if (r.share && !links.some((x) => x.url === r.share!.url)) links.push(r.share);
+  for (const l of links) out.push(linkLine(l));
   out.push(sigmaLine(r));
   return out.join("\n");
 }
@@ -716,7 +727,7 @@ export type FinalizeOptions = ShortOptions & { full?: boolean };
 export function finalizeReport(r: RunReport, o: FinalizeOptions = {}): RunReport {
   const { console: _console, ...rest } = r; // text konzole prohlížeče se do JSON / HTTP nepřenáší
   void _console;
-  const merged: RunReport = { ...rest, entries: mergeEntries(r.entries) };
+  const merged: RunReport = { ...rest, entries: withEntryIds(mergeEntries(r.entries)) }; // stabilní id záznamů (vlna 22, bod 15)
   const s = shortProtocol(merged, o);
   const out: RunReport = { ...merged, protocol: s.text };
   if (s.overflow) out.overflow = s.overflow;
@@ -743,6 +754,8 @@ export class ReportBuilder {
   private stoppedAt?: { line: number | null; code: string };
   /** odkaz vytvořený během běhu (text `sdílet` / `odkaz`) – řádek O, pokud ho `finish` nepřepíše (`--share`) */
   private sharedLink?: ShareInfo;
+  /** všechny odkazy běhu (vlna 22, bod 16) – `RunReport.shares` */
+  private sharedLinks: ShareInfo[] = [];
   /** přísný režim běhu (volba + řádky `přísně`) – CLI podle něj zastaví i závěrečnou stavbu a výstupy (engine/strict.ts) */
   strictMode?: StrictState;
   private readonly t0: number;
@@ -783,6 +796,9 @@ export class ReportBuilder {
   /** sdílený odkaz z běhu (poslední vyhrává; `finish({ share })` má přednost) */
   setShare(s: ShareInfo): void {
     this.sharedLink = s;
+    // každý odkaz běhu zůstane v `shares` (tři `sdílet` = tři adresy); `odkaz` (znovu vypsaný poslední) se nepřidá podruhé
+    const last = this.sharedLinks[this.sharedLinks.length - 1];
+    if (!last || last.url !== s.url) this.sharedLinks.push(s);
   }
   /** přísný režim zastavil běh */
   stop(line: number | null, code: string): void {
@@ -813,7 +829,7 @@ export class ReportBuilder {
       ms: this.elapsed(o.ms),
       lang: this.o.lang,
       counts: { lines: this.o.lines, ops: this.ops, ok: this.count("ok"), notes: this.count("note"), warnings: this.count("warn"), errors },
-      entries: mergeEntries(this.list),
+      entries: withEntryIds(mergeEntries(this.list)),
       docs: o.docs ?? [],
       files: o.files ?? [],
       timing: [...this.times].sort((a, b) => b.ms - a.ms).slice(0, 5),
@@ -824,6 +840,8 @@ export class ReportBuilder {
     if (this.run) r.run = { ...this.run };
     const share = o.share ?? this.sharedLink;
     if (share) r.share = share;
+    const shares = o.share && !this.sharedLinks.some((x) => x.url === o.share!.url) ? [...this.sharedLinks, o.share] : [...this.sharedLinks];
+    if (shares.length) r.shares = shares;
     return r;
   }
 }

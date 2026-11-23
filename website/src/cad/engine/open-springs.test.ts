@@ -1,0 +1,97 @@
+/**
+ * Vlna 22, bod 7 – pružina po načtení dokumentu (skutečné jádro in-process, jako engine/acceptance-kernel.test.ts).
+ * Repro: sestava s pružinou 25 mm mezi Přidržovačem a Deskou A; externí úprava JSON posune Desku A o 10 mm níž (ZDVIH 47,5) a
+ * `spring.length` nechá 25. Dřív: `stav` „„Pružina“ 25 mm … ✓“, `kolize` ⚠ clash.real „Deska A“ × „Pružina“ 445,6 mm³, exit 0.
+ * Nyní: po načtení (řádek JSON i CLI `--open` = `preloaded`) ⚠ spring.stale „uložená délka 25 mm … (15 mm)“, `stav` 15 mm
+ * „délka odvozená z dosedacích ploch“, kolize bez průniku pružiny do desky.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { setHostAssets } from "../host-assets";
+import { makeKernelClient } from "../kernel-client";
+import type { CadDoc } from "../types";
+import { memoryFileSink, memoryFileSource, type EngineHost } from "./host";
+import { MemoryWorkspace } from "./memory-workspace";
+import { formatConsole } from "./protocol";
+import { runScript } from "./run";
+import { verifyKeyOf } from "./verify";
+
+const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
+const FONTS = path.resolve(__dirname, "../../../public/fonts");
+
+/** sestava repro bodu 7 (neutrální názvy): Rám, Deska A na ZDVIH 57,5, Přidržovač v Mezi, Pružina mezi Přidržovačem a Deskou A */
+const BUILD = [
+  'nový díl "Rám"',
+  "kvádr 100 100 10",
+  'nový díl "Deska A"',
+  "kvádr 100 100 10",
+  'nový díl "Přidržovač"',
+  "kvádr 60 60 8",
+  'nový díl "Pružina"',
+  "pružina 18 stoupání 5 závity 6 drát 2",
+  'nová sestava "Mechanika"',
+  'vložit "Rám" ukotvit',
+  'vložit "Deska A" v 0 0 67.5',
+  'vložit "Přidržovač" v 20 20 34.5',
+  'vložit "Pružina" v 50 50 42.5',
+  'sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"',
+  'sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"',
+  'sestava vazba zámek "Pružina" "Přidržovač"',
+  'sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20',
+];
+
+/** externí úprava: Deska A o 10 mm níž, ZDVIH 47,5, uložená délka pružiny ponechána */
+function edited(doc: CadDoc): CadDoc {
+  const d = JSON.parse(JSON.stringify(doc)) as CadDoc;
+  for (const c of d.components ?? []) if (c.name === "Deska A") c.placement.position[2] = 57.5;
+  for (const m of d.mates ?? []) if (m.name === "ZDVIH") m.value = 47.5;
+  return d;
+}
+
+describe("bod 7: pružina po načtení dokumentu – délka z dosedacích ploch (jádro)", async () => {
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
+  const { inProcessTransport } = await import("../kernel-inprocess");
+  const kernel = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await kernel.init();
+  const hostOf = (): EngineHost => ({ kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+
+  let built: CadDoc;
+  it("sestava: pružina 25 mm podle dosedacích ploch", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await runScript(ws, BUILD.join("\n"), hostOf());
+    expect(r.counts.errors).toBe(0);
+    built = ws.present();
+    expect(built.components!.find((c) => c.name === "Pružina")!.spring!.length).toBeCloseTo(25, 3);
+  }, 240_000);
+
+  it("řádek JSON: ⚠ spring.stale (25 × 15 mm), stav 15 mm z ploch, kolize bez průniku pružiny", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await runScript(ws, `${JSON.stringify(edited(built))}\nstav\nkolize`, hostOf());
+    const stale = r.entries.filter((e) => e.code === "spring.stale");
+    expect(stale).toHaveLength(1);
+    expect(stale[0].line).toBe(1);
+    expect(stale[0].text).toMatch(/pružina „Pružina“: uložená délka 25 mm neodpovídá dosedacím plochám \(15 mm\)/);
+    const con = formatConsole(r);
+    expect(con).toMatch(/Pružiny: „Pružina“ 15 mm \(L0 32 · Ln 14\) · F 340 N ✓ – délka odvozená z dosedacích ploch/);
+    expect(con).not.toMatch(/Pružiny: „Pružina“ 25 mm/);
+    expect(r.entries.some((e) => e.code === "clash.real" && /Pružina/.test(e.text))).toBe(false);
+    expect(ws.present().components!.find((c) => c.name === "Pružina")!.spring!.length).toBeCloseTo(15, 3);
+  }, 240_000);
+
+  it("CLI --open (preloaded): totéž před skriptem (řádek načtení L-)", async () => {
+    const ws = new MemoryWorkspace();
+    await ws.openInTab(edited(built));
+    const r = await runScript(ws, "stav", hostOf(), { preloaded: [{ key: verifyKeyOf(ws.docKey(), ws.present()), doc: ws.present() }] });
+    const stale = r.entries.filter((e) => e.code === "spring.stale");
+    expect(stale).toHaveLength(1);
+    expect(stale[0].line).toBeNull();
+    expect(formatConsole(r)).toMatch(/„Pružina“ 15 mm .* – délka odvozená z dosedacích ploch/);
+  }, 240_000);
+
+  it("dokument, jehož délka plochám odpovídá: žádné ⚠ spring.stale", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await runScript(ws, `${JSON.stringify(built)}\nstav`, hostOf());
+    expect(r.entries.filter((e) => e.code === "spring.stale")).toEqual([]);
+  }, 240_000);
+});

@@ -93,8 +93,9 @@ describe("registr kódů", () => {
       expect(bad).toEqual([]);
       setLang(lang);
       for (const c of CODES) {
-        const t = codeText(c.code, "A", "B", "C");
-        expect(t, c.code).not.toBe(c.key.replace(/\{0\}/g, "A").replace(/\{1\}/g, "B").replace(/\{2\}/g, "C"));
+        // čtyři argumenty: clash.clearance (vlna 22, bod 6) má i limit {3}
+        const t = codeText(c.code, "A", "B", "C", "D");
+        expect(t, c.code).not.toBe(c.key.replace(/\{0\}/g, "A").replace(/\{1\}/g, "B").replace(/\{2\}/g, "C").replace(/\{3\}/g, "D"));
         expect(t, c.code).not.toMatch(/\{\d\}/);
       }
       setLang("cs");

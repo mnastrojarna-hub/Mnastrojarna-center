@@ -8,6 +8,7 @@
  */
 import { tr } from "./i18n";
 import type { LogoTrace, TitleLogo } from "./title-block";
+import { rasterShapes, sanitizeSvg, svgShapes } from "./title-logo-svg";
 
 /** největší rozměr loga v px (větší se zmenší – logo se ukládá do dokumentu i do sdíleného odkazu) */
 export const LOGO_MAX_W = 600;
@@ -424,7 +425,7 @@ export function traceLogo(r: Raster, maxCols = 160, maxRows = 80): LogoTrace {
 const hasCanvas = () => typeof document !== "undefined" && typeof Image !== "undefined";
 
 /** Obrázek (libovolný formát, který prohlížeč umí) → rastr RGBA (zmenšený) – jen v prohlížeči. */
-export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOGO_MAX_H): Promise<Raster> {
+export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOGO_MAX_H, size?: { w: number; h: number }): Promise<Raster> {
   const img = new Image();
   img.decoding = "async";
   img.src = src;
@@ -432,8 +433,9 @@ export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOG
   let w = img.naturalWidth || img.width || 300;
   let h = img.naturalHeight || img.height || 150;
   const k = Math.min(1, maxW / w, maxH / h);
-  w = Math.max(1, Math.round(w * k));
-  h = Math.max(1, Math.round(h * k));
+  // `size` = pevná velikost rastru (logo SVG: stejná jako bez prohlížeče – vektor se vykreslí do 600 × 300, prohlížeč = CLI)
+  w = size ? size.w : Math.max(1, Math.round(w * k));
+  h = size ? size.h : Math.max(1, Math.round(h * k));
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
@@ -477,9 +479,10 @@ export async function prepareLogo(src: string, name?: string): Promise<{ logo: T
     return { logo: { src: out, w: r.w, h: r.h, ...nm, trace: traceLogo(r) }, warnings };
   }
   if (!kind) throw new Error(tr("logo: neznámý formát obrázku – použijte PNG nebo JPEG"));
+  if (kind === "svg") return prepareSvgLogo(d.bytes, nm, warnings);
   if (hasCanvas()) {
-    // JPEG / SVG / WebP / GIF v prohlížeči: rastr přes canvas → PNG (obrys pro DXF / DWG z rastru)
-    const r = await rasterInBrowser(toDataUrl(d.mime.startsWith("image/") ? d.mime : `image/${kind === "svg" ? "svg+xml" : kind}`, d.bytes));
+    // JPEG / WebP / GIF v prohlížeči: rastr přes canvas → PNG (obrys pro DXF / DWG z rastru)
+    const r = await rasterInBrowser(toDataUrl(d.mime.startsWith("image/") ? d.mime : `image/${kind}`, d.bytes));
     return { logo: { src: toDataUrl("image/png", await encodePng(r)), w: r.w, h: r.h, ...nm, trace: traceLogo(r) }, warnings };
   }
   if (kind === "jpeg") {
@@ -489,4 +492,32 @@ export async function prepareLogo(src: string, name?: string): Promise<{ logo: T
     return { logo: { src: toDataUrl("image/jpeg", d.bytes), w: s.w, h: s.h, ...nm }, warnings };
   }
   throw new Error(tr("logo {0} jde převést jen v prohlížeči – bez něj použijte PNG nebo JPEG", kind.toUpperCase()));
+}
+
+/**
+ * Logo SVG (vlna 22, bod 22j): uloží se očištěné SVG (vektor do SVG / PDF výkresu, do dokumentu, sdílení i skriptu) a k němu
+ * PNG náhled + obrys pro DXF / DWG. Náhled v prohlížeči přes canvas, bez prohlížeče (CLI) z tvarů SVG (cad/title-logo-svg.ts);
+ * co tvary neumí (text, gradient, obrázek v SVG), ohlásí upozornění. SVG bez kreslitelných tvarů mimo prohlížeč = jen vektor.
+ */
+async function prepareSvgLogo(bytes: Uint8Array, nm: { name?: string }, warnings: string[]): Promise<{ logo: TitleLogo; warnings: string[] }> {
+  let clean: string;
+  try {
+    clean = sanitizeSvg(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error(tr("logo: soubor SVG nemá prvek <svg>"));
+  }
+  const svg = toDataUrl("image/svg+xml", new TextEncoder().encode(clean));
+  const doc = svgShapes(clean);
+  const k = Math.min(LOGO_MAX_W / doc.w, LOGO_MAX_H / doc.h);
+  const W = Math.max(1, Math.round(doc.w * k));
+  const H = Math.max(1, Math.round(doc.h * k));
+  let r: Raster | null = null;
+  if (hasCanvas()) r = await rasterInBrowser(svg, W, H, { w: W, h: H }).catch(() => null); // stejný rozměr jako `rasterShapes` (CLI)
+  if (!r && doc.shapes.length) r = rasterShapes(doc, W, H);
+  if (doc.skipped.length && !hasCanvas()) warnings.push(tr("logo SVG: {0} se bez prohlížeče do náhledu a obrysu DXF/DWG nepřenese (vektor v SVG a PDF zůstává)", doc.skipped.join(", ")));
+  if (!r) {
+    warnings.push(tr("logo SVG bez kreslitelných tvarů: náhled ani obrys pro DXF/DWG nejsou – v SVG a PDF zůstane vektor"));
+    return { logo: { src: svg, w: W, h: H, ...nm, svg }, warnings };
+  }
+  return { logo: { src: toDataUrl("image/png", await encodePng(r)), w: r.w, h: r.h, ...nm, trace: traceLogo(r), svg }, warnings };
 }

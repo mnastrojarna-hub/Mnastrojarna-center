@@ -1,7 +1,7 @@
 "use client";
 
 import { langMeta, tr } from "@/cad/i18n";
-import { Component, forwardRef, isValidElement, useImperativeHandle, useState, type ReactNode, type Ref } from "react";
+import { Component, forwardRef, isValidElement, useEffect, useImperativeHandle, useState, type ReactNode, type Ref } from "react";
 import { explainRenderFailure, type RenderFailure } from "@/cad/diagnostics";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -9,6 +9,10 @@ import { softView, usePublishPickProps, useSoftPickProps, type SoftPickProps } f
 import { mouseHint } from "./box-pick-3d";
 import type { ViewportHandle } from "./viewport";
 import { SOFT_BTN, SoftViewport, type SoftScene } from "./viewport-soft";
+import { SOFT_LIMITS, SOFT_PICK_ALTERNATIVES, softStatusText } from "@/cad/soft-view";
+
+/** událost „ukaž omezení softwarového zobrazení“ (tlačítko stavu prostředí v horní liště – vlna 22, bod 21) */
+export const SOFT_WHY_EVENT = "mncad:soft-why";
 
 /**
  * Hranice chyb kolem 3D okna: výjimka při vykreslování nebo v efektech 3D okna neshodí celou aplikaci –
@@ -70,6 +74,11 @@ export function ViewportFallback({ failure, core, onRetry, onCopy, scene, hidden
   const [why, setWhy] = useState(false);
   const [note, setNote] = useState(true);
   const pick = useSoftPickProps();
+  useEffect(() => {
+    const open = () => setWhy(true);
+    window.addEventListener(SOFT_WHY_EVENT, open);
+    return () => window.removeEventListener(SOFT_WHY_EVENT, open);
+  }, []);
   if (!scene) {
     return (
       <div role="alert" data-viewport-fallback className={cn("absolute inset-0 z-20 overflow-y-auto bg-[#eef1f5]/95 p-4 sm:p-8", hidden && "invisible")}>
@@ -92,9 +101,9 @@ export function ViewportFallback({ failure, core, onRetry, onCopy, scene, hidden
       {/* na širokém okně dole vedle sloupce plovoucích panelů (Řez, Měření… vlevo nahoře), aby je nezakrývaly */}
       {note && (
         <div role="status" data-soft-note className="absolute bottom-10 left-[92px] right-3 z-10 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 py-2 pl-3 pr-7 text-[11.5px] leading-relaxed text-[#26303b] shadow lg:bottom-14 lg:left-[292px] lg:right-auto lg:w-[420px]">
-          <strong className="font-semibold">{tr("Zjednodušený náhled bez WebGL.")}</strong> {title}
-          {/* tlačítka myši podle Nastavení (jako stavový řádek 3D okna): levé tlačítko táhne výběr oknem (box-pick-3d.ts); text nejvýš na 5 řádků (e2e cad-soft-pick) */}
-          {tr(" – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.", mouseHint(pick?.mouse, pick?.leftDrag))}
+          <strong className="font-semibold">{softStatusText()}.</strong> {title}
+          {/* tlačítka myši podle Nastavení (jako stavový řádek 3D okna): levé tlačítko táhne výběr oknem (box-pick-3d.ts); text nejvýš na 5 řádků (e2e cad-soft-pick); „softwarové“ už říká tučný stav – neopakovat (fáze 2: 6 řádků) */}
+          {tr(" – {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.", mouseHint(pick?.mouse, pick?.leftDrag))}
           <button type="button" onClick={() => setNote(false)} aria-label={tr("Skrýt")} className="absolute right-1 top-1 rounded p-0.5 text-[#6b7785] hover:bg-white">
             <CadIcon name="x" className="h-3.5 w-3.5" />
           </button>
@@ -139,6 +148,27 @@ function HelpCard({ failure, core, onRetry, onCopy, onClose, soft }: { failure: 
           ? tr("Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Model se místo 3D okna zobrazuje jako zjednodušený náhled: pohledy, přizpůsobení, přiblížení, otáčení, řez i výběr ploch, hran a vrcholů kliknutím fungují (náhled je pravoúhlý; gizmo přesunu, skici a pomocné roviny v modelu nezobrazuje). Pro automatizaci (headless Chrome, Playwright, Puppeteer): spusťte prohlížeč bez přepínače --disable-software-rasterizer a s --enable-unsafe-swiftshader (případně --use-angle=swiftshader) – WebGL pak běží softwarově přes SwiftShader a zobrazí se plné 3D okno.")
           : e.note}
       </p>
+      {soft && (
+        // úplný seznam omezení a náhrad (vlna 22, bod 21 – jeden seznam cad/soft-view.ts pro lištu, návod pro AI a příručku);
+        // omezení prostředí, ne chyba modelu – jádro, přepočet, řez, výběr a exporty běží
+        <div className="mt-3 text-[12px] leading-relaxed text-[#26303b]" data-soft-limits={SOFT_LIMITS.length}>
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6b7785]">{tr("Co náhled bez WebGL neukáže – a čím to nahradit")}</h3>
+          <ul className="mt-1.5 space-y-1">
+            {SOFT_LIMITS.map((l) => (
+              <li key={l.key} data-soft-limit={l.key}>
+                <span className="font-medium">{l.what()}</span> <span className="text-[#6b7785]">→ {l.instead()}</span>
+              </li>
+            ))}
+          </ul>
+          <h3 className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6b7785]">{tr("Výběr hran a ploch bez 3D okna")}</h3>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5" data-soft-pick-alternatives>
+            {SOFT_PICK_ALTERNATIVES().map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[#6b7785]">{tr("Je to omezení prohlížeče nebo prostředí, ne chyba modelu: jádro, přepočet, řez, výběr, měření a exporty (i video) běží dál.")}</p>
+        </div>
+      )}
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={onRetry} className="rounded bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-white shadow hover:bg-brand-600">
           {tr("Zkusit znovu")}

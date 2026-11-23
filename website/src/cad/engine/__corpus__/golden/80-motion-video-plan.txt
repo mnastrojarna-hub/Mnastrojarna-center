@@ -1,0 +1,57 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 200000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 200000 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 200 × 100 × 10 mm (X 0…200, Y 0…100, Z 0…10) · objem 200 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 200000 mm³ · těleso platné – 200 × 100 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Studie V“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Přidržovač“ F5 → „Deska A“ F6 · 57,5 mm: ok · poloha beze změny
+✓ vazba Rovnoběžně „Přidržovač“ F2 → „Deska A“ F2: ok · poloha beze změny
+✓ vazba Rovnoběžně „Přidržovač“ F4 → „Deska A“ F4: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
+Pohybová studie: 112 kroků · 0,65 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 1 („Deska A“)
+Vazby splněny ve všech krocích
+Video studie: video 0,667 s = 1,03 × délka studie 0,65 s · rychlost 1× · 30 fps · 20 snímků (tolerance ±1 snímek = ±0,033 s)
+Video studie: video 2,6 s = 4 × délka studie 0,65 s · rychlost 0,25× · 30 fps · 78 snímků (tolerance ±1 snímek = ±0,033 s)
+Video studie: video 1,3 s = 2 × délka studie 0,65 s · rychlost 0,5× · 30 fps · 39 snímků (tolerance ±1 snímek = ±0,033 s)
+Video studie: video 5 s = 7,69 × délka studie 0,65 s · rychlost 0,13× · 60 fps · 300 snímků (tolerance ±1 snímek = ±0,017 s)
+
+Dokument: „Studie V“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [0; 0; 67,5]
+Vazby: 3 (3 ok)
+Pohybová studie: motorů 1 · kroků 112 · 0,65 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 200 × 100 × 77,5 mm · objem Σ 400 cm³ · hmotnost Σ 3,140 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 112 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 3 ===
+Pohybová studie: motorů 1 · kroků 12
+ 1. lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 12 kroků · 0,65 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 1 („Deska A“)
+Vazby splněny ve všech krocích
+Video studie: video 0,667 s = 1,03 × délka studie 0,65 s · rychlost 1× · 30 fps · 20 snímků (tolerance ±1 snímek = ±0,033 s)
+✗ řádek 4: rychlost videa: kladné číslo, např. 1, 0,5 nebo 0,25× ← „pohyb video rychlost -1“
+
+Dokument: „Studie V“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [0; 0; 67,5]
+Vazby: 3 (3 ok)
+Pohybová studie: motorů 1 · kroků 12 · 0,65 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 200 × 100 × 77,5 mm · objem Σ 400 cm³ · hmotnost Σ 3,140 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

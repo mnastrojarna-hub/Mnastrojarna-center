@@ -137,8 +137,13 @@ function bodyItems(text: string): string[] {
   }
   return out;
 }
-/** priorita podle kap. 4.1 z tvaru řádku: ✗ > ⚠ > F/O > jednořádkové = > D > výpis > ℹ */
-const prioOf = (t: string) => (t.startsWith("✗") ? 0 : t.startsWith("⚠") ? 1 : /^[FO] /.test(t) ? 2 : t.startsWith("= ") ? (t.includes("\n") ? 5 : 3) : t.startsWith("D ") ? 4 : t.startsWith("ℹ") ? 6 : 99);
+/**
+ * priorita podle kap. 4.1 z tvaru řádku: ✗ > ⚠ > F/O > D hlavního dokumentu > jednořádkové = > D ostatních (s ✗/⚠) > výpis > ℹ;
+ * ℹ share.store-off (vypnuté úložiště odkazů, vlna 22 bod 16) má prioritu F/O – nesmí se ztratit v přebytku za výpisy odkazů.
+ * Hlavní dokument se tiskne první z řádků D (`mainD` = jeho řádek); jeho řádek D má přednost před výpisy `=` (vlna 22: brána
+ * synth – hlavní souhrn nesmí vytlačit libovolně mnoho vyžádaných měření).
+ */
+const prioOf = (t: string, mainD?: string) => (t.startsWith("✗") ? 0 : t.startsWith("⚠") ? 1 : /^[FO] /.test(t) || /^ℹ \S+(?: ×\d+)? share\.store-off\b/.test(t) ? 2 : t.startsWith("D ") ? (t === mainD ? 3 : 5) : t.startsWith("= ") ? (t.includes("\n") ? 6 : 4) : t.startsWith("ℹ") ? 7 : 99);
 const markerB = (n: number, bytes: number) => (n > 0 ? B(`… ${n} entries ${bytes}B in protocol-full.txt`) + 1 : 0);
 
 /**
@@ -165,7 +170,8 @@ function checkSelection(s: ShortProtocol, all: string[]) {
   expect(j, "vypsané záznamy = podposloupnost všech kandidátů v pořadí tisku").toBe(kept.length);
   const fixed = B(lines[0]) + 1 + B(lines.at(-1)!) + 1 + (oLine ? B(oLine) + 1 : 0) + (sumLine ? B(sumLine) + 1 : 0);
   const bytes = all.map((t) => B(t) + 1);
-  const order = all.map((_, i) => i).sort((a, b) => prioOf(all[a]) - prioOf(all[b]) || a - b);
+  const mainD = all.find((t) => t.startsWith("D ")); // hlavní dokument je první řádek D (pořadí tisku)
+  const order = all.map((_, i) => i).sort((a, b) => prioOf(all[a], mainD) - prioOf(all[b], mainD) || a - b);
   const total = bytes.reduce((a, b) => a + b, 0);
   const keptBytes = order.filter((i) => isKept[i]).reduce((a, i) => a + bytes[i], 0);
   const dropped = order.filter((i) => !isKept[i]);
@@ -331,27 +337,31 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
     expect(err.every((l) => [...freeText(l)].length <= 160)).toBe(true);
     expect(s.overflow!.entries).toBeGreaterThan(290);
   });
-  it("priority: řádky stejné délky – při každém rozpočtu je vypsaná množina tříd začátkem pořadí ✗ > ⚠ > F/O > = > D > výpis", () => {
-    // šest tříd, každá jeden řádek (výpis dva) – výplně se dorovnají tak, aby všechny řádky měly stejný počet bajtů
+  it("priority: řádky stejné délky – při každém rozpočtu je vypsaná množina tříd začátkem pořadí ✗ > ⚠ > F/O > D hlavního > = > D s ✗ > výpis", () => {
+    // sedm tříd, každá jeden řádek (výpis dva) – výplně se dorovnají tak, aby všechny řádky měly stejný počet bajtů;
+    // vedlejší dokument „B…“ má řádek D jen díky ✗ (záznam s doc = jeho ref „b“)
     const make = (pad: number[]) => {
       const x = (i: number) => "x".repeat(pad[i]);
       const rb = new ReportBuilder({ lang: "cs", lines: 10 });
-      rb.code("op.failed", { line: 1, text: x(0) });
+      rb.code("op.failed", { line: 1, doc: "b", text: x(0) });
       rb.code("select.fallback", { line: 2, text: x(1) });
-      rb.measure(3, "measure", `V=1cm3 ${x(3)}`);
-      rb.measure(4, "check", `a=${x(5)}\nb`);
-      const docs: DocSummary[] = [{ ref: "m", name: x(4), kind: "draft", main: true }];
+      rb.measure(3, "measure", `V=1cm3 ${x(4)}`);
+      rb.measure(4, "check", `a=${x(6)}\nb`);
+      const docs: DocSummary[] = [
+        { ref: "m", name: "M" + x(3), kind: "draft", main: true },
+        { ref: "b", name: "B" + x(5), kind: "draft" },
+      ];
       const files: OutFile[] = [{ name: x(2), format: "step", bytes: 1, sha256: "", doc: "m" }];
       return rb.finish({ docs, files });
     };
-    const cls = (l: string) => (l.startsWith("✗") ? 0 : l.startsWith("⚠") ? 1 : l.startsWith("F ") ? 2 : l.startsWith("= L3") ? 3 : l.startsWith("D ") ? 4 : l.startsWith("= L4") ? 5 : -1);
+    const cls = (l: string) => (l.startsWith("✗") ? 0 : l.startsWith("⚠") ? 1 : l.startsWith("F ") ? 2 : l.startsWith('D "M') ? 3 : l.startsWith("= L3") ? 4 : l.startsWith('D "B') ? 5 : l.startsWith("= L4") ? 6 : -1);
     const sizes = (r: RunReport) => {
-      const s = [0, 0, 0, 0, 0, 0];
+      const s = [0, 0, 0, 0, 0, 0, 0];
       for (const l of formatShort(r, { budget: 1e6 }).split("\n")) if (cls(l) >= 0) s[cls(l)] += B(l) + 1;
-      s[5] += 2; // pokračovací řádek výpisu „  b“
+      s[6] += 2; // pokračovací řádek výpisu „  b“
       return s;
     };
-    let pad = [60, 60, 60, 60, 60, 60];
+    let pad = [60, 60, 60, 60, 60, 60, 60];
     const s0 = sizes(make(pad));
     const T = Math.max(...s0);
     pad = pad.map((p, i) => p + T - s0[i]);
@@ -363,10 +373,34 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
       const s = shortProtocol(r, { budget });
       expect(s.bytes).toBeLessThanOrEqual(budget);
       const kept = [...new Set(s.text.split("\n").map(cls).filter((c) => c >= 0))].sort();
-      expect(kept).toEqual([0, 1, 2, 3, 4, 5].slice(0, kept.length));
+      expect(kept).toEqual([0, 1, 2, 3, 4, 5, 6].slice(0, kept.length));
       seen |= 1 << kept.length;
     }
-    expect(seen).toBe(0b1111111); // prošly všechny stupně 0…6 tříd
+    expect(seen).toBe(0b11111111); // prošly všechny stupně 0…7 tříd
+  });
+  it("regrese brány synth (vlna 22): řádek D hlavní sestavy se vypíše i za mnoha výpisy `=` a dlouhým ⚠; vedlejší D s ⚠ má prioritu až pod `=`", () => {
+    const MAIN = "900-01-00 Nástroj";
+    const rb = new ReportBuilder({ lang: "cs", lines: 400, now: () => 0 });
+    rb.code("select.fallback", { doc: MAIN, text: "díl bez výkresu: " + "Lišta (bez výkresu, bez čísla), ".repeat(6) });
+    // měření každého dílu – dohromady víc než rozpočet
+    for (let i = 0; i < 20; i++) rb.measure(300 + i, "measure", `V=${100 + i}.5cm3 m=${i}.25kg area=219008.176mm2 bbox=320x220x40 min=0,0,0 max=320,220,40 com=160.021,109.969,19.791 rho=7.85`);
+    const docs: DocSummary[] = [
+      { ref: "p", name: "Díl s ⚠", kind: "part", features: { ok: 3, warn: 1, error: 0 } },
+      { ref: "m", name: MAIN, kind: "assembly", main: true, components: 70, parts: 19, mates: { total: 53, ok: 53, conflict: 0, missing: 0, suppressed: 0 }, volume_mm3: 8375263, volume_union_mm3: 8363690, mass_kg: 65.746, bbox: box(320, 220, 304), clashes: { total: 30, thread: 30, real: 0, undetermined: 0 }, sheets: 1 },
+    ];
+    const r = rb.finish({ docs, files: [{ name: `${MAIN}.step`, format: "step", bytes: 2095173, sha256: "", doc: "m", check: { ok: true, text: "" } }] });
+    const s = shortProtocol(r);
+    expect(s.bytes).toBeLessThanOrEqual(2048);
+    expect(checkGrammar(s.text)).toEqual([]);
+    const lines = s.text.split("\n");
+    expect(lines.some((l) => l.startsWith(`D "${MAIN}" asm comp=70`))).toBe(true); // hlavní souhrn vždy
+    expect(allItems(r).some((t) => t.startsWith('D "Díl s ⚠"'))).toBe(true); // vedlejší D (s ⚠) je kandidát s prioritou pod `=` – ověří checkSelection
+    expect(lines.filter((l) => l.startsWith("= L3")).length).toBeGreaterThan(3);
+    expect(s.overflow!.entries).toBeGreaterThan(0);
+    checkSelection(s, allItems(r));
+    // na staré prioritě (= před D) by se D hlavního dokumentu nevešel: výpisy `=` samy přesahují rozpočet
+    const eqBytes = allItems(r).filter((t) => t.startsWith("= ")).reduce((a, t) => a + B(t) + 1, 0);
+    expect(eqBytes).toBeGreaterThan(2048);
   });
   it("dlouhý záznam, který se nevejde, se přeskočí – kratší záznam téže priority se vypíše dřív než nižší priorita (jako sonda P10)", () => {
     const rb = new ReportBuilder({ lang: "cs", lines: 9 });

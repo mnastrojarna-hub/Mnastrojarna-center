@@ -3,7 +3,7 @@
  * na skutečných otázkách agenta – správný oddíl musí být mezi prvními třemi výsledky u ≥ 90 % otázek (cs, bez diakritiky,
  * s překlepy, en, de). Výstup ≤ 1,5 kB, 5–8 výsledků, strojová část `hits=N q="…"`.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseAgentText, type AgentOp } from "../agent";
 import { dictOf, setLang, tr, type CadLang } from "../i18n";
 import { AGENT_COMMANDS } from "../agent";
@@ -308,6 +308,27 @@ describe("hodnocení na otázkách agenta", () => {
     }
     expect(commandChunks("en").find((c) => c.text === en)).toBeTruthy();
     expect(textIn("bez překladu xyz", "en")).toBe("bez překladu xyz");
+  });
+  it("každý popis tabulky příkazů je jeden klíč slovníku (složený popis z více tr() by v EN / DE měl jiný text podle jazyka načtení modulu)", () => {
+    // fáze 2 vlny 22: dva složené popisy (nový díl … znovu, řez … čelo řezu) dávaly v anglickém rejstříku podle pořadí načtení
+    // jiný text – `mncad help search tabs` a `mncad run "help search tabs"` pak řadily 6. a 7. výsledek opačně
+    const bad = AGENT_COMMANDS.filter((c) => !dictOf("en")[c.desc] || !dictOf("de")[c.desc]).map((c) => c.desc.slice(0, 80));
+    expect(bad).toEqual([]);
+  });
+  it("pořadí výsledků nezávisí na jazyce, ve kterém se načetl agent.ts (en tabs: CLI help = mncad run = prohlížeč)", async () => {
+    const run = async (loadLang: CadLang) => {
+      vi.resetModules();
+      const i = await import("../i18n");
+      i.setLang(loadLang);
+      const a = await import("./answer");
+      i.setLang("en");
+      return a.searchSections("tabs", "en").map((s) => `${s.key} ${s.score.toFixed(9)}`);
+    };
+    const cs = await run("cs");
+    const en = await run("en");
+    vi.resetModules();
+    expect(cs.length).toBeGreaterThanOrEqual(5);
+    expect(en).toEqual(cs);
   });
   it("nic nenalezeno → hits=0 a rada", () => {
     const a = searchAnswer("qqqxxyzz", "cs");

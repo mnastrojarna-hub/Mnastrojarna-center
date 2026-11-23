@@ -12,6 +12,8 @@
 //  5) bez WebGL (softwarový náhled, jak zkoušel majitel): protokol = CLI, strom prvků = protokol
 //  6) etapa G2 (22a, 22d): ⚠ thread.tip-tangent / thread.no-reach místo ✓ (prohlížeč = CLI), „m18 x 1,5 … šroubovice“,
 //     kontrola přesně (Geometrie „· přesná kontrola“, D vcheck=exact), formulář Závit (Provedení, ⚠ ISO 261), čip platnosti
+//  7) etapa G3 (22c): objemový export bez tělesa – text v prohlížeči = CLI (✗ out.no-solid, nikdy „věrná kopie“ bez tělesa),
+//     export z menu Soubor ▸ STEP / STL ukáže tutéž hlášku ([data-export-check] error / warn / ok), panel „Objem –“
 // Spuštění: E2E_BASE=http://localhost:3532 node e2e/cad-w22-g.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -91,7 +93,8 @@ const start = async (p, url) => {
   fs.writeFileSync(S + 'w22g-edit-short-browser.txt', bShort + '\n');
   fs.writeFileSync(S + 'w22g-edit-short-cli.txt', cShort + '\n');
   ok(bShort === cShort && Buffer.byteLength(bShort, 'utf8') <= 2048, `1: stručný protokol prohlížeč = CLI, ${Buffer.byteLength(bShort, 'utf8')} B ≤ 2048` + (bShort === cShort ? '' : ' – první rozdíl: ' + (bShort.split('\n').find((l, i) => l !== cShort.split('\n')[i]) || '').slice(0, 140)));
-  ok(/^D "Plech" part feat=1\/0\/1 .* sheets=1 solids=1 valid=1$/m.test(bShort), '1: řádek D nese solids= valid=: ' + (linesOf(bShort, /^D /)[0] || ''));
+  // + aditivní pole D z balíku D na konci: rev= (revize modelu, D2) a overlaps= (kontrola překryvů listů, D4)
+  ok(/^D "Plech" part feat=1\/0\/1 .* sheets=1 solids=1 valid=1 rev=r·[0-9a-f]{6} overlaps=0$/m.test(bShort), '1: řádek D nese solids= valid=: ' + (linesOf(bShort, /^D /)[0] || ''));
 
   // 1b) načtený dokument (JSON na řádku – korpus 58-status-load): načtení je přijetí, ✗ vadného prvku na řádku načtení;
   //     dokument bez vady dostane ✓ „postaven“ až po ověřovací stavbě – prohlížeč = CLI
@@ -245,8 +248,9 @@ const start = async (p, url) => {
     // 6b) GUI: formulář Závit – Provedení kosmetický / drážky / šroubovice (data-thread-geometry), varování ISO 261 (M18×3)
     const q = await fresh();
     await q.evaluate((t) => window.mncad.run(t), 'nový díl "Čep B"\nválec 18 30\nzávit M18×3 délka 10 v 0 0 10');
-    await q.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length === 2, null, { timeout: 120000 });
-    await q.getByText('Závit 1', { exact: true }).first().dblclick();
+    await q.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length === 2 && ![...document.querySelectorAll('[data-feature-row]')].some((r) => r.getAttribute('data-feature-state') === 'pending'), null, { timeout: 120000 });
+    // formulář prvku otevře JEDEN klik na řádek stromu (manager.tsx onSelect); dvojklik je přejmenování (2. klik formulář zase zavře)
+    await q.locator('[data-feature-row][data-feature-name="Závit 1"]').click();
     await q.waitForSelector('[data-thread-geometry]', { timeout: 30000 });
     ok((await q.locator('[data-thread-geometry]').getAttribute('data-thread-geometry')) === 'cosmetic' && /není pro M18 v ISO 261/.test((await q.locator('[data-thread-pitch-warning]').textContent().catch(() => '')) || ''), '6b: formulář Závit – kosmetický, ⚠ stoupání mimo ISO 261 ve formuláři');
     const warnRow = await q.locator('[data-feature-row][data-feature-name="Závit 1"]').getAttribute('data-feature-state');
@@ -266,6 +270,61 @@ const start = async (p, url) => {
     ok(true, '6c: po změně modelu se přesný výsledek neukazuje (zpět „rychlá kontrola“)');
     await q.screenshot({ path: S + 'w22g-g2-validity.png' });
     await q.context().close();
+  }
+
+  // ════════════ 7) etapa G3 (22c): objemový export bez tělesa – GUI = text ════════════
+  {
+    const SHELL = 'nový díl "Deska A"\nskica XY: obdélník 40 30\nprvek surf.extrude sketchId="Skica 1" distance=20\nskica XY: obdélník 40 30\nprvek surf.planar sketchId="Skica 2"\nskica XY odsazení 20: obdélník 40 30\nprvek surf.planar sketchId="Skica 3"\nprvek surf.sew tolerance=0.01';
+    const FREE = 'nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano';
+    const SOLID = 'nový díl "Deska C"\nkvádr 120 100 40 v -60 -50 0\nskica XY odsazení 35: spline -60 45 -20 30 20 45 60 30\nprvek sweep pathId="Skica 1" circleRadius=3 mode=cut';
+    // 7a) text: prohlížeč = CLI, ✗ out.no-solid místo „✓ … věrná kopie“, F check=fail
+    const sFull = norm(await runFresh(SHELL + '\nexport step', { protocol: 'full' }));
+    const sCli = norm(cli(SHELL + '\nexport step', ['--full']));
+    fs.writeFileSync(S + 'w22g-g3-shell-browser.txt', sFull + '\n');
+    fs.writeFileSync(S + 'w22g-g3-shell-cli.txt', sCli + '\n');
+    const noSolidLine = (t) => linesOf(t, /^✗ L\d+ out\.no-solid /)[0] || '';
+    ok(!!noSolidLine(sFull) && noSolidLine(sFull) === noSolidLine(sCli), '7a: ✗ out.no-solid v prohlížeči = CLI: ' + noSolidLine(sFull).slice(0, 140));
+    ok(!/věrná kopie/.test(sFull) && /^ℹ L9 msg\.note "Deska A": export STEP: /m.test(sFull) && !/^✓ L9 /m.test(sFull), '7a: bez tělesa žádné „věrná kopie“ ani ✓ exportu (zápis jen ℹ)');
+    ok(/^D "Deska A" part .*V=- m=- .*solids=0/m.test(sFull) && /objem – \(žádné těleso\)/.test(norm(await runFresh(SHELL + '\nstav', { protocol: 'full' }))), '7a: řádek D V=- m=- solids=0, stav „objem – (žádné těleso)“');
+    const fFull = norm(await runFresh(FREE + '\nexport step', { protocol: 'full' }));
+    ok(/^⚠ L\d+ out\.free-surfaces "Deska B": /m.test(fFull) && !/věrná kopie/.test(fFull) && /^D "Deska B" part feat=\S+ V=24cm3 /m.test(fFull), '7a: těleso + volná plocha → ⚠ out.free-surfaces, objem jen tělesa 24 cm³');
+    const cFull = norm(await runFresh(SOLID + '\nexport step', { protocol: 'full' }));
+    ok(/^✓ L\d+ kontrola STEP: soubor znovu načten jádrem – těles: 1, .*věrná kopie modelu/m.test(cFull) && !/out\.(no-solid|free-surfaces|check-failed)/.test(cFull), '7a: forma s kanálem po spline (oprava 4. 11.) – platné těleso, „věrná kopie“');
+
+    // 7b) GUI: Soubor ▸ STEP AP214 / STL – stejná hláška jako textový export (lišta [data-export-check][data-export-format];
+    // samotné [data-export-check] nesou i položky úloh exportu v run-chip.tsx – data-export-job, balík A3)
+    const gc = await b.newContext({ viewport: { width: 1400, height: 860 }, acceptDownloads: true });
+    await gc.addInitScript(() => { window.showSaveFilePicker = undefined; });
+    const g = await gc.newPage();
+    g.on('pageerror', (e) => errs.push(e.message));
+    g.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await start(g, BASE + '/cad');
+    const menuExport = async (name) => {
+      await g.getByRole('button', { name: 'Soubor', exact: true }).click();
+      await g.waitForTimeout(400);
+      const [d] = await Promise.all([g.waitForEvent('download', { timeout: 120000 }), g.getByRole('button', { name }).first().click()]);
+      await g.waitForSelector('[data-export-check][data-export-format]', { timeout: 120000 });
+      return { file: d.suggestedFilename(), level: await g.locator('[data-export-check][data-export-format]').getAttribute('data-export-check'), text: ((await g.locator('[data-export-check][data-export-format]').innerText()) || '').replace(/×\s*$/, '').trim() };
+    };
+    await g.evaluate((t) => window.mncad.run(t), SHELL);
+    await g.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length >= 7 && ![...document.querySelectorAll('[data-feature-row]')].some((r) => r.getAttribute('data-feature-state') === 'pending'), null, { timeout: 120000 });
+    const gs = await menuExport(/STEP AP214 \(\.step\)/);
+    const want = noSolidLine(sFull).replace(/^✗ L\d+ out\.no-solid "Deska A": /, '');
+    ok(gs.level === 'error' && gs.text.replace(/^✗\s*/, '') === want && !/věrná kopie/.test(gs.text), '7b: GUI export STEP skořepiny → ✗ stejná věta jako text (' + gs.file + '): ' + gs.text.slice(0, 120));
+    await g.screenshot({ path: S + 'w22g-g3-export-noshell.png' });
+    const gl = await menuExport(/STL \(\.stl\)/);
+    ok(gl.level === 'error' && /STL: model nemá objemové těleso/.test(gl.text), '7b: GUI export STL skořepiny → ✗ model nemá objemové těleso: ' + gl.text.slice(0, 100));
+    ok((await g.locator('[data-volume-chip]').getAttribute('data-volume-chip').catch(() => '')) === 'none' && /^V –$/.test(((await g.locator('[data-volume-chip]').innerText().catch(() => '')) || '').trim()), '7b: čip objemu „V –“ u dílu bez tělesa (data-volume-chip=none)');
+    await g.evaluate((t) => window.mncad.run(t), FREE);
+    await g.waitForFunction(() => !document.querySelector('[data-export-check][data-export-format]'), null, { timeout: 60000 }).catch(() => {});
+    await g.waitForTimeout(1500);
+    const gw = await menuExport(/STEP AP214 \(\.step\)/);
+    ok(gw.level === 'warn' && /plochy mimo tělesa/.test(gw.text) && !/věrná kopie/.test(gw.text), '7b: GUI export STEP tělesa s volnou plochou → ⚠: ' + gw.text.slice(0, 100));
+    await g.evaluate((t) => window.mncad.run(t), SOLID);
+    await g.waitForTimeout(1500);
+    const go = await menuExport(/STEP AP214 \(\.step\)/);
+    ok(go.level === 'ok' && /věrná kopie modelu/.test(go.text) && /těles: 1/.test(go.text), '7b: GUI export STEP platného tělesa → ✓ věrná kopie (těles: 1)');
+    await gc.close();
   }
 
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));

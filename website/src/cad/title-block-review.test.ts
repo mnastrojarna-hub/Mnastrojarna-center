@@ -87,7 +87,7 @@ describe("Chytré kóty se vyhnou celému razítku podle šablony (dřív jen 18
       const segBoxes = g.polys.flatMap((p) => p.pts.slice(1).map((q, i): Box => ({ x0: Math.min(p.pts[i][0], q[0]), y0: Math.min(p.pts[i][1], q[1]), x1: Math.max(p.pts[i][0], q[0]), y1: Math.max(p.pts[i][1], q[1]) })));
       expect(segBoxes.filter((b) => inside(b, tb))).toEqual([]);
       expect(g.texts.map((t) => textBox(t)).filter((b) => boxesOverlap(b, tb, -0.1))).toEqual([]);
-      expect(log.join("\n")).toMatch(/Kontrola kót: všech 5 očekávaných rozměrů je na listu/);
+      expect(log.join("\n")).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
     }, 120_000);
   }
   it("překážka = razítko + tabulky nad ním; bez údaje výchozí 180 × 38", () => {

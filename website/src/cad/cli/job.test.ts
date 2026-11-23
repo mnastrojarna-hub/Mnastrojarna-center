@@ -24,12 +24,19 @@ const enc = (o: unknown) => new TextEncoder().encode(typeof o === "string" ? o :
 
 function fakeKernel(o: { failBuild?: string; featureError?: boolean; featureWarning?: boolean } = {}) {
   const calls: string[] = [];
+  const statusOf = (d: CadDoc) => d.features.map((f, i) => ({ id: f.id, ok: !(o.featureError && i === 1), ...(o.featureError && i === 1 ? { error: "díra mimo těleso" } : {}), ...(o.featureWarning && i === 1 ? { warning: "Prvek těleso nezměnil" } : {}) }));
   const k = {
     generation: () => 1,
     build: async (d: CadDoc) => {
       calls.push(`build:${d.name}`);
       if (o.failBuild) throw new Error(o.failBuild);
-      return { status: d.features.map((f, i) => ({ id: f.id, ok: !(o.featureError && i === 1), ...(o.featureError && i === 1 ? { error: "díra mimo těleso" } : {}), ...(o.featureWarning && i === 1 ? { warning: "Prvek těleso nezměnil" } : {}) })), mesh: null, metrics: { volume: 49497.3, area: 1, bbox: [[0, 0, 0], [100, 50, 10]], faces: 7, edges: 15 }, ms: 1 };
+      return { status: statusOf(d), mesh: null, metrics: { volume: 49497.3, area: 1, bbox: [[0, 0, 0], [100, 50, 10]], faces: 7, edges: 15 }, ms: 1 };
+    },
+    // stavba bez sítě – fáze „model“ exportu jako úlohy (vlna 22, bod 22h: engine/export-job.ts) a přísné ověření po operaci
+    check: async (d: CadDoc) => {
+      calls.push(`check:${d.name}`);
+      if (o.failBuild) throw new Error(o.failBuild);
+      return { status: statusOf(d), paramErrors: [], solid: true };
     },
     // díly jako komponenty (ověření dokumentu z --open, ze kterého běh odešel / přísný běh – engine/verify.ts)
     asmParts: async (parts: { key: string; source: { kind: string; doc: CadDoc } }[]) => Promise.all(parts.map(async (p) => ({ key: p.key, result: await k.build(p.source.doc) }))),
@@ -162,7 +169,9 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
     expect([...s.sink.files.keys()]).toEqual(["Deska 1.step", "Deska 1.mncad"]);
     expect(JSON.parse(new TextDecoder().decode(s.sink.files.get("Deska 1.mncad")!.data)).name).toBe("Deska 1");
     // 1. stavba = ověření dokumentu z --open enginem (B4: načtený dokument se vždy ověří), 2. = souhrn D (v jádře z mezipaměti)
-    expect(s.calls).toEqual(["build:Deska 1", "build:Deska 1", "export:step:Deska 1"]);
+    // 3. = tělesa modelu před zápisem STEP (vlna 22, bod 22c: engine/solid-check.ts), check = fáze „model“ exportu jako úlohy
+    // (vlna 22, bod 22h: engine/export-job.ts; v jádře z mezipaměti stavby)
+    expect(s.calls).toEqual(["build:Deska 1", "build:Deska 1", "build:Deska 1", "check:Deska 1", "export:step:Deska 1"]);
     expect(log).toEqual(["start - build", "end - build", "start - out:step", "end - out:step", "start - out:mncad", "end - out:mncad"]);
   });
   it("✗ ve skriptu: soubory se zapíší (run=fail značí handleRun); --no-output-on-error nezapíše nic", async () => {

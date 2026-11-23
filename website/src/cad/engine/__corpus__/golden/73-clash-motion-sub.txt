@@ -10,19 +10,19 @@
 → Válec 2 (cylinder) přidán – výsledek po výpočtu níže
 ✓ nový díl „Doraz“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Díra 1 (hole)
-✓ Díra 2 (hole)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
-✓ Kvádr 3 (box)
+✓ Kvádr 1 (box) · přidáno 72000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2035,8 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 3053,6 mm³ (celý nástroj) · těleso platné
+✓ Kvádr 3 (box) · přidáno 2000 mm³ · těleso platné
 
 Dokument: „Doraz“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 10 × 20 × 10 mm (X 0…10, Y 0…20, Z 0…10) · objem 2 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 10 × 20 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 3 [box, id #] ✓ přidáno 2000 mm³ · těleso platné – 10 × 20 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Sestava 5S“ – nová záložka
 ✓ komponenta „Základ“ vložena do sestavy (ukotvená)
@@ -33,9 +33,13 @@ Prvky:
 ✓ podsestava „Horní skupina“: „Deska A“, „Šroub M12“, „Šroub M12“
 kolize: 2 – šroub v závitu 2, skutečné 0
 ✓ motor 1: lineární motor · ZDVIH „Horní skupina“ → „Základ“ · hodnota vazby 40 → 45 mm ↑ zdvih 5 mm
+ pohání: „Horní skupina“ · směr +Z
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · ZDVIH „Horní skupina“ → „Základ“ · hodnota vazby 40 → 45 mm ↑ zdvih 5 mm
- Horní skupina: rozsah pohybu X 0 · Y 0 · Z 5 mm · konec [0; 0; 5]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Horní skupina“: ΔZ +5 mm
+ stojí: 1 („Základ“)
 Kolize v pohybu: kroků s kolizí 0 z 6 · šroub v závitu 2 dvojic (kroky 0–5) · skutečné: žádné
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ℹ řádek 9: šroub v závitu: 2 dvojic v krocích 0–5
 Krok 2 (t = 0,8 s, motory 42):
@@ -61,11 +65,13 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez
 ✓ vazba Zámek „Šroub M12“ [S2] → „Deska A“: ok · poloha beze změny
 ✓ vazba ZDVIH „Deska A“ F5 → „Základ“ F6 · 40 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
+ pohání: „Deska A“ + 2 díly – spolu s ním kvůli pevné vazbě (zámku): „Šroub M12“, „Šroub M12“ · směr +Z
 Pohybová studie: 15 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
- Deska A: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 65]
- Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [20; 30; 77]
- Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [80; 30; 77]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Deska A“ + 2 díly (tuhá skupina – zámek / pevné vazby): ΔZ +15 mm
+ stojí: 2 („Základ“, „Doraz“)
 Kolize v pohybu: kroků s kolizí 7 z 16 · šroub v závitu 2 dvojic (kroky 0–15) · skutečné: 1 dvojic dílů v 7 krocích, první v kroku 9
+ kontrolováno spojitě i mezi polohami (16 poloh + 8 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 7)
 Vazby splněny ve všech krocích
 ℹ řádek 10: šroub v závitu: 2 dvojic v krocích 0–15
 ⚠ řádek 10: v pohybu „Doraz“ × „Šroub M12 [S2]“ od kroku 9 (t = 1,2 s): kroků 7, dvojic komponent 1, největší průnik 1191,793 mm³ – místo [80; 30; 100,5] v kroku 9

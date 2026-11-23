@@ -7,16 +7,16 @@
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Sloupek“ – nová záložka
 → Kvádr 4 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
-✓ Kvádr 4 (box)
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 500 mm³ · těleso platné
+✓ Kvádr 4 (box) · přidáno 125 mm³ · těleso platné
 
 Dokument: „Sloupek“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 4 [box, id #] ✓ – 5 × 5 × 5 mm, new, roh [0; 0; 0]
+ 1. Kvádr 4 [box, id #] ✓ přidáno 125 mm³ · těleso platné – 5 × 5 × 5 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Sestava A“ – nová záložka
 ✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
@@ -26,9 +26,13 @@ Prvky:
 ✓ podsestava „Skupina“: „Doraz“, „Sloupek“
 ✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
-Kolize: žádné ve všech krocích
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −15 mm
+ stojí: 2 („Deska A“, „Skupina“)
+Kolize: žádný průnik v 6 polohách
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
@@ -48,11 +52,14 @@ Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −15 mm
+ stojí: 2 („Deska A“, „Skupina“)
 Kolize v pohybu: kroků s kolizí 4 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 4 krocích, první v kroku 2
+ kontrolováno spojitě i mezi polohami (6 poloh + 1 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“
-⚠ řádek 6: v pohybu „Přidržovač“ × „Skupina“ od kroku 2 (t = 0,8 s): kroků 4, dvojic komponent 1, největší průnik 500 mm³
+⚠ řádek 6: v pohybu „Přidržovač“ × „Skupina › Doraz“ od kroku 2 (t = 0,8 s): kroků 4, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 25,5] v kroku 2
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30] · Skupina [0; 0; 0] (podsestava)
@@ -65,8 +72,11 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, pr�
 ✓ pohybová studie smazána
 Pohybová studie: motorů 0 · kroků 36
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −15 mm
+ stojí: 2 („Deska A“, „Skupina“)
 Vazby splněny ve všech krocích
 ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)
 
@@ -89,6 +99,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kol
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0
 Pohybová studie: 20 kroků · 0,02 s · motory: 
+ stojí: 3 („Deska A“, „Vodítko“, „Přidržovač“)
 Vazby splněny ve všech krocích
 Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
  „Přidržovač“ 0,0078 kg (z objemu × hustoty): v klidu
@@ -97,11 +108,12 @@ Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/m
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0 · síla vazba 2 ZDVIH: 10 N
 Pohybová studie: 20 kroků · 0,02 s · motory: 
+ stojí: 3 („Deska A“, „Vodítko“, „Přidržovač“)
 Vazby splněny ve všech krocích
 Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
  „Přidržovač“ 0,0078 kg (z objemu × hustoty): v klidu
  Kontrola energie: odchylka 0 % z 0 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0 J, dotyky 0 J, zadané síly 0 J)
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 4712,4 mm³ · těleso platné
 
 Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [30; 20; -10] ⚓ · Přidržovač [25; 15; 30]

@@ -21,6 +21,7 @@ import type { GearTable } from "./gears/data";
 import type { SpringMark } from "./drawing-doc";
 import { inSpringEnvelope, springWireLines } from "./drawing-springs";
 import { drawSpringTables, springTableHeight, type SpringDrawTable } from "./drawing-springtable";
+import { layoutBalloons, type BView } from "./drawing-balloons";
 
 // ---------------------------------------------------------------- typy
 
@@ -81,6 +82,8 @@ export type DrawingMeta = {
   template?: TitleTemplate;
   /** logo firmy v razítku (data URL PNG / JPEG, rozměr v px, obrys pro DXF / DWG) */
   logo?: TitleLogo;
+  /** název pojmenované šablony hlavičky, ze které list vzal razítko (vlna 22, bod 22j – cad/title-templates.ts) */
+  titleTpl?: string;
   company?: string;
   customer?: string;
   project?: string;
@@ -101,9 +104,13 @@ export type DrawingMeta = {
   springs?: SpringMark[];
 };
 
-export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
-/** úpravy vygenerovaných objektů listu (DrawingOptions.genEdit) */
-export type GenEdit = { off?: string[]; move?: Record<string, Vec2> };
+/** pozice sestavy: číslo, název, obálka všech výskytů a (vlna 22, bod 17) obálky jednotlivých výskytů – kotva odkazu na prvním */
+export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3]; boxes?: [Vec3, Vec3][] };
+/**
+ * úpravy vygenerovaných objektů listu (DrawingOptions.genEdit): skryté, posunuté (relativně k automatické poloze) a zamčené
+ * pozice (`lock` – absolutní střed balónku na listu, přežije přepočet i nové rozmístění ostatních; vlna 22, bod 17)
+ */
+export type GenEdit = { off?: string[]; move?: Record<string, Vec2>; lock?: Record<string, Vec2> };
 /** vygenerovaný objekt listu (DrawingResult.generated): klíč, druh, čáry a obdélníky textů [x0, y0, x1, y1] na listu */
 export type GenItem = { id: string; kind: "dim" | "balloon"; polys: Vec2[][]; rects: [number, number, number, number][] };
 /** čáry a texty přidané od indexů `np` / `nt` jako jeden vygenerovaný objekt */
@@ -177,6 +184,18 @@ export type DrawingOptions = {
   dimPads?: Record<string, Partial<Record<"l" | "t" | "r" | "b", number>>>;
   /** pozice komponent (balónky) – jen sestavy s meta.components */
   balloons?: boolean;
+  /**
+   * přiřazení pozic pohledům (vlna 22, bod 17): číslo pozice → pohled (front, top, left, right, back, bottom, iso); pozice
+   * bez záznamu dostane hlavní pohled a když se k němu nevejde, další pohled, kde je komponenta vidět
+   */
+  balloonViews?: Record<string, string>;
+  /**
+   * umístění kusovníku (vlna 22, bod 17): auto (nad razítkem, dlouhý ve sloupcích vlevo od razítka), above (nad razítkem),
+   * columns (sloupce vlevo od razítka), sheet (na samostatném listu – tento list ho nekreslí)
+   */
+  bomPlace?: "auto" | "above" | "columns" | "sheet";
+  /** list jen s kusovníkem (sloupce přes celý list, razítko; pohledy se nekreslí) – `výkres kusovník list` */
+  bomOnly?: boolean;
   /**
    * vygenerované objekty listu upravené výběrem ve výkresu (klik / okno, Delete, posun – cad/drawing-boxsel.ts): skryté (`off`)
    * a posunuté (`move`, mm listu) kóty celkových rozměrů `dim:<pohled>:<t|l>` a pozice (balónky) `pos:<číslo>`
@@ -266,8 +285,19 @@ export type DrawingResult = {
   springTables?: number;
   /** umístěné detailní pohledy (list: levý horní roh, velikost) */
   details?: { id: string; label: string; x: number; y: number; w: number; h: number }[];
-  /** pozice (balónky) – střed kroužku na listu */
-  balloons?: { pos: number; x: number; y: number }[];
+  /**
+   * pozice (balónky) – střed kroužku na listu; vlna 22, bod 17: pohled, kotva odkazové čáry `a`, poloměr, způsob umístění
+   * (auto / posunutá / zamčená), přiřazení pohledu (ručně / auto) a `lost` = nenašlo se volné místo
+   */
+  balloons?: { pos: number; x: number; y: number; id?: string; view?: string; a?: Vec2; r?: number; mode?: "auto" | "moved" | "locked"; assigned?: "user" | "auto"; lost?: boolean }[];
+  /** souhrn pozic: nevešlé, křížení odkazových čar, pozice přiřazené pohledu, který na listu není */
+  balloonInfo?: { lost: number; crossings: number; missingView: number[] };
+  /** tabulky listu (razítko, kusovník – i jeho další sloupce, tabulka děr, pružin, revizí) – obdélníky pro kontrolu překryvů */
+  tables?: { kind: "title" | "bom" | "holes" | "springs" | "revisions"; x: number; y: number; w: number; h: number }[];
+  /** vnitřní obdélník rámu listu */
+  frameRect?: { x: number; y: number; w: number; h: number };
+  /** rozvržení kusovníku: režim, počet sloupců, řádků celkem a nevykreslených (nevešly se) */
+  bomLayout?: { mode: "above" | "columns" | "sheet" | "only"; cols: number; rows: number; hidden: number };
   /** vygenerované objekty listu, které jdou vybrat a upravit (`genEdit`): kóty celkových rozměrů a pozice – čáry a texty (mm listu) */
   generated?: GenItem[];
   /** pohledy dalších modelů: klíč pohledu, měřítko a obdélník na listu */
@@ -1485,6 +1515,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     return makeDrawing(shape, meta, { ...options, breakScale: first.scaleValue }, extra);
   }
   const opts: DrawingOptions = { ...defaultDrawingOptions, ...options, views: { ...defaultDrawingOptions.views, ...(options.views ?? {}) } };
+  // list jen s kusovníkem (výkres kusovník list – vlna 22, bod 17): bez pohledů, sloupce přes celý list
+  if (opts.bomOnly) return bomOnlySheet(meta, opts);
   // řez: odsazení podle verze (konvence skici / starší souřadnice) → souřadnice na ose; dál se počítá jen s ní
   const sec0 = opts.section;
   if (sec0) opts.section = absoluteSection(sec0);
@@ -1507,7 +1539,17 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // tabulky ozubení nad tabulkou děr (a nad tabulkou pružiny, drawing-geartable.ts): nejvýš dvě vedle sebe, šířka 110 mm na kolo
   const gearTabs = opts.gearTable ? (meta.gears ?? []) : [];
   const gearH = gearTableHeight(gearTabs);
-  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]) + springH + gearH;
+  // tabulky nad razítkem kromě kusovníku (tabulka děr, údaje pružin)
+  const tablesH = holeTableHeight(holeTableColumns(holeRows)[0]) + springH + gearH;
+  // kusovník (vlna 22, bod 17): nad razítkem, dlouhý ve sloupcích vlevo od razítka, nebo na samostatném listu – nikdy tiché
+  // zmenšení pohledů na 1:200 ani přetečení přes horní rám (plán podle formátu listu: `bomPlanFor`)
+  const bomRows = meta.bom?.length ? bomRowsOf(meta.bom) : [];
+  type BomPlan = { mode: "above" | "columns" | "sheet" | "none"; cols: BomRow[][]; h0: number; hidden: number };
+  const bomPlace = opts.bomPlace ?? "auto";
+  const planAbove: BomPlan = !bomRows.length ? { mode: "none", cols: [], h0: 0, hidden: 0 } : bomPlace === "sheet" ? { mode: "sheet", cols: [], h0: BOM_ROW, hidden: 0 } : { mode: "above", cols: [bomRows], h0: bomBlockH(bomRows.length), hidden: 0 };
+  let bomPlan: BomPlan = planAbove;
+  const NO_BOM: BomPlan = { mode: "none", cols: [], h0: 0, hidden: 0 };
+  let TBH = TB.h + bomPlan.h0 + tablesH;
 
   // --- projekce
   const keys = ISO_KEYS.filter((k) => opts.views[k]);
@@ -1635,14 +1677,17 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   for (const x of xt.list) extras.push({ v: x.view, pad: { l: 6, t: 14, r: 6, b: 6 }, scale: "auto", name: x.label, xv: x });
   type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[]; room: number };
-  const arrange = (n: SheetName, s: number, force = false): Arrangement | null => {
+  const arrange = (n: SheetName, s: number, force = false, bp: BomPlan = bomPlanFor(n), tbhOverride?: number): Arrangement | null => {
+    const tbh = tbhOverride ?? TB.h + bp.h0 + tablesH;
     const [W, H] = sheetDims(n);
     // plocha pro pohledy: rám bez pásu razítka (kóty kolem pohledů do ní patří)
-    const area: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M - TBH - 4 };
+    const area: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M - tbh - 4 };
     const bounds: Rect = { x: M_LEFT + 4, y: M + 4, w: W - M_LEFT - M - 8, h: H - 2 * M - 8 };
-    const fixed: Rect[] = [{ x: W - M - TB.w - 3, y: H - M - TBH - 12, w: TB.w + 3, h: TBH + 12 }];
-    if (gearTableWidth(gearTabs) > TB.w) fixed.push({ x: W - M - gearTableWidth(gearTabs) - 3, y: H - M - TBH - 12, w: gearTableWidth(gearTabs) + 3, h: gearH + 12 });
+    const fixed: Rect[] = [{ x: W - M - TB.w - 3, y: H - M - tbh - 12, w: TB.w + 3, h: tbh + 12 }];
+    if (gearTableWidth(gearTabs) > TB.w) fixed.push({ x: W - M - gearTableWidth(gearTabs) - 3, y: H - M - tbh - 12, w: gearTableWidth(gearTabs) + 3, h: gearH + 12 });
     if (meta.revisions?.length) fixed.push({ x: W - M - 124 - 3, y: M, w: 127, h: 6 + (meta.revisions.length + 1) * 6 + 3 });
+    // další sloupce kusovníku vlevo od razítka (dosedají na spodní rám, výška celého pásu)
+    if (bp.mode === "columns" && bp.cols.length > 1) fixed.push({ x: W - M - TB.w - (bp.cols.length - 1) * BOM_W - 3, y: H - M - tbh - 3, w: (bp.cols.length - 1) * BOM_W + 3, h: tbh + 3 });
     const frame: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M };
     /** mřížka s mezerou 24 + room a okrajem DIM_ROOM + room; `loose` = pohledy smí i vedle razítka (jen ne do něj) */
     const tryGrid = (list: Cell[], room: number) => {
@@ -1737,6 +1782,47 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   };
   const fits = (n: SheetName, s: number) => !!arrange(n, s);
   const bestScale = (n: SheetName) => STANDARD_SCALES.find((s) => fits(n, s)) ?? null;
+  /** kusovník ve sloupcích pro formát `n`: nejnižší pás (sloupec 0 nad razítkem, další vlevo), pohledům zůstane ≥ 40 mm */
+  const columnsPlan = (n: SheetName): BomPlan => {
+    const [W, H] = sheetDims(n);
+    const maxLeft = Math.max(0, Math.floor((W - M_LEFT - M - TB.w) / BOM_W));
+    const maxBand = H - 2 * M - 40;
+    let last: BomPlan | null = null;
+    for (let r = 1; r <= bomRows.length; r++) {
+      const band = TB.h + tablesH + bomBlockH(r);
+      if (band > maxBand) break;
+      const leftRows = Math.floor(band / BOM_ROW) - 1;
+      const c = bomColumns(bomRows, r, leftRows, maxLeft);
+      last = { mode: "columns", cols: c.cols, h0: bomBlockH(r), hidden: c.hidden };
+      if (!c.hidden) return last;
+    }
+    // ani ve sloupcích se nevejde: co nejvíc řádků, zbytek se ohlásí (⚠ drawing.bom-overflow)
+    return last ?? { mode: "columns", cols: [], h0: 0, hidden: bomRows.length };
+  };
+  const planMemo = new Map<SheetName, BomPlan>();
+  /** plán kusovníku pro formát (auto: nad razítkem, dokud pás nezabere > 40 % rámu a sloupce nedají větší měřítko) */
+  function bomPlanFor(n: SheetName): BomPlan {
+    if (planAbove.mode !== "above" || bomPlace === "above") return planAbove;
+    const hit = planMemo.get(n);
+    if (hit) return hit;
+    let p: BomPlan;
+    const col = columnsPlan(n);
+    if (bomPlace === "columns") p = col;
+    else {
+      const [, H] = sheetDims(n);
+      const bandA = TB.h + tablesH + planAbove.h0;
+      if (bandA > H - 2 * M - 40 || (bandA > 0.4 * (H - 2 * M) && !col.hidden)) p = col;
+      else {
+        const sc = (q: BomPlan) => STANDARD_SCALES.find((x) => !!arrange(n, x, false, q)) ?? 0;
+        p = !col.hidden && sc(col) > sc(planAbove) + 1e-12 ? col : planAbove;
+      }
+    }
+    planMemo.set(n, p);
+    return p;
+  }
+  function tbhFor(n: SheetName): number {
+    return TB.h + bomPlanFor(n).h0 + tablesH;
+  }
 
   let sheet: SheetName;
   let scale: number;
@@ -1763,6 +1849,28 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const pick = SHEET_ORDER.find((n) => (bestScale(n) ?? 0) >= 0.5);
     sheet = pick ?? "A0";
     scale = bestScale(sheet) ?? STANDARD_SCALES[STANDARD_SCALES.length - 1];
+  }
+  // pohledy bez měřítka, které by se vešlo (ani 1:200): nikdy tiše – ⚠ s radou (vlna 22, bod 17)
+  if (opts.scale === "auto" && !fits(sheet, scale)) {
+    const t = tr("Pohledy se na list {0} nevejdou ani v měřítku {1} – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)", sheet, scaleLabel(scale));
+    warnings.push(t);
+    issues.push({ level: "warn", code: "drawing.warning", kind: "sheet-fit", text: t, data: { scale: scaleLabel(scale), sheet, cause: "none" } });
+  }
+  bomPlan = bomPlanFor(sheet);
+  TBH = tbhFor(sheet);
+  // tabulky (kusovník, díry, pružiny) zmenšily pohledy pod 1:20: ⚠ s měřítkem bez nich
+  if (opts.scale === "auto" && (bomRows.length || tablesH)) {
+    const free = STANDARD_SCALES.find((x) => !!arrange(sheet, x, false, NO_BOM, TB.h)) ?? null;
+    if (free != null && scale < free - 1e-12 && scale < 1 / 10 - 1e-12) {
+      const t = tr("Pohledy zmenšeny na {0} kvůli kusovníku a tabulkám nad razítkem (bez nich {1}) – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)", scaleLabel(scale), scaleLabel(free));
+      warnings.push(t);
+      issues.push({ level: "warn", code: "drawing.warning", kind: "sheet-fit", text: t, data: { scale: scaleLabel(scale), sheet, cause: "tables", free: scaleLabel(free) } });
+    }
+  }
+  if (bomPlan.hidden) {
+    const t = tr("Kusovník ({0} řádků) se na list {1} nevejde ani ve sloupcích – {2} řádků chybí; zvolte větší formát nebo kusovník na samostatném listu (výkres kusovník list)", bomRows.length, sheet, bomPlan.hidden);
+    warnings.push(t);
+    issues.push({ level: "warn", code: "drawing.bom-overflow", kind: "bom-overflow", text: t, data: { rows: bomRows.length, hidden: bomPlan.hidden, sheet } });
   }
   const arr = arrange(sheet, scale, true)!;
   const [SW, SH] = [arr.W, arr.H];
@@ -1842,6 +1950,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
 
   // izometrie do největšího volného místa
   let isoRect: Rect | null = null;
+  let isoPlaced: Placed | null = null;
   if (iso) {
     const busy = [...arr.items.map((it) => inflate(it.rect, it.grid ? atLeast(it.pad, 10) : it.pad)), ...arr.fixed];
     const best = largestFree({ x: M_LEFT + 6, y: M + 6, w: SW - M_LEFT - M - 12, h: SH - 2 * M - 12 }, busy, iso.w, iso.h, scale);
@@ -1849,6 +1958,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       const p: Placed = { ...iso, s: best.s, px: best.x + (best.w - iso.w * best.s) / 2, py: best.y + (best.h - iso.h * best.s) / 2 };
       for (const pl of p.polys) polys.push({ layer: "thin", pts: pl.pts.map((q) => toSheet(p, q)) });
       isoRect = { x: p.px, y: p.py, w: iso.w * best.s, h: iso.h * best.s };
+      isoPlaced = p;
     }
   }
 
@@ -1924,11 +2034,14 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const res = detailView(d, p, SW, SH, TBH, polys, texts, details);
     if (!res) warnings.push(tr("Detail {0}: v kruhu není žádná geometrie.", d.label));
   }
-  // pozice (balónky) komponent sestavy
+  // pozice (balónky) komponent sestavy – po pohledech, bez překryvů s texty, kótami, tabulkami a rámem (vlna 22, bod 17)
   const balloons: NonNullable<DrawingResult["balloons"]> = [];
+  let balloonInfo: DrawingResult["balloonInfo"];
   if (opts.balloons && meta.components?.length) {
-    const mainView = centerView ? placed.get(centerView.key) : ortho[0];
-    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons, { top: M + 3, bottom: SH - M - TBH - 3, left: M_LEFT + 3, right: SW - M - 3 }, { edit: gen, out: generated });
+    const blocked: Rect[] = [{ x: SW - M - TB.w - 2, y: SH - M - TBH - 2, w: TB.w + 2, h: TBH + 2 }];
+    if (bomPlan.mode === "columns" && bomPlan.cols.length > 1) blocked.push({ x: SW - M - TB.w - (bomPlan.cols.length - 1) * BOM_W - 2, y: SH - M - TBH - 2, w: (bomPlan.cols.length - 1) * BOM_W + 2, h: TBH + 2 });
+    if (meta.revisions?.length) blocked.push({ x: SW - M - 124 - 2, y: M, w: 126, h: 6 + (meta.revisions.length + 1) * 6 + 2 });
+    balloonInfo = drawBalloons(meta.components, ortho, isoPlaced, centerView ? centerView.key : null, opts, polys, texts, balloons, blocked, { x: M_LEFT + 2, y: M + 2, w: SW - M_LEFT - M - 4, h: SH - 2 * M - 4 }, { edit: gen, out: generated });
   }
 
   // značky svarů ISO 2553 z 3D svarů (drawing-welds.ts)
@@ -1946,11 +2059,23 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // rám, centrovací značky, zóny, razítko
   frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
-  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]) + springH + gearH);
+  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, tablesH, bomPlan.h0);
   let yTop = SH - M - TB.h;
-  if (meta.bom?.length) {
-    partsList(SW - M - TB.w, yTop, meta.bom, polys, texts);
-    yTop -= bomHeight(meta.bom);
+  const tables: NonNullable<DrawingResult["tables"]> = [{ kind: "title", x: SW - M - TB.w, y: SH - M - TB.h, w: TB.w, h: TB.h }];
+  if (bomPlan.mode === "above" || bomPlan.mode === "columns") {
+    // sloupec 0 nad razítkem, další sloupce vlevo od razítka (dosedají na spodní rám, stejně vysoké jako pás)
+    bomPlan.cols.forEach((rows, i) => {
+      if (!rows.length) return;
+      const x = SW - M - TB.w - i * BOM_W;
+      const yb = i === 0 ? yTop : SH - M;
+      partsList(x, yb, rows, polys, texts);
+      tables.push({ kind: "bom", x, y: yb - bomBlockH(rows.length), w: BOM_W, h: bomBlockH(rows.length) });
+    });
+    yTop -= bomPlan.h0;
+  } else if (bomPlan.mode === "sheet") {
+    // kusovník na samostatném listu (výkres kusovník list): odkaz nad razítkem
+    texts.push({ x: SW - M - TB.w + 1.5, y: yTop - 2.2, s: tr("Kusovník: samostatný list"), size: 2.8, anchor: "start", layer: "text" });
+    yTop -= bomPlan.h0;
   }
   if (holeRows.length) {
     holeTable(SW - M - TB.w, yTop, holeRows, polys, texts);
@@ -1964,8 +2089,15 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       issues.push({ level: "warn", code: "drawing.warning", kind: "hole-table-overlap", text: t, data: { rows: holeRows.length, views: hit.map((p) => p.key) } });
     }
   }
+  if (holeRows.length) {
+    const th = holeTableHeight(holeTableColumns(holeRows)[0]);
+    tables.push({ kind: "holes", x: SW - M - TB.w, y: yTop - th, w: TB.w, h: th });
+  }
   // tabulka údajů pružiny (EN ISO 2162-2) nad tabulkou děr / kusovníkem – místo je v TBH
-  if (opts.springTable && meta.springData?.length) drawSpringTables(SW - M - TB.w, yTop - holeTableHeight(holeTableColumns(holeRows)[0]), TB.w, meta.springData, polys, texts);
+  if (opts.springTable && meta.springData?.length) {
+    drawSpringTables(SW - M - TB.w, yTop - holeTableHeight(holeTableColumns(holeRows)[0]), TB.w, meta.springData, polys, texts);
+    tables.push({ kind: "springs", x: SW - M - TB.w, y: yTop - holeTableHeight(holeTableColumns(holeRows)[0]) - springH, w: TB.w, h: springH });
+  }
   if (gearTabs.length) {
     // nad tabulkou děr (yTop = horní hrana kusovníku / razítka), překryv s pohledy = varování jako u tabulky děr
     const g = drawGearTables(SW - M, yTop - holeTableHeight(holeTableColumns(holeRows)[0]) - (opts.springTable && meta.springData?.length ? springH : 0), gearTabs, polys, texts);
@@ -1978,6 +2110,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     }
   }
   const revZoneAt = meta.revisions?.length ? revisionTable(SW, meta.revisions, polys, texts, !!zones) : [];
+  if (meta.revisions?.length) tables.push({ kind: "revisions", x: SW - M - 124, y: M, w: 124, h: 6 + (meta.revisions.length + 1) * 6 });
 
   return {
     sheet: { name: sheet, w: SW, h: SH },
@@ -1995,6 +2128,10 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     ...(opts.springTable ? { springTables: meta.springData?.length ?? 0 } : {}),
     details: details.length ? details : undefined,
     balloons: balloons.length ? balloons : undefined,
+    ...(balloonInfo ? { balloonInfo } : {}),
+    tables,
+    frameRect: { x: M_LEFT, y: M, w: SW - M_LEFT - M, h: SH - 2 * M },
+    ...(bomRows.length ? { bomLayout: { mode: bomPlan.mode === "none" ? "above" : bomPlan.mode, cols: bomPlan.cols.filter((c) => c.length).length, rows: bomRows.length, hidden: bomPlan.hidden } } : {}),
     generated: generated.length ? generated : undefined,
     models: modelOut.length ? modelOut : undefined,
     stacks: stackOut.length ? stackOut : undefined,
@@ -2333,6 +2470,37 @@ function rectOfPts(pts: Vec2[], pad = 0): { x: number; y: number; w: number; h: 
   const y = Math.min(...ys) - pad;
   return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
 }
+/** protíná některá úsečka obdélník [x0, y0, x1, y1] (zmenšený o 0,2 mm – dotyk okrajem se nepočítá)? (Liang–Barsky) */
+export function boxHitsSegs(b: [number, number, number, number], segs: readonly [Vec2, Vec2][]): boolean {
+  const [x0, y0, x1, y1] = [b[0] + 0.2, b[1] + 0.2, b[2] - 0.2, b[3] - 0.2];
+  for (const [p, q] of segs) {
+    if (Math.max(p[0], q[0]) < x0 || Math.min(p[0], q[0]) > x1 || Math.max(p[1], q[1]) < y0 || Math.min(p[1], q[1]) > y1) continue;
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    let t0 = 0;
+    let t1 = 1;
+    let hit = true;
+    for (const [pp, qq] of [[-dx, p[0] - x0], [dx, x1 - p[0]], [-dy, p[1] - y0], [dy, y1 - p[1]]] as [number, number][]) {
+      if (Math.abs(pp) < 1e-12) {
+        if (qq < 0) {
+          hit = false;
+          break;
+        }
+        continue;
+      }
+      const r = qq / pp;
+      if (pp < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) {
+        hit = false;
+        break;
+      }
+    }
+    if (hit) return true;
+  }
+  return false;
+}
+
 export function textBox(t: DText): [number, number, number, number] {
   const w = t.s.length * t.size * CHAR_W;
   const x0 = t.anchor === "middle" ? -w / 2 : t.anchor === "end" ? -w : 0;
@@ -2696,13 +2864,15 @@ function frame(W: number, H: number, polys: Poly[]) {
 }
 
 /** Razítko listu podle šablony (cad/title-block.ts): pole bez zkracování, značka promítání ISO 5456-2, logo, patička nad tabulkami. */
-function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[], extraAbove = 0): TitleBlockInfo {
-  return drawTitleBlock({ W, H, margin: M, ctx: { sheet, scaleLabel: scaleLabel(scale), projection }, meta, polys, texts, above: bomHeight(meta.bom) + extraAbove });
+function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[], extraAbove = 0, bomAbove = bomHeight(meta.bom)): TitleBlockInfo {
+  return drawTitleBlock({ W, H, margin: M, ctx: { sheet, scaleLabel: scaleLabel(scale), projection }, meta, polys, texts, above: bomAbove + extraAbove });
 }
 
 // ---------------------------------------------------------------- kusovník (ISO 7573)
 
 const BOM_ROW = 7;
+/** šířka bloku (sloupce) kusovníku = šířka razítka ISO 7200 */
+const BOM_W = 180;
 /**
  * sloupce (součet = šířka razítka 180 mm): Poz. | Název | Číslo výkresu / normy | Rozměr / kat. č. | Ks | Materiál / třída |
  * Hmotnost – popisky v jazyce rozhraní v okamžiku kreslení (CLI volí jazyk až po načtení modulu)
@@ -2731,12 +2901,12 @@ function bomCells(it: BomItem): { number: string; size: string } {
   return { number: it.number ?? "", size: "" };
 }
 
-/** Kusovník nad razítkem: hlavička dole, položky rostou nahoru (poz. 1 nejníže); při více druzích oddíly se záhlavím. */
-function partsList(x: number, yBottom: number, bom: BomItem[], polys: Poly[], texts: DText[]) {
-  const cols = bomCols();
+/** řádek kusovníku na listu: položka nebo záhlaví oddílu */
+type BomRow = { item: BomItem } | { section: string };
+/** řádky kusovníku odspodu: záhlaví oddílu (je-li jich víc), položky oddílu, další oddíl … (poz. 1 nejníže) */
+function bomRowsOf(bom: BomItem[]): BomRow[] {
   const items = [...bom].sort((a, b) => a.pos - b.pos);
-  // řádky odspodu: záhlaví oddílu (je-li jich víc), položky oddílu, další oddíl …
-  const rows: ({ item: BomItem } | { section: string })[] = [];
+  const rows: BomRow[] = [];
   const sections = bomSections(items);
   let cur: string | undefined;
   for (const it of items) {
@@ -2747,6 +2917,31 @@ function partsList(x: number, yBottom: number, bom: BomItem[], polys: Poly[], te
     }
     rows.push({ item: it });
   }
+  return rows;
+}
+/** výška bloku kusovníku s `n` řádky (+ hlavička) */
+const bomBlockH = (n: number) => (n > 0 ? (n + 1) * BOM_ROW : 0);
+/**
+ * Kusovník rozdělený do sloupců (vlna 22, bod 17): sloupec 0 nad razítkem (`r` řádků), další sloupce vlevo od razítka
+ * dosedají na spodní rám a mají výšku celého pásu (`band`). Záhlaví oddílu na konci sloupce přejde do dalšího.
+ */
+function bomColumns(rows: BomRow[], r: number, leftRows: number, maxLeft: number): { cols: BomRow[][]; hidden: number } {
+  const cols: BomRow[][] = [];
+  let i = 0;
+  const take = (n: number) => {
+    let end = Math.min(rows.length, i + n);
+    if (end < rows.length && end - i > 1 && "section" in rows[end - 1]) end--;
+    cols.push(rows.slice(i, end));
+    i = end;
+  };
+  take(r);
+  for (let c = 0; c < maxLeft && i < rows.length; c++) take(leftRows);
+  return { cols, hidden: rows.length - i };
+}
+
+/** Blok kusovníku: hlavička dole, řádky rostou nahoru (první řádek bloku nejníže); záhlaví oddílu přes celou šířku. */
+function partsList(x: number, yBottom: number, rows: BomRow[], polys: Poly[], texts: DText[]) {
+  const cols = bomCols();
   const h = (rows.length + 1) * BOM_ROW;
   const y0 = yBottom - h;
   rect(polys, x, y0, TB.w, h, "frame", 0.7);
@@ -3080,7 +3275,10 @@ function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: numbe
   const cs = toSheet(p, [d.cx, d.cy]);
   const rs = d.r * p.s;
   polys.push({ layer: "thin", pts: circlePts(cs, rs, 48) });
-  texts.push({ x: cs[0] + rs * 0.75, y: cs[1] - rs * 0.75, s: d.label, size: 5, bold: true, layer: "text" });
+  // písmeno vpravo nahoře VNĚ kroužku: nejbližší roh rámečku textu (vlevo dole) leží ≥ 0,6 mm za kružnicí – dřív ležel uvnitř
+  // a písmeno křížilo vlastní kroužek (kontrola překryvů listu, vlna 22 bod 17 – fáze 2)
+  const k = (rs + 0.6) * Math.SQRT1_2 + 1;
+  texts.push({ x: cs[0] + k, y: cs[1] - k, s: d.label, size: 5, bold: true, layer: "text" });
   const clipped: { layer: Layer; pts: Vec2[] }[] = [];
   for (const pl of p.polys) for (const part of clipPolylineToCircle(pl.pts, [d.cx, d.cy], d.r)) clipped.push({ layer: pl.layer, pts: part });
   if (!clipped.length) return false;
@@ -3098,56 +3296,105 @@ function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: numbe
 // ---------------------------------------------------------------- pozice (balónky)
 
 /**
- * Balónky s čísly pozic u hlavního pohledu s odkazy na průmět středu komponenty.
- * Řady nad a pod pohledem se použijí jen tam, kde se vejdou do rámu (a mimo razítko); jinak sloupec vlevo od pohledu.
+ * List jen s kusovníkem (vlna 22, bod 17 – `výkres kusovník list`): sloupec nad razítkem a další sloupce zprava doleva přes
+ * celou výšku rámu; formát auto = nejmenší, na který se celý kusovník vejde. Co se nevejde ani na A0 → ⚠ drawing.bom-overflow.
  */
-function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>, bounds: { top: number; bottom: number; left: number; right: number }, gen?: { edit?: GenEdit; out: GenItem[] }) {
-  const R = 4;
-  const pts = items
-    .map((it) => {
-      const c: Vec3 = [(it.bbox[0][0] + it.bbox[1][0]) / 2, (it.bbox[0][1] + it.bbox[1][1]) / 2, (it.bbox[0][2] + it.bbox[1][2]) / 2];
-      return { pos: it.pos, q: toSheet(v, proj(v.cam, c)) };
-    })
-    .sort((a, b) => a.q[0] - b.q[0]);
-  const n = pts.length;
-  const left = v.px;
-  const width = v.w * v.s;
-  const clampX = (x: number) => Math.max(bounds.left + R, Math.min(bounds.right - R, x));
-  const clampY = (y: number) => Math.max(bounds.top + R, Math.min(bounds.bottom - R, y));
-  const aboveY = v.py - 12 - R;
-  const belowY = v.py + v.h * v.s + 12 + R;
-  const rows = [aboveY, belowY].filter((y) => y - R >= bounds.top && y + R <= bounds.bottom);
-  const seen = new Map<number, number>();
-  const place = (b: { pos: number; q: Vec2 }, bx0: number, by0: number) => {
-    // balónek skrytý / posunutý výběrem ve výkresu (odkazová čára vede dál k bodu komponenty)
-    const k = (seen.get(b.pos) ?? 0) + 1;
-    seen.set(b.pos, k);
-    const id = k > 1 ? `pos:${b.pos}#${k}` : `pos:${b.pos}`;
-    if (gen?.edit?.off?.includes(id)) return;
-    const mv = gen?.edit?.move?.[id];
-    const [bx, by] = [bx0 + (mv?.[0] ?? 0), by0 + (mv?.[1] ?? 0)];
-    const [np, nt] = [polys.length, texts.length];
-    polys.push({ layer: "dim", pts: circlePts([bx, by], R, 32) });
-    texts.push({ x: bx, y: by + 1.3, s: String(b.pos), size: 3.5, anchor: "middle", bold: true, layer: "dim" });
-    // odkazová čára od okraje kroužku k bodu komponenty, zakončená tečkou
-    const dx = b.q[0] - bx;
-    const dy = b.q[1] - by;
-    const l = Math.hypot(dx, dy) || 1;
-    polys.push({ layer: "dim", pts: [[bx + (dx / l) * R, by + (dy / l) * R], b.q] });
-    polys.push({ layer: "dim", fill: true, pts: circlePts(b.q, 0.7, 10) });
-    out.push({ pos: b.pos, x: bx, y: by });
-    // tvar pro výběr: kroužek s číslem (bez odkazové čáry – okno kolem balónku ho vybere)
-    if (gen) gen.out.push({ id, kind: "balloon", polys: [polys[np].pts], rects: texts.slice(nt).map(textBox) });
+function bomOnlySheet(meta: DrawingMeta, opts: DrawingOptions): DrawingResult {
+  const TBS = titleBlockSize(meta);
+  const rows = meta.bom?.length ? bomRowsOf(meta.bom) : [];
+  const dims = (n: SheetName): [number, number] => (opts.orientation === "portrait" ? [SHEETS[n][1], SHEETS[n][0]] : SHEETS[n]);
+  const plan = (n: SheetName) => {
+    const [W, H] = dims(n);
+    const r0 = Math.max(0, Math.floor((H - 2 * M - TBS.h - 4) / BOM_ROW) - 1);
+    const rl = Math.max(0, Math.floor((H - 2 * M) / BOM_ROW) - 1);
+    const maxLeft = Math.max(0, Math.floor((W - M_LEFT - M - TBS.w) / BOM_W));
+    return { W, H, ...bomColumns(rows, r0, rl, maxLeft) };
   };
-  if (rows.length) {
-    const perRow = Math.ceil(n / rows.length);
-    const spacing = Math.max(2 * R + 3, Math.min(14, width / Math.max(1, perRow)));
-    pts.forEach((b, i) => place(b, clampX(left + Math.floor(i / rows.length) * spacing + R), rows[i % rows.length]));
-    return;
+  const sheet: SheetName = opts.sheet !== "auto" ? opts.sheet : (SHEET_ORDER.find((n) => !plan(n).hidden) ?? "A0");
+  const p = plan(sheet);
+  const polys: Poly[] = [];
+  const texts: DText[] = [];
+  const warnings: string[] = [];
+  const issues: DrawingIssue[] = [];
+  frame(p.W, p.H, polys);
+  const tables: NonNullable<DrawingResult["tables"]> = [{ kind: "title", x: p.W - M - TBS.w, y: p.H - M - TBS.h, w: TBS.w, h: TBS.h }];
+  p.cols.forEach((col, i) => {
+    if (!col.length) return;
+    const x = p.W - M - TBS.w - i * BOM_W;
+    const yb = i === 0 ? p.H - M - TBS.h : p.H - M;
+    partsList(x, yb, col, polys, texts);
+    tables.push({ kind: "bom", x, y: yb - bomBlockH(col.length), w: BOM_W, h: bomBlockH(col.length) });
+  });
+  const tbInfo = drawTitleBlock({ W: p.W, H: p.H, margin: M, ctx: { sheet, scaleLabel: "—", projection: opts.projection }, meta, polys, texts, above: bomBlockH(p.cols[0]?.length ?? 0) });
+  if (!rows.length) warnings.push(tr("List kusovníku: sestava nemá kusovník."));
+  if (p.hidden) {
+    const t = tr("Kusovník ({0} řádků) se na list {1} nevejde ani ve sloupcích – {2} řádků chybí; zvolte větší formát nebo kusovník na samostatném listu (výkres kusovník list)", rows.length, sheet, p.hidden);
+    warnings.push(t);
+    issues.push({ level: "warn", code: "drawing.bom-overflow", kind: "bom-overflow", text: t, data: { rows: rows.length, hidden: p.hidden, sheet } });
   }
-  // pohled sahá až k rámu nahoře i dole → sloupec vlevo od pohledu
-  const bx = clampX(v.px - 12 - R);
-  pts.forEach((b, i) => place(b, bx, clampY(v.py + i * (2 * R + 3) + R)));
+  return {
+    sheet: { name: sheet, w: p.W, h: p.H },
+    views: [],
+    scale: "—",
+    scaleValue: 1,
+    polys,
+    texts,
+    svg: toSvg(p.W, p.H, polys, texts),
+    dxf: toDxf(p.H, polys, texts),
+    warnings,
+    ...(issues.length ? { issues } : {}),
+    tables,
+    frameRect: { x: M_LEFT, y: M, w: p.W - M_LEFT - M, h: p.H - 2 * M },
+    bomLayout: { mode: "only", cols: p.cols.filter((c) => c.length).length, rows: rows.length, hidden: p.hidden },
+    titleBlock: tbInfo,
+  };
+}
+
+/** pohledy, ke kterým lze přiřadit pozice (pořadí přednosti po hlavním pohledu) */
+export const BALLOON_VIEWS = ["front", "top", "left", "right", "back", "bottom", "iso"] as const;
+
+/**
+ * Pozice (balónky) sestavy: rozmístění po obvodu pohledů (cad/drawing-balloons.ts – přiřazení pohledům, volná místa,
+ * výměny proti křížení, zamčené a posunuté pozice) a kresba: kroužek s číslem, odkazová čára k první viditelné části
+ * komponenty zakončená tečkou. Vrací souhrn (nevešlé, křížení, chybějící pohledy).
+ */
+function drawBalloons(items: BalloonItem[], ortho: Placed[], isoP: Placed | null, mainKey: string | null, opts: DrawingOptions, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>, blocked: Rect[], bounds: Rect, gen: { edit?: GenEdit; out: GenItem[] }): NonNullable<DrawingResult["balloonInfo"]> {
+  const R = 4;
+  const byKey = new Map<string, Placed>(ortho.filter((p) => (BALLOON_VIEWS as readonly string[]).includes(p.key)).map((p) => [p.key, p]));
+  if (isoP) byKey.set("iso", isoP);
+  const order = [...(mainKey && byKey.has(mainKey) ? [mainKey] : []), ...BALLOON_VIEWS.filter((k) => k !== mainKey && byKey.has(k))];
+  if (!order.length && ortho[0]) {
+    byKey.set(ortho[0].key, ortho[0]);
+    order.push(ortho[0].key);
+  }
+  const views: BView[] = order.map((k) => {
+    const p = byKey.get(k)!;
+    return { key: k, rect: { x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s }, project: (q: Vec3) => toSheet(p, proj(p.cam, q)), pad: opts.dimPads?.[k] };
+  });
+  // překážky: texty a kóty listu, ostatní pohledy (řez, pomocné, modely), razítko, tabulky
+  const obstacles: Rect[] = [...blocked];
+  for (const t of texts) {
+    const [x0, y0, x1, y1] = textBox(t);
+    obstacles.push({ x: x0 - 0.5, y: y0 - 0.5, w: x1 - x0 + 1, h: y1 - y0 + 1 });
+  }
+  for (const pl of polys) if (pl.layer === "dim" && pl.pts.length > 1 && !pl.fill) obstacles.push(rectOfPts(pl.pts, 0.5));
+  for (const p of ortho) if (!byKey.has(p.key) || byKey.get(p.key) !== p) obstacles.push({ x: p.px - 1, y: p.py - 1, w: p.w * p.s + 2, h: p.h * p.s + 2 });
+  const lay = layoutBalloons({ items: items.map((it) => ({ pos: it.pos, name: it.name, boxes: it.boxes?.length ? it.boxes : [it.bbox] })), views, assign: opts.balloonViews, edit: gen.edit, obstacles, bounds, R });
+  for (const b of lay.placed) {
+    const [np, nt] = [polys.length, texts.length];
+    polys.push({ layer: "dim", pts: circlePts([b.x, b.y], R, 32) });
+    texts.push({ x: b.x, y: b.y + 1.3, s: String(b.pos), size: 3.5, anchor: "middle", bold: true, layer: "dim" });
+    // odkazová čára od okraje kroužku k bodu komponenty, zakončená tečkou
+    const dx = b.a[0] - b.x;
+    const dy = b.a[1] - b.y;
+    const l = Math.hypot(dx, dy) || 1;
+    polys.push({ layer: "dim", pts: [[b.x + (dx / l) * R, b.y + (dy / l) * R], b.a] });
+    polys.push({ layer: "dim", fill: true, pts: circlePts(b.a, 0.7, 10) });
+    out.push({ pos: b.pos, x: b.x, y: b.y, id: b.id, view: b.view, a: b.a, r: R, mode: b.mode, assigned: b.assigned, ...(b.lost ? { lost: true } : {}) });
+    // tvar pro výběr: kroužek s číslem (bez odkazové čáry – okno kolem balónku ho vybere)
+    gen.out.push({ id: b.id, kind: "balloon", polys: [polys[np].pts], rects: texts.slice(nt).map(textBox) });
+  }
+  return { lost: lay.lost, crossings: lay.crossings, missingView: lay.missingView };
 }
 
 /**
@@ -3181,7 +3428,8 @@ export function toSvg(W: number, H: number, polys: Poly[], texts: DText[]) {
   for (const p of polys) {
     const st = STYLE[p.layer];
     if (p.img) {
-      out.push(`<image x="${f(p.img.x)}" y="${f(p.img.y)}" width="${f(p.img.w)}" height="${f(p.img.h)}" preserveAspectRatio="xMidYMid meet" href="${esc(p.img.src)}"/>`);
+      // logo SVG zůstává vektorem (vlna 22, bod 22j), jinak bitmapa PNG / JPEG
+      out.push(`<image x="${f(p.img.x)}" y="${f(p.img.y)}" width="${f(p.img.w)}" height="${f(p.img.h)}" preserveAspectRatio="xMidYMid meet" href="${esc(p.img.svg ?? p.img.src)}"/>`);
       continue;
     }
     const pts = p.pts.map(([x, y]) => `${f(x)},${f(y)}`).join(" ");
@@ -3888,6 +4136,30 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
     return fitSuffix(value, code, a.tolShow ?? d.fitShow ?? "dev");
   };
   const S = (view: string, q: Vec2) => annToSheet(d.views, view, q);
+  /** viditelné hrany a kružnice pohledu v mm listu (úsečky; oblouky po 15°) – volné místo pro značky skupin děr */
+  const segCache = new Map<string, [Vec2, Vec2][]>();
+  const viewSegs = (view: string): [Vec2, Vec2][] => {
+    let l = segCache.get(view);
+    if (l) return l;
+    l = [];
+    for (const e of d.views.find((v) => v.key === view)?.ents ?? []) {
+      if (e.hidden) continue;
+      if (e.t === "line") {
+        l.push([S(view, e.a), S(view, e.b)]);
+        continue;
+      }
+      const n = Math.max(4, Math.ceil(Math.abs(e.da) / (Math.PI / 12)));
+      let p = S(view, [e.c[0] + e.r * Math.cos(e.a0), e.c[1] + e.r * Math.sin(e.a0)]);
+      for (let i = 1; i <= n; i++) {
+        const t = e.a0 + (e.da * i) / n;
+        const q = S(view, [e.c[0] + e.r * Math.cos(t), e.c[1] + e.r * Math.sin(t)]);
+        l.push([p, q]);
+        p = q;
+      }
+    }
+    segCache.set(view, l);
+    return l;
+  };
   const modelLen = (view: string, a: Vec2, b: Vec2) => {
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
@@ -4049,10 +4321,19 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
         // značka skupiny děr u každé díry (souřadnicové kóty – který popis patří ke které díře)
         if (a.tag && a.tags?.length) {
           const pv = d.views.find((v) => v.key === a.view);
+          const segs = viewSegs(a.view);
           for (const g of a.tags) {
             const q = S(a.view, g.c);
-            const rr = g.r * (pv?.s ?? 1) * Math.SQRT1_2;
-            texts.push({ x: q[0] + rr + 0.4, y: q[1] - rr - 0.4, s: a.tag, size: 2.5, layer: "dim" });
+            const rr = g.r * (pv?.s ?? 1) * Math.SQRT1_2 + 0.4;
+            // značka šikmo vedle díry; vadí-li tam hrana pohledu (sousední díra, obrys), zkusí se další tři rohy (vlna 22, bod 17 –
+            // vygenerovaný popis nemá ležet přes geometrii); když jsou všechny obsazené, zůstane první (kontrola překryvů to ohlásí)
+            const cands: DText[] = [
+              { x: q[0] + rr, y: q[1] - rr, s: a.tag, size: 2.5, layer: "dim" },
+              { x: q[0] + rr, y: q[1] + rr + 2, s: a.tag, size: 2.5, layer: "dim" },
+              { x: q[0] - rr, y: q[1] - rr, s: a.tag, size: 2.5, layer: "dim", anchor: "end" },
+              { x: q[0] - rr, y: q[1] + rr + 2, s: a.tag, size: 2.5, layer: "dim", anchor: "end" },
+            ];
+            texts.push(cands.find((t) => !boxHitsSegs(textBox(t), segs)) ?? cands[0]);
           }
         }
         // popis díry s polem tolerance (Ø12H7 skrz): úchylky za prvním řádkem

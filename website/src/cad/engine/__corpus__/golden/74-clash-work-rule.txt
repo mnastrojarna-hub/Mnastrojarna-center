@@ -8,17 +8,17 @@
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
 ✓ nový díl „Rám“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Kvádr 2 (box)
-✓ Válec 1 (cylinder)
-✓ Kvádr 3 (box)
+✓ Kvádr 1 (box) · přidáno 36000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1131 mm³ (5 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 7200 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 18000 mm³ · těleso platné
 
 Dokument: „Rám“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 60 × 60 × 5 mm (X 0…60, Y 0…60, Z 0…5) · objem 18 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 60 × 60 × 5 mm, new, roh [0; 0; 0]
+ 1. Kvádr 3 [box, id #] ✓ přidáno 18000 mm³ · těleso platné – 60 × 60 × 5 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Střih“ – nová záložka
 ✓ komponenta „Rám“ vložena do sestavy (ukotvená)
@@ -31,9 +31,13 @@ kolize: 1 – šroub v závitu 0, skutečné 1
 ✓ pravidlo kolizí r1 pracovní kontakt „Razník“ × „Plech“ v krocích 0–2
 kolize po pravidlech: skutečné 1
 ✓ motor 1: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+ pohání: „Razník“ · směr −Z
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
- Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −4 mm
+ stojí: 3 („Rám“, „Matrice“, „Plech“)
 Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (5 poloh + 4 mezipoloh ze zjemnění; úseky: mez posunu 4, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ⚠ řádek 9: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
 ℹ řádek 9: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³
@@ -46,8 +50,11 @@ Kolize (zkontrolováno ?): pracovní kontakt 1 · zobrazeno 1 skupin (vše)
 Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize
  1. lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
- Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −4 mm
+ stojí: 3 („Rám“, „Matrice“, „Plech“)
 Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (5 poloh + 4 mezipoloh ze zjemnění; úseky: mez posunu 4, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ⚠ řádek 13: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
 ℹ řádek 13: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³

@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseAgentText } from "./agent";
 import type { DrawingCmd } from "./agent-drawing";
+import { partComponent } from "./assembly";
 import { annotationGeometry, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { activeSheet, activeSheetIndex, applyDrawingCmd, drawingStatus, sheetMeta, type DrawingEnv } from "./drawing-agent";
 import { fixtureCompute, plateDoc } from "./drawing-fixture";
@@ -228,7 +229,7 @@ describe("detaily a další modely na listu", () => {
   });
   it("model: komponenta sestavy, otevřená záložka, změna pohledu, odebrání", async () => {
     const part = plateDoc("Hřídel");
-    const asm: CadDoc = { ...plateDoc("Sestava"), kind: "assembly", features: [], components: [{ id: "c1", name: "Hřídel", doc: part } as never] };
+    const asm: CadDoc = { ...plateDoc("Sestava"), kind: "assembly", features: [], components: [{ ...partComponent(part), id: "c1" }] }; // platná komponenta: list sestavy počítá revizi modelu z poloh (D2)
     let { doc, log } = await run(asm, 'kótovat celkově\nvýkres model "hřídel" pohled horní měřítko 1:2');
     expect(opts(doc).models).toEqual([expect.objectContaining({ name: "Hřídel", source: { kind: "component", compId: "c1" }, view: "top", scale: 0.5 })]);
     expect(log).toMatch(/✓ model „Hřídel“ na listu: pohled horní, měřítko 0\.5/);

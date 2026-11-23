@@ -105,7 +105,6 @@ ks ·	pcs ·
 103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.	103 families: screws, bearings, gears, profiles, mould standards… Just type “M8x30”.
 24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce	24 chapters, step-by-step procedures, FAQ – opens in a new tab
 2D profil na rovině nebo ploše	2D profile on a plane or face
-3D okno: nedostupné (WebGL)	3D view: unavailable (WebGL)
 3D tisk	3D printing
 3D tisk s jednotkami	3D printing with units
 Aktivní dokument – název lze přepsat	Active document – the name can be edited
@@ -113,8 +112,6 @@ Analýza	Analysis
 Barva komponenty	Component colour
 Barva plochy	Face colour
 Barva tělesa	Body colour
-Bez kolizí ✓	No interferences ✓
-Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu	No interferences ✓ – the result is in the Interference panel and in the document status
 Bílý (tisk)	White (print)
 CAD jádro se nepodařilo načíst. Zkuste prosím aktuální Chrome, Edge, Firefox nebo Safari.	The CAD kernel could not be loaded. Please try a current Chrome, Edge, Firefox or Safari.
 Celá dokumentace jako PDF k tisku a offline čtení.	The whole documentation as a PDF for printing and offline reading.
@@ -554,7 +551,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) added – result after computation below
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} edges by rule “{3}” – result after computation below
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ document “{0}” ({1} features) – opens in a new tab
-✓ kolize: žádné ({0} komponent)	✓ interferences: none ({0} components)
 ✓ materiál = {0}	✓ material = {0}
 ✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ material “{0}” = designation for the title block; density stays by class “{1}” ({2} g/cm³) – for another density enter: material {3}
 ✓ odstraněn prvek „{0}“	✓ feature “{0}” removed
@@ -586,7 +582,6 @@ Automaticky	Automatic
 Celkové	Overall
 Celý list	Whole sheet
 Charakteristika	Characteristic
-Chybí {0} z {1} očekávaných kót	{0} of {1} expected dimensions missing
 DWG se nepodařilo vytvořit.	The DWG could not be created.
 DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).	DWG is written directly in the browser (layers OBRYS/SKRYTE/OSY/KOTY, line types and widths, AutoCAD 2000–2018+ versions). DXF is in AutoCAD R12 format for older and open-source programs (LibreCAD, QCAD).
 DWG {0} uloženo: {1}	DWG {0} saved: {1}
@@ -624,7 +619,6 @@ Nepředepsané tolerance	General tolerances
 Nástroj „Detail“ (L): střed, poloměr, umístění.	“Detail” tool (L): centre, radius, placement.
 Název listu	Sheet name
 Odstranit list	Remove sheet
-Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.	Derived from the feature history – a helper list, not a substitute for a designer's check. Add a missing dimension with the Dimension tool (2 points + offset); enter the tolerance (H8, ±0.1) in the “suffix” field of the dimension in the list.
 Opracování hran	Edge treatment
 Osy děr a válců	Axes of holes and cylinders
 PDF se nepodařilo vytvořit.	The PDF could not be created.
@@ -658,7 +652,6 @@ Verze DWG	DWG version
 Verze souboru DWG	DWG file version
 Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.	Manufacturing requirements and notes are not added to the drawing automatically – only filled-in ones appear.
 Výška písma [mm]	Text height [mm]
-Všech {0} očekávaných kót je na listu	All {0} expected dimensions are on the sheet
 XY (vodor.)	XY (horiz.)
 XZ (čelní)	XZ (front)
 YZ (boční)	YZ (side)

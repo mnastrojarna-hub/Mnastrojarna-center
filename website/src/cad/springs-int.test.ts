@@ -88,7 +88,7 @@ describe("pohybová studie: strojový řádek a souhrn dynamiky", () => {
         energy: { e0: 0.3, end: 0.3, drift: 0.0001, damping: 0, contacts: 0, applied: 0, kinMax: 1 },
       },
     } as unknown as DynResult;
-    expect(motionKv(res, null)).toMatch(/^motion steps=0 t=0 motors=0 conflicts=0 static=0 mode=dyn bodies=1 spring\.max=85\.9N@0\.2385s stops=2 return=0\.375s drift=0\.01%$/);
+    expect(motionKv(res, null)).toMatch(/^motion steps=0 t=0 motors=0 conflicts=0 static=0 mode=dyn bodies=1 spring\.max=85\.9N@0\.2385s stops=2 return=0\.375s drift=0\.01% level=dyn$/); // vlna 22: úroveň simulace na konci řádku
     // kinematika beze změny (bez mode=dyn)
     expect(motionKv(base, null)).not.toMatch(/mode=dyn/);
   });

@@ -277,7 +277,7 @@ export function measureLines(rep: MeasureReport): string[] {
       const b = rep.body;
       const [a, z] = b.bbox;
       return [
-        tr("{0}: obálka {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · objem {10} mm³ ({11} cm³) · povrch {12} mm² · hmotnost {13} kg ({14} g/cm³) · těžiště {15} · ploch {16} · hran {17} · vrcholů {18}{19}", b.label, mfmt(b.size[0]), mfmt(b.size[1]), mfmt(b.size[2]), mfmt(a[0]), mfmt(z[0]), mfmt(a[1]), mfmt(z[1]), mfmt(a[2]), mfmt(z[2]), mfmt(b.volume), mfmt(b.volume / 1000), mfmt(b.area), mfmt(b.mass, 4), mfmt(b.density, 2), b.com ? vec(b.com) : "–", b.faces, b.edges, b.vertices, b.solids > 1 ? tr(" · těles {0}", b.solids) : ""),
+        tr("{0}: obálka {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · objem {10} mm³ ({11} cm³) · povrch {12} mm² · hmotnost {13} kg ({14} g/cm³) · těžiště {15} · ploch {16} · hran {17} · vrcholů {18}{19}", b.label, mfmt(b.size[0]), mfmt(b.size[1]), mfmt(b.size[2]), mfmt(a[0]), mfmt(z[0]), mfmt(a[1]), mfmt(z[1]), mfmt(a[2]), mfmt(z[2]), b.solids ? mfmt(b.volume) : "–", b.solids ? mfmt(b.volume / 1000) : "–", mfmt(b.area), b.solids ? mfmt(b.mass, 4) : "–", mfmt(b.density, 2), b.com ? vec(b.com) : "–", b.faces, b.edges, b.vertices, b.solids > 1 ? tr(" · těles {0}", b.solids) : b.solids === 0 ? tr(" · ŽÁDNÉ objemové těleso – objem a hmotnost se z ploch nepočítají") : ""),
       ];
     }
     case "holes":

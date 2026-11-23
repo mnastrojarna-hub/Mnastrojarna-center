@@ -12,6 +12,8 @@ import type { SmartDims } from "./drawing-dims";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { CompareOptions, CompareResult, ReferenceFile } from "./compare";
 import type { ClashDetail, ClashPair } from "./clash-class";
+import type { ClrReq, ClrRes } from "./clearance-types";
+import type { ProcReq, ProcRes } from "./process-types";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { FaceOwner } from "./face-owner";
 import type { MeasureQuery, MeasureReport } from "./measure";
@@ -46,6 +48,10 @@ export type KernelReq =
   | { id: number; op: "asmEnvelope"; doc: CadDoc }
   /** zařazení dvojic kolizí šroub × závit geometricky (clash-detail.ts, kap. 6.3) */
   | { id: number; op: "clashDetail"; doc: CadDoc; pairs: ClashPair[] }
+  /** vůle mezi komponentami a spojitá kontrola úseku pohybu (clearance-kernel.ts, vlna 22 bod 6) */
+  | { id: number; op: "clearance"; req: ClrReq }
+  /** procesní vrstva pohybové studie – střih / otisk jako booleovské odebrání (process-kernel.ts, vlna 22 bod 4) */
+  | { id: number; op: "process"; req: ProcReq }
   | { id: number; op: "compare"; doc: CadDoc; file: ReferenceFile; opts?: CompareOptions }
   | { id: number; op: "mateFace"; key: string; index: number }
   | { id: number; op: "mateEnt"; key: string; index: number; ent: "edge" | "vertex" | "mesh" }
@@ -95,6 +101,8 @@ export interface KernelResults {
   interference: Interference[];
   asmEnvelope: { bbox: [Vec3, Vec3] | null; leaves: number; turned: number; approx: number };
   clashDetail: ClashDetail[];
+  clearance: ClrRes;
+  process: ProcRes;
   compare: CompareResult;
   mateFace: MateFaceInfo | null;
   mateEnt: MateFaceInfo | null;

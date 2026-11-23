@@ -6,6 +6,7 @@
  * takže ho lze testovat v Node s náhradním jádrem. Geometrie ploch a řešič vazeb jsou stejné jako v panelu sestavy
  * (seznam ploch: `faceRow` / `sortFaceRows`, vazby: `mateFromPending`, `measureMateIn`, `solveMates`).
  */
+import { copiesText } from "./asm-bulk-text";
 import {
   apply3,
   boltStack,
@@ -93,6 +94,8 @@ import {
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
 import type { ClashDetail, ClashPair } from "./clash-class";
+import type { ClrReq, ClrRes } from "./clearance-types";
+import type { ProcReq, ProcRes } from "./process-types";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
 export type PartFaces = { faces: { face: number; info: PartFace; area?: number }[]; truncated: boolean };
@@ -121,6 +124,10 @@ export type AsmEnv = {
   interference?: (doc: CadDoc) => Promise<{ a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] }[]>;
   /** geometrické zařazení dvojic kolize v jádře (šroub × závit, kap. 6.3 – clash-class.ts) – v pohybu stejné jako `kolize` */
   clashDetail?: (doc: CadDoc, pairs: ClashPair[]) => Promise<ClashDetail[]>;
+  /** vůle mezi komponentami a spojitá kontrola úseku pohybu v jádře (vlna 22, bod 6 – cad/clearance-kernel.ts) */
+  clearance?: (req: ClrReq) => Promise<ClrRes>;
+  /** procesní vrstva pohybové studie v jádře (vlna 22, bod 4 – střih / otisk, cad/process-kernel.ts) */
+  process?: (req: ProcReq) => Promise<ProcRes>;
   /** díl má víc ploch, než se načte (`FACE_LIMIT`) – plochy navíc nejdou vybrat pro vazbu (⚠ asm.faces-truncated, 5.2 č. 30) */
   onFacesTruncated?: (key: string, limit: number) => void;
   /** výsledky pohybové studie podle dokumentu: úložiště pracovního prostoru a klíč dokumentu, se kterým prostředí pracuje (cad/motion-cache.ts) */
@@ -856,7 +863,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       const i = (doc.components ?? []).findIndex((x) => x.id === c.id);
       const copies = (doc.components ?? []).slice(i + 1, i + cmd.pattern.count);
       const p = cmd.pattern;
-      log.push(tr("✓ pole „{0}“: {1} ks ({2}) – kopie {3}", c.name, p.count, p.kind === "linear" ? tr("lineární, rozteč {0} mm, směr {1}", fmt(p.spacing), pt(p.direction, 3)) : tr("kruhové, úhel {0}°, osa {1}, střed {2}", fmt(p.angle), Array.isArray(p.axis) ? pt(p.axis, 3) : p.axis, pt(p.center)), copies.map((x) => `„${x.name}“ ${pt(x.placement.position)}`).join(", ")));
+      // souhrn místo polohy každé kopie (vlna 22, bod 15 – asm-bulk-text.ts); polohy všech vypíše „sestava komponenty“
+      log.push(tr("✓ pole „{0}“: {1} ks ({2}) – kopie {3}", c.name, p.count, p.kind === "linear" ? tr("lineární, rozteč {0} mm, směr {1}", fmt(p.spacing), pt(p.direction, 3)) : tr("kruhové, úhel {0}°, osa {1}, střed {2}", fmt(p.angle), Array.isArray(p.axis) ? pt(p.axis, 3) : p.axis, pt(p.center)), copiesText(copies.map((x) => ({ name: x.name, pos: pt(x.placement.position) })))));
       return done(doc, true);
     }
     case "mirror": {

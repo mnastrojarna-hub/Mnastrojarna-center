@@ -1,0 +1,3 @@
+# vlna 22, balík V, etapa V2 (zpráva 20. 11.): čela řezu v sestavě
+čela řezu se v drátovém zobrazení nekreslí	section caps are not drawn in the wireframe display
+čela řezu: každá komponenta s objemem (barva komponenty, šrafy)	section caps: every component with volume (component colour, hatching)

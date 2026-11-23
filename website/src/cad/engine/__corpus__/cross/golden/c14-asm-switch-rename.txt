@@ -8,7 +8,7 @@
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
 ✓ komponenta „Čep“ vložena do sestavy
 ✓ vazba Souosost „Čep“ F1 → „Deska“ F7: ok · „Čep“ poloha [40; 30; 0]
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 ✓ nová sestava „B“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
 ✓ komponenta „Deska“ vložena do sestavy
@@ -36,7 +36,7 @@ Dokument: „A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓,
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 0]
 Vazby: 1 (1 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 30 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 4 ===
 ✓ záložka „B2“ (sestava) je aktivní – další příkazy pracují s ní
 

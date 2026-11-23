@@ -13,7 +13,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { fmt } from "@/cad/agent-asm";
-import { motionCached, motionRun, type MotionSignal } from "@/cad/asm-agent-kin";
+import { motionCached, motionRun, motorCheck, type MotionSignal } from "@/cad/asm-agent-kin";
+import { reachHighlight, reachText, type MotorConflict, type MotorReach } from "@/cad/motion-reach";
 import type { AsmEnv } from "@/cad/asm-agent";
 import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
@@ -23,11 +24,16 @@ import { levelLine, levelOf, studyMode } from "@/cad/motion-mode";
 import { devText } from "@/cad/motion-quasi";
 import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
 import { stepHasFault } from "@/cad/clash-report"; // štítek kroku jen u skutečné kolize (vlna 22, bod 5)
-import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
+import { buildMotor, fitDuration, motorArrow, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, motorSpan, type MotorInput } from "@/cad/motor-model";
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
+import { MotionPhases, PhaseTimeline } from "./motion-phases-panel";
+import { ClearanceResult, ClearanceSettings } from "./motion-clearance-panel"; // vůle a spojitá kontrola (vlna 22, bod 6)
+import { ProcessSettings, ProcessState } from "./motion-process-panel"; // procesní vrstva: střih / otisk (vlna 22, bod 4)
+import { ensureProcessMeshes } from "./process-meshes";
+import { processOf } from "@/cad/motion-process";
 import type { SpringStep } from "@/cad/asm-spring";
-import { uid, type CadDoc, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
+import { uid, type CadDoc, type MotionMotor, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
 import { Num, Vec } from "./props";
@@ -37,11 +43,12 @@ import { findView } from "@/cad/motion-views";
 import { studySpan } from "@/cad/motion-video";
 import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
 import { MotionPlayer, type PlayerHost } from "./motion-player";
+import { appRuns } from "./run-host";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
 /** `springs` = délky pružin v kroku (cad/asm-spring.ts) – zobrazení protáhne síť volné pružiny */
-type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null; /** neplatný krok (bod 8): zobrazená poloha je poslední platného kroku `shows` – 3D okno ho výrazně označí */ invalid?: { step: number; shows: number } | null };
+type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null; /** neplatný krok (bod 8): zobrazená poloha je poslední platného kroku `shows` – 3D okno ho výrazně označí */ invalid?: { step: number; shows: number } | null; /** procesní vrstva (vlna 22, bod 4): výsledek a krok (index do `res.steps`), jehož stav obrobku a odpad 3D okno ukáže */ proc?: { res: MotionResult; k: number } | null };
 let view: View = { pose: null, trace: null };
 const subs = new Set<() => void>();
 const EMPTY: View = { pose: null, trace: null };
@@ -59,6 +66,27 @@ export const motionView = {
 /** poloha komponent a stopa aktuálního kroku studie (null = studie se nezobrazuje) */
 export function useMotionView(): View {
   return useSyncExternalStore(motionView.subscribe, motionView.get, () => EMPTY);
+}
+/**
+ * Zvýraznění motoru ve 3D okně (vlna 22, bod 10): komponenty, které motor skutečně pohání (zkušební posun – cad/motion-reach.ts),
+ * řízená vazba a osa se šipkou směru (čáry + popisek; WebGL i softwarový náhled je kreslí jako překryv měření).
+ */
+export type MotorHighlight = { motor: number | "draft"; mate: string; comps: string[]; lines: [Vec3, Vec3][]; label: { pos: Vec3; text: string } | null };
+let hl: MotorHighlight | null = null;
+const hlSubs = new Set<() => void>();
+export const motorHighlight = {
+  get: () => hl,
+  set(v: MotorHighlight | null) {
+    hl = v;
+    hlSubs.forEach((f) => f());
+  },
+  subscribe(f: () => void) {
+    hlSubs.add(f);
+    return () => void hlSubs.delete(f);
+  },
+};
+export function useMotorHighlight(): MotorHighlight | null {
+  return useSyncExternalStore(motorHighlight.subscribe, motorHighlight.get, () => null);
 }
 const queue: MotionSignal[] = [];
 const sigSubs = new Set<() => void>();
@@ -96,8 +124,47 @@ const readCompact = () => {
 /** stav výsledku pro otisk dokumentu `sig` (starší stav se při vykreslení jiného dokumentu nepoužije ani na jeden snímek) */
 type Live = { sig: string; key: string; st: MotionState; running: boolean };
 /** rozpracovaný motor formuláře: nevyplněná pole (undefined) se berou z vazby – začátek = aktuální hodnota, konec = začátek + výchozí zdvih */
-type Draft = { kind: "rotary" | "linear"; mate: string; from?: number; to?: number; stroke?: number; end: "to" | "stroke"; mode: "range" | "ranged" | "open"; speed?: number; back?: boolean };
+type Draft = {
+  kind: "rotary" | "linear";
+  mate: string;
+  from?: number;
+  to?: number;
+  stroke?: number;
+  end: "to" | "stroke";
+  mode: "range" | "ranged" | "open";
+  speed?: number;
+  back?: boolean;
+  /** navazující úseky (vlna 22, bod 3): kam + čas NEBO rychlost (ot/min u rotačního); s úseky se konec / zdvih nepoužije */
+  legs?: { to: number; by: "time" | "speed"; value: number }[];
+  /** časové okno [s] a fáze, se kterou motor začne */
+  t0?: number;
+  t1?: number;
+  phase?: string;
+  atLimit?: "stop" | "error";
+};
 const newDraft = (kind: "rotary" | "linear"): Draft => ({ kind, mate: "", end: "to", mode: "range" });
+/** formulář z uloženého motoru (Upravit vybraný motor) – klíčové polohy se upravují jako úseky s časem */
+function draftOf(mo: MotionMotor): Draft {
+  const per = mo.kind === "rotary" ? 6 : 1;
+  const legs = mo.keys && mo.keys.length > 1
+    ? mo.keys.slice(1).map((k, i) => ({ to: k.v, by: "time" as const, value: k.t - mo.keys![i].t }))
+    : mo.legs?.map((g) => ({ to: g.to, by: g.speed !== undefined && g.time === undefined ? ("speed" as const) : ("time" as const), value: g.speed !== undefined && g.time === undefined ? g.speed / per : (g.time ?? 0) }));
+  return {
+    kind: mo.kind,
+    mate: mo.mate,
+    from: mo.from,
+    to: mo.to,
+    end: "to",
+    mode: mo.ranged ? "ranged" : mo.speed !== undefined && !legs ? "open" : "range",
+    ...(mo.speed !== undefined ? { speed: mo.ranged ? Math.abs(mo.speed) : mo.speed } : {}),
+    ...(mo.back ? { back: true } : {}),
+    ...(legs?.length ? { legs } : {}),
+    ...(mo.window?.t0 !== undefined ? { t0: mo.window.t0 } : {}),
+    ...(mo.window?.t1 !== undefined ? { t1: mo.window.t1 } : {}),
+    ...(mo.phase ? { phase: mo.phase } : {}),
+    ...(mo.atLimit ? { atLimit: mo.atLimit } : {}),
+  };
+}
 
 export function MotionPanel({
   doc,
@@ -146,6 +213,21 @@ export function MotionPanel({
   /** otisk dokumentu, který se právě počítá (změní-li se dokument, výpočet zastaralého vstupu se zruší) */
   const computing = useRef<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => newDraft("rotary"));
+  /**
+   * formulář motoru (vlna 22, bod 10): zavřený, „Nový motor“, nebo „Upravit vybraný motor N“ (předvyplněný, Uložit / Zrušit).
+   * Dřív byl pod seznamem trvale otevřený formulář „Přidat motor“ a motor na téže vazbě se potichu nahradil.
+   */
+  const [editor, setEditor] = useState<{ mode: "new" } | { mode: "edit"; i: number } | null>(null);
+  const openNew = () => {
+    setDraft(newDraft(draft.kind));
+    setEditor({ mode: "new" });
+  };
+  const openEdit = (i: number) => {
+    const mo = study.motors[i];
+    if (!mo) return;
+    setDraft(draftOf(mo));
+    setEditor({ mode: "edit", i });
+  };
   const setStudy = (s: Partial<MotionStudy>) => onDoc({ ...doc, motion: { ...study, ...s } });
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
   const mateLabel = (m: { name?: string; type: keyof typeof MATE_LABEL }) => m.name ?? tr(MATE_LABEL[m.type]);
@@ -162,8 +244,12 @@ export function MotionPanel({
   docRef.current = doc;
   const envRef = useRef(env);
   envRef.current = env;
-  const busyRef = useRef(engineBusy);
-  busyRef.current = engineBusy;
+  /**
+   * běh textových příkazů probíhá nebo ČEKÁ ve frontě běhů (run-host.ts `appRuns`): `window.mncad.run(…)` běh jen zařadí a engine
+   * začne až v další mikroúloze – klik na „Vypočítat pohyb“ hned po zařazení by jinak spočítal dokument PŘED během (fáze 2, bod 12)
+   */
+  const busyRef = useRef<(() => boolean) | undefined>(undefined);
+  busyRef.current = () => !!engineBusy?.() || appRuns.pending().some((e) => e.kind === "script");
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -199,8 +285,12 @@ export function MotionPanel({
     }
     const s = res.steps[step];
     const trace = res.steps.slice(0, step + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null, invalid: s?.status === "invalid" ? { step: s.i, shows: s.shows ?? 0 } : null });
+    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null, invalid: s?.status === "invalid" ? { step: s.i, shows: s.shows ?? 0 } : null, proc: processOf(res) ? { res, k: step } : null });
   }, [res, step]);
+  // sítě procesní vrstvy (obrobek po operaci, odpad) – načtou se jednou po výsledku; 3D okno je pak čte synchronně
+  useEffect(() => {
+    if (res && processOf(res)) void ensureProcessMeshes(res, docRef.current, envRef.current().process);
+  }, [res]);
   useEffect(() => () => motionView.set({ pose: null, trace: null }), []);
   const compute = useCallback(async (): Promise<MotionResult | null> => {
     const d = docRef.current;
@@ -280,7 +370,7 @@ export function MotionPanel({
   const showStep = (r: MotionResult, i: number) => {
     const st = r.steps[i];
     const trace = r.steps.slice(0, i + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: st?.place ?? null, trace: trace.length > 1 ? trace : null, springs: st?.springs ?? null });
+    motionView.set({ pose: st?.place ?? null, trace: trace.length > 1 ? trace : null, springs: st?.springs ?? null, proc: processOf(r) ? { res: r, k: i } : null });
   };
   /**
    * Snímky PNG / video WebM s pevným časováním (motion-export.ts): bez záznamu obrazovky, délka = délka studie / rychlost
@@ -299,13 +389,15 @@ export function MotionPanel({
     });
     const host: ExportHost = {
       ...player,
-      setPose: (p) => motionView.set({ pose: p.place, trace: p.trace, springs: p.springs }),
+      // procesní vrstva: stav obrobku a odpad podle kroku před zobrazeným časem (sítě musí být načtené – viz níže)
+      setPose: (p) => motionView.set({ pose: p.place, trace: p.trace, springs: p.springs, proc: processOf(r) ? { res: r, k: p.k } : null }),
       save,
       progress: (t) => setRec(t),
       cancelled: () => exportCancel.current,
     };
     exportCancel.current = false;
     setRec(tr("Připravuji snímky…"));
+    await ensureProcessMeshes(r, d, envRef.current().process); // exportované snímky obsahují obrobek po střihu / otisku
     try {
       const rep = await exportMotion(r, d, { kind, speed: v.speed, fps: v.fps, seconds: v.seconds, perStep: kind === "png" && (sig ? !!sig.perStep : true), views, annot: v.annot !== false && !st.annot?.off, annotSettings: st.annot, name: d.name, csv: motionCsv(r, d) }, host);
       setReport(rep);
@@ -396,30 +488,89 @@ export function MotionPanel({
   const dStroke = draft.end === "stroke" ? (draft.stroke ?? defStroke) : (draft.to ?? dFrom + defStroke) - dFrom;
   const dTo = draft.end === "stroke" ? dFrom + dStroke : (draft.to ?? dFrom + defStroke);
   const dSpeed = draft.speed ?? (rot ? 60 : 10);
-  const dInput: MotorInput = { kind: draft.kind, from: dFrom, ...(draft.mode === "open" ? {} : draft.end === "stroke" ? { stroke: dStroke } : { to: dTo }), ...(draft.mode !== "range" ? { speed: dSpeed } : {}), ...(draft.back && draft.mode === "range" ? { back: true } : {}) };
-  // náhled motoru, délky studie a upozornění ještě před přidáním
+  const dWindow = draft.t0 !== undefined || draft.t1 !== undefined ? { ...(draft.t0 !== undefined ? { t0: draft.t0 } : {}), ...(draft.t1 !== undefined ? { t1: draft.t1 } : {}) } : undefined;
+  const dInput: MotorInput = draft.legs?.length
+    ? { kind: draft.kind, from: dFrom, extra: draft.legs.map((g) => ({ to: g.to, ...(g.by === "speed" ? { speed: g.value } : { time: g.value }) })), ...(dWindow ? { window: dWindow } : {}), ...(draft.phase ? { phase: draft.phase } : {}) }
+    : { kind: draft.kind, from: dFrom, ...(draft.mode === "open" ? {} : draft.end === "stroke" ? { stroke: dStroke } : { to: dTo }), ...(draft.mode !== "range" ? { speed: dSpeed } : {}), ...(draft.back && draft.mode === "range" ? { back: true } : {}), ...(dWindow ? { window: dWindow } : {}), ...(draft.phase ? { phase: draft.phase } : {}) };
+  /** upravovaný motor (index) nebo motor na téže vazbě se stejným začátkem, který by nový motor nahradil (nikdy potichu) */
+  const editIdx = editor?.mode === "edit" ? editor.i : -1;
+  const startKey = (x: { window?: { t0?: number }; phase?: string }) => `${x.phase ?? ""}|${x.window?.t0 ?? 0}`;
+  const sameIdx = editor?.mode === "new" && dMate ? study.motors.findIndex((x) => x.mate === dMate.id && startKey(x) === startKey({ ...(dWindow ? { window: dWindow } : {}), ...(draft.phase ? { phase: draft.phase } : {}) })) : -1;
+  // náhled motoru, délky studie a upozornění ještě před uložením
   const preview = useMemo(() => {
     if (!dMate) return null;
     try {
-      const i = study.motors.findIndex((x) => x.mate === dMate.id);
+      const i = editIdx >= 0 ? editIdx : sameIdx;
       const mo = buildMotor(dInput, { id: i >= 0 ? study.motors[i].id : "draft", mate: dMate.id, abs: dAbs, current: dCur });
+      if (draft.atLimit === "error") mo.atLimit = "error";
       const motors = i >= 0 ? study.motors.map((x, k) => (k === i ? mo : x)) : [...study.motors, mo];
       const fit = fitDuration({ ...study, motors }, i >= 0 ? i : motors.length - 1);
       const notes = motorNotes({ motors: [mo], duration: fit.duration, collisions: study.collisions }, doc.mates ?? [], (m) => m.name ?? tr(MATE_LABEL[m.type]));
-      return { mo, motors, duration: fit.duration, extended: fit.note?.text ?? null, notes, error: null as string | null };
+      return { mo, motors, index: i >= 0 ? i : motors.length - 1, duration: fit.duration, extended: fit.note?.text ?? null, notes, error: null as string | null };
     } catch (e) {
-      return { mo: null, motors: null, duration: study.duration, extended: null, notes: [], error: (e as Error).message };
+      return { mo: null, motors: null, index: -1, duration: study.duration, extended: null, notes: [], error: (e as Error).message };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dMate, JSON.stringify(dInput), dAbs, dCur, study]);
+  }, [dMate, JSON.stringify(dInput), dAbs, dCur, study, editIdx, sameIdx, draft.atLimit]);
   const addMotor = () => {
     if (!preview?.mo || !preview.motors) return;
     setStudy({ motors: preview.motors.map((m) => (m.id === "draft" ? { ...m, id: uid() } : m)), duration: preview.duration });
     if (preview.extended) flash(preview.extended);
+    if (sameIdx >= 0) flash(tr("Motor {0} na vazbě „{1}“ nahrazen.", sameIdx + 1, dMate ? mateLabel(dMate) : ""));
+    setEditor(null);
   };
+  /** „Navázat úsek za motor N“: formulář přejde na úpravu motoru N s dalším úsekem do zadaného konce */
+  const appendTo = (i: number) => {
+    const mo = study.motors[i];
+    if (!mo) return;
+    const d = draftOf(mo);
+    const per = mo.kind === "rotary" ? 6 : 1;
+    const base = d.legs ?? [{ to: mo.to, by: mo.ranged && mo.speed ? ("speed" as const) : ("time" as const), value: mo.ranged && mo.speed ? Math.abs(mo.speed) : motorSpan(mo, study.duration).time / (mo.ranged ? per : 1) }];
+    setDraft({ ...d, mode: "range", back: undefined, legs: [...base, { to: dTo, by: "time", value: Math.max(0.1, study.duration / 4) }] });
+    setEditor({ mode: "edit", i });
+  };
+  /** úseky z jednoduchého zadání: první úsek = nynější rozsah, druhý návrat na začátek */
+  const toLegs = () => {
+    const first = { to: dTo, by: draft.mode === "ranged" ? ("speed" as const) : ("time" as const), value: draft.mode === "ranged" ? dSpeed : Math.max(0.1, study.duration / 2) };
+    setDraft({ ...draft, mode: "range", back: undefined, legs: [first, { to: dFrom, by: "time", value: Math.max(0.1, study.duration / 2) }] });
+  };
+  /* ───────── co motor pohání, konflikt s jiným motorem (zkušební posun řešičem – cad/motion-reach.ts) a zvýraznění ve 3D ───────── */
+  const [check, setCheck] = useState<{ key: string; reach: MotorReach | null; conflicts: MotorConflict[] } | null>(null);
+  const checkDoc = editor && preview?.motors ? { ...doc, motion: { ...study, motors: preview.motors.map((m) => (m.id === "draft" ? { ...m, id: "draft" } : m)) } } : null;
+  const checkIdx = editor && preview?.motors ? preview.index : -1;
+  const checkKey = checkDoc ? `${sig}|${JSON.stringify(checkDoc.motion.motors)}|${checkIdx}` : "";
+  useEffect(() => {
+    if (!checkDoc || checkIdx < 0) return;
+    let alive2 = true;
+    const t = setTimeout(() => {
+      void motorCheck(checkDoc, envRef.current(), checkIdx).then((r) => alive2 && setCheck({ key: checkKey, ...r }));
+    }, 250);
+    return () => {
+      alive2 = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkKey]);
+  const chk = check && check.key === checkKey ? check : null;
+  // zvýraznění: řízený díl a díly, které s ním jdou, a osa se šipkou směru (jen dokud je formulář otevřený)
+  useEffect(() => {
+    const r = chk?.reach;
+    const h = r ? reachHighlight(r, 40) : null;
+    if (!editor || !h || !dMate) {
+      motorHighlight.set(null);
+      return;
+    }
+    const sp = preview?.mo ? motorSpan(preview.mo, preview.duration) : null;
+    const arrow = sp ? motorArrow({ kind: draft.kind }, sp.dir) : "";
+    motorHighlight.set({ motor: editIdx >= 0 ? editIdx : "draft", mate: dMate.id, comps: h.comps, lines: h.lines, label: r?.axis ? { pos: h.tip, text: `${mateLabel(dMate)} ${arrow}` } : null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chk, editor, dMate?.id]);
+  useEffect(() => () => motorHighlight.set(null), []);
   const cur = res?.steps[step];
   // upozornění k motorům zvlášť (i bez výpočtu – níže), v souhrnu výsledku by byla podruhé
-  const summary = res ? motionSummary(res, doc, { notes: false }) : [];
+  // souhrn po tuhých skupinách (vlna 22, bod 15); po dílech jen na vyžádání („Detail po dílech“)
+  const [detail, setDetail] = useState(false);
+  const summary = res ? motionSummary(res, doc, { notes: false, detail }) : [];
   // motor na mezi, neplatné kroky, vazbami neurčená poloha (vlna 22, body 2 a 8) – v panelu jako upozornění s kódem
   const findings = res && !isDyn(res) ? motionFindings(res, doc) : [];
   // úroveň simulace: z výsledku, jinak co by zvolil výpočet (studie bez výslovného režimu = automaticky)
@@ -467,21 +618,23 @@ export function MotionPanel({
                 const mm = doc.mates?.find((x) => x.id === mo.mate);
                 const abs = motorIsAbsolute(mo, mm);
                 return (
-                  <li key={mo.id} data-motor={mo.id} data-motor-meaning={abs ? "absolute" : "relative"} className="flex items-center gap-1.5 rounded border border-[#d5dbe2] bg-white px-2 py-1">
+                  <li key={mo.id} data-motor={mo.id} data-motor-meaning={abs ? "absolute" : "relative"} data-motor-selected={editIdx === i ? "1" : undefined} className={cn("flex items-center gap-1.5 rounded border bg-white px-2 py-1", editIdx === i ? "border-brand ring-1 ring-brand/30" : "border-[#d5dbe2]")}>
                     <CadIcon name={mo.kind === "rotary" ? "revolve" : "extrude"} className="h-3.5 w-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{mo.kind === "rotary" ? tr("Rotační") : tr("Lineární")} · {mateName(mo.mate)}</span>
+                    {/* klik na motor = Upravit vybraný motor (předvyplněný formulář) – oddělené od „Nový motor“ (vlna 22, bod 10) */}
+                    <button type="button" data-motor-edit={i + 1} title={tr("Upravit motor {0}", i + 1)} onClick={() => openEdit(i)} className="min-w-0 flex-1 text-left">
+                      <span className="block truncate font-medium">{tr("Motor {0}", i + 1)} · {mo.kind === "rotary" ? tr("Rotační") : tr("Lineární")} · {mateName(mo.mate)}</span>
                       {/* začátek → konec, zdvih, směr, rychlost a doba – stejný text jako protokol (motorText) */}
                       <span data-motor-range className="block font-mono text-[10.5px] text-[#6b7785]">
                         {motorMeaningText(mo, abs, study.duration)}
+                        {mo.phase ? tr(" · začne s fází „{0}“", study.phases?.find((p) => p.id === mo.phase)?.name ?? "?") : ""}
                       </span>
-                    </span>
+                    </button>
                     {/* chování na mezi (bod 8): stop = motor stojí na poslední dosažitelné hodnotě, chyba = kroky za mezí neplatné */}
                     <select data-motor-atlimit={mo.id} aria-label={tr("Motor na mezi")} title={tr("Motor na mezi: stop = stojí na poslední dosažitelné hodnotě · neplatný krok = kroky za mezí se neřeší, zůstane poslední platná poloha")} value={mo.atLimit ?? "stop"} onChange={(e) => setStudy({ motors: study.motors.map((x, k) => (k === i ? (e.target.value === "error" ? { ...x, atLimit: "error" as const } : withoutAtLimit(x)) : x)) })} className="w-[74px] shrink-0 rounded border border-[#cfd6de] bg-white px-1 py-0.5 text-[10.5px]">
                       <option value="stop">{tr("na mezi: stop")}</option>
                       <option value="error">{tr("na mezi: chyba")}</option>
                     </select>
-                    <button type="button" title={tr("Odebrat motor")} onClick={() => setStudy({ motors: study.motors.filter((_, k) => k !== i) })} className="text-[#6b7785] hover:text-brand">
+                    <button type="button" data-motor-remove={i + 1} title={tr("Odebrat motor")} onClick={() => (setStudy({ motors: study.motors.filter((_, k) => k !== i) }), editIdx === i && setEditor(null))} className="text-[#6b7785] hover:text-brand">
                       <CadIcon name="trash" className="h-3.5 w-3.5" />
                     </button>
                   </li>
@@ -491,14 +644,23 @@ export function MotionPanel({
           ) : (
             <p className="text-[11px] text-[#6b7785]">{tr("Zatím žádný motor. Rotační motor otáčí komponentou na vazbě Závěs / Souosost / Šroub, lineární ji posouvá na vazbě Vzdálenost / Drážka / Dráha / Souosost.")}</p>
           )}
-          <div className="mt-2 space-y-1.5 rounded border border-dashed border-[#cfd6de] p-2" data-motion-add data-motor-meaning={dAbs ? "absolute" : "relative"}>
-            <div className="flex rounded-md bg-[#eef2f6] p-0.5">
-              {(["rotary", "linear"] as const).map((k) => (
-                <button key={k} type="button" data-motor-kind={k} onClick={() => setDraft(newDraft(k))} className={cn("flex-1 rounded px-2 py-0.5 text-[11.5px]", draft.kind === k ? "bg-white shadow-sm" : "text-[#5b6776]")}>
-                  {k === "rotary" ? tr("Rotační") : tr("Lineární")}
-                </button>
-              ))}
-            </div>
+          {!editor && (
+            <button type="button" data-motor-new onClick={openNew} className="mt-2 w-full rounded border border-[#cfd6de] bg-white py-1 text-[12px] font-medium hover:bg-[#f3f6f9]">
+              {tr("+ Nový motor")}
+            </button>
+          )}
+          {editor && (
+          <div className={cn("mt-2 space-y-1.5 rounded border p-2", editor.mode === "edit" ? "border-brand/60 bg-[#fffaf9]" : "border-dashed border-[#cfd6de]")} data-motion-add data-motor-form={editor.mode} data-motor-meaning={dAbs ? "absolute" : "relative"}>
+            <p className="text-[11.5px] font-semibold text-[#26303b]">{editor.mode === "edit" ? tr("Upravit motor {0}", editor.i + 1) : tr("Nový motor")}</p>
+            {editor.mode === "new" && (
+              <div className="flex rounded-md bg-[#eef2f6] p-0.5">
+                {(["rotary", "linear"] as const).map((k) => (
+                  <button key={k} type="button" data-motor-kind={k} onClick={() => setDraft(newDraft(k))} className={cn("flex-1 rounded px-2 py-0.5 text-[11.5px]", draft.kind === k ? "bg-white shadow-sm" : "text-[#5b6776]")}>
+                    {k === "rotary" ? tr("Rotační") : tr("Lineární")}
+                  </button>
+                ))}
+              </div>
+            )}
             {okMates(draft.kind).length ? (
               <select data-motor-mate aria-label={tr("Vazba motoru")} value={draftMate} onChange={(e) => setDraft({ ...newDraft(draft.kind), mode: draft.mode, end: draft.end, speed: draft.speed, mate: e.target.value })} className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12px]">
                 {okMates(draft.kind).map((m) => (
@@ -520,6 +682,28 @@ export function MotionPanel({
                     : tr("Začátek a konec jsou posuv od výchozí polohy (0 = jak díl teď stojí), ne hodnota vazby.")}
               </p>
             )}
+            {/* vazba už má motor se stejným začátkem: uložení ho NAHRADÍ – nebo navázat další úsek (vlna 22, body 3 a 10) */}
+            {sameIdx >= 0 && (
+              <div data-motor-same={sameIdx + 1} className="rounded bg-[#fff4e5] px-2 py-1 text-[11px] leading-snug text-[#8a5300]">
+                ⚠ {tr("Vazba „{0}“ už má motor {1} – uložením ho nahradíte. Další pohyb na téže vazbě zapište jako navazující úsek, nebo motoru dejte jiné časové okno / fázi.", dMate ? mateLabel(dMate) : "", sameIdx + 1)}
+                <button type="button" data-motor-append={sameIdx + 1} onClick={() => appendTo(sameIdx)} className="ml-1 underline">
+                  {tr("Navázat úsek za motor {0}", sameIdx + 1)}
+                </button>
+              </div>
+            )}
+            {/* co motor pohání: řízený díl + díly spojené zámkem / pevnou vazbou, osa a směr (zvýrazněno ve 3D okně) */}
+            {chk?.reach && (
+              <p data-motor-reach={chk.reach.comps.length} className="rounded bg-[#eef4fb] px-2 py-1 text-[10.5px] leading-snug text-[#24476b]">
+                {reachText(chk.reach, doc)}
+                {chk.reach.locked.length ? <span className="block">{tr("Díly spojené pevnou vazbou (zámkem) se pohybují společně s řízeným dílem – motor nedávejte každému zvlášť.")}</span> : null}
+              </p>
+            )}
+            {chk?.conflicts.map((c, k) => (
+              <p key={k} data-motor-conflict={c.kind} className="rounded bg-brand/10 px-2 py-1 text-[11px] leading-snug text-brand-600">
+                ⚠ {c.text}
+              </p>
+            ))}
+            {!draft.legs?.length && (
             <div className="flex rounded-md bg-[#eef2f6] p-0.5" role="group" aria-label={tr("Průběh motoru")}>
               {(["range", "ranged", "open"] as const).map((k) => (
                 <button key={k} type="button" data-motor-mode={k} aria-pressed={draft.mode === k} onClick={() => setDraft({ ...draft, mode: k })} className={cn("flex-1 rounded px-1 py-0.5 text-[10.5px] leading-tight", draft.mode === k ? "bg-white shadow-sm" : "text-[#5b6776]")}>
@@ -527,7 +711,8 @@ export function MotionPanel({
                 </button>
               ))}
             </div>
-            {draft.mode === "range" && (
+            )}
+            {draft.mode === "range" && !draft.legs?.length && (
               <label className="flex items-center gap-2 text-[11.5px]">
                 <input type="checkbox" data-motor-back className="accent-[#E03930]" checked={!!draft.back} onChange={(e) => setDraft({ ...draft, back: e.target.checked })} />
                 {tr("Tam a zpět (sinusově, jako lis)")}
@@ -537,7 +722,7 @@ export function MotionPanel({
               <div data-motor-field="from">
                 <Num label={fromLabel} value={dFrom} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, from: v })} />
               </div>
-              {draft.mode !== "open" &&
+              {draft.mode !== "open" && !draft.legs?.length &&
                 (draft.end === "stroke" ? (
                   <div data-motor-field="stroke">
                     <Num label={rot ? tr("Otočení (od začátku, ±)") : tr("Zdvih (od začátku, ±)")} value={dStroke} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, stroke: v })} />
@@ -547,13 +732,60 @@ export function MotionPanel({
                     <Num label={toLabel} value={dTo} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, to: v })} />
                   </div>
                 ))}
-              {draft.mode !== "range" && (
+              {draft.mode !== "range" && !draft.legs?.length && (
                 <div data-motor-field="speed">
                   <Num label={draft.mode === "open" ? tr("Rychlost (± = směr)") : tr("Rychlost")} value={dSpeed} step={rot ? 10 : 1} suffix={rot ? tr("ot/min") : "mm/s"} onChange={(v) => setDraft({ ...draft, speed: v })} />
                 </div>
               )}
             </div>
-            {draft.mode !== "open" && (
+            {/* navazující úseky / klíčové polohy (vlna 22, bod 3): kam + čas nebo rychlost; prodleva = stejná hodnota s časem */}
+            {draft.legs?.length ? (
+              <div data-motor-legs={draft.legs.length} className="space-y-1">
+                <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#4a5664]">{tr("Úseky (klíčové polohy)")}</p>
+                {draft.legs.map((g, k) => (
+                  <div key={k} data-motor-leg={k + 1} className="grid grid-cols-[1fr_74px_1fr_20px] items-end gap-1">
+                    <Num label={tr("{0}. do", k + 1)} value={g.to} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, legs: draft.legs!.map((x, j) => (j === k ? { ...x, to: v } : x)) })} />
+                    <select aria-label={tr("Úsek {0}: čas nebo rychlost", k + 1)} value={g.by} onChange={(e) => setDraft({ ...draft, legs: draft.legs!.map((x, j) => (j === k ? { ...x, by: e.target.value as "time" | "speed" } : x)) })} className="rounded border border-[#cfd6de] bg-white px-1 py-1 text-[11px]">
+                      <option value="time">{tr("za čas")}</option>
+                      <option value="speed">{tr("rychlostí")}</option>
+                    </select>
+                    <Num label={g.by === "time" ? tr("čas") : tr("rychlost")} value={g.value} step={g.by === "time" ? 0.1 : rot ? 10 : 1} min={0} suffix={g.by === "time" ? "s" : rot ? tr("ot/min") : "mm/s"} onChange={(v) => setDraft({ ...draft, legs: draft.legs!.map((x, j) => (j === k ? { ...x, value: v } : x)) })} />
+                    <button type="button" data-motor-leg-remove={k + 1} title={tr("Odebrat úsek")} onClick={() => setDraft({ ...draft, legs: draft.legs!.filter((_, j) => j !== k) })} className="pb-1 text-[#6b7785] hover:text-brand">
+                      <CadIcon name="x" className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-1.5">
+                  <button type="button" data-motor-leg-add onClick={() => setDraft({ ...draft, legs: [...draft.legs!, { to: draft.legs![draft.legs!.length - 1].to, by: "time", value: 0.2 }] })} className="flex-1 rounded border border-[#cfd6de] bg-white py-0.5 text-[11px] hover:bg-[#f3f6f9]">
+                    {tr("+ úsek")}
+                  </button>
+                  <button type="button" data-motor-leg-return onClick={() => setDraft({ ...draft, legs: [...draft.legs!, { to: dFrom, by: "time", value: 0.3 }] })} className="flex-1 rounded border border-[#cfd6de] bg-white py-0.5 text-[11px] hover:bg-[#f3f6f9]">
+                    {tr("+ návrat na začátek")}
+                  </button>
+                </div>
+              </div>
+            ) : draft.mode !== "open" ? (
+              <button type="button" data-motor-to-legs onClick={toLegs} className="w-full rounded border border-dashed border-[#cfd6de] py-0.5 text-[11px] text-[#4a5664] hover:bg-[#f3f6f9]">
+                {tr("+ další úsek / návratový zdvih (klíčové polohy)")}
+              </button>
+            ) : null}
+            {/* časové okno a fáze: od kdy motor jede (vlna 22, bod 3) */}
+            <div className="grid grid-cols-3 gap-1.5" data-motor-window>
+              <Num label={tr("Začátek [s]")} value={draft.t0 ?? 0} step={0.1} min={0} suffix="s" onChange={(v) => setDraft({ ...draft, t0: v > 0 ? v : undefined })} />
+              <Num label={tr("Konec okna [s]")} value={draft.t1 ?? 0} step={0.1} min={0} suffix="s" onChange={(v) => setDraft({ ...draft, t1: v > 0 ? v : undefined })} />
+              <label className="block text-[10.5px] text-[#4a5664]">
+                {tr("Začne s fází")}
+                <select data-motor-phase value={draft.phase ?? ""} onChange={(e) => setDraft({ ...draft, phase: e.target.value || undefined })} className="mt-0.5 w-full rounded border border-[#cfd6de] bg-white px-1 py-1 text-[11px]">
+                  <option value="">{tr("(od začátku)")}</option>
+                  {(study.phases ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {draft.mode !== "open" && !draft.legs?.length && (
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="text-[#6b7785]">{tr("Zadat")}</span>
                 {(["to", "stroke"] as const).map((k) => (
@@ -593,11 +825,19 @@ export function MotionPanel({
                 )}
               </p>
             ))}
-            <button type="button" data-motor-add disabled={!preview?.mo} onClick={addMotor} className="w-full rounded border border-[#cfd6de] bg-white py-1 text-[12px] hover:bg-[#f3f6f9] disabled:opacity-50">
-              {tr("Přidat motor")}
-            </button>
+            <div className="flex gap-1.5">
+              <button type="button" data-motor-add data-motor-save={editor.mode} disabled={!preview?.mo} onClick={addMotor} className="flex-1 rounded bg-brand py-1 text-[12px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
+                {editor.mode === "edit" ? tr("Uložit motor {0}", editor.i + 1) : sameIdx >= 0 ? tr("Nahradit motor {0}", sameIdx + 1) : tr("Přidat motor")}
+              </button>
+              <button type="button" data-motor-cancel onClick={() => setEditor(null)} className="rounded border border-[#cfd6de] bg-white px-2 text-[12px] hover:bg-[#f3f6f9]">
+                {tr("Zrušit")}
+              </button>
+            </div>
           </div>
+          )}
         </div>
+        {/* fáze studie (vlna 22, bod 3): nájezd, sevření, střih, návrat v jedné časové ose – kinematika / kvazistatika */}
+        {study.mode !== "dynamic" && <MotionPhases doc={doc} study={study} onStudy={setStudy} flash={flash} />}
         <div className="grid grid-cols-2 gap-2">
           <Num label={tr("Délka studie")} value={study.duration} step={study.mode === "dynamic" ? 0.1 : 0.5} min={0.01} suffix="s" onChange={(v) => v > 0 && setStudy({ duration: v })} />
           {study.mode !== "dynamic" && <Num label={tr("Počet kroků")} value={study.steps} step={6} min={1} suffix="" onChange={(v) => setStudy({ steps: Math.max(1, Math.min(2000, Math.round(v))) })} />}
@@ -616,8 +856,10 @@ export function MotionPanel({
         {study.mode === "dynamic" && <DynamicSettings doc={doc} study={study} onStudy={setStudy} env={env} />}
         <label className="flex items-center gap-2">
           <input type="checkbox" data-motion-collisions className="accent-[#E03930]" checked={!!study.collisions} onChange={(e) => setStudy({ collisions: e.target.checked || undefined })} />
-          {tr("Kontrolovat kolize v každém kroku (pomalejší)")}
+          {tr("Kontrolovat kolize v pohybu (pomalejší)")}
         </label>
+        <ClearanceSettings doc={doc} study={study} onStudy={setStudy} />
+        <ProcessSettings doc={doc} study={study} onStudy={setStudy} />
         <div>
           <label className="flex items-center gap-2">
             <input type="checkbox" data-motion-trace className="accent-[#E03930]" checked={!!study.trace} onChange={(e) => setStudy({ trace: e.target.checked ? { compId: doc.components?.find((c) => !c.fixed)?.id ?? doc.components?.[0]?.id ?? "", point: [0, 0, 0] } : undefined })} />
@@ -665,6 +907,8 @@ export function MotionPanel({
         </p>
         {res && cur && (
           <div data-motion-result className="space-y-2 border-t border-[#e3e8ee] pt-2">
+            {/* pásy fází nad časovou osou: skutečný okamžik začátku každé fáze (klik = první krok fáze) */}
+            <PhaseTimeline res={res} onStep={(i) => (setPlay(null), setPos({ res, i }))} />
             <div className="flex items-center gap-2">
               <button type="button" data-motion-play aria-label={playing ? tr("Pauza") : tr("Přehrát")} onClick={() => (playing ? setPlay(null) : (step >= res.steps.length - 1 && setPos({ res, i: 0 }), setPlay(res)))} className="rounded border border-[#cfd6de] bg-white px-2.5 py-1 text-[12px] font-semibold hover:bg-[#f3f6f9]">
                 {playing ? "❚❚" : "▶"}
@@ -677,6 +921,7 @@ export function MotionPanel({
             </div>
             <p data-motion-step className="font-mono text-[11px] text-[#4a5664]">
               {tr("krok {0}/{1} · t = {2} s · motory {3}", cur.i, res.steps.length - 1, f(cur.t, 3), cur.motors.map((v, i) => `${f(v)}${res.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(", "))}
+              {cur.phase !== undefined && res.phases?.[cur.phase] ? <span data-motion-step-phase={cur.phase + 1}> · {tr("fáze {0} „{1}“", cur.phase + 1, res.phases[cur.phase].name)}</span> : null}
               {stepHasFault(doc, cur) ? <span className="text-brand"> · {tr("kolize")}</span> : null}
               {cur.conflicts.length ? <span className="text-brand"> · {tr("nesplněno {0}", cur.conflicts.length)}</span> : null}
               {/* krok s konfliktem (bod 8): motor stojí na mezi / neřešitelný krok s poslední platnou polohou */}
@@ -703,7 +948,13 @@ export function MotionPanel({
                 ⚠ {x.text}
               </p>
             ))}
-            <ul data-motion-summary className="space-y-0.5 text-[11px] leading-snug text-[#4a5664]">
+            <ClearanceResult res={res} doc={doc} step={step} onStep={(i) => (setPlay(null), setPos({ res, i: Math.max(0, Math.min(res.steps.length - 1, i)) }))} />
+            <ProcessState res={res} doc={doc} step={step} />
+            <label className="flex items-center gap-1.5 text-[11px] text-[#4a5664]">
+              <input type="checkbox" data-motion-detail className="accent-[#E03930]" checked={detail} onChange={(e) => setDetail(e.target.checked)} />
+              {tr("Detail po dílech (jinak tuhé skupiny)")}
+            </label>
+            <ul data-motion-summary data-motion-summary-mode={detail ? "detail" : "groups"} className="space-y-0.5 text-[11px] leading-snug text-[#4a5664]">
               {summary.map((l, i) => (
                 <li key={i} className={cn((l.startsWith("⚠") || l.startsWith(" ⚠")) && "text-brand-600")}>
                   {l}

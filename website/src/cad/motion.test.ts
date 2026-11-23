@@ -320,7 +320,7 @@ describe("bod 8 – priorita tvrdých podmínek: motor × mez × pevná vzdálen
     expect(f8[0].text).toContain("„Mez H → A“ 5 mm – na mezi min 5 mm (doraz)");
     expect(f8[0].text).toContain("„PEVNÁ H → R“ 24,5 mm (splněno)");
     expect(f8[0].text).toMatch(/příčina: motor žádá hodnotu, kterou tvrdé podmínky .* nedovolí/);
-    expect(motionKv(res, null, 2)).toMatch(/ m1=range:57\.5>27\.15:- stopped=5 level=kin$/);
+    expect(motionKv(res, null, 2)).toMatch(/ m1=range:57\.5>27\.15:- stopped=5 level=kin groups=\S+$/);
   });
 
   it("motor na mezi = chyba: kroky 8–12 neplatné, zobrazena poloha kroku 7 (deska 49,796, přidržovač 34,5), výrazně označeno", async () => {
@@ -337,7 +337,7 @@ describe("bod 8 – priorita tvrdých podmínek: motor × mez × pevná vzdálen
     const f8 = motionFindings(res, d);
     expect(f8[0].code).toBe("motion.invalid");
     expect(f8[0].text).toMatch(/^neřešitelné kroky 8–12 \(t = 1\.333–2 s\) – zobrazena poslední platná poloha \(krok 7\), žádný kompromis; konflikt: /);
-    expect(motionKv(res, null, 2)).toMatch(/ invalid=5 level=kin$/);
+    expect(motionKv(res, null, 2)).toMatch(/ invalid=5 level=kin groups=\S+$/);
   });
 
   it("vazby si odporují i bez motoru (dvě pevné vzdálenosti): neplatné kroky, příčina = vazby, porušené vazby s odchylkami", async () => {

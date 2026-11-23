@@ -34,4 +34,3 @@ Výběr oknem	Fensterauswahl
 Výběr oknem: zleva doprava = jen celé uvnitř, zprava doleva = i protnuté · Ctrl/Shift přidá · Ctrl+Shift/Alt odebere · Esc zruší	Fensterauswahl: von links nach rechts = nur ganz innen, von rechts nach links = auch geschnitten · Strg/Umschalt fügt hinzu · Strg+Umschalt/Alt entfernt · Esc bricht ab
 Vybráno oknem	Per Fenster gewählt
 hledám prvky…	suche Features…
- – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	 – Software-Darstellung: {0}, Mausrad zoomt. Klick wählt Fläche, Kante oder Eckpunkt (Strg/Umschalt fügt hinzu), per Text „auswählen F3 E2“ oder window.mncad.select([…]). Volles 3D: Chrome mit --enable-unsafe-swiftshader ohne --disable-software-rasterizer.

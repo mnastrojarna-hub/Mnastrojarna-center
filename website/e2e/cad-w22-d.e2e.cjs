@@ -4,6 +4,21 @@
 //    příkaz `sestava obnovit` – pak kusovník i CSV nesou DA-001 / 1.2379 a upozornění zmizí;
 //  - 19: výběr „Druh v kusovníku“ (data-supply-select) → nakupovaný; Katalogové číslo; Kusovník v oddílech
 //    (data-bom-section make/standard/buy), normálie s třídou 12.9 a kolík s m6; text v konzoli dává totéž.
+//  - D2 (bod 20, výkresy a výstupy): vydaný list nese revizi modelu (odznak rev. A na záložce listu, data-sheet-issued),
+//    po změně modelu odznak ⚠ (data-sheet-stale) a pruh „Model se změnil po vydání rev. A“ (data-drawing-stale-banner)
+//    s tlačítkem „Vydat novou revizi B“ (data-issue-new); panel „Zastaralé výstupy“ v rohu 3D okna (data-outputs-chip,
+//    data-outputs-item) a „Přepočítat vše“ (data-recompute-all) = text `přepočítat vše`; patička listu „Model r·…“.
+//  - D3 (bod 18, kontrola kót pro výrobu): repro „okno vyříznuté pomocným tělesem“ – panel Kontrola kót (data-dim-check,
+//    data-dim-size / data-dim-pos) bez výšky nástroje 40, pomocné těleso šedě (data-dim-aux); po smazání kót polohy 0/6
+//    (data-dim-incomplete="1"), tlačítko „Přidat kótu“ (data-dim-add) u polohy díry přidá kótu (polohy 1/6), „Přidat všechny
+//    navržené kóty“ (data-dim-add-all) → nic nechybí; funkční díra textem i pravým tlačítkem na plochu (Označit jako funkční)
+//    → položka data-dim-functional="missing" (bez tolerance); text v konzoli dává totéž (⚠ drawing.dims-incomplete).
+//  - D4 (bod 17, čitelný výkres sestavy): 12 dílů – panel „Pozice a překryvy“ (data-positions-panel) s počtem překryvů
+//    (data-overlap-count), pohled pozice výběrem (data-balloon-view-select → data-balloon-view), zámek (data-balloon-lock →
+//    data-balloon-mode="locked"), tažení balónku myší (posunutá pozice v textu), přesun přes geometrii → značky překryvů
+//    (data-overlap-marker), umístění kusovníku (data-bom-place → data-bom-layout); text `výkres pozice` dává totéž.
+//  - D4 (bod 22j): panel Razítko – „Uložit jako šablonu“ (data-title-tpl-name, data-title-tpl-save) → `výkres hlavička`
+//    vypíše šablonu; nový díl: výběr šablony (data-title-tpl-select) → razítko s firmou a nástrojářskou šablonou.
 // Spuštění (fáze 2): bin/e2e-run <worktree>/website 3534 <out> cad-w22-d   (E2E_BASE nastaví e2e-run)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -107,6 +122,194 @@ async function scenario(args, label) {
   const sections = await p.locator('[data-bom-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-bom-section')));
   ok(JSON.stringify(sections) === JSON.stringify(['make', 'standard', 'buy']), `${label}: okno Kusovník – oddíly ${JSON.stringify(sections)}`);
   await closeModal();
+
+  // ── D2 (bod 20): vydání listu, zastaralý list, panel Zastaralé výstupy ──
+  await openConsole();
+  log = await run('nový díl "Deska V"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres vydat\nexport step');
+  // příkaz výkresu je přijatý (→, vlna 22 – 22i), výsledek dá vyhodnocení listu (✓ list vyhodnocen / ⚠ / ✗)
+  ok(/→ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6}.* – výsledek po vyhodnocení listu níže/.test(log) && /✓ výkres: list „List 1“ vyhodnocen/.test(log) && !/^✗/m.test(log), `${label}: výkres vydat → rev. A z modelu r·…`);
+  await closeConsole();
+  await p.waitForTimeout(1500);
+  const issued = p.locator('[data-sheet-issued="A"]').first();
+  await issued.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await issued.count()) === 1 && (await issued.getAttribute('data-sheet-stale')) === null, `${label}: záložka listu – odznak rev. A bez ⚠`);
+  ok(/model r·[0-9a-f]{6}/.test(await p.locator('[data-model-rev]').first().innerText().catch(() => '')), `${label}: lišta listů ukazuje revizi modelu`);
+  // změna modelu textem → list zastaralý: odznak ⚠, pruh s tlačítky
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska V"\nupravit "Kvádr 1" size=30;40;10\nvýkres stav');
+  ok(/⚠ Vydání: rev\. A z modelu r·\w{6} .* list je ZASTARALÝ/.test(log) && /drawing\.stale|vydaný výkres neodpovídá modelu/.test(log), `${label}: výkres stav po změně – ⚠ zastaralý list`);
+  await closeConsole();
+  const chip = p.locator('[data-outputs-chip]').first();
+  await chip.waitFor({ timeout: 20000 }).catch(() => {});
+  ok(Number(await chip.getAttribute('data-outputs-chip').catch(() => '0')) >= 2, `${label}: odznak Zastaralé výstupy (list + STEP)`);
+  await chip.click().catch(() => {});
+  const kinds = await p.locator('[data-outputs-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-outputs-item')));
+  ok(kinds.includes('sheet') && kinds.includes('export'), `${label}: panel – položky ${JSON.stringify(kinds)}`);
+  await p.locator('[data-recompute-all]').first().click().catch(() => {});
+  const res = p.locator('[data-recompute-result]').first();
+  await res.waitFor({ timeout: 120000 }).catch(() => {});
+  const resText = await res.innerText().catch(() => '');
+  ok(/Zbývá udělat ručně \(2\)/.test(resText) && /výkres vydat B/.test(resText) && /export step/.test(resText), `${label}: Přepočítat vše – vypíše, co musí udělat člověk`);
+  // výkres: pruh + nová revize tlačítkem
+  await openConsole();
+  await run('výkres');
+  await closeConsole();
+  const banner = p.locator('[data-drawing-stale-banner="A"]').first();
+  await banner.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await banner.count()) === 1 && (await p.locator('[data-sheet-stale="1"]').count()) >= 1, `${label}: výkres – pruh „Model se změnil po vydání rev. A“ a odznak ⚠`);
+  await p.locator('[data-issue-new="B"]').first().click().catch(() => {});
+  await p.waitForTimeout(1500);
+  ok((await p.locator('[data-sheet-issued="B"]').count()) === 1 && (await p.locator('[data-drawing-stale-banner]').count()) === 0, `${label}: Vydat novou revizi B → odznak rev. B, pruh zmizel`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska V"\nvýstupy');
+  ok(/List 1: Vydání: rev\. B z modelu r·\w{6} .* – odpovídá modelu/.test(log) && /Zastaralé výstupy \(1\)/.test(log), `${label}: výstupy – list rev. B odpovídá, zbývá jen STEP`);
+  await closeConsole();
+
+  // ── D3 (bod 18): kontrola kót pro výrobu ──
+  await openConsole();
+  log = await run('nový díl "Deska K"\nkvádr 100 60 20\nkvádr 30 20 40 v 35 20 -10 nové těleso Nástroj\nsloučit 1 Nástroj odebrat\ndíra 8 skrz v 15 15 20 těleso 1\ndíra 8 skrz v 85 45 20 těleso 1\nvýkres A3 na šířku pohledy přední,horní\nvýkres nepředepsané ISO 2768-mK\nkótovat\nvýkres stav');
+  ok(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2 · pomocná tělesa \(nekótují se\): Nástroj/.test(log) && !/40 \(Kvádr 2\)/.test(log) && !/všech \d+ očekávaných/.test(log), `${label}: výkres stav – okno a polohy, bez výšky nástroje 40, bez „všech“`);
+  await run('výkres');
+  await closeConsole();
+  const checkBtn = p.getByRole('button', { name: /Kontrola kót/ }).first();
+  await checkBtn.waitFor({ timeout: 60000 }).catch(() => {});
+  await checkBtn.click().catch(() => {});
+  const dc = p.locator('[data-dim-check]').first();
+  await dc.waitFor({ timeout: 30000 }).catch(() => {});
+  const sz = await dc.getAttribute('data-dim-size').catch(() => '');
+  const ps = await dc.getAttribute('data-dim-pos').catch(() => '');
+  ok(/^(\d+)\/\1$/.test(sz || '') && /^(\d+)\/\1$/.test(ps || '') && (await dc.getAttribute('data-dim-incomplete')) === '0', `${label}: panel Kontrola kót – velikosti ${sz}, polohy ${ps}, nic nechybí`);
+  ok(/Nástroj/.test(await p.locator('[data-dim-aux]').first().innerText().catch(() => '')), `${label}: panel – pomocné těleso Nástroj se nekótuje`);
+  ok(!/\b40\b/.test(await p.locator('[data-dim-sizes]').first().innerText().catch(() => '')), `${label}: panel – velikost 40 (nástroj) se neočekává`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska K"\nvýkres smazat vše\nvýkres kóta vodorovně pohled horní 0 0 100 0\nvýkres kóta svisle pohled horní 0 0 0 60\nvýkres kóta svisle pohled přední 0 0 0 20\nvýkres kóta vodorovně pohled horní 35 20 65 20\nvýkres kóta průměr pohled horní střed 15 15 r 4\nvýkres stav');
+  ok(/drawing\.dims-incomplete|kóty neúplné/.test(log) && /polohy 0\/6/.test(log) && /na listu 1× z 2×/.test(log), `${label}: text – ⚠ kóty neúplné, polohy 0/6, Ø8 1× z 2×`);
+  await run('výkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Kontrola kót/ }).first().click().catch(() => {});
+  const dc2 = p.locator('[data-dim-check]').first();
+  await dc2.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await dc2.getAttribute('data-dim-incomplete').catch(() => '')) === '1' && (await dc2.getAttribute('data-dim-pos').catch(() => '')) === '0/6', `${label}: panel – chybí polohy (0/6)`);
+  const addHole = p.locator('[data-dim-add^="holepos:"]').first();
+  await addHole.click().catch(() => {});
+  await p.waitForTimeout(1200);
+  ok((await p.locator('[data-dim-check]').first().getAttribute('data-dim-pos').catch(() => '')) === '1/6', `${label}: Přidat kótu u polohy díry → polohy 1/6`);
+  await p.locator('[data-dim-add-all]').first().click().catch(() => {});
+  await p.waitForTimeout(1500);
+  ok((await p.locator('[data-dim-check]').first().getAttribute('data-dim-incomplete').catch(() => '')) === '0', `${label}: Přidat všechny navržené kóty → nic nechybí`);
+  await p.keyboard.press('Escape').catch(() => {});
+  // funkční díra textem → v panelu funkční položka bez tolerance
+  await openConsole();
+  log = await run('záložka "Deska K"\nfunkční "Díra 1" H7\nvýkres stav');
+  ok(/✓ funkční Díra 1 · tolerance H7/.test(log) && /funkční prvky: tolerance 0\/\d+/.test(log), `${label}: funkční „Díra 1“ H7 → tolerance 0/n ve výkres stav`);
+  await run('výkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Kontrola kót/ }).first().click().catch(() => {});
+  await p.locator('[data-dim-check]').first().waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await p.locator('[data-dim-functional="missing"]').count()) >= 1 && /Díra 1/.test(await p.locator('[data-dim-functional-marks]').first().innerText().catch(() => '')), `${label}: panel – funkční Díra 1 bez tolerance`);
+  await p.keyboard.press('Escape').catch(() => {});
+  // pravé tlačítko na plochu modelu → Označit jako funkční (text přes engine)
+  const vpBox = await p.locator('main canvas, [data-soft-view-canvas], [data-soft]').first().boundingBox().catch(() => null);
+  if (vpBox) {
+    await p.mouse.click(vpBox.x + vpBox.width / 2, vpBox.y + vpBox.height / 2, { button: 'right' });
+    await p.waitForTimeout(500);
+    const mark = p.getByRole('button', { name: 'Označit jako funkční' }).first();
+    const has = await mark.isVisible().catch(() => false);
+    if (has) await mark.click();
+    await p.waitForTimeout(1500);
+    await openConsole();
+    log = await run('záložka "Deska K"\nfunkční');
+    ok(has && /Funkční prvky a základny \(2\):/.test(log), `${label}: pravé tlačítko na plochu → Označit jako funkční (funkční prvky 2)`);
+    await closeConsole();
+  } else ok(false, `${label}: 3D okno pro pravé tlačítko nenalezeno`);
+
+  // ── D4 (bod 17): pozice po pohledech, zámek, tažení, překryvy, kusovník ──
+  await openConsole();
+  {
+    const L = [];
+    for (let i = 1; i <= 12; i++) L.push(`nový díl Deska P${i}`, `kvádr 20 10 ${4 + (i % 4)}`);
+    L.push('nová sestava Sestava P');
+    for (let i = 1; i <= 12; i++) L.push(i === 1 ? 'vložit "Deska P1" ukotvit' : `vložit "Deska P${i}" v ${((i - 1) % 4) * 25} ${Math.floor((i - 1) / 4) * 15} ${(i % 3) * 8}`);
+    L.push('výkres A3 na šířku pohledy přední,horní', 'výkres kusovník ano', 'výkres balónky ano', 'výkres pozice');
+    log = await run(L.join('\n'), 600000);
+  }
+  ok(/Pozice: 12 \(/.test(log) && /Překryvy na listu: 0 \(zkontrolováno/.test(log), `${label}: výkres pozice – 12 pozic, překryvy 0 (zkontrolováno)`);
+  await run('výkres');
+  await closeConsole();
+  const panel = p.locator('[data-positions-panel]').first();
+  await panel.waitFor({ timeout: 60000 }).catch(() => {});
+  // list se v okně výkresu počítá asynchronně (prodleva + jádro): počkat na hotový list, ne číst první snímek panelu
+  await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12 && !!document.querySelector('[data-positions-panel] [data-overlap-count="0"]'), null, { timeout: 90000 }).catch(() => {});
+  ok((await panel.locator('[data-overlap-count="0"]').count()) === 1, `${label}: panel Pozice a překryvy – odznak Překryvy: 0`);
+  ok((await p.locator('[data-balloon-row]').count()) === 12, `${label}: panel – 12 řádků pozic`);
+  await p.locator('[data-balloon-view-select="1"]').first().selectOption('top').catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-balloon-row="1"]')?.getAttribute('data-balloon-view') === 'top', null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-balloon-row="1"]').getAttribute('data-balloon-view').catch(() => '')) === 'top', `${label}: pozice 1 → pohled horní (výběrem v panelu)`);
+  // změna pohledu pozice 1 list přepočítá a panel překreslí – zámek klikat až na hotový panel (12 řádků), případně znovu
+  for (let i = 0; i < 3; i++) {
+    await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12 && !!document.querySelector('[data-positions-panel] [data-overlap-count]:not([data-overlap-count=""])'), null, { timeout: 60000 }).catch(() => {});
+    await p.waitForTimeout(500);
+    await p.locator('[data-balloon-lock="2"]').first().check().catch(() => {});
+    const done = await p.waitForFunction(() => document.querySelector('[data-balloon-row="2"]')?.getAttribute('data-balloon-mode') === 'locked', null, { timeout: 20000 }).then(() => true).catch(() => false);
+    if (done) break;
+  }
+  ok((await p.locator('[data-balloon-row="2"]').getAttribute('data-balloon-mode').catch(() => '')) === 'locked', `${label}: zámek pozice 2 v panelu`);
+  // tažení balónku 5 myší (výběr ve výkresu – genEdit move)
+  await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12, null, { timeout: 60000 }).catch(() => {});
+  await p.waitForTimeout(800); // list po zámku přepočítán (prodleva okna výkresu)
+  const b5 = p.locator('[data-sheet] svg text').filter({ hasText: /^5$/ }).first();
+  const bb5 = await b5.boundingBox().catch(() => null);
+  if (bb5) {
+    const cx = bb5.x + bb5.width / 2;
+    const cy = bb5.y + bb5.height / 2;
+    await p.mouse.move(cx, cy);
+    await p.mouse.down();
+    await p.mouse.move(cx + 15, cy + 25, { steps: 8 });
+    await p.mouse.up();
+    await p.waitForTimeout(1500);
+  }
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Sestava P"\nvýkres pozice');
+  ok(/zamčené 1/.test(log) && /horní: 1/.test(log), `${label}: text po GUI – pozice 1 u horního pohledu, zámek pozice 2`);
+  ok(!!bb5 && /posunuté [1-9]/.test(log), `${label}: tažení balónku myší → posunutá pozice`);
+  // přesun pozice do geometrie → překryv: odznak a značky na listu
+  log = await run('výkres vygenerované posun pos:7 0 -40\nvýkres pozice');
+  ok(/Překryvy na listu: [1-9]/.test(log), `${label}: přesun přes geometrii → překryv v textu`);
+  await run('výkres');
+  await closeConsole();
+  await p.waitForFunction(() => Number(document.querySelector('[data-overlap-count]')?.getAttribute('data-overlap-count') || '0') > 0, null, { timeout: 60000 }).catch(() => {});
+  ok(Number(await p.locator('[data-overlap-count]').first().getAttribute('data-overlap-count').catch(() => '0')) > 0 && (await p.locator('[data-overlap-marker]').count()) > 0, `${label}: odznak překryvů > 0 a červené značky na listu`);
+  await p.locator('[data-bom-place]').first().selectOption('columns').catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-bom-layout]')?.getAttribute('data-bom-layout') === 'columns', null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-bom-layout]').first().getAttribute('data-bom-layout').catch(() => '')) === 'columns', `${label}: Kusovník ve sloupcích (výběr v panelu)`);
+
+  // ── D4 (bod 22j): šablona hlavičky z panelu Razítko ──
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  await run('nový díl "Deska H"\nkvádr 60 40 10\nvýkres A4\nvýkres razítko šablona=nástrojářská firma="Firma s.r.o."\nvýkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Razítko/ }).first().click().catch(() => {});
+  await p.locator('[data-title-tpl-name]').first().fill('Firma').catch(() => {});
+  await p.locator('[data-title-tpl-save]').first().click().catch(() => {});
+  await p.waitForTimeout(1000);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska H"\nvýkres hlavička');
+  ok(/Šablony hlavičky: v dokumentu „Firma“ \(nástrojářská/.test(log), `${label}: Uložit jako šablonu → výkres hlavička vypíše „Firma“`);
+  await run('nový díl "Deska H2"\nkvádr 30 20 10\nvýkres A4\nvýkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Razítko/ }).first().click().catch(() => {});
+  await p.locator('[data-title-tpl-select]').first().selectOption('Firma').catch(() => {});
+  await p.waitForTimeout(1000);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska H2"\nvýkres razítko');
+  ok(/nástrojářská/.test(log) && /firma „Firma s\.r\.o\.“/.test(log) && /šablona hlavičky „Firma“/.test(log), `${label}: výběr šablony hlavičky v panelu → razítko podle šablony`);
+  await closeConsole();
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

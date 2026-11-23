@@ -113,6 +113,18 @@ describe("záznamy exportů", () => {
   });
 });
 
+describe("export zastaralého vydaného listu (soubor nese staré písmeno revize)", () => {
+  it("revStale: záznam je zastaralý i při shodě modelu – papír rev. A ≠ soubor rev. A (žádné „odpovídá modelu“)", () => {
+    const d = recordExport(part(), { what: "drawing", format: "pdf", file: "x.pdf", sheets: ["s1"], rev: "A", revStale: true }).doc;
+    const rec = d.outputs![0];
+    expect(rec.sig).toBe(modelId(d).sig);
+    expect(exportLine(d, rec)).toMatch(/^⚠ PDF „x\.pdf“ .* – NESE ZASTARALÉ PÍSMENO REVIZE: rev\. A byla vydána z jiné revize modelu/);
+    expect(exportLine(d, rec)).not.toContain("odpovídá modelu");
+    expect(staleOutputs(d).map((x) => [x.kind, x.why])).toEqual([["export", "soubor nese rev. A, která byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu"]]);
+    expect(staleOutputKinds(d)).toEqual(["export"]);
+  });
+});
+
 describe("zastaralé výstupy a stav dokumentu", () => {
   it("dokument bez vydaných listů a záznamů exportů: stav beze změny (žádné řádky, žádné kv)", () => {
     const d = part();

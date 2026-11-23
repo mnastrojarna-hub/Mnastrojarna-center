@@ -13,6 +13,7 @@ import { writeZip } from "./formats/zip";
 import { tr } from "./i18n";
 import { generalTolOf } from "./title-block";
 import type { CadDoc } from "./types";
+import { dimExportWarnings, sheetDimCheck } from "./drawing-dimcheck";
 
 export type DrawingExportFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
 export type DrawingExportOptions = {
@@ -135,8 +136,11 @@ export async function renderSheet(doc: CadDoc, idx: number, compute: DrawingComp
     userLost = m?.userLost ?? 0;
   }
   const st = annotationStatus(res, anns);
+  const out = withAnnotations(res, anns);
+  // neúplné kóty a funkční prvky bez tolerance – export je ohlásí u listu (vlna 22, bod 18 – cad/drawing-dimcheck.ts)
+  const dims = has ? dimExportWarnings(sheetDimCheck(doc, out, anns, o)) : [];
   // ruční úpravy kót, které se při přegenerování ztratily, nikdy tiše (zkouška 959, nález 8)
-  return { out: withAnnotations(res, anns), meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: userLost ? [...res.warnings, lostEditsText(userLost)] : res.warnings };
+  return { out, meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: [...res.warnings, ...(userLost ? [lostEditsText(userLost)] : []), ...dims] };
 }
 
 /**

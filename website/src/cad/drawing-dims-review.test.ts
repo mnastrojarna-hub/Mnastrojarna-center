@@ -135,7 +135,7 @@ describe("tolerance pomocné kóty (ISO 129-1: pomocná kóta se netoleruje)", (
     const st = (await drawingStatus(doc, computeDrawing)).text;
     expect(statusLine(st, "přední")).toContain("42±0,05");
     expect(statusLine(st, "přední")).toContain("(50)");
-    expect(st).toMatch(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/);
+    expect(st).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
     expect(AGENT_GUIDE).not.toContain("výkres tolerance 50 ±0,05");
   }, 120_000);
 });

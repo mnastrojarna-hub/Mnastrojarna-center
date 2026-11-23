@@ -31,10 +31,12 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
+import { clearanceScript } from "./agent-clearance";
+import { processScript } from "./agent-process";
 import { stripLineComment } from "./agent-comment";
-import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
+import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords, emitPhases, motorIsPiecewise, motorPieceWords, windowWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
-import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
+import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitPositions, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { emitIssue } from "./doc-outputs";
 import { springScriptLine } from "./agent-springs";
 import { gearAutoName, gearScriptLines } from "./agent-gears";
@@ -217,6 +219,9 @@ const WORDS = {
   // druh položky kusovníku (vlna 22, bod 19): komponenta `sestava komponenta #k druh …`, díl `druh …`
   supplyComp: ["druh", "kind", "art"],
   supplyPart: ["druh", "supply", "beschaffung"],
+  // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
+  functionalMark: ["funkční", "functional", "funktional"],
+  datumMark: ["základna", "datum", "bezug"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
   sBuy: ["nakupovaný", "buy", "kauf"],
@@ -266,6 +271,9 @@ const WORDS = {
   springTable: ["tabulka pružiny", "springtable", "federtabelle"],
   gearTable: ["tabulka ozubení", "geartable", "verzahnungstabelle"],
   bom: ["kusovník", "bom", "stückliste"],
+  bomAbove: ["nad", "above", "oben"],
+  bomColumns: ["sloupce", "columns", "spalten"],
+  bomAuto: ["auto", "auto", "auto"],
   balloons: ["balónky", "balloons", "positionsnummern"],
   projection: ["promítání", "projection", "projektion"],
   dimension: ["kótovat", "dimension", "bemaßen"],
@@ -276,6 +284,7 @@ const WORDS = {
   chain: ["řetězově", "chain", "kette"],
   baseline: ["od základny", "baseline", "basis"],
   sheetNew: ["list nový", "sheet new", "blatt neu"],
+  sheetSel: ["list", "sheet", "blatt"],
   sheetRename: ["list přejmenovat", "sheet rename", "blatt umbenennen"],
   drawingNew: ["nový", "new", "neu"],
   title: ["razítko", "titleblock", "schriftfeld"],
@@ -943,6 +952,11 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       return one(ax === null || at === null ? null : `${c.w("spring")} ${n(2 * f.radius)} ${c.w("pitch")} ${n(f.pitch)} ${c.w("turns")} ${n(f.turns)} ${c.w("wire")} ${n(f.wire)}${at}${ax}${primMode(p, f)}${bodyPart(p, f)}`);
     }
     case "ext":
+      // kola a ozubení: kolo <druh> … (agent-gears.ts); „nové“ kolo dostane další volné těleso samo – jiné těleso jen obecně / JSON
+      if (f.ext.startsWith("gear.")) {
+        if (f.body && !(isNewBodyMode(f) && hasSolid(p.feats) && f.body === nextBodyName(bodiesAt({ features: p.feats }).names))) return [];
+        return gearScriptLines(f, c.lang, n);
+      }
       // pružiny z tabulky: `pružina tlačná d 2 De 20 L0 50 n 8 …` (agent-springs.ts); ostatní rozšíření obecným `prvek`
       return one(springScriptLine(f, c.lang));
     case "thread": {
@@ -1135,10 +1149,6 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       const b = scriptQuote(f.tool, true);
       return one(!a || !b || !f.target || !f.tool ? null : `${c.w("combine")} ${a} ${b}${f.op === "cut" ? ` ${c.w("cut")}` : f.op === "intersect" ? ` ${c.w("intersect")}` : ""}${f.keepTool ? ` ${c.w("keep")}` : ""}`);
     }
-    // kola a ozubení: kolo <druh> … (agent-gears.ts); „nové“ kolo dostane další volné těleso samo – jiné těleso jen obecně / JSON
-    case "ext":
-      if (!f.ext.startsWith("gear.") || (f.body && !(isNewBodyMode(f) && hasSolid(p.feats) && f.body === nextBodyName(bodiesAt({ features: p.feats }).names)))) return [];
-      return gearScriptLines(f, c.lang, n);
     default:
       return [];
   }
@@ -1597,7 +1607,11 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
     parts.push(`${c.w("rotation")} ${n(o.rotation)}`);
     keys.push("rotation");
   }
-  if (typeof o.bomTable === "boolean") {
+  if (o.bomTable !== false && (o.bomPlace === "above" || o.bomPlace === "columns" || o.bomPlace === "auto")) {
+    // umístění kusovníku (vlna 22, bod 17) – volba zapne i kusovník
+    parts.push(`${c.w("bom")} ${c.w(o.bomPlace === "above" ? "bomAbove" : o.bomPlace === "columns" ? "bomColumns" : "bomAuto")}`);
+    keys.push("bomPlace");
+  } else if (typeof o.bomTable === "boolean") {
     parts.push(`${c.w("bom")} ${c.yn(o.bomTable)}`);
     keys.push("bomTable");
   }
@@ -1654,6 +1668,16 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
         }
+      } else if (o.bomOnly && list.slice(0, i).some((p) => p.drawing === s.drawing && (p.options as Rec | undefined)?.bomPlace === "sheet")) {
+        // list jen s kusovníkem vznikl příkazem `výkres kusovník list` u listu sestavy (vlna 22, bod 17): vybrat ho a přejmenovat
+        how = "sheet";
+        const auto = trIn(c.lang, "Kusovník");
+        const sel = `${c.w("drawing")} ${c.w("sheetSel")} ${scriptQuote(auto, true) ?? ""}`;
+        if (check(sel, (cmd) => cmd.k === "sheet" && cmd.op === "select")) c.line(sel);
+        if (s.name !== auto && q) {
+          const l = `${c.w("drawing")} ${c.w("sheetRename")} ${q}`;
+          if (check(l, (cmd) => cmd.k === "sheet" && cmd.op === "rename")) c.line(l);
+        }
       } else {
         how = "sheet";
         const l = `${c.w("drawing")} ${c.w("sheetNew")} ${q ?? ""}`.trim();
@@ -1662,6 +1686,7 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
         }
+        if (o.bomOnly) c.note(tr("list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list", s.name));
       }
     }
     setName = s.drawing;
@@ -1714,6 +1739,8 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
     }
     // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
     emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
+    // pozice po pohledech, zámky pozic, kusovník na samostatném listu (vlna 22, bod 17)
+    emitPositions(c.sheetOut, doc, s, c.genKeys[s.id]);
     emitIssue(c.sheetOut, doc, s); // vydání listu (vlna 22, bod 20 – doc-outputs.ts)
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
@@ -1837,10 +1864,28 @@ function emitPart(c: Ctx, doc: CadDoc, name: string) {
     const cq = cf ? scriptQuote(cf.name, true) : null;
     if (cq) c.line(`${c.w("config")} ${c.w("active")} ${cq}`);
   }
+  emitFunctional(c, doc);
   if (doc.bodies?.some((b) => b.color || b.hidden)) c.note(tr("barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.faceColors && Object.keys(doc.faceColors).length) c.note(tr("barvy ploch dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.underlays && Object.keys(doc.underlays).length) c.note(tr("podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   emitDrawings(c, doc, name);
+}
+
+/** funkční prvky a základny (vlna 22, bod 18): `funkční F7 H7` · `funkční "Díra 1" H7` · `funkční základna A F3` – plocha se při čtení změří znovu */
+function emitFunctional(c: Ctx, doc: CadDoc) {
+  for (const m of doc.functional ?? []) {
+    const tol = m.tol ? ` ${m.tol}` : "";
+    if (m.kind === "datum") {
+      if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
+      else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;
+    const q = f ? scriptQuote(f.name, true) : null;
+    if (m.face) c.line(`${c.w("functionalMark")} F${m.face.index + 1}${tol}`);
+    else if (q && !/[\r\n]/.test(tol)) c.line(`${c.w("functionalMark")} ${q}${tol}`);
+    else c.note(tr("funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
+  }
 }
 
 /* ───────────────────────── sestava ───────────────────────── */
@@ -2092,9 +2137,11 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pružiny mezi díly (dosedací plochy, L0, Ln, tuhost, vedení) – po vazbách, komponenty už stojí (doc-script-asm.ts)
   emitAsmSprings(c.sheetOut, comps, idx);
   const mo = doc.motion;
+  let phaseLater: string[] = [];
   if (mo?.motors.length) {
     c.comment(c.w("cMotion"));
-    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined);
+    phaseLater = emitPhases(c.sheetOut, mo, mateNo); // fáze před motory (motor se na fázi odkazuje názvem)
+    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined) || mo.motors.some(motorIsPiecewise);
     mo.motors.forEach((m, i) => {
       const no = mateNo.get(m.mate);
       if (no === undefined) {
@@ -2107,9 +2154,15 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       const end = open ? unusedEnd(m) : null;
       if (end !== null)
         c.note(tr("motor pohybové studie č. {0}: uložený konec {1} se nepoužíval (motor jede od začátku rychlostí bez konce) – skript ho nezapisuje; dojet na konec a stát = {2}..{1} s rychlostí (rozsah × rychlost)", i + 1, n(end), n(m.from)));
-      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
-      if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
+      // vlna 22, bod 3: úseky / klíčové polohy / okno / fáze motoru (doc-script-asm.ts)
+      const phName = mo.phases?.find((p) => p.id === m.phase)?.name;
+      const piece = motorIsPiecewise(m);
+      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${piece ? motorPieceWords(c.sheetOut, m, phName) : open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
+      if (piece) {
+        /* rychlosti a časy jsou u úseků */
+      } else if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
+      if (!piece) l += windowWords(c.sheetOut, m, phName);
       l += motorLimitWords(c.sheetOut, m); // vlna 22, bod 8: na mezi chyba
       if (i === 0) {
         // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
@@ -2123,6 +2176,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       c.line(l);
     });
     if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
+    for (const l of phaseLater) c.line(l);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
   // vlna 22, bod 2: preferované strany mezí a režim studie (kinematika / kvazistatika) bez nastavení dynamiky
@@ -2146,6 +2200,14 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pohledy studie (kamera, řez), aktivní pohled, volby videa, anotace – vlna 22 (doc-script-motion-view.ts)
   if (mo?.motors.length || mo?.dyn) emitMotionViews(c.sheetOut, mo);
   else if (mo?.views?.length) c.note(tr("pohledy pohybové studie bez motoru se do skriptu nepřenáší"));
+  // sledovaná vůle a spojitost kontroly kolizí pohybové studie – vlna 22, bod 6 (cad/agent-clearance.ts)
+  const clr = clearanceScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null));
+  for (const l of clr.lines) c.line(l);
+  if (clr.skipped) c.note(tr("sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})", clr.skipped));
+  // procesní vrstva pohybové studie (střih / otisk) – vlna 22, bod 4 (cad/agent-process.ts)
+  const pr = processScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null), (id) => mateNo.get(id));
+  for (const l of pr.lines) c.line(l);
+  if (pr.skipped) c.note(tr("procesní operace s komponentou mimo skript se do skriptu nepřenáší ({0})", pr.skipped));
   // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
   const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
   for (const l of cr.lines) c.line(l);
