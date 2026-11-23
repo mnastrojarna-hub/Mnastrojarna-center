@@ -135,7 +135,7 @@ export default async function DashboardPage() {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"><EyeOff className="h-4 w-4" /></span>
           <span className="min-w-0 flex-1">
             <strong className="text-rose-800 dark:text-rose-200">{anonReview} {anonReview === 1 ? "výkres" : anonReview < 5 ? "výkresy" : "výkresů"} — anonymizace se nepovedla</strong>
-            <span className="block text-xs text-muted-foreground">Dodavateli zatím nepůjdou. Otevři a zkus „Anonymizovat znovu“, nebo nahraj výkres jako PDF.</span>
+            <span className="block text-xs text-muted-foreground">Při odeslání dodavateli odejdou jako originál (se jménem zákazníka). Otevři a zkus „Anonymizovat znovu“, nebo nahraj výkres jako PDF.</span>
           </span>
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
         </Link>

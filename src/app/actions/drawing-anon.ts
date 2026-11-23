@@ -8,7 +8,7 @@ import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/su
 import { userActor } from "@/lib/supabase/actor-headers";
 import { settingsFromRow, settingsToRow, configHash, type AnonSettings } from "@/lib/anonymize/settings";
 import { anonRunnerStatus, appOrigin, approve, enqueue, kick, promoteLegacy, skip, type AnonDb, type AnonTable } from "@/lib/anonymize/queue";
-import { allowQueuedOriginals, cancelSend, enqueueSend, sendWithoutPending, validateSendRequest, type SendKind, type SendPayload } from "@/lib/anonymize/send-queue";
+import { allowQueuedOriginals, cancelSend, enqueueSend, sendQueuedNow, sendWithoutPending, validateSendRequest, type SendKind, type SendPayload } from "@/lib/anonymize/send-queue";
 import { assertJobFileAccess } from "@/lib/jobs/job-file-access";
 import { getAccess } from "@/lib/auth/session";
 
@@ -168,7 +168,7 @@ export async function requeueChangedConfig(): Promise<Result<{ queued: number; i
  * Odeslání čekající na anonymizaci (volá hák sendPurchaseOrder / sendJobDocument / poptávka dodavateli,
  * když některý výkres je pending): zařadí do anon_send_queue a šťouchne do fronty.
  */
-export async function queueSendAfterAnon(input: { kind: SendKind; jobId: string | null; refId?: string | null; payload: SendPayload; fileIds: string[] }): Promise<Result<{ id: string }>> {
+export async function queueSendAfterAnon(input: { kind: SendKind; jobId: string | null; refId?: string | null; payload: SendPayload; fileIds: string[] }): Promise<Result<{ id: string; sent?: boolean }>> {
   const c = await begin("orders");
   if ("error" in c) return { ok: false, error: c.error as string };
   if (!input || typeof input !== "object") return { ok: false, error: "Neplatný požadavek." };
@@ -188,8 +188,11 @@ export async function queueSendAfterAnon(input: { kind: SendKind; jobId: string 
   }
   const r = await enqueueSend(c.db, { kind: input.kind, jobId: input.jobId, refId: chk.refId, payload: chk.payload, fileIds: chk.fileIds, createdBy: c.user.id });
   if (!r.ok) return { ok: false, error: r.error };
+  // majitel 23. 11.: kliknuté „Odeslat" odejde hned — výkresy se anonymizují v tomto požadavku, co nestihne / nepovede se, odejde originál
+  const now = await sendQueuedNow(c.db, r.id, { actorId: c.user.id });
+  if (now.sent) return { ok: true, id: r.id, sent: true };
   await kick({ origin: await origin(), table: "job_files", ids: chk.fileIds.slice(0, 5), manualBy: c.user.id }).catch(() => undefined);
-  return { ok: true, id: r.id };
+  return { ok: true, id: r.id, sent: false };
 }
 
 export async function cancelQueuedSend(id: string): Promise<Result> {

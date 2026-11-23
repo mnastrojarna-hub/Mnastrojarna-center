@@ -14,6 +14,8 @@ import { UiPrefsProvider } from "@/components/ui-prefs/use-ui-prefs";
 import { getUiPrefs } from "@/lib/data/ui-prefs";
 import { ScrollMemory } from "@/components/nav/scroll-memory";
 import { ActivityHeartbeat } from "@/components/activity-heartbeat";
+import { UnsentMailBanner } from "@/components/layout/unsent-mail-banner";
+import { flushStuckSendQueueAfterResponse, listUnsentMail } from "@/lib/data/unsent-mail";
 
 // Každý požadavek ověřuje přihlášení a oprávnění — nikdy statické předrenderování
 // (bez env při buildu by se jinak stránky aplikace „zapekly" jako statické).
@@ -23,9 +25,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Login-first: bez aktivního účtu se do aplikace nedostane nikdo.
   const user = await requireUser();
   // osobní předvolby vzhledu (sbalené menu, rozložení Pošty) — sdílené celou aplikací, platí hned při vykreslení
-  const [{ features }, counts, quoteApprovers, uiPrefs] = await Promise.all([
+  const [{ features }, counts, quoteApprovers, uiPrefs, unsent] = await Promise.all([
     getAccess(), getBadgeCounts(), listQuoteApprovers(), getUiPrefs(user.id),
+    // neodeslané e-maily nesmí zapadnout (majitel 23. 11.) — lišta na každé stránce
+    listUnsentMail(user).catch(() => []),
   ]);
+  // co ve frontě odeslání visí, odejde po odpovědi (i to, co zůstalo z doby před opravou)
+  if (unsent.some((u) => u.source === "vykresy")) flushStuckSendQueueAfterResponse();
 
   // AccessBridge obaluje vše: oprávnění platí už při vykreslení na serveru a při hydrataci (viz access-provider)
   return (
@@ -50,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar user={user} features={features} />
               <PasswordChangeGate required={user.mustChangePassword} />
+              <UnsentMailBanner items={unsent} />
               <main data-scroll-key="main" className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 md:pb-14">
                 <div className="mx-auto w-full max-w-7xl animate-fade-in">{children}</div>
               </main>

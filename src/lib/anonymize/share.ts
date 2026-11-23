@@ -37,6 +37,13 @@ export interface ShareOptions {
   archive?: boolean;
   /** Nákupní doklad (#25 — cena dodavatele, DB job_file_price_ids): anonymizovaná kopie se nikdy nesdílí. */
   priceDocument?: boolean;
+  /**
+   * Člověk klikl „Odeslat" (majitel 23. 11.: „když kliknu odeslat, mail musí odejít"): výkres, jehož
+   * anonymizace selhala / formát nejde / byla přeskočena, odejde jako ORIGINÁL (audit + událost), místo aby
+   * e-mail visel ve frontě. "all" = i výkres, který se ještě anonymizuje (už se na něj nečeká).
+   * Doklady zákazníka (poptávka, objednávka) a nákupní doklady s cenou dál nikdy neodejdou.
+   */
+  sendAnyway?: "settled" | "all";
 }
 
 export type ShareDecision =
@@ -96,6 +103,13 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
   if (!candidate && isModel3d(row.kind, row.filename)) return original(row, false);
   if (!candidate && status !== null && status !== "skipped") {
     return { ok: false, reason: "excluded", message: "Soubor už není výkres zákazníka — anonymizovaná kopie neplatí." };
+  }
+  if (opts.sendAnyway && !customerDoc && !opts.priceDocument) {
+    const waiting = status === "pending" || status === "processing" || status === null;
+    const gaveUp = status === "failed" || status === "unsupported" || status === "skipped" || (!candidate && status === null);
+    if (gaveUp || (waiting && opts.sendAnyway === "all")) {
+      return original(row, true, gaveUp ? "Anonymizace výkresu se nepovedla — odešel originál." : "Výkres se nestihl anonymizovat — odešel originál.");
+    }
   }
   if (!candidate && status === null) {
     // externí soubor, který se neanonymizuje (ZIP, DOCX, XLSX z e-mailu zákazníka, doklad dodavatele…):

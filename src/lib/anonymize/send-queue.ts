@@ -77,6 +77,10 @@ export interface SendQueueRow {
 
 const MAX_ATTACHMENTS_BYTES = 20 * 1024 * 1024;
 const MAX_ATTEMPTS = 3;
+/** Jak dlouho nejvýš čeká kliknuté odeslání na anonymizaci výkresu (pak odejde originál). */
+const WAIT_ALL_MS = 2 * 60_000;
+/** Kolik času má odeslání v požadavku na anonymizaci čekajících výkresů, než e-mail odejde. */
+const INLINE_ANON_MS = 45_000;
 
 function cleanPayload(p: SendPayload): SendPayload {
   const emails = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)).slice(0, 20);
@@ -182,7 +186,7 @@ export async function cancelSend(db: AnonDb, id: string, userId: string, isAdmin
 }
 
 /** Stav příloh řádku fronty. */
-export async function queueReadiness(db: AnonDb, row: Pick<SendQueueRow, "file_ids" | "payload">): Promise<{ pending: string[]; blocked: { id: string; message: string }[]; ready: string[] }> {
+export async function queueReadiness(db: AnonDb, row: Pick<SendQueueRow, "file_ids" | "payload">, anyway?: "settled" | "all"): Promise<{ pending: string[]; blocked: { id: string; message: string }[]; ready: string[] }> {
   const out = { pending: [] as string[], blocked: [] as { id: string; message: string }[], ready: [] as string[] };
   if (!row.file_ids.length) return out;
   const { data } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", row.file_ids);
@@ -193,7 +197,7 @@ export async function queueReadiness(db: AnonDb, row: Pick<SendQueueRow, "file_i
   for (const id of row.file_ids) {
     const f = rows.find((r) => r.id === id);
     if (!f) { out.blocked.push({ id, message: "Výkres byl smazán." }); continue; }
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...originalOpts(originals, f) });
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...originalOpts(originals, f), ...(anyway ? { sendAnyway: anyway } : {}) });
     if (d.ok) out.ready.push(id);
     else if (d.reason === "pending") out.pending.push(id);
     else out.blocked.push({ id, message: d.message });
@@ -257,8 +261,13 @@ async function sentMailLinks(db: AnonDb, row: SendQueueRow): Promise<{ supplierI
 }
 
 /** Odešle jeden řádek fronty (už claimnutý → status sending). */
-async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{ status: SendQueueRow["status"]; reason: string | null }> {
+async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender, anyway?: "settled" | "all"): Promise<{ status: SendQueueRow["status"]; reason: string | null }> {
   const p = row.payload;
+  // zrušená objednávka (mezitím stornovaná) už dodavateli neodejde — řádek fronty se zruší
+  if (row.kind === "purchase_order" && p.purchaseOrderId) {
+    const { data: po0 } = await db.from("purchase_orders").select("status").eq("id", p.purchaseOrderId).maybeSingle();
+    if ((po0 as { status?: string } | null)?.status === "zrusena") return { status: "cancelled", reason: "Objednávka byla zrušena — neodesílá se." };
+  }
   const ids = [...row.file_ids, ...(p.extraFileIds ?? [])];
   const { data } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
   const rows = (data ?? []) as FileRowWithAnon[];
@@ -269,6 +278,8 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
   const names = new Set<string>();
   /** Externí originály, které odešly (audit). */
   const originals: string[] = [];
+  /** Výkresy, které odešly bez anonymizace (selhala / nestihla se) — do historie. */
+  const notAnon: string[] = [];
   let total = 0;
   for (const id of ids) {
     const f = rows.find((r) => r.id === id);
@@ -276,20 +287,21 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     // pojistka: příloha musí patřit k zakázce řádku fronty (kontrola i při zařazení — validateSendRequest)
     if (!row.job_id || String(f.job_id ?? "").toLowerCase() !== row.job_id.toLowerCase()) return { status: "blocked", reason: "Příloha nepatří k zakázce." };
     const asOriginal = row.file_ids.includes(id) ? originalOpts(confirmed, f) : {};
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...asOriginal });
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...asOriginal, ...(anyway && row.file_ids.includes(id) ? { sendAnyway: anyway } : {}) });
     if (!d.ok) return { status: d.reason === "pending" ? "waiting" : "blocked", reason: d.message };
     let bytes = await verifyShareBytes(db as never, d, f);
     // naše číslo zakázky nad razítko výkresu (objednávka dodavateli; jen kopie, 16. 11.)
     const stamp = p.stamps?.[id] ?? p.stamps?.[id.toLowerCase()];
     if (stamp && d.mime === "application/pdf") bytes = await stampJobNumber(bytes, stamp);
     if (d.audit) originals.push(id);
+    if (d.warn && d.source === "original" && anyway) notAnon.push(id);
     total += bytes.length;
     // originál bez anonymizace (super admin) bez původního názvu — ten často nese jméno zákazníka
     const ext = /\.[A-Za-z0-9]{1,8}$/.exec(d.filename)?.[0]?.toLowerCase() ?? "";
     const neutral = p.neutralNames?.[id.toLowerCase()];
     // poptávka dodavateli: neutrální název (číslo výkresu / naše číslo) s příponou skutečně odesílaného souboru
     const base = neutral ? `${neutral.replace(/\.[A-Za-z0-9]{1,8}$/, "")}${ext || (/\.[A-Za-z0-9]{1,8}$/.exec(neutral)?.[0] ?? "")}`
-      : asOriginal.original && d.source === "original" ? `original${ext}` : d.filename;
+      : (asOriginal.original || notAnon.includes(id)) && d.source === "original" ? `original${ext}` : d.filename;
     let name = base;
     for (let i = 2; names.has(name.toLowerCase()); i++) name = base.replace(/(\.[^.]+)?$/, `-${i}$1`);
     names.add(name.toLowerCase());
@@ -316,13 +328,14 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     const n = row.file_ids.length;
     await logJobEvent(db as unknown as JobsDb, {
       jobId: row.job_id, type: "email",
-      message: `Odesláno${p.recipientLabel ? ` ${p.recipientLabel}` : ""} po anonymizaci: ${n} ${n === 1 ? "výkres" : n >= 2 && n <= 4 ? "výkresy" : "výkresů"} (${p.to.join(", ")})`,
-      data: { sendQueueId: row.id, kind: row.kind, fileIds: row.file_ids, emailId: res.emailId ?? null },
+      message: `Odesláno${p.recipientLabel ? ` ${p.recipientLabel}` : ""}${notAnon.length ? "" : " po anonymizaci"}: ${n} ${n === 1 ? "výkres" : n >= 2 && n <= 4 ? "výkresy" : "výkresů"} (${p.to.join(", ")})`
+        + (notAnon.length ? ` — ${notAnon.length === n ? "bez anonymizace" : `${notAnon.length} bez anonymizace`} (anonymizace se nepovedla / nestihla, odešel originál)` : ""),
+      data: { sendQueueId: row.id, kind: row.kind, fileIds: row.file_ids, emailId: res.emailId ?? null, ...(notAnon.length ? { notAnonymized: notAnon } : {}) },
       actorId: row.created_by, actorKind: "user", via: "rucne", agent: "fronta",
       entity: row.kind === "purchase_order" ? "purchase_order" : "file", entityId: row.ref_id ?? undefined,
     });
   }
-  await logAudit({ action: "anon_send_queue_sent", entity: "anon_send_queue", entityId: row.id, diff: { kind: row.kind, to: p.to, files: row.file_ids.length, originals, ...(originals.length && p.originalConfirmedBy ? { originalConfirmedBy: p.originalConfirmedBy } : {}) }, actor });
+  await logAudit({ action: "anon_send_queue_sent", entity: "anon_send_queue", entityId: row.id, diff: { kind: row.kind, to: p.to, files: row.file_ids.length, originals, notAnonymized: notAnon, ...(originals.length && p.originalConfirmedBy ? { originalConfirmedBy: p.originalConfirmedBy } : {}) }, actor });
   return { status: "sent", reason: null };
 }
 
@@ -330,7 +343,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
  * Projde čekající odeslání (s daným souborem nebo všechna): všechny přílohy done → odeslat;
  * některá review/failed/unsupported → blocked (+ událost); jinak čekat.
  */
-export async function flushSendQueue(db: AnonDb, opts: { fileId?: string; ids?: string[]; sender?: Sender; limit?: number } = {}): Promise<{ sent: number; blocked: number; waiting: number }> {
+export async function flushSendQueue(db: AnonDb, opts: { fileId?: string; ids?: string[]; sender?: Sender; limit?: number; anyway?: "settled" | "all" } = {}): Promise<{ sent: number; blocked: number; waiting: number }> {
   const out = { sent: 0, blocked: 0, waiting: 0 };
   let q = db.from("anon_send_queue").select("*").in("status", ["waiting", "blocked"]).order("created_at", { ascending: true }).limit(opts.limit ?? 20);
   if (opts.fileId) q = q.contains("file_ids", [opts.fileId]);
@@ -339,7 +352,10 @@ export async function flushSendQueue(db: AnonDb, opts: { fileId?: string; ids?: 
   const rows = (data ?? []) as SendQueueRow[];
   const sender = opts.sender ?? (await defaultSender());
   for (const row of rows) {
-    const r = await queueReadiness(db, row);
+    // majitel 23. 11.: kliknuté „Odeslat" musí odejít — nepovedená anonymizace e-mail nezdrží (odejde originál);
+    // na výkres, který se ještě anonymizuje, se čeká nejvýš WAIT_ALL_MS, pak odejde také
+    const anyway = opts.anyway ?? (Date.now() - new Date(row.created_at).getTime() > WAIT_ALL_MS ? "all" : "settled");
+    const r = await queueReadiness(db, row, anyway);
     if (r.pending.length) { out.waiting++; continue; }
     if (r.blocked.length) {
       const reason = r.blocked[0].message;
@@ -363,7 +379,7 @@ export async function flushSendQueue(db: AnonDb, opts: { fileId?: string; ids?: 
     if (!c) continue;
     let result: { status: SendQueueRow["status"]; reason: string | null };
     try {
-      result = await sendRow(db, c, sender);
+      result = await sendRow(db, c, sender, anyway);
     } catch (err) {
       result = { status: c.attempts >= MAX_ATTEMPTS ? "failed" : "waiting", reason: err instanceof Error ? err.message : "Odeslání selhalo." };
     }
@@ -434,4 +450,35 @@ export async function allowQueuedOriginals(db: AnonDb, id: string, user: { id: s
   const { data: after } = await db.from("anon_send_queue").select("status, reason").eq("id", id).maybeSingle();
   const a = after as { status: string; reason: string | null } | null;
   return a?.status === "waiting" ? { ok: true, sent: false } : { ok: false, error: a?.reason ?? "Odeslání se nepodařilo — zkontroluj frontu." };
+}
+
+/**
+ * Odeslání hned po kliknutí (majitel 23. 11.: „když kliknu odeslat, mail musí odejít"): čekající výkresy se
+ * anonymizují přímo v tomto požadavku (nejvýš INLINE_ANON_MS), pak e-mail odejde — výkres, který se nepovedl
+ * nebo nestihl anonymizovat, jako originál (audit + historie). Řádek fronty zůstane jen jako záznam; když
+ * selže samo odeslání (SMTP), zkusí se znovu z fronty.
+ */
+export async function sendQueuedNow(db: AnonDb, id: string, opts: { sender?: Sender; actorId?: string | null; budgetMs?: number } = {}): Promise<{ sent: boolean; reason: string | null }> {
+  const { data } = await db.from("anon_send_queue").select("*").eq("id", id).maybeSingle();
+  const row = data as SendQueueRow | null;
+  if (!row) return { sent: false, reason: "Odeslání nenalezeno." };
+  const r = await queueReadiness(db, row);
+  if (r.pending.length) {
+    try {
+      const { runClaimed } = await import("./service");
+      const { userActor: ua } = await import("@/lib/supabase/actor-headers");
+      const budget = opts.budgetMs ?? INLINE_ANON_MS;
+      // runClaimed končí 30 s před termínem → termín = teď + 30 s + rozpočet
+      await runClaimed(db, "job_files", r.pending, {
+        deadline: Date.now() + 30_000 + budget, manual: true,
+        ...(opts.actorId ? { actor: ua({ id: opts.actorId }, "rucne") } : {}),
+      }, r.pending.length);
+    } catch (err) {
+      console.warn(`[send-queue] Anonymizace před odesláním selhala: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  await flushSendQueue(db, { ids: [id], anyway: "all", ...(opts.sender ? { sender: opts.sender } : {}) });
+  const { data: after } = await db.from("anon_send_queue").select("status, reason").eq("id", id).maybeSingle();
+  const st = after as { status: SendQueueRow["status"]; reason: string | null } | null;
+  return { sent: st?.status === "sent", reason: st?.reason ?? null };
 }
