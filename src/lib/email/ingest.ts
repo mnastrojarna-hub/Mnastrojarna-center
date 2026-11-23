@@ -36,6 +36,8 @@ import { aiToneFor, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/
 
 /** Automatické odeslání AI odpovědí je vypnuté (majitel 23. 11.: odchází jen to, co odeslal člověk). */
 const AI_AUTO_SEND = false as boolean;
+/** AI návrhy odpovědí na příchozí poštu se negenerují (majitel 23. 11.: „AI balast" na každý mail — zatím vypnuto). */
+const AI_REPLY_DRAFTS = false as boolean;
 
 /**
  * Stahování a (volitelně) AI-analýza pošty.
@@ -508,7 +510,7 @@ export async function ingestEmailsProgress(
     }
 
     // Návrh odpovědi jen s AI, ne u spamu a jen u čerstvé pošty: plná automatika = odeslat hned, jinak fronta
-    if (!analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
+    if (!AI_REPLY_DRAFTS || !analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
     try {
       // tykání / vykání vlastníka schránky (odpověď odejde pod jeho jménem) s odesílatelem
       const tone = await aiToneFor(db, opts.ownerId ?? null, e.fromEmail, e.fromName);
