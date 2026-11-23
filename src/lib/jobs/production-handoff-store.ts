@@ -1708,7 +1708,7 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
       supplierEmail: meta.supplierEmail, senderUsable: Boolean(senderBox), cheaperQuote: meta.cheaperQuote, hasQuote: meta.hasQuote,
     }) : ["neznámá objednávka"];
     // majitel 23. 11.: objednávka dodavateli odejde jen kliknutím člověka — automatické odeslání vypnuté
-    const auto = false && !human && mode === "full" && actor.margins && blockers.length === 0;
+    const auto = (false as boolean) && !human && mode === "full" && actor.margins && blockers.length === 0;
     if ((human || auto) && actor.id) {
       const r = await sendQueuedPurchaseOrder(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll, fromMailboxId: actor.fromMailboxId }, p.id, {
         status: human ? "approved" : "auto_executed", via: human ? "rucne" : "automaticky", eventData: { handoffId: result.handoffId, auto },

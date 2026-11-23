@@ -372,14 +372,17 @@ await T("9 · super admin schválí objednávku v AI přehledu → bez volby z j
 });
 
 // ── 10. Plná automatika ──────────────────────────────────────
-await T("10 · plná automatika: bezpečná objednávka odejde sama; bez ceny čeká ve frontě s důvodem", async (ctx) => {
+await T("10 · i v plné automatice odejde objednávka jen kliknutím člověka (majitel 23. 11.)", async (ctx) => {
   setMode("full");
   try {
     const page = await ctx.newPage();
     await login(page, USERS.obchod);
     await openJob(page, F);
     await openHandoffFromNext(page);
-    expect((await dialogText(page)).includes("Plná automatika — objednávka odejde dodavateli sama"), "dialog: odejde sama (plná automatika)");
+    expect(!(await dialogText(page)).includes("odejde dodavateli sama"), "dialog neslibuje automatické odeslání");
+    const sendNow = page.locator('[data-testid="handoff-send-now"] input[type="checkbox"]').filter({ visible: true }).first();
+    await sendNow.waitFor({ timeout: 20_000 });
+    if (!(await sendNow.isChecked())) await sendNow.check();
     await submit(page).click();
     await waitResult(page);
     expect((await dialogText(page)).includes("odesláno"), "výsledek: odesláno");
@@ -389,7 +392,8 @@ await T("10 · plná automatika: bezpečná objednávka odejde sama; bez ceny č
     await submit(page).click();
     await waitResult(page);
     const q = queue(G)[0];
-    expect(q && q.status === "pending" && /Neodesláno automaticky: .*bez ceny/.test(q.summary), `G čeká s důvodem (${q?.summary})`);
+    expect(q && q.status === "pending", `G bez kliknutí na odeslání čeká ve frontě (${q?.status})`);
+    expect(pos(G)[0]?.status !== "odeslana", "G neodešla sama");
   } finally {
     setMode("approval");
   }
