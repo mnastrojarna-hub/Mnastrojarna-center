@@ -7,6 +7,9 @@ import { UnsentMailRetry } from "./unsent-mail-retry";
  * Výrazná lišta na každé stránce: e-mail, který po kliknutí na „Odeslat" neodešel (majitel 23. 11.: „nesmí
  * zapadnout"). Zmizí sama, jakmile e-mail odejde nebo ho autor zruší.
  */
+/** Chyba přihlášení ke schránce (špatné heslo) → odkaz do Můj účet. */
+const LOGIN_RE = /přihlá|heslo|login|auth|credentials|535/i;
+
 export function UnsentMailBanner({ items }: { items: UnsentMailItem[] }) {
   if (!items.length) return null;
   const n = items.length;
@@ -21,10 +24,13 @@ export function UnsentMailBanner({ items }: { items: UnsentMailItem[] }) {
           <span className="text-rose-800/80 dark:text-rose-200/80"> — systém je zkouší odeslat znovu; když to nejde, oprav příčinu (schránka, adresa) nebo odešli znovu.</span>
           <ul className="mt-1 space-y-0.5">
             {items.slice(0, 5).map((it) => (
-              <li key={`${it.source}-${it.id}`} className="truncate">
+              <li key={`${it.source}-${it.id}`} className="break-words">
                 <Link href={it.href} className="font-medium underline-offset-2 hover:underline">{it.subject}</Link>
                 {it.to && <span className="text-rose-800/80 dark:text-rose-200/80"> → {it.to}</span>}
                 {it.reason && <span className="text-rose-800/80 dark:text-rose-200/80"> · {it.reason}</span>}
+                {it.mine && it.reason && LOGIN_RE.test(it.reason) && (
+                  <Link href="/account" className="ml-1 font-medium underline underline-offset-2">Opravit heslo schránky</Link>
+                )}
               </li>
             ))}
             {n > 5 && <li className="text-rose-800/80 dark:text-rose-200/80">…a další ({n - 5})</li>}
