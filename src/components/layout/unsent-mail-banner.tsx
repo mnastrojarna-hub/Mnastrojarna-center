@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MailWarning } from "lucide-react";
 import type { UnsentMailItem } from "@/lib/data/unsent-mail";
 import { UnsentMailRetry } from "./unsent-mail-retry";
+import { UnsentMailClose } from "./unsent-mail-close";
 
 /**
  * Výrazná lišta na každé stránce: e-mail, který po kliknutí na „Odeslat" neodešel (majitel 23. 11.: „nesmí
@@ -36,6 +37,8 @@ export function UnsentMailBanner({ items }: { items: UnsentMailItem[] }) {
             {n > 5 && <li className="text-rose-800/80 dark:text-rose-200/80">…a další ({n - 5})</li>}
           </ul>
         </div>
+        {/* zavřít jednou provždy (majitel 25. 11.) — e-maily, které autor vidí jako své (super admin všechny) */}
+        <UnsentMailClose items={items.map((it) => ({ source: it.source, id: it.id }))} />
       </div>
     </div>
   );
