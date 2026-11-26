@@ -236,6 +236,11 @@ describe("soupis 5.2 – stavba, sestava, měření, výkres, materiál (č. 24�
     const r = await runFake("nový díl A\nkvádr 1 1 1\nmateriál EN AW-6082\nmateriál XY-123");
     has(r, 3, "note", "material.class");
     has(r, 4, "warn", "material.density-assumed");
+    // ČSN 11 423 = ocel třídy 11: třída se pozná (ℹ), hustota se nepředpokládá (žádné ⚠ density-assumed) – e2e cad-plate-roundtrip
+    const c = await runFake("nový díl A\nkvádr 1 1 1\nmateriál ČSN 11 423");
+    has(c, 3, "note", "material.class");
+    expect(find(c, "material.class")!.text).toMatch(/ČSN 11 423.*Ocel \(7\.85 g\/cm³\)/);
+    expect(coded(c).some((x) => x.includes("material.density-assumed"))).toBe(false);
     expect(["EN AW-6082", "1.4301", "1.4404", "1.2311", "1.0503", "ČSN 11 523", "19 312", "S235JR", "C45", "42CrMo4", "CuZn39Pb3", "X5CrNi18-10", "3.7165", "nesmysl"].map(materialClass)).toEqual(["hlinik", "nerez", "nerez", "ocel", "ocel", "ocel", "ocel", "ocel", "ocel", "ocel", "mosaz", "nerez", "titan", null]);
   });
   it("38 hole.tap-diameter ⚠: zadaný průměr závitové díry nahrazen tabulkovým vrtákem", async () => {
