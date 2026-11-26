@@ -34,6 +34,7 @@ import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
 import { AsmInstanceProps } from "./asm-spring-props";
+import { lostSpringComps, springLostSides, springLostSideTexts, springRemoveCmd, withoutSpringOf } from "@/cad/spring-lost";
 import { AsmSupplyFields } from "./asm-supply";
 import { kindsIn, supplySection, supplyWord } from "@/cad/bom-model";
 import { renameProblem } from "@/cad/agent-asm";
@@ -60,6 +61,7 @@ export function AsmTree({
   picked,
   onRepick,
   repickMate,
+  onRun,
 }: {
   doc: CadDoc;
   selected: string | null;
@@ -83,6 +85,8 @@ export function AsmTree({
   onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void;
   /** vazba, jejíž plocha se právě vybírá znovu */
   repickMate?: string | null;
+  /** textový příkaz přes agenta (protokol + záznam) – např. `sestava pružina #k odebrat`; bez něj přímá změna dokumentu */
+  onRun?: (text: string) => void;
 }) {
   const comps = doc.components ?? [];
   const groups = groupComponents(comps); // „Normálie“ i „Standard parts“ = jedna skupina (asm-groups.ts)
@@ -154,7 +158,7 @@ export function AsmTree({
             ))}
         </div>
       ))}
-      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} />
+      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} onRun={onRun} />
     </div>
   );
 }
@@ -167,27 +171,31 @@ const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "ko
  * v poli (číslo i výraz), otočit, potlačit nebo smazat – každá změna jde přes `onCommit`, které sestavu znovu přepočítá.
  * Vazba Ukotvit se týká jedné komponenty; jejím smazáním / potlačením se komponenta uvolní.
  */
-function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null }) {
+function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate, onRun }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null; onRun?: (text: string) => void }) {
   const mates = doc.mates ?? [];
   const [closed, setClosed] = useState(false);
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
-  if (!mates.length) return null;
+  // pružiny se ztracenou dosedací plochou patří do seznamu vazeb (reference jako strana vazby) – vlna 22, bod 20, kolo 4
+  const lostSprings = lostSpringComps(doc);
+  if (!mates.length && !lostSprings.length) return null;
   const conflicts = mates.filter((m) => status?.[m.id] === "conflict").length;
   const lost = mates.filter((m) => !m.suppressed && mateLost(m));
+  const lostN = lost.length + lostSprings.length;
   return (
-    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list data-mates-state={state ?? "ok"} data-mates-lost={lost.length}>
+    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list data-mates-state={state ?? "ok"} data-mates-lost={lostN} data-springs-lost={lostSprings.length}>
       <button type="button" onClick={() => setClosed((v) => !v)} className="flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left text-[11.5px] font-semibold text-[#4a5664]">
         <CadIcon name={closed ? "chevronRight" : "chevronDown"} className="h-3 w-3" />
         {tr("Vazby")}
         {conflicts > 0 && <span className="rounded bg-brand/10 px-1 text-[10px] text-brand-600">{tr("{0} konflikt", conflicts)}</span>}
-        {lost.length > 0 && <span className="rounded bg-[#fde8e7] px-1 text-[10px] text-[#b42318]">{tr("{0} ztracená reference", lost.length)}</span>}
+        {lostN > 0 && <span className="rounded bg-[#fde8e7] px-1 text-[10px] text-[#b42318]">{tr("{0} ztracená reference", lostN)}</span>}
         <span className="ml-auto pr-2 font-mono text-[10px] font-normal text-[#8a95a3]">{mates.length}</span>
       </button>
-      {!closed && lost.length > 0 && (
+      {!closed && lostN > 0 && (
         // ztracené reference (vlna 22, bod 20): plocha vazby po úpravě dílu neexistuje / není jednoznačná – vazba je mimo řešení,
         // komponenty se kvůli ní nehýbou; nic se tiše nepřipojilo jinam. Oprava: vybrat plochu znovu, nebo vazbu smazat.
         <p data-mates-lost-note className="ml-3 mr-2 rounded border border-[#f3c4c0] bg-[#fef3f2] px-2 py-1 text-[11px] leading-snug text-[#912018]">
-          {tr("Ztracené reference vazeb: {0}. Plocha, na kterou vazba ukazovala, po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení a komponenty se kvůli ní nehýbou. Vyberte plochu znovu, nebo vazbu smažte.", lost.length)}
+          {tr("Ztracené reference vazeb: {0}. Plocha, na kterou vazba ukazovala, po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení a komponenty se kvůli ní nehýbou. Vyberte plochu znovu, nebo vazbu smažte.", lostN)}
+          {lostSprings.length > 0 && ` ${tr("Pružiny se ztracenou dosedací plochou: {0} – jejich délka a síla se nekontrolují.", lostSprings.length)}`}
         </p>
       )}
       {!closed && state === "stale" && (
@@ -281,6 +289,38 @@ function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick
                   </label>
                 </div>
               )}
+            </div>
+          );
+        })}
+      {!closed &&
+        lostSprings.map((c) => {
+          // pružina se ztracenou dosedací plochou: červený řádek s tím, která plocha chybí; oprava = nové dosedací plochy v panelu
+          // pružiny (Upravit pružinu / sestava pružina … mezi …), nebo pružinu odebrat – nic se tiše nepřipojilo jinam
+          const s = c.spring!;
+          return (
+            <div key={`spring:${c.id}`} data-mate-spring={c.id} data-mate-status="lost" data-mate-lost={springLostSides(s).join(",")} className="group ml-3 rounded bg-[#fef3f2] px-2 py-[3px] text-[12px]" onClick={() => onSelect(c.id)} title={tr("ztracená dosedací plocha pružiny – délka a síla se nekontrolují")}>
+              <div className="flex items-center gap-2">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT.lost)} />
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{tr("Pružina „{0}“", c.name)}</span>
+                  <span className="block truncate text-[10.5px] text-[#8a95a3]">{`${name(s.a.compId)} → ${name(s.b.compId)}`}</span>
+                </span>
+              </div>
+              <div className="ml-4 mt-0.5 text-[10.5px] leading-snug text-[#912018]" data-mate-lost-detail={`spring:${c.id}`}>
+                {springLostSideTexts(doc, c).map((t) => (
+                  <span key={t} className="block">
+                    {t}
+                  </span>
+                ))}
+                <span className="mt-0.5 flex gap-1.5">
+                  <button type="button" data-spring-fix={c.id} onClick={(e) => { e.stopPropagation(); onSelect(c.id); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
+                    {tr("Zadat dosedací plochy znovu")}
+                  </button>
+                  <button type="button" data-spring-remove={c.id} onClick={(e) => { e.stopPropagation(); if (onRun) onRun(springRemoveCmd(doc, c.id)); else onCommit(withoutSpringOf(doc, c.id)); }} className="rounded border border-[#d5dbe2] bg-white px-1.5 py-[1px] text-[10.5px] text-[#4a5664] hover:bg-[#f3f6f9]">
+                    {tr("Odebrat pružinu")}
+                  </button>
+                </span>
+              </div>
             </div>
           );
         })}

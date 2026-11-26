@@ -774,7 +774,11 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
    („→ … vrácen … – stav vazeb níže“). Oprava: `sestava vazba 1 plocha b F6` (nová plocha strany B, F-číslo nebo pravidlo
    jako u nové vazby; bez strany = ztracená strana) nebo `sestava vazba 1 smazat`; ztracená hrana / vrchol = táž entita
    číslem `sestava vazba 1 plocha b E2` / `… V3` (v aplikaci „Vybrat hranu / vrchol znovu“ – seznam hran / vrcholů dílu);
-   vrátí-li další úprava tutéž plochu, reference se obnoví (ℹ `mate.restored`).
+   vrátí-li další úprava tutéž plochu, reference se obnoví (ℹ `mate.restored`). Totéž platí pro `sestava obnovit` (díl změněný v záložce, GUI „Obnovit z dílu“) a pro
+   **dosedací plochy pružin**: ztracená dosedací plocha = ✗ `mate.lost` s názvem pružiny, řádek „pružina „P“ … – ztracená reference: …“
+   ve výpisu `sestava vazby` (hlavička „· pružiny se ztracenou dosedací plochou: N“), `sestava pružiny` / `stav` bez délky, síly a ✓
+   („délka a síla nezkontrolovány“), strojově `springs.lost=N` v řádku `D`, `= … status` a `Σ`;
+   oprava `sestava pružina "P" mezi "Deska A" F6 "Přidržovač" F5` nebo `… odebrat`.
 9. `kusovník [strukturovaně] [csv]` – tabulka `Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks`; `kolize` = průniky.
    Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
    řádek nerozdělí; jiné číslo výkresu (`číslo "…"`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.
@@ -3164,7 +3168,9 @@ v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený st
 `porovnat` tohoto dokumentu je z dřívější revize, příkaz zopakujte. Řádek `D` končí `stale=clash,mates,motion,measure,compare`
 (jen druhy, které konečnému stavu neodpovídají; JSON `docs[].stale`) – kolize a vazby se před tím přepočítají, zůstává hlavně
 měření a porovnání provedené před poslední změnou. Výsledek bez `stale` (`kolize: žádný průnik`, `ok=1`, `mates=N/N`) tedy
-popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
+popisuje právě odevzdávaný stav. Ztracené reference po změně dílu nejsou nikdy zelené ani bez `stale`: vazba `mates=…(lost=N)`,
+dosedací plocha pružiny `springs.lost=N` (řádek `D`, `= … status`, `Σ`, `kontrola sestava`; JSON `docs[].springs`) – délka a síla té
+pružiny se nekontrolují, oprava `sestava pružina "P" mezi "A" <plocha> "B" F5` nebo `sestava pružina "P" odebrat`. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
 (`data-clash-state`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi `r·…` a polohu.
 Výstupy (vlna 22, bod 20): dokument s výkresy nebo záznamy exportů má v řádku `D` revizi modelu `rev=r·a1b2c3` (JSON
 `docs[].rev`) a `stale=` navíc `drawing` (vydaný list ze starší revize modelu – `výkres vydat`) a `export` (záznam exportu ze

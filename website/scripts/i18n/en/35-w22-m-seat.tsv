@@ -1,0 +1,15 @@
+# vlna 22, bod 20 – kolo 4 (balík M): ztracená dosedací plocha pružiny ve výpisu vazeb, sestava pružiny, stav, pohyb, GUI; sestava obnovit = remapAsmRefs
+ · pružiny se ztracenou dosedací plochou: {0}	 · springs with a lost seat face: {0}
+„{0}“{1} – ztracená dosedací plocha {2}: délka a síla nezkontrolovány – {3}	“{0}”{1} – lost seat face {2}: length and force not checked – {3}
+{0}; délka pružiny se z ní nepočítá	{0}; the spring length is not computed from it
+{0}: dosedací plocha {1} dílu „{2}“ – {3}	{0}: seat face {1} of part “{2}” – {3}
+⚠ pružina {0}	⚠ spring {0}
+Odebrat pružinu	Remove spring
+pružina „{0}“ „{1}“ {2} → „{3}“ {4} – {5}: {6} – {7}	spring “{0}” “{1}” {2} → “{3}” {4} – {5}: {6} – {7}
+Pružiny se ztracenou dosedací plochou: {0} – jejich délka a síla se nekontrolují.	Springs with a lost seat face: {0} – their length and force are not checked.
+sestava pružina {0} mezi {1} {2} | sestava pružina {0} odebrat	assembly spring {0} between {1} {2} | assembly spring {0} remove
+Vyberte komponenty A a B a klikněte na Upravit pružinu (dosedací plocha = nejbližší kolmá rovinná plocha), nebo textem: {0}	Choose components A and B and click Update spring (seat face = nearest perpendicular planar face), or as text: {0}
+Zadat dosedací plochy znovu	Set seat faces again
+Ztracená dosedací plocha – délka a síla pružiny se nekontrolují:	Lost seat face – the spring length and force are not checked:
+ztracená dosedací plocha pružiny – délka a síla se nekontrolují	lost spring seat face – length and force are not checked
+<plocha>	<face>

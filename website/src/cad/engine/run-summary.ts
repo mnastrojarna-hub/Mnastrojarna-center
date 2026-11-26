@@ -25,7 +25,7 @@ import { asmStatus } from "./asm-status";
 import { codeEntry, featureWarnCode, type Code, type CodeEntryInit } from "./codes";
 import { validityOf } from "./validity-store";
 import type { EngineHost } from "./host";
-import { matesCount } from "./kv";
+import { matesCount, springsCount } from "./kv";
 import { checkClashes, clashFindings } from "./ops/clash";
 import type { ReportBuilder } from "./protocol";
 import type { DocSummary } from "./protocol-types";
@@ -91,6 +91,9 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
   if (s.kind === "assembly") {
     s.components = d.components?.length ?? 0;
     s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;
+    // ztracená dosedací plocha pružiny je vlastnost dokumentu (jako ztracená reference vazby) – `springs.lost=N` (vlna 22, bod 20)
+    const sp = springsCount(d);
+    if (sp) s.springs = sp;
     if (ws && s.components > 0)
       try {
         // stav vazeb a kolize pod klíčem dokumentu záložky (přejmenování ho nezmění); chybějící stav vazeb se přepočítá

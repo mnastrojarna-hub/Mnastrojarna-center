@@ -17,7 +17,6 @@ Nová plocha vazby – komponenta „{0}“	Neue Fläche der Verknüpfung – Ko
 plocha {0} → {1}	Fläche {0} → {1}
 Plocha vazby vybrána znovu (F{0}) – vazba se zase řeší.	Fläche der Verknüpfung neu gewählt (F{0}) – die Verknüpfung wird wieder gelöst.
 po úpravě dílu neexistuje	existiert nach der Teiländerung nicht mehr
-pružina „{0}“ – ztracená dosedací plocha {1} {2}: délka pružiny se z ní nepočítá; zadejte dosedací plochy znovu (sestava pružina "{0}" mezi "A" <plocha> "B" <plocha>)	Feder „{0}“ – verlorene Auflagefläche {1} {2}: die Federlänge wird daraus nicht berechnet; Auflageflächen neu angeben (baugruppe feder "{0}" zwischen "A" <fläche> "B" <fläche>)
 původní geometrie neznámá	ursprüngliche Geometrie unbekannt
 sestava vazba {0} plocha {1} <plocha> | smazat	baugruppe verknüpfung {0} fläche {1} <fläche> | löschen
 táž plocha, nové číslo	dieselbe Fläche, neue Nummer

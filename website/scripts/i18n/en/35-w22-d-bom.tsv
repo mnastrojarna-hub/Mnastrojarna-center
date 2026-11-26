@@ -4,7 +4,6 @@
  (bez výkresu {0})	 (without drawing {0})
 — (třída {0})	— (class {0})
 (pozor: kopie byla upravena i v sestavě – {0}; obnova úpravu přepíše)	(note: the copy was also changed in the assembly – {0}; refreshing overwrites that change)
-⚠ plochy vazeb, které po obnově dílu nejde najít: {0} – sestava vazby	⚠ mate faces that cannot be found after refreshing the part: {0} – assembly mates
 ✓ druh dílu „{0}“: {1}{2}	✓ supply kind of part “{0}”: {1}{2}
 ✓ druh dílu „{0}“: výchozí podle původu	✓ supply kind of part “{0}”: default by origin
 ✓ komponenta „{0}“ obnovena z dílu ({1}){2}	✓ component “{0}” refreshed from the part ({1}){2}
