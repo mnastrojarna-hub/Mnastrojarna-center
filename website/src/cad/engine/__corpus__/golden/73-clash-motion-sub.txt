@@ -53,7 +53,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (4 dílů po rozložení podsestav) · obálka 120 × 60 × 92 mm · objem Σ 199,08 cm³ · hmotnost Σ 1,563 kg
 Kolize: 2 – šroub v závitu 2 (zkontrolováno ?)
-Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt) (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), vůle nekontrolována (podrobně pohyb stav)
 === run 3 ===
 ✓ nová sestava „Sestava 5M“ – nová záložka
 ✓ komponenta „Základ“ vložena do sestavy (ukotvená)

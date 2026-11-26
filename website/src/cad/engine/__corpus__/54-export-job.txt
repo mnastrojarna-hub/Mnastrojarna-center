@@ -1,0 +1,11 @@
+# vlna 22, body 12 a 22h: export jako úloha – soubor STEP nese revizi modelu (řádek F / hlavička souboru), záznam exportu
+# v dokumentu nese úlohu (stav, čas ⏱, kontrola zpětným načtením); export bez kontroly nepíše „kontrola ✓“; po změně
+# modelu je záznam zastaralý (nikdy „odpovídá modelu“ pro soubor ze starší revize)
+nový díl "Deska A"
+kvádr 40 30 10
+export step
+export step "bez-kontroly" bez kontroly
+exporty
+#--- run
+upravit "Kvádr 1" size=40;30;12
+exporty

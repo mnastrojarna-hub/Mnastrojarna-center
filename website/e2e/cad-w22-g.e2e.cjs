@@ -12,6 +12,8 @@
 //  5) bez WebGL (softwarový náhled, jak zkoušel majitel): protokol = CLI, strom prvků = protokol
 //  6) etapa G2 (22a, 22d): ⚠ thread.tip-tangent / thread.no-reach místo ✓ (prohlížeč = CLI), „m18 x 1,5 … šroubovice“,
 //     kontrola přesně (Geometrie „· přesná kontrola“, D vcheck=exact), formulář Závit (Provedení, ⚠ ISO 261), čip platnosti
+//  6d) 22d fáze 2: formulář Tažení po šroubovici – čísla z katalogu živě (data-ext-derived)
+//  7c) 22a fáze 2: STEP závitu šroubovicí → ⚠ out.reload-invalid (text = CLI, lišta exportu z menu), nikdy „věrná kopie“
 //  7) etapa G3 (22c): objemový export bez tělesa – text v prohlížeči = CLI (✗ out.no-solid, nikdy „věrná kopie“ bez tělesa),
 //     export z menu Soubor ▸ STEP / STL ukáže tutéž hlášku ([data-export-check] error / warn / ok), panel „Objem –“
 // Spuštění: E2E_BASE=http://localhost:3532 node e2e/cad-w22-g.e2e.cjs <složka pro výstupy>
@@ -269,6 +271,20 @@ const start = async (p, url) => {
     await q.waitForFunction(() => document.querySelector('[data-validity]')?.getAttribute('data-validity') === 'fast', null, { timeout: 120000 });
     ok(true, '6c: po změně modelu se přesný výsledek neukazuje (zpět „rychlá kontrola“)');
     await q.screenshot({ path: S + 'w22g-g2-validity.png' });
+    // 6d) 22d (fáze 2): formulář Tažení po šroubovici s „Závit z katalogu“ ukáže poloměr / stoupání / hloubku z označení živě
+    //     (data-ext-derived) – dřív ukazoval uložená čísla 10 / 5 / 1,2, která stavba nepoužila; přepnutí strany je přepočítá
+    await q.evaluate((t) => window.mncad.run(t), 'nový díl "Čep H"\nválec 18 30\nprvek surf.helixSweep profile=thread60 thread=M18 x 1,5 turns=10 mode=cut position=0,0,10');
+    await q.waitForFunction(() => { const r = [...document.querySelectorAll('[data-feature-row]')]; return r.length === 2 && !r.some((x) => x.getAttribute('data-feature-state') === 'pending'); }, null, { timeout: 120000 });
+    await q.locator('[data-feature-row][data-feature-name^="Tažení po šroubovici"]').click();
+    await q.waitForSelector('[data-ext-derived="radius"]', { timeout: 30000 });
+    const dv = async () => Object.fromEntries(await Promise.all(['radius', 'pitch', 'depth'].map(async (k) => [k, Number(await q.locator(`[data-ext-derived="${k}"]`).getAttribute('data-value'))])));
+    const ext = await dv();
+    ok(ext.radius === 9 && ext.pitch === 1.5 && Math.abs(ext.depth - 0.920145) < 1e-6 && /z katalogu M18×1,5/.test((await q.locator('[data-ext-derived="radius"]').textContent()) || ''), '6d: formulář Tažení po šroubovici – z katalogu M18×1,5 vnější: R 9, P 1,5, h 0,920145 (ne uložené 10 / 5): ' + JSON.stringify(ext));
+    await q.getByRole('button', { name: 'Vnitřní (v díře)', exact: true }).click();
+    await q.waitForFunction(() => Math.abs(Number(document.querySelector('[data-ext-derived="radius"]')?.getAttribute('data-value')) - 8.188101) < 1e-6, null, { timeout: 30000 }).catch(() => {});
+    const int = await dv();
+    ok(Math.abs(int.radius - 8.188101) < 1e-6 && Math.abs(int.depth - 0.811899) < 1e-6 && int.pitch === 1.5, '6d: přepnuto na Vnitřní → živě R 8,188101, h 0,811899: ' + JSON.stringify(int));
+    await q.screenshot({ path: S + 'w22g-g2-helix-form.png' });
     await q.context().close();
   }
 
@@ -324,6 +340,21 @@ const start = async (p, url) => {
     await g.waitForTimeout(1500);
     const go = await menuExport(/STEP AP214 \(\.step\)/);
     ok(go.level === 'ok' && /věrná kopie modelu/.test(go.text) && /těles: 1/.test(go.text), '7b: GUI export STEP platného tělesa → ✓ věrná kopie (těles: 1)');
+    // 7c) 22a (fáze 2, falešná zelená): závit šroubovicí – soubor STEP po zpětném načtení přesnou kontrolou neprojde (nezávislá
+    //     kontrola souboru valid(exact)=false) → ⚠ out.reload-invalid v textu (prohlížeč = CLI) i v liště exportu z menu, nikdy „věrná kopie“
+    const THREAD = 'nový díl "Čep S"\nválec 18 30\nzávit M18×1,5 délka 20 v 0 0 10 šroubovice';
+    const rFull = norm(await runFresh(THREAD + '\nexport step', { protocol: 'full' }));
+    const rCli = norm(cli(THREAD + '\nexport step', ['--full']));
+    fs.writeFileSync(S + 'w22g-22a-reload-browser.txt', rFull + '\n');
+    fs.writeFileSync(S + 'w22g-22a-reload-cli.txt', rCli + '\n');
+    const rl = (t) => linesOf(t, /^⚠ L\d+ out\.reload-invalid /)[0] || '';
+    ok(!!rl(rFull) && rl(rFull) === rl(rCli) && /NEPROJDE přesnou kontrolou platnosti/.test(rl(rFull)) && !/věrná kopie/.test(rFull) && !/věrná kopie/.test(rCli), '7c: text – ⚠ out.reload-invalid v prohlížeči = CLI, žádná „věrná kopie“: ' + rl(rFull).slice(0, 160));
+    await g.evaluate((t) => window.mncad.run(t), THREAD);
+    await g.waitForFunction(() => !document.querySelector('[data-export-check][data-export-format]'), null, { timeout: 60000 }).catch(() => {});
+    await g.waitForTimeout(1500);
+    const gr = await menuExport(/STEP AP214 \(\.step\)/);
+    ok(gr.level === 'warn' && /NEPROJDE přesnou kontrolou platnosti/.test(gr.text) && !/věrná kopie/.test(gr.text), '7c: GUI export STEP závitu šroubovicí → ⚠ (ne ✓ věrná kopie): ' + gr.text.slice(0, 140));
+    await g.screenshot({ path: S + 'w22g-22a-export-reload.png' });
     await gc.close();
   }
 

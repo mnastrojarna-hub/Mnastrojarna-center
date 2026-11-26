@@ -539,6 +539,19 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
     expect(shortProtocol(r).overflow).toBeUndefined();
     expect(formatShort(r, { notes: true })).toContain("ℹ L1 ui.no-view bez 3D okna nemá příkaz účinek: pohled iso");
   });
+  it("regrese (vlna 22, bod 16): ℹ share.store-off má prioritu F/O i s `notes` – nezmizí v přebytku za ostatními ℹ", () => {
+    // výpisy `=` (priorita pod F/O) zaplní rozpočet; ℹ share.store-off musí zůstat i se zapnutými ℹ (`notes`)
+    const rb = new ReportBuilder({ lang: "cs", lines: 200 });
+    for (let i = 1; i <= 60; i++) rb.measure(i, "measure", `k=${i} ${"x".repeat(40)}`);
+    rb.code("ui.no-view", { line: 61, args: ["pohled iso"] });
+    rb.code("share.store-off", { line: 62, args: [9000] });
+    const r = rb.finish();
+    for (const notes of [false, true]) {
+      const s = shortProtocol(r, { budget: 700, notes });
+      expect(s.overflow?.entries ?? 0, `notes=${notes}: výpisy = jdou do přebytku`).toBeGreaterThan(0);
+      expect(s.text, `notes=${notes}`).toMatch(/^ℹ L62 share\.store-off /m);
+    }
+  });
   it("náhodné reporty (400 případů): rozpočet, gramatika, pořadí tisku, přesný počet přebytku", () => {
     let seed = 12345;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);

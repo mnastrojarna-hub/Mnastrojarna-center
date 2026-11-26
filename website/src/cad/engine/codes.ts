@@ -25,6 +25,8 @@ export const CODES = [
   { code: "run.crash", level: "error", key: "výpočet spadl: {0}" },
   { code: "run.interrupted", level: "error", key: "běh přerušen" },
   { code: "run.cancelled", level: "error", key: "výpočet zrušen – dokument zůstal beze změny" },
+  // vlna 22, bod 12: zrušený běh, který už před zrušením zapsal jiný dokument (přechod `záložka` / `nový díl`) – nikdy „beze změny“
+  { code: "run.cancelled-partial", level: "error", key: "výpočet zrušen – změny zapsané před zrušením zůstaly v {0}" },
   { code: "host.app-only", level: "error", key: "příkaz funguje jen v aplikaci v prohlížeči: {0}" },
   { code: "host.fonts", level: "error", key: "písma pro PDF a text modelu nejsou k dispozici" },
   { code: "ui.no-view", level: "note", key: "bez 3D okna nemá příkaz účinek: {0}" },
@@ -45,6 +47,8 @@ export const CODES = [
   { code: "share.days-clamped", level: "warn", key: "platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})" },
   { code: "share.days-unlimited", level: "error", key: "odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“" },
   { code: "out.check-failed", level: "warn", key: "kontrola souboru: {0}" },
+  // vlna 22, bod 22a (fáze 2): soubor STEP / BREP po zpětném načtení neprojde přesnou kontrolou platnosti, model ano
+  { code: "out.reload-invalid", level: "warn", key: "soubor po zpětném načtení neprojde přesnou kontrolou platnosti: {0}" },
   // objemový export (STEP, BREP, STL, 3MF) bez tělesa / s plochami mimo tělesa – vlna 22, bod 22c (solid-export.ts)
   { code: "out.no-solid", level: "error", key: "objemový export bez tělesa: {0}" },
   { code: "out.free-surfaces", level: "warn", key: "objemový export s plochami mimo tělesa: {0}" },
@@ -180,6 +184,8 @@ export const CODES = [
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
   // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
   { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
+  // ruční kóta po změně modelu neleží na geometrii / přichytila se ke změněné geometrii (vlna 22, bod 20 – cad/drawing-dim-attach.ts)
+  { code: "drawing.dim-detached", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },

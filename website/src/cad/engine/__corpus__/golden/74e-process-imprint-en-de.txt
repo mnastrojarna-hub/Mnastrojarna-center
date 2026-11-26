@@ -65,6 +65,7 @@ Vazby splněny ve všech krocích
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
  otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
  otisk 2 „Kolík“ → „Štítek“: bez záběru – nástroj obrobek nezasáhl, obrobek beze změny
+ „Štítek“: 2 operací, celkem odebráno 23,562 mm³ (sjednocení – společný objem operací jen jednou; součet operací 23,562 mm³)
 Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
 ℹ řádek 10: pracovní kontakt „Razidlo“ × „Štítek“ v krocích 5–8 (pravidlo proces otisk 1), největší průnik 78,54 mm³
 ⚠ řádek 10: procesní operace otisk 2: nástroj „Kolík“ obrobek „Štítek“ v okně operace nezasáhl – obrobek beze změny
@@ -74,6 +75,7 @@ Procesní operace: 2
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
  otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
  otisk 2 „Kolík“ → „Štítek“: bez záběru – nástroj obrobek nezasáhl, obrobek beze změny
+ „Štítek“: 2 operací, celkem odebráno 23,562 mm³ (sjednocení – společný objem operací jen jednou; součet operací 23,562 mm³)
 Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
 ✗ řádek 12: fáze „Neexistuje“ ve studii není – fáze: žádné
 ✓ procesní operace smazána: 2. otisk „Kolík“ → „Štítek“ · hloubka 0,2 mm · od dotyku nástroje
@@ -95,4 +97,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 8 · 2 s · kolize – pohyb stav
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 60 × 60 × 43 mm · objem Σ 41,68 cm³ · hmotnost Σ 0,327 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 8 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Štítek“ v záběru, odebráno 23,562 mm³ (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 8 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), vůle nekontrolována, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Štítek“ v záběru, odebráno 23,562 mm³ (podrobně pohyb stav)

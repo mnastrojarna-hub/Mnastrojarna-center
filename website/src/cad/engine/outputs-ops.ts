@@ -13,7 +13,7 @@
  */
 import type { OutputsCmd } from "../agent-outputs";
 import { staleCopies, staleCopyText } from "../asm-refresh";
-import { exportsText, modelId, recordExport, type ModelId, sheetIssueLine, staleExportText, staleExports, staleOutputs, staleOutputsText, staleSheets, staleSheetText, type ExportInput, type StaleItem } from "../doc-outputs";
+import { exportsText, modelId, recordExport, sameModel, type ModelId, sheetIssueLine, staleExportText, staleExports, staleOutputs, staleOutputsText, staleSheets, staleSheetText, type ExportInput, type StaleItem } from "../doc-outputs";
 import { tr } from "../i18n";
 import type { CadDoc } from "../types";
 import { drawExtras, ensureMateStatus } from "./asm-status";
@@ -21,7 +21,7 @@ import { asmHooks, coded, sayKv, type OpCtx } from "./ops/util";
 import { runEngineOp } from "./ops/registry";
 import { staleResults } from "./result-key";
 import { docKeyOf, runOf } from "./run-doc";
-import { drawingMemo } from "./sheet-eval";
+import { drawingMemo, sheetWarningCode } from "./sheet-eval";
 
 /* ───────────────────────── záznamy exportů ───────────────────────── */
 
@@ -41,14 +41,14 @@ export function warnStaleExport(ctx: OpCtx, doc: CadDoc, sheetIds: readonly stri
   const id = modelId(doc);
   for (const sid of sheetIds) {
     const s = doc.drawings?.find((x) => x.id === sid);
-    if (!s?.issued || s.issued.sig === id.sig) continue;
+    if (!s?.issued || sameModel(s.issued, id)) continue;
     coded(ctx, "drawing.stale", { args: [staleExportText(s.name, s.issued, id)], data: staleData(s.id, id), ...(ctx.strict?.escalates("drawing.stale", ctx.line) ? { level: "error" as const } : {}) });
   }
 }
 
 /** strojová data ⚠ drawing.stale: id listu a otisk modelu, pro který hláška platí (jedna hláška za list a revizi v běhu) */
-export const staleData = (sheet: string, id: ModelId): { sheet: string; sig: string; rev: string } => ({ sheet, sig: id.sig, rev: id.rev });
-const reported = (ctx: OpCtx, sheet: string, id: ModelId) => ctx.report.entries.some((e) => e.code === "drawing.stale" && (e.data as { sheet?: string; sig?: string } | undefined)?.sheet === sheet && (e.data as { sig?: string }).sig === id.sig);
+export const staleData = (sheet: string, id: ModelId): { sheet: string; sig: string; rev: string } => ({ sheet, sig: `${id.sig}|${id.data}`, rev: id.rev });
+const reported = (ctx: OpCtx, sheet: string, id: ModelId) => ctx.report.entries.some((e) => e.code === "drawing.stale" && (e.data as { sheet?: string; sig?: string } | undefined)?.sheet === sheet && (e.data as { sig?: string }).sig === `${id.sig}|${id.data}`);
 
 /** otisk modelu dokumentu na konci minulého běhu nad týmž prostorem (`ws.asm` – stejný objekt i za obalem prostoru) */
 const lastSig = new WeakMap<object, Map<string, string>>();
@@ -66,8 +66,10 @@ export function reportStaleSheets(ctx: OpCtx, doc: CadDoc, o: { end?: boolean } 
     if (!m) lastSig.set(ctx.ws.asm, (m = new Map()));
     const key = docKeyOf(ctx);
     const prev = m.get(key);
-    m.set(key, id.sig);
-    if (prev === id.sig) return;
+    // otisk geometrie i údajů (číslo, materiál…): změna jen údajů vydaný list také zneplatní (bod 20, kolo 3)
+    const now = `${id.sig}|${id.data}`;
+    m.set(key, now);
+    if (prev === now) return;
   }
   if (!doc.drawings?.some((s) => s.issued)) return;
   for (const x of staleSheets(doc, id)) {
@@ -132,6 +134,8 @@ async function runFix(ctx: OpCtx, text: string): Promise<boolean> {
 async function recomputeAll(ctx: OpCtx): Promise<void> {
   const r = runOf(ctx);
   const done: string[] = [];
+  const warned: string[] = [];
+  const manual: string[] = [];
   const first = staleItems(ctx, r.doc);
   // 1) kopie dílů v sestavě – D1 (jedna funkce obnovy: `sestava obnovit vše`, přečíslování ploch vazeb a přepočet vazeb)
   if (first.some((x) => x.kind === "copy") && (await runFix(ctx, "sestava obnovit vše"))) done.push(tr("kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)"));
@@ -154,19 +158,26 @@ async function recomputeAll(ctx: OpCtx): Promise<void> {
     const id = modelId(d);
     for (let i = 0; i < sheets.length; i++) {
       const s = await renderSheet(d, i, compute, extras);
-      done.push(tr("list „{0}“ přepočten z modelu {1}{2}", s.name, id.rev, s.warnings.length ? tr(" – varování: {0}", s.warnings.join("; ")) : ""));
+      const t = tr("list „{0}“ přepočten z modelu {1}{2}", s.name, id.rev, s.warnings.length ? tr(" – varování: {0}", s.warnings.join("; ")) : "");
+      // list s varováním (ruční kóta bez geometrie, neúplné kóty …) není „✓ přepočten“ bez výhrad (vlna 22, bod 20 – kolo 3)
+      if (s.warnings.length) warned.push(t);
+      else done.push(t);
+      // ruční kóty, které po přepočtu neodpovídají geometrii, musí opravit člověk (přepočet je nepřesune)
+      for (const w of s.warnings) if (sheetWarningCode(w) === "drawing.dim-detached") manual.push(`  ⚠ ${tr("list „{0}“", s.name)} – ${w}`);
     }
   }
   // 4) co zbývá: vydané listy ze starší revize, exporty, měření / porovnání
   const left = staleItems(ctx, r.doc);
   const L: string[] = [tr("Přepočítat vše – dokument „{0}“, revize modelu {1}:", r.doc.name, modelId(r.doc).rev)];
-  L.push(done.length ? tr("Přepočteno ({0}):", done.length) : tr("Přepočteno: nic – nebylo co přepočítat"));
+  L.push(done.length + warned.length ? tr("Přepočteno ({0}):", done.length + warned.length) : tr("Přepočteno: nic – nebylo co přepočítat"));
   for (const x of done) L.push(`  ✓ ${x}`);
-  if (left.length) {
-    L.push(tr("Zbývá udělat ručně ({0}) – program to sám neudělá:", left.length));
+  for (const x of warned) L.push(`  ⚠ ${x}`);
+  if (left.length || manual.length) {
+    L.push(tr("Zbývá udělat ručně ({0}) – program to sám neudělá:", left.length + manual.length));
     for (const x of left) L.push(`  ⚠ ${x.label} – ${x.why} → ${x.fix}`);
+    L.push(...manual);
   } else L.push(tr("Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu {0}", modelId(r.doc).rev));
-  sayKv(ctx, `recomputed=${done.length} left=${left.length} ${kvOf(r.doc, left)}`, L.join("\n"));
+  sayKv(ctx, `recomputed=${done.length + warned.length} left=${left.length + manual.length} ${kvOf(r.doc, left)}`, L.join("\n"));
   // vydané listy ze starší revize zůstávají zastaralé, dokud člověk nevydá novou revizi – ⚠ (jednou za běh)
   reportStaleSheets(ctx, r.doc);
 }

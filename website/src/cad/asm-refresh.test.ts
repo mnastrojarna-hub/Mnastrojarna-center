@@ -55,8 +55,8 @@ describe("staleCopies + text ⚠ s příkazem obnovy", () => {
       ["Deska A", ["number"]],
       ["Přidržovač", ["material"]],
     ]);
-    expect(staleCopyText(st[0])).toBe("komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1");
-    expect(staleCopyText(st[1])).toMatch(/obnovit: sestava obnovit "P1"$/);
+    expect(staleCopyText(st[0])).toBe("komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení");
+    expect(staleCopyText(st[1])).toMatch(/obnovit: sestava obnovit "P1"; kusovník a výkres ukazují údaje z vložení$/);
     expect(staleCopies(d, undefined)).toEqual([]);
   });
 });

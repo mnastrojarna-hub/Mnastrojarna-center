@@ -79,7 +79,8 @@ describe("vlna 22 C1: žádné falešné zelené u tříd kolizí (bod 5)", () =
   it("3. pohyb: „Kolize: žádný průnik v N polohách“ jen bez průniku – ne při šroubu v závitu, dotyku ani pracovním kontaktu", () => {
     const st = (clashes: ClashDetail[]) => ({ steps: [0, 1, 2].map((i) => ({ i, t: i, motors: [i], clashes })), collisionsChecked: true });
     // vlna 22, bod 6: bez údaje o spojitosti = diskrétně, výslovně „mezi polohami nekontrolováno“ (dřív „žádné ve všech krocích“)
-    expect(motionClashSummary(st([]), doc).lines).toEqual(["Kolize: žádný průnik v 3 polohách", " kontrolováno jen v 3 polohách (diskrétně, bez posunu mezi polohami) – mezi polohami nekontrolováno"]);
+    // fáze 2 kolo 3: bez sledované vůle i výslovně „vůle nekontrolována“ (nulový průnik není provozní vůle)
+    expect(motionClashSummary(st([]), doc).lines).toEqual(['Kolize: žádný průnik v 3 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)', " kontrolováno jen v 3 polohách (diskrétně, bez posunu mezi polohami) – mezi polohami nekontrolováno"]);
     for (const c of [det("d", "s", "thread"), det("d", "s", "real", { depth: 0.0001 }), det("r", "pl", "real")]) {
       const d = c.a === "r" ? { ...doc, clashRules: [{ id: "r1", kind: "work" as const, a: ["r"], b: ["pl"] }] } : doc;
       const lines = motionClashSummary(st([c]), d).lines;
@@ -166,6 +167,28 @@ describe("vlna 22 C1: žádné falešné zelené u tříd kolizí (bod 5)", () =
     expect(clearanceSummaryLines(res(pair({ unproven: 1 })) as never, d).join("\n")).not.toMatch(GREEN);
     expect(clearanceSummaryLines(res(pair({})) as never, { ...d, motion: { ...d.motion!, clearance: { ...d.motion!.clearance!, refine: false } } }).join("\n")).not.toMatch(GREEN);
     expect(clearanceSummaryLines({ steps, collisionsChecked: false } as never, d)).toEqual([]); // vůle nespočítána = žádná věta
+  });
+
+  it("8b. `stav` motion=ok jen bez vůle pod limitem; „Kolize: žádný průnik“ bez sledované vůle vždy s „vůle nekontrolována“", () => {
+    // fáze 2 kolo 3: dřív motion=ok, i když text stavu ⚠ vůle pod limitem měl; souhrn pohybu bez vůle neříkal „vůle nekontrolována“
+    const steps = [0, 1, 2].map((i) => ({ i, t: i, motors: [i], clashes: [] as ClashDetail[], place: {}, conflicts: [] }));
+    const sw: SweepInfo = { mode: "continuous", poses: 3, refined: 2, bounded: 2, swept: 0, contacts: 0, covered: 0, unproven: 0, unprovenContact: 0, unprovenAt: [], maxStep: 5, maxTurn: 0, between: "solver" };
+    const plain = motionClashSummary({ steps, collisionsChecked: true, sweep: sw }, doc).lines[0];
+    expect(plain).toMatch(/^Kolize: žádný průnik v 3 polohách · vůle nekontrolována/);
+    const pair = (d: number, below: number[]): ClearancePair => ({ a: "r", b: "pl", min: { d, exact: true, pos: 0, t: 0, motors: [0] }, series: [d, d, d], pts: [null, null, null], below, unproven: 0 });
+    const clr = (p: ClearancePair) => ({ limit: 0.05, moving: true, pairs: [p], poses: 3, refined: 0, reach: 1.1 });
+    expect(motionClashSummary({ steps, collisionsChecked: true, sweep: sw, clearance: clr(pair(0.2, [])) }, doc).lines[0]).not.toMatch(/vůle nekontrolována/);
+    const md = { ...doc, motion: { motors: [{ id: "m", kind: "linear" as const, mate: "x", from: 0, to: 1 }], duration: 1, steps: 2, collisions: true, clearance: { pairs: "moving" as const, limit: 0.05 } } } as CadDoc;
+    const verdict = (p: ClearancePair) => {
+      const store = motionStoreOf({});
+      const res = { steps, comps: [], motors: md.motion!.motors, collision: null, collisionsChecked: true, conflictSteps: 0, sweep: sw, clearance: clr(p) };
+      store.byDoc.set("k", { ...motionSigParts(md), res: res as never, seq: 1, at: 0, doc: "S", comps: 4 });
+      return motionStatusOf(store, "k", md)!;
+    };
+    const low = verdict(pair(0.01, [0, 1, 2]));
+    expect(low.state).toBe("warn");
+    expect(low.line).toMatch(/0,01 mm < limit 0,05 mm \(⚠ 1 dvojic\)/);
+    expect(verdict(pair(0.2, [])).state).toBe("ok");
   });
 });
 

@@ -9,6 +9,7 @@ import {
   ACadVersion,
   Arc,
   CadDocument,
+  CadSummaryInfo,
   Circle,
   Color,
   DwgWriter,
@@ -195,11 +196,27 @@ function addText(ctx: Ctx, t: DText, H: number) {
  * Výkres (výsledek makeDrawing) → DWG. Souřadnice listu v mm, osa Y se obrací (DWG má počátek vlevo dole).
  * Šrafy a šipky kót jsou čáry/plošky (SOLID), kóty nejsou asociativní objekty DIMENSION.
  */
-export async function drawingToDwg(d: Pick<DrawingResult, "polys" | "texts" | "sheet">, opts: { version?: DwgVersion } = {}): Promise<ArrayBuffer> {
+/**
+ * Vlastnosti souboru DWG (Soubor → Vlastnosti v AutoCADu; sekce SummaryInfo, jen AC1018 / R2004 a novější): název, předmět
+ * „Model r·… · rev. A“, klíčová slova `model=r·… rev=A`, číslo revize = písmeno listu (vlna 22, bod 20 – revize modelu i v DWG).
+ * R2000 sekci nemá – tam nese revizi jen patička razítka (text ve výkresu).
+ */
+export type DwgInfo = { title?: string; subject?: string; keywords?: string; revision?: string };
+
+export async function drawingToDwg(d: Pick<DrawingResult, "polys" | "texts" | "sheet">, opts: { version?: DwgVersion; info?: DwgInfo } = {}): Promise<ArrayBuffer> {
   const version = opts.version ?? "R2018";
   if (!ACAD[version]) throw new Error(tr("Neznámá verze DWG: {0}.", version));
   try {
     const ctx = newDocument(version);
+    if (opts.info && (opts.info.subject || opts.info.title)) {
+      const si = new CadSummaryInfo();
+      si.title = opts.info.title ?? "";
+      si.subject = opts.info.subject ?? "";
+      si.keywords = opts.info.keywords ?? "";
+      si.revisionNumber = opts.info.revision ?? "";
+      si.comments = "Mnastrojarna CAD";
+      ctx.doc.summaryInfo = si;
+    }
     const H = d.sheet.h;
     for (const p of d.polys) addPoly(ctx, p, H);
     for (const t of d.texts) addText(ctx, t, H);

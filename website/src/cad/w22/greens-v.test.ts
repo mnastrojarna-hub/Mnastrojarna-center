@@ -77,6 +77,26 @@ describe("greens V: anotace a pohledy", () => {
     expect(rows.some((r) => r.key === "clearance" || r.key === "cut")).toBe(false);
     expect(rows.map((r) => r.text).join(" ")).not.toMatch(/vůle|zásah/);
   });
+  it("vůle: studie ji sleduje, výsledek ji nemá → „vůle: nezkontrolováno“ ⚠ (ne mlčení, ne hodnota); dvojice bez měření → „nezměřeno“", () => {
+    const d: CadDoc = { ...doc(), motion: { motors: [], duration: 1, steps: 4, clearance: { pairs: [{ a: "x", b: "y" }], limit: 0.1 } } };
+    const none = annotRows({ t: 0, step: 0, steps: 5, motors: [] }, d, { res: { steps: [] } });
+    expect(none.filter((r) => r.key === "clearance")).toEqual([{ key: "clearance", text: "vůle: nezkontrolováno", warn: true }]);
+    // kontrola proběhla, ale dvojici nezměřila (bez tělesa) – žádné číslo, žádné „dodrženo“
+    const res = { steps: [], clearance: { limit: 0.1, moving: false, pairs: [], poses: 5, refined: 0 } };
+    const rows = annotRows({ t: 0, step: 0, steps: 5, motors: [] }, d, { res });
+    expect(rows.filter((r) => r.key === "clearance")).toEqual([{ key: "clearance", text: "vůle x × y: nezměřeno", warn: true }]);
+    // vůle nad limitem: hodnota bez ⚠, ale nikdy ✓ / „dodržen“ (anotace kroku netvrdí nic o celém pohybu)
+    const ok = { steps: [], clearance: { limit: 0.1, moving: false, pairs: [{ a: "x", b: "y", min: { d: 0.2, exact: true, pos: 0, t: 0, motors: [] }, series: [0.2], pts: [null], below: [], unproven: 0 }], poses: 1, refined: 0 } };
+    const r2 = annotRows({ t: 0, step: 0, steps: 1, motors: [] }, d, { res: ok }).filter((r) => r.key === "clearance");
+    expect(r2).toEqual([{ key: "clearance", text: "vůle x × y: 0,2 mm (min. 0,1)", warn: false }]);
+    expect(r2[0].text).not.toMatch(/✓|dodržen|ok/);
+  });
+  it("vůle „pohyblivé“: dvojice nezměřená v kroku se nevypisuje (nic se o ní netvrdí)", () => {
+    const d: CadDoc = { ...doc(), motion: { motors: [], duration: 1, steps: 4, clearance: { pairs: "moving", limit: 0.1 } } };
+    const res = { steps: [], clearance: { limit: 0.1, moving: true, pairs: [{ a: "x", b: "y", min: { d: 0.05, exact: true, pos: 1, t: 0, motors: [] }, series: [null, 0.05], pts: [], below: [1], unproven: 0 }], poses: 2, refined: 0, reach: 1.2 } };
+    expect(annotRows({ t: 0, step: 0, steps: 2, motors: [] }, d, { res }).some((r) => r.key === "clearance")).toBe(false);
+    expect(annotRows({ t: 0, step: 1, steps: 2, motors: [] }, d, { res }).find((r) => r.key === "clearance")).toMatchObject({ text: "⚠ vůle x × y: 0,05 mm (min. 0,1)", warn: true });
+  });
   it("nesplněné vazby / kolize kroku jsou v anotaci ⚠, ne mlčení", () => {
     const rows = annotRows({ t: 0, step: 0, steps: 5, motors: [], stepData: { conflicts: ["m1"], clashes: [{}] } }, doc());
     expect(rows.find((r) => r.key === "flags")).toMatchObject({ warn: true, text: "⚠ kolize · nesplněno 1" });

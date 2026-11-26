@@ -24,8 +24,8 @@ const bb: [Vec3, Vec3] = [
 const shell: ShapeStats = { solids: 0, volume: 0, bbox: bb, shells: 1, closedShells: 1, freeShells: 1, closedFree: 1, freeFaces: 0, free: 6, valid: true };
 /** C3 „Deska B“: kvádr + otevřená plocha */
 const boxFree: ShapeStats = { solids: 1, volume: 24000, bbox: [[-10, -30, 0], [50, 30, 20]], shells: 2, closedShells: 1, freeShells: 1, closedFree: 0, freeFaces: 0, free: 1, valid: true };
-/** C4 „Deska C“: platné těleso */
-const solid: ShapeStats = { solids: 1, volume: 476356.381, bbox: [[-60, -50, 0], [60, 50, 40]], shells: 1, closedShells: 1, freeShells: 0, closedFree: 0, freeFaces: 0, free: 0, valid: true };
+/** C4 „Deska C“: platné těleso – i přesnou kontrolou (22a fáze 2: „věrná kopie“ jen s přesnou kontrolou souboru; míry z jádra ji nesou) */
+const solid: ShapeStats = { solids: 1, volume: 476356.381, bbox: [[-60, -50, 0], [60, 50, 40]], shells: 1, closedShells: 1, freeShells: 0, closedFree: 0, freeFaces: 0, free: 0, valid: true, faces: 9, validExact: true };
 
 describe("exportCheck – „věrná kopie“ jen s objemovým tělesem", () => {
   it("skořepina bez tělesa: model = soubor, přesto ✗ out.no-solid, ne ✓ věrná kopie (dřív ok:true, těles: 0)", () => {

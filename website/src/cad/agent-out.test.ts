@@ -191,8 +191,10 @@ describe("názvy souborů a velikosti", () => {
 describe("kontrola exportu STEP / BREP", () => {
   const box = (x: number, y: number, z: number): [Vec3, Vec3] => [[0, 0, 0], [x, y, z]];
   const model = { solids: 1, volume: 120_000, bbox: box(100, 60, 20) };
-  it("stejný model → ✓ věrná kopie (numerický šum se toleruje)", () => {
-    const c = exportCheck(model, { solids: 1, volume: 120_000.0004, bbox: [[0, 0, -1e-7], [100, 60, 20.000001]] }, "STEP");
+  // vlna 22, 22a fáze 2: „věrná kopie“ jen po přesné kontrole platnosti souboru – míry souboru proto nesou validExact: true
+  it("stejný model a soubor prošel přesnou kontrolou → ✓ věrná kopie (numerický šum se toleruje)", () => {
+    const c = exportCheck(model, { solids: 1, volume: 120_000.0004, bbox: [[0, 0, -1e-7], [100, 60, 20.000001]], valid: true, validExact: true, faces: 6 }, "STEP");
+    expect(c.validCheck).toBe("exact");
     expect(c.ok).toBe(true);
     expect(c.line).toMatch(/^✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 120\s000 mm³ \(rozdíl 0,0000 %\), obálka 100,00 × 60,00 × 20,00 mm/);
     expect(c.line).toMatch(/věrná kopie modelu$/);
@@ -213,6 +215,31 @@ describe("kontrola exportu STEP / BREP", () => {
     const c = exportCheck({ volume: 10, bbox: box(1, 2, 5) }, { volume: 10, bbox: box(1, 2, 5) }, "BREP");
     expect(c.ok).toBe(true);
     expect(c.line).toMatch(/^✓ kontrola BREP: soubor znovu načten jádrem – objem 10,00 mm³/);
+    // platnost souboru se nekontrolovala vůbec → řečeno, žádná „věrná kopie“ (22a)
+    expect(c.line).toMatch(/→ odpovídá modelu; platnost souboru nezkontrolována$/);
+    expect(c.validCheck).toBe("none");
+  });
+  it("22a: soubor po zpětném načtení přesnou kontrolou neprojde (model ano) → ⚠ out.reload-invalid s počtem vadných ploch, nikdy „věrná kopie“", () => {
+    const m = { ...model, valid: true, validExact: true, faces: 19 };
+    const c = exportCheck(m, { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: false, badFaces: 14, faces: 19 }, "STEP");
+    expect(c.ok).toBe(false);
+    expect(c.level).toBe("warn");
+    expect(c.code).toBe("out.reload-invalid");
+    expect(c.validCheck).toBe("exact");
+    expect(c.line).toMatch(/^⚠ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 120\s000 mm³ \(rozdíl 0,0000 %\), obálka 100,00 × 60,00 × 20,00 mm \(odchylka 0,0000 mm\) – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti \(BRepCheck přesnou metodou\): vadných ploch 14 z 19 \(rychlá kontrola: platné; model přesně platný\)/);
+    expect(c.line).not.toMatch(/věrná kopie modelu/);
+    // model je přesně neplatný už sám (⚠ geom.exact-invalid před exportem) → soubor ho kopíruje i s vadou: také ⚠, ne ✓
+    const both = exportCheck({ ...m, validExact: false }, { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: false, badFaces: 3, faces: 19 }, "STEP");
+    expect(both.code).toBe("out.reload-invalid");
+    expect(both.line).toMatch(/vadných ploch 3 z 19 \(rychlá kontrola: platné; model je přesnou kontrolou neplatný také\)/);
+    expect(both.line).not.toMatch(/věrná kopie modelu|model přesně platný/);
+  });
+  it("22a: přesná kontrola souboru neproběhla (ploch nad mez) → ✓ jen „odpovídá modelu; platnost souboru jen rychlou kontrolou …“, ne „věrná kopie“", () => {
+    const c = exportCheck({ ...model, valid: true }, { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: null, faces: 812 }, "STEP");
+    expect(c.ok).toBe(true);
+    expect(c.validCheck).toBe("fast");
+    expect(c.line).toMatch(/→ odpovídá modelu; platnost souboru jen rychlou kontrolou – přesná neproběhla \(812 ploch > 400\)$/);
+    expect(c.line).not.toMatch(/věrná kopie/);
   });
   it("počet těles neznámý není „0 těles“; bez objemu nebo s plochami mimo tělesa ale nikdy „věrná kopie“ (vlna 22, 22c)", () => {
     const zero = exportCheck({ volume: 0, bbox: box(1, 2, 5) }, { volume: 0, bbox: box(1, 2, 5) }, "BREP");

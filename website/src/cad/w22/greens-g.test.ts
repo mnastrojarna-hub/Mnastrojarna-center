@@ -17,7 +17,9 @@
  *                              Geometrie / kontrola / D – ne bez přesné kontroly, ne pro jinou revizi modelu (G2, 22a)
  *   „→ věrná kopie modelu“, F check=ok, ✓ export STEP, objem / hmotnost
  *                              kontrola exportu / řádek F / D – ne bez objemového tělesa (ani když soubor = model), ne s volnými
- *                              plochami vedle tělesa, ne když se soubor nenačetl, ne bez kontroly („bez kontroly“, STL) (G3, 22c)
+ *                              plochami vedle tělesa, ne když se soubor nenačetl, ne bez kontroly („bez kontroly“, STL) (G3, 22c);
+ *                              ne, když soubor po zpětném načtení neprojde přesnou kontrolou platnosti (⚠ out.reload-invalid),
+ *                              ne bez přesné kontroly souboru (ploch nad mez – jen „odpovídá modelu; … jen rychlou kontrolou“) (22a f. 2)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { docStatusText } from "../agent";
@@ -253,5 +255,23 @@ describe("„věrná kopie modelu“, F check=ok, ✓ export STEP – jen s obje
     const solid = await run("nový díl Kostka\nkvádr 10 10 10\nexport step bez kontroly\nexport stl");
     expect(solid.full).not.toMatch(/věrná kopie/); // kontrola se vynechala – „věrná kopie“ by byla nepodložená
     expect(solid.protocol).not.toMatch(/check=/); // bez kontroly není výsledek kontroly – ani ok, ani fail
+  });
+});
+
+describe("„věrná kopie modelu“ – jen po přesné kontrole platnosti souboru (22a, fáze 2)", () => {
+  const run = async (t: string) => finalizeReport(await runReport(new MemoryWorkspace(), t, host(), { lang: "cs" }), { full: true });
+  it("kontrola selhala: závit šroubovicí – soubor po načtení přesnou kontrolou neprojde → ⚠ out.reload-invalid, F check=fail, žádné „věrná kopie“", { timeout: 300_000 }, async () => {
+    const r = await run('nový díl "Šroub B"\nválec 18 30\nzávit M18×1,5 délka 20 v 0 0 10 šroubovice\nexport step');
+    expect(r.full).not.toMatch(/věrná kopie/);
+    expect(r.protocol).toMatch(/check=fail/);
+    expect(r.protocol).not.toMatch(/check=ok/);
+    expect(r.entries.some((e) => e.code === "out.reload-invalid" && e.level === "warn")).toBe(true);
+  });
+  it("kontrola neproběhla nad souborem (ploch nad mez): „věrná kopie“ se nevypíše, řádek řekne „jen rychlou kontrolou“", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [10, 10, 10]];
+    const c = exportCheck({ solids: 1, volume: 1000, bbox: box, valid: true }, { solids: 1, volume: 1000, bbox: box, valid: true, validExact: null, faces: 401 }, "STEP");
+    expect(c.line).not.toMatch(/věrná kopie/);
+    expect(c.line).toMatch(/jen rychlou kontrolou – přesná neproběhla \(401 ploch > 400\)/);
   });
 });

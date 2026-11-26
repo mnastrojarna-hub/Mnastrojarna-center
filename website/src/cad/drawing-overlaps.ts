@@ -17,8 +17,8 @@ import { countCrossings, segmentHitsCircle } from "./drawing-balloons";
 import { tr } from "./i18n";
 import type { Vec2 } from "./types";
 
-export type OverlapKind = "balloon-balloon" | "balloon-text" | "balloon-table" | "balloon-frame" | "balloon-geometry" | "leader-balloon" | "text-text" | "text-geometry" | "table-geometry" | "text-frame";
-export const OVERLAP_KINDS: OverlapKind[] = ["balloon-balloon", "balloon-text", "balloon-table", "balloon-frame", "balloon-geometry", "leader-balloon", "text-text", "text-geometry", "table-geometry", "text-frame"];
+export type OverlapKind = "balloon-balloon" | "balloon-text" | "balloon-table" | "balloon-frame" | "balloon-geometry" | "leader-balloon" | "text-text" | "text-geometry" | "table-geometry" | "text-frame" | "table-frame";
+export const OVERLAP_KINDS: OverlapKind[] = ["balloon-balloon", "balloon-text", "balloon-table", "balloon-frame", "balloon-geometry", "leader-balloon", "text-text", "text-geometry", "table-geometry", "text-frame", "table-frame"];
 export type OverlapHit = { kind: OverlapKind; /** obdélník místa na listu [x0, y0, x1, y1] (mm, y dolů) */ at: [number, number, number, number]; /** co se překrývá (číslo pozice, text) */ what: string };
 export type SheetOverlaps = {
   total: number;
@@ -146,6 +146,27 @@ export function sheetOverlaps(res: Pick<DrawingResult, "polys" | "texts" | "ball
     const g = shrink(t.box, 0.5);
     if (geo.near(g).some(([p, q]) => segInBox(p, q, g))) push("table-geometry", t.box, t.kind);
   }
+  // ---- čáry rámu, které vedou z okraje listu dovnitř rámu (centrovací značky ISO 5457) × tabulky, texty a balónky (bod 17:
+  // značka uprostřed spodního rámu přes záhlaví kusovníku ve sloupcích – dřív „Překryvy na listu: 0“)
+  if (frame) {
+    const fr = frame;
+    const inFrame = (p: Vec2) => p[0] > fr[0] + 0.3 && p[0] < fr[2] - 0.3 && p[1] > fr[1] + 0.3 && p[1] < fr[3] - 0.3;
+    const outside = (p: Vec2) => p[0] < fr[0] - 0.3 || p[0] > fr[2] + 0.3 || p[1] < fr[1] - 0.3 || p[1] > fr[3] + 0.3;
+    const marks: [Vec2, Vec2][] = [];
+    for (const p of res.polys) {
+      if (p.layer !== "frame" || p.fill || p.img) continue;
+      // jeden konec uvnitř rámu, druhý v okraji listu (ne na čáře rámu – čáry tabulek u rámu na ní končí)
+      for (let i = 0; i + 1 < p.pts.length; i++) {
+        const [a, b] = [p.pts[i], p.pts[i + 1]];
+        if ((inFrame(a) && outside(b)) || (inFrame(b) && outside(a))) marks.push([a, b]);
+      }
+    }
+    for (const [p, q] of marks) {
+      for (const t of tables) if (segInBox(p, q, shrink(t.box, 0.3))) push("table-frame", t.box, tr("{0} × značka rámu", t.kind));
+      for (const x of texts) if (segInBox(p, q, shrink(x.box, 0.35))) push("text-frame", x.box, `„${x.t.s}“`);
+      for (const b of balloons) if (segmentHitsCircle(p, q, [b.x, b.y], R(b) - 0.2)) push("balloon-frame", bbox(b), String(b.pos));
+    }
+  }
   const byKind: Partial<Record<OverlapKind, number>> = {};
   for (const h of hits) byKind[h.kind] = (byKind[h.kind] ?? 0) + 1;
   return { total: hits.length, byKind, hits, crossings, balloons: balloons.length };
@@ -164,6 +185,7 @@ export function overlapKindText(k: OverlapKind): string {
     case "text-geometry": return tr("text × geometrie");
     case "table-geometry": return tr("tabulka × pohled");
     case "text-frame": return tr("text × rám");
+    case "table-frame": return tr("tabulka × rám");
   }
 }
 
@@ -173,6 +195,7 @@ export function overlapAdvice(o: SheetOverlaps): string {
   const tips: string[] = [];
   if (k["balloon-balloon"] || k["balloon-text"] || k["balloon-geometry"] || k["leader-balloon"] || k["balloon-table"] || k["balloon-frame"])
     tips.push(tr("rozdělte pozice do pohledů (výkres pozice pohled horní 13-30), posuňte a zamkněte pozici (výkres vygenerované posun pos:7 dx dy · výkres pozice zamknout 7) nebo zvolte větší formát"));
+  if (k["table-frame"]) tips.push(tr("tabulka přes čáru nebo centrovací značku rámu: kusovník nad razítkem / na samostatném listu (výkres kusovník nad | list) nebo jiný formát"));
   if (k["table-geometry"]) tips.push(tr("kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list) nebo větší formát"));
   if (k["text-text"] || k["text-geometry"] || k["text-frame"]) tips.push(tr("posuňte kótu / poznámku (výkres upravit <id> posun=\"dx dy\" | odsazení=…)"));
   return tips.join("; ");

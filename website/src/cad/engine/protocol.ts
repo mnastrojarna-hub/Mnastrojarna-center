@@ -573,9 +573,10 @@ function candidates(r: RunReport, notes: boolean): Item[] {
   sorted.forEach((e, i) => {
     if (e.level === "error") add(PRIO.error, GROUP.error, i, msgLine(e, false));
     else if (e.level === "warn") add(PRIO.warn, GROUP.warn, i, msgLine(e, false));
-    else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
-    // vypnuté úložiště odkazů (vlna 22, bod 16): ℹ se nesmí ztratit v přebytku za výpisy odkazů – priorita jako F / O
+    // vypnuté úložiště odkazů (vlna 22, bod 16): ℹ se nesmí ztratit v přebytku za výpisy odkazů – priorita jako F / O,
+    // i s `notes` (dřív s `notes` spadla mezi ostatní ℹ s nejnižší prioritou a při malém rozpočtu zmizela)
     else if (e.level === "note" && e.code === "share.store-off") add(PRIO.out, GROUP.note, i, msgLine(e, false));
+    else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
     else if (e.level === "note" && e.code && codeDef(e.code)?.short) add(PRIO.shownNote, GROUP.note, i, msgLine(e, false));
     else if (e.level === "measure") {
       const t = measureText(e);

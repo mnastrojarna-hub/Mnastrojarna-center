@@ -8,7 +8,8 @@ import { CadCancelled } from "@/cad/kernel-client";
 import { RunTracker, isRunCancelled } from "@/cad/engine/run-queue";
 import { resetExportChecks } from "@/cad/engine/files";
 import { emptyDoc, type CadDoc, type Feature } from "@/cad/types";
-import { discardTarget, exportRun, type ExportRunDeps, type ExportTarget } from "./export-run";
+import { exportLine, exportState, modelId } from "@/cad/doc-outputs";
+import { discardTarget, exportRun, recordExportJob, type ExportRunDeps, type ExportTarget } from "./export-run";
 
 const doc = (): CadDoc => ({ ...emptyDoc("Deska A"), features: [{ id: "f1", name: "Kvádr", type: "box", size: [20, 10, 10], position: [0, 0, 0] } as unknown as Feature] });
 const stats = { solids: 1, volume: 2000, bbox: [[0, 0, 0], [20, 10, 10]] as [[number, number, number], [number, number, number]] };
@@ -120,6 +121,46 @@ describe("export jako úloha v aplikaci", () => {
     expect(r.data.length).toBeGreaterThan(0);
     expect(writes).toHaveLength(0);
     expect(t.snapshot(t.get(h.id)!)).toMatchObject({ kind: "export", source: "api", state: "done", phases: [{ phase: "model" }, { phase: "convert" }, { phase: "verify" }, { phase: "write" }] });
+  });
+
+  it("kolo 3 (body 12, 22h – falešná zelená): model změněný BĚHEM exportu → záznam nese revizi exportovaného modelu a je zastaralý, ne „odpovídá modelu“", async () => {
+    resetExportChecks();
+    const t = new RunTracker();
+    let cur = doc(); // dokument aplikace – úloha si ho vezme při startu
+    const { d, release } = deps({ hold: true });
+    d.doc = () => cur;
+    const h = exportRun(t, { format: "step", label: "STEP", source: "menu", target: { name: "Deska A.step", handle: handle() } }, d);
+    await tick();
+    await tick();
+    expect(t.get(h.id)!.phase).toBe("convert");
+    // uživatel mezitím změní rozměr kvádru (převod v jádře běží dál nad původním modelem)
+    cur = { ...cur, features: cur.features.map((f) => ({ ...f, size: [20, 10, 25] }) as unknown as Feature) };
+    release();
+    const r = await h.done;
+    const out = recordExportJob(cur, { format: "step", file: "Deska A.step", job: r, id: h.id, ms: t.get(h.id)!.ms });
+    expect(out.changed).toBe(true);
+    expect(out.rec.modelRev).toBe(r.modelRev);
+    expect(out.rec.modelRev).not.toBe(modelId(cur).rev);
+    expect(exportState(out.doc, out.rec)).toBe("stale");
+    expect(exportLine(out.doc, out.rec)).not.toMatch(/odpovídá modelu/);
+    expect(exportLine(out.doc, out.rec)).toMatch(/ZASTARALÝ/);
+  });
+
+  it("kolo 3 (bod 22h): úplný záznam úlohy zůstane v dokumentu – id, stav, čas, fáze, kontrola; nezměněný model = „odpovídá modelu“", async () => {
+    resetExportChecks();
+    const t = new RunTracker();
+    const { d } = deps();
+    const cur = doc();
+    d.doc = () => cur;
+    const h = exportRun(t, { format: "step", label: "STEP", source: "menu", target: { name: "Deska A.step", handle: handle() } }, d);
+    const r = await h.done;
+    const out = recordExportJob(cur, { format: "step", file: "Deska A.step", job: r, id: h.id, ms: 1234 });
+    expect(out.changed).toBe(false);
+    expect(out.rec.job).toMatchObject({ id: h.id, state: "done", ms: 1234, check: { ok: true } });
+    expect(out.rec.job?.phases?.map((p) => p.phase)).toEqual(["model", "convert", "verify", "write"]);
+    expect(out.doc.outputs?.at(-1)?.job?.id).toBe(h.id); // v dokumentu (uloží se s ním), ne jen v relaci
+    const line = exportLine(out.doc, out.rec);
+    expect(line).toMatch(/úloha: dokončeno ⏱ 1,2 s · kontrola ✓ – odpovídá modelu$/);
   });
 
   it("discardTarget: odstraní jen cíl s handle.remove", async () => {

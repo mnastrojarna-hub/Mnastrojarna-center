@@ -97,7 +97,7 @@ export function MotionPlayer({
   const act = activeView(study);
   const annotOn = !study.annot?.off;
   const rows = useMemo(
-    () => (res && cur && annotOn ? annotRows({ t: cur.t, step: cur.i, steps: res.steps.length, motors: cur.motors, stepData: cur as unknown as Record<string, unknown> }, doc, { study: T, view: act?.name, settings: study.annot }) : []),
+    () => (res && cur && annotOn ? annotRows({ t: cur.t, step: cur.i, steps: res.steps.length, motors: cur.motors, stepData: cur as unknown as Record<string, unknown> }, doc, { study: T, view: act?.name, settings: study.annot, res }) : []),
     [res, cur, annotOn, doc, T, act?.name, study.annot],
   );
   const video: MotionVideoSettings = study.video ?? {};

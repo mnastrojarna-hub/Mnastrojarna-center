@@ -118,4 +118,33 @@ describe("značky skupin děr nevedou přes hrany pohledu (fáze 2 – akceptač
     expect(free.anchor).toBeUndefined();
     expect(free.x).toBeGreaterThan(120);
   });
+
+  it("kolo 3: centrovací značka rámu přes záhlaví kusovníku / text / balónek se počítá (dřív „Překryvy na listu: 0“)", () => {
+    const s = base();
+    // A3: značka uprostřed spodního rámu (x = 215) od okraje papíru 5 mm dovnitř rámu; druhý sloupec kusovníku x 50…230 u spodního rámu
+    s.polys.push({ layer: "frame", width: 0.7, pts: [[20, 10], [410, 10], [410, 287], [20, 287], [20, 10]] }, { layer: "frame", width: 0.7, pts: [[215, 297], [215, 282]] });
+    s.tables!.push({ kind: "bom", x: 50, y: 266, w: 180, h: 21 });
+    const o = sheetOverlaps(s);
+    expect(o.byKind["table-frame"]).toBe(1);
+    expect(o.total).toBe(1);
+    expect(overlapIssueText(o)).toMatch(/tabulka × rám 1/);
+    expect(overlapSummary(o)).toBe("1 (tabulka × rám 1)");
+    // značka levého rámu přes text a balónek
+    s.polys.push({ layer: "frame", width: 0.7, pts: [[0, 148.5], [25, 148.5]] });
+    s.texts.push({ x: 23, y: 149.5, s: "Poznámka", size: 3.5, anchor: "start", layer: "text" });
+    withNum(s, balloon(9, 22, 160, [60, 160]));
+    s.polys.push({ layer: "frame", width: 0.7, pts: [[0, 160], [25, 160]] });
+    const o2 = sheetOverlaps(s);
+    expect(o2.byKind["text-frame"]).toBe(1);
+    expect(o2.byKind["balloon-frame"]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("kolo 3: čáry rámu jen v okraji listu (rám, zóny, zkrácená značka) se nepočítají", () => {
+    const s = base();
+    s.polys.push({ layer: "frame", width: 0.7, pts: [[20, 10], [410, 10], [410, 287], [20, 287], [20, 10]] });
+    s.polys.push({ layer: "frame", width: 0.7, pts: [[215, 297], [215, 287]] }); // zkrácená značka (končí na čáře rámu)
+    s.polys.push({ layer: "frame", pts: [[100, 10], [100, 5]] }, { layer: "frame", pts: [[20, 100], [15, 100]] }); // zóny
+    s.tables!.push({ kind: "bom", x: 50, y: 266, w: 180, h: 21 });
+    expect(sheetOverlaps(s).total).toBe(0);
+  });
 });

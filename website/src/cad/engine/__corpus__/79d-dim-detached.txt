@@ -1,0 +1,19 @@
+# vlna 22, bod 20 (výkres): ruční kóty po změně modelu – kóta hrany se přichytí ke zkrácené hraně (na listu 30, zadáno 60),
+# kóta průměru díry, která zmizela, visí podle uložených údajů; místo „✓ list vyhodnocen bez nálezů“ ⚠ drawing.dim-detached
+# s id kót; potvrzení přichycené kóty `výkres upravit aN …`, smazání visící kóty → list zase bez nálezů
+nový díl "Deska A"
+kvádr 60 40 10
+díra 8 skrz v 45 20
+výkres A4
+výkres nepředepsané ISO 2768-mK
+výkres kóta vodorovně pohled přední 0 10 60 10 odsazení 10
+výkres kóta průměr pohled horní střed 45 20 r 4
+#--- run
+# změna modelu po vytvoření kót: deska kratší, díra pryč
+upravit "Kvádr 1" size=30;40;10
+smazat "Díra 1"
+výkres stav
+#--- run
+výkres upravit a1 odsazení=10
+výkres smazat a2
+výkres stav

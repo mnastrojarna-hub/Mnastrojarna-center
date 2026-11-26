@@ -111,7 +111,7 @@ export async function runReport(ws: Workspace, text: string, host: EngineHost, o
   const console = await runInto(ws, text, { ...host, files: rec.sink }, rb, o);
   let docs: RunReport["docs"] = [];
   // zrušený výpočet (tlačítko Zrušit): dokument zůstal beze změny, nic dalšího se nestaví
-  if (!rb.entries.some((e) => e.code === "run.cancelled")) {
+  if (!rb.entries.some((e) => e.code === "run.cancelled" || e.code === "run.cancelled-partial")) {
     docs = (await runSummaries(ws, host.kernel, rb)).docs;
     // pojistka přísného režimu jako CLI (`cli/job.ts strictStop`): ⚠/✗ souhrnů v přísném úseku = STOP
     const hit = rb.stopped ? undefined : rb.strictMode?.hit(rb.entries, null);

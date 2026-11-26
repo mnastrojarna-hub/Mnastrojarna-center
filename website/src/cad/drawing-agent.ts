@@ -10,12 +10,13 @@ import { overlapIssueText, sheetOverlaps } from "./drawing-overlaps";
 import { positionLines } from "./drawing-pos-agent";
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
-import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
+import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
 import { linMeaning, type SmartDims, type SmartReport } from "./drawing-dims";
 import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type RefTolDim, type TolDim } from "./drawing-functional";
 import { hasDrawnSprings, threadsOfDoc } from "./drawing-doc";
 import { gearTableStatus } from "./drawing-geartable";
 import { gearTablesOf } from "./gears/data";
+import { attachLabel, dimAttachIssue, settleDim, userDimAttach } from "./drawing-dim-attach";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { dimCheckDetail, dimCheckLine } from "./dim-complete";
@@ -980,7 +981,9 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const anns = sheet().annotations;
       const i = resolveOne(res.views, anns, cmd.target, o);
       const before = annLabel(res.views, anns[i]);
-      const next = patchAnn(anns[i], cmd.patch, res.views.find((v) => v.key === anns[i].view)?.s ?? 1);
+      // úprava ruční kóty = potvrzení: kóta přichycená ke změněné geometrii se uloží s nynější geometrií (bod 20)
+      const cur = anns[i].type === "dim" && !anns[i].auto ? settleDim(res.views, anns[i] as DimAnn) : anns[i];
+      const next = patchAnn(cur, cmd.patch, res.views.find((v) => v.key === anns[i].view)?.s ?? 1);
       put({ ...sheet(), annotations: anns.map((a, k) => (k === i ? next : a)) });
       const off = cmd.patch.offset !== undefined ? tr(" (odsazení {0})", fmtN(cmd.patch.offset)) : cmd.patch.shift ? tr(" (posun {0} {1})", fmtN(cmd.patch.shift[0]), fmtN(cmd.patch.shift[1])) : "";
       log.push(tr("✓ upraveno {0}: {1} → {2}{3}", shortId(i), before, annLabel(res.views, next), off));
@@ -1147,10 +1150,17 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   if (extra.length) L.push(tr("Volby: {0}", extra.join(" · ")));
   const dims = anns.filter((a) => a.type === "dim" || a.type === "callout");
   L.push(tr("Kóty a popisy ({0}, z toho vygenerovaných {1}):", dims.length, dims.filter((a) => a.auto).length));
+  // ruční kóty po změně modelu (bod 20): hodnota, která je na listu (přichycená geometrie), a značka ⚠ u kóty bez geometrie
+  const attach = new Map(userDimAttach(views, anns).map((x) => [x.ann, x]));
+  const dimText = (a: DrawingAnnotation) => {
+    const x = attach.get(a as DimAnn);
+    if (!x) return annLabel(views, a) + (a.auto ? "" : " *");
+    return `${attachLabel(x)} * ⚠`;
+  };
   const byView = new Map<string, string[]>();
-  for (const a of dims) byView.set(a.view, [...(byView.get(a.view) ?? []), annLabel(views, a) + (a.auto ? "" : " *")]);
+  for (const a of dims) byView.set(a.view, [...(byView.get(a.view) ?? []), dimText(a)]);
   for (const [k, list] of byView) L.push(`  ${VIEW_NAME(k, o)}: ${list.join(" · ")}`);
-  if (dims.some((a) => !a.auto)) L.push(tr("  (* = vlastní kóta uživatele)"));
+  if (dims.some((a) => !a.auto)) L.push(attach.size ? tr("  (* = vlastní kóta uživatele · ⚠ = po změně modelu neodpovídá geometrii – viz hlášení níže)") : tr("  (* = vlastní kóta uživatele)"));
   const others = anns.filter((a) => a.type !== "dim" && a.type !== "callout");
   if (others.length) L.push(tr("Poznámky a značky: {0}", others.map((a) => annLabel(views, a)).join(" · ")));
   if (anns.length) L.push(tr("Id (výkres upravit / smazat / značka na <id>): {0}", annList(views, anns, o)));
@@ -1199,6 +1209,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
   const sh = doc.drawings![idx];
   if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });
+  // ruční kóty bez geometrie / přichycené ke změněné geometrii → ⚠ drawing.dim-detached (bod 20)
+  const det = dimAttachIssue(views, anns, o, sh.id);
+  if (det) issues.push(det);
   // překryvy na listu → ⚠ drawing.overlap s počtem a radou na řádku `výkres stav` (bod 17)
   const ovText = overlapIssueText(ov);
   if (ovText) issues.push({ level: "warn", code: "drawing.overlap", kind: "sheet-overlap", text: ovText, sheetId: sh.id, data: { total: ov.total, byKind: ov.byKind, crossings: ov.crossings } });

@@ -237,6 +237,25 @@ async function v1(b) {
     }
   } else ok(false, 'PNG: soubor nestažen');
 
+  // ── bod 14 (fáze 2): vůle v anotaci ze skutečné kontroly vůle (dřív adaptér četl step.clearance, které nikdo nezapisoval) ──
+  // Přidržovač × Deska A: vůle = hodnota ZDVIH (57,5 → 27,15 mm), limit 50 mm → krok 0 bez ⚠, poslední krok ⚠ pod limitem
+  log = await run(['pohyb vůle "Přidržovač" "Deska A" min 50', 'pohyb spustit'].join('\n'));
+  ok(!/^✗/m.test(log), 'pohyb vůle … min 50 + přepočet: ' + (log.split('\n').find((l) => /Vůle .*nejmenší/.test(l)) || '').trim());
+  await p.waitForFunction(() => document.querySelector('[data-motion-player]')?.getAttribute('data-player-state') === 'ok', null, { timeout: 120000 }).catch(() => {});
+  const hudCl = async (k) => {
+    await p.locator('[data-player-scrub]').fill(String(k));
+    await p.waitForTimeout(150);
+    return (await p.locator('[data-hud-row="clearance"]').allInnerTexts().catch(() => [])).join(' | ');
+  };
+  const cl0 = await hudCl(0);
+  ok(/^vůle Přidržovač × Deska A: 57,5 mm \(min\. 50\)$/.test(cl0), `anotace kroku 0: vůle z kontroly vůle bez ⚠ („${cl0}“)`);
+  const clN = await hudCl(112);
+  ok(/^⚠ vůle Přidržovač × Deska A: 27,15 mm \(min\. 50\)$/.test(clN), `anotace kroku 112: ⚠ vůle pod limitem („${clN}“)`);
+  const kN = await run('pohyb krok 112');
+  ok(/vůle „Přidržovač“ × „Deska A“: 27,15 mm ⚠ pod limitem 50 mm/.test(kN), 'stejná hodnota v textu `pohyb krok 112`: ' + (kN.split('\n').find((l) => /vůle/.test(l)) || '').trim());
+  // vůli pak zase vypnout – zbytek scénáře beze změny
+  await run('pohyb vůle smazat');
+
   // ── API: plán videa ──
   const api = await p.evaluate(() => window.mncad.motion().then((m) => m.video));
   ok(api && Math.abs(api.seconds - 0.6667) < 0.001 && api.frames === 20, `window.mncad.motion().video = ${JSON.stringify(api)}`);

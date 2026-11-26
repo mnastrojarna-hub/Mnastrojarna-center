@@ -132,9 +132,38 @@ describe("bod 20 (výkresy a výstupy) – engine se skutečným jádrem", async
     expect(c).toMatch(/✓ kopie dílů v sestavě obnoveny z dílů \(sestava obnovit vše\)/);
     expect(c).toMatch(/✓ list „List 1“ přepočten z modelu r·\w{6}/);
     expect(c).toMatch(/1 \| Deska A \| DA-001 \| 1 \| 1\.2379 \|/);
-    // číslo / materiál geometrii nemění: revize modelu sestavy zůstala, vydaný list sestavy odpovídá modelu (známé omezení:
-    // údaje kusovníku na vydaném listu se změnily, hlídá je D1 ⚠ asm.stale-copy, ne revize modelu)
-    expect(c).toMatch(/Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu r·\w{6}/);
+    // číslo / materiál geometrii nemění (revize modelu r·… zůstala), ale kusovník vydaného listu sestavy ano → vydaný list je
+    // zastaralý a nová revize je úkol pro člověka (vlna 22, bod 20 – kolo 3; dřív „Zbývá: nic … odpovídají modelu“ = falešně zelené)
+    expect(c).not.toMatch(/Zbývá: nic/);
+    expect(c).toMatch(/Zbývá udělat ručně \(1\) – program to sám neudělá:\n  ⚠ list „List 1“ rev\. A – vydán z modelu (r·\w{6}), model je teď \1 se změněnými údaji dílu \(název, číslo, materiál, druh položky\) → výkres vydat B/);
+    expect(codes(r, "drawing.stale").length).toBeGreaterThan(0);
+  }, 240_000);
+
+  it("kolo 3: změna jen materiálu / čísla dílu zneplatní vydaný list a export výkresu / CSV kusovníku, ne STEP (bod 20)", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf();
+    const r1 = await runScript(ws, `${PART}\nvýkres vydat\nexport step\nvýkres export pdf`, host);
+    expect(codes(r1, "drawing.stale")).toEqual([]);
+    const rev = modelId(docOf(ws, "Deska A")).rev;
+    // před opravou: geometrie stejná → „Vydání: rev. A … – odpovídá modelu“ i s jiným materiálem v razítku (falešně zelené)
+    const r2 = await runReport(ws, 'záložka "Deska A"\nmateriál 1.2379\nvýkres stav\nexporty', host);
+    expect(modelId(docOf(ws, "Deska A")).rev).toBe(rev);
+    expect(r2.console).not.toMatch(/Vydání: rev\. A .* – odpovídá modelu/);
+    expect(r2.console).toMatch(new RegExp(`⚠ Vydání: rev\\. A z modelu ${rev} \\(.+\\) – model je teď ${rev} se změněnými údaji dílu \\(název, číslo, materiál, druh položky\\): list je ZASTARALÝ – vydejte novou revizi: výkres vydat B`));
+    expect(r2.console).toMatch(/PDF „Deska_A_vykres\.pdf“ .* ZASTARALÝ: model je teď r·\w{6} se změněnými údaji dílu/);
+    // STEP nese jen geometrii – materiál ho nezneplatní
+    expect(r2.console).toMatch(/STEP „Deska_A\.step“ .* – odpovídá modelu/);
+    expect(r2.docs.find((x) => x.name === "Deska A")!.stale).toEqual(expect.arrayContaining(["drawing", "export"]));
+    // nové vydání: popis „změna údajů dílu“, pak list i stav zase odpovídají
+    const r3 = await runReport(ws, 'záložka "Deska A"\nvýkres vydat\nvýkres stav', host);
+    expect(r3.console).toMatch(/do tabulky revizí přidána revize B „změna údajů dílu \(název, číslo, materiál, druh položky\)“/);
+    expect(r3.console).toMatch(/Vydání: rev\. B z modelu r·\w{6} \(.+\) – odpovídá modelu/);
+    // starší záznam vydání bez otisku údajů (dokument z dřívější verze) se po upgradu nehlásí jako zastaralý
+    const d = docOf(ws, "Deska A");
+    const { data: _d, ...old } = d.drawings![0].issued!;
+    void _d;
+    const { sheetState } = await import("../doc-outputs");
+    expect(sheetState(d, { issued: old })).toBe("current");
   }, 240_000);
 
   it("razítko a metadata souborů nesou revizi modelu; skript z dokumentu zapíše výkres vydat A", async () => {

@@ -15,7 +15,7 @@ Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „St
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Střižník“: ΔZ −20 mm
  stojí: 1 („Vodítko“)
-Kolize: žádný průnik v 11 polohách
+Kolize: žádný průnik v 11 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
  kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
 Vazby splněny ve všech krocích
 Vůle: „Střižník“ × „Vodítko“ · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
@@ -55,7 +55,7 @@ Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „St
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Střižník“: ΔZ −20 mm
  stojí: 1 („Vodítko“)
-Kolize: žádný průnik v 11 polohách
+Kolize: žádný průnik v 11 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
  kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
 Vazby splněny ve všech krocích
 ✓ Kvádr 1 (box) · přidáno 16000 mm³ · těleso platné
@@ -68,4 +68,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 10 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 18,35 cm³ · hmotnost Σ 0,144 kg
 Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
-Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle nekontrolována (podrobně pohyb stav)

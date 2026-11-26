@@ -22,6 +22,7 @@ import { tr } from "./i18n";
 import { auxInfo, countOf, expectedDims, presentDims, type DimKind } from "./dim-check";
 import { placementOf } from "./placements";
 import { threadByName, threadLabel } from "./defaults";
+import { modelRev } from "./engine/result-key";
 import type { CadDoc, DrawingAnnotation, Feature, FunctionalMark, Vec2, Vec3 } from "./types";
 
 /* ───────────────────────── typy ───────────────────────── */
@@ -87,6 +88,8 @@ export type DimCompleteResult = {
     missing: DimReq[];
     /** přesná tolerance na rozměru, který není funkční (přetolerování – ℹ) */
     over: { ann: string; label: string; tol: string }[];
+    /** označené plochy / základny ze starší revize modelu – nekontrolují se (nezkontrolováno, označit znovu) */
+    stale?: number;
   };
 };
 
@@ -601,21 +604,39 @@ const normTol = (s: string) => s.replace(/\s+/g, "").replace(/,/g, ".").replace(
 /* ───────────────────────── funkční prvky a základny ───────────────────────── */
 
 /** Základny vyznačené v modelu: písmeno, osa a souřadnice roviny (jen rovinné plochy kolmé na osu souřadnic). */
-export function datumsOf(marks: readonly FunctionalMark[] | undefined): { label: string; k: 0 | 1 | 2; c: number }[] {
+export function datumsOf(marks: readonly FunctionalMark[] | undefined, rev?: string): { label: string; k: 0 | 1 | 2; c: number }[] {
   return (marks ?? []).flatMap((m) => {
-    if (m.kind !== "datum" || m.geom?.t !== "plane") return [];
+    if (m.kind !== "datum" || m.geom?.t !== "plane" || markStale(m, rev)) return [];
     const ax = axisOf(m.geom.n);
     return ax ? [{ label: m.label ?? "?", k: ax.k, c: m.geom.c[ax.k] }] : [];
   });
 }
 
+/** označená plocha (ne prvek historie) ze starší revize modelu – snímek geometrie pro nynější model neplatí */
+const markStale = (m: FunctionalMark, rev: string | undefined): boolean => !m.feature && !!m.face && !!m.rev && !!rev && m.rev !== rev;
+const staleMarkText = (what: string, m: FunctionalMark, rev: string): string =>
+  tr("{0}: plocha F{1} označena na modelu {2}, model je teď {3} – označte ji znovu ({4})", what, (m.face?.index ?? 0) + 1, m.rev ?? "?", rev, m.kind === "datum" ? tr("základna {0} F{1}", m.label ?? "?", (m.face?.index ?? 0) + 1) : tr("funkční F{0}", (m.face?.index ?? 0) + 1) + (m.tol ? ` ${m.tol}` : ""));
+
 /** Funkční prvky do požadavků: prvek historie (díra, kapsa…) → jeho položky; rovinná plocha → poloha; válcová plocha → díra / Ø. */
-function applyMarks(doc: CadDoc, reqs: DimReq[], unchecked: string[]): number {
+function applyMarks(doc: CadDoc, reqs: DimReq[], unchecked: string[]): { n: number; stale: number } {
   const marks = (doc.functional ?? []).filter((m) => m.kind === "functional");
-  const datums = datumsOf(doc.functional);
+  const rev = doc.functional?.some((m) => m.rev) ? modelRev(doc) : undefined;
+  const datums = datumsOf(doc.functional, rev);
+  let stale = 0;
+  for (const m of doc.functional ?? [])
+    if (m.kind === "datum" && markStale(m, rev)) {
+      unchecked.push(staleMarkText(tr("základna {0}", m.label ?? "?"), m, rev!));
+      stale++;
+    }
   let n = 0;
   for (const m of marks) {
     const label = markLabel(doc, m);
+    // plocha označená na jiné revizi modelu: snímek geometrie neplatí – nekontrolovat podle něj (nezkontrolováno, označit znovu)
+    if (markStale(m, rev)) {
+      unchecked.push(staleMarkText(tr("funkční {0}", label), m, rev!));
+      stale++;
+      continue;
+    }
     let fid = m.feature;
     if (!fid && m.geom?.t === "cyl") {
       // válcová plocha = díra / odebraný válec se stejnou osou a poloměrem
@@ -658,7 +679,7 @@ function applyMarks(doc: CadDoc, reqs: DimReq[], unchecked: string[]): number {
     }
     unchecked.push(tr("funkční {0}: plochu nejde zkontrolovat (tvar)", label));
   }
-  return n;
+  return { n, stale };
 }
 
 /** popisek značky: „F7“, „Díra 1“, „základna A (F3)“ */
@@ -690,7 +711,8 @@ export function checkSheet(inp: SheetInput): DimCompleteResult {
   const bbox = inp.bbox ?? viewsBbox(inp.views);
   const baked = inp.dimensions === "auto" || inp.dimensions === "overall";
   const { reqs, aux, unchecked } = requirements(doc, bbox);
-  const marked = applyMarks(doc, reqs, unchecked) + (inp.dimFunctional?.length ?? 0);
+  const am = applyMarks(doc, reqs, unchecked);
+  const marked = am.n + (inp.dimFunctional?.length ?? 0);
   // texty kót listu (i vygenerované kóty mimo poznámky listu – celkové rozměry, popisy) pro položky párované hodnotou
   const facts = sheetFacts(inp.views, inp.annotations, inp.holeRows ?? [], inp.texts ?? []);
   const used = new Map<number, string[]>();
@@ -737,7 +759,7 @@ export function checkSheet(inp: SheetInput): DimCompleteResult {
     aux,
     unchecked: [...new Set(unchecked)],
     baked,
-    tol: { marked, ok: tolOk, missing: tolMissing, over },
+    tol: { marked, ok: tolOk, missing: tolMissing, over, ...(am.stale ? { stale: am.stale } : {}) },
   };
 }
 
@@ -765,7 +787,8 @@ export function dimCheckLine(r: DimCompleteResult): string {
   if (r.tol.marked) {
     s += tr(" · funkční prvky: tolerance {0}/{1}", r.tol.ok, r.tol.ok + r.tol.missing.length);
     if (r.tol.over.length) s += tr(" · přesná tolerance na nefunkčním rozměru: {0}", r.tol.over.map((o) => `${o.label} ${o.tol}`).join(", "));
-  } else s += tr(" · tolerance neověřeny (funkční prvky nevyznačeny)");
+  } else if (r.tol.stale) s += tr(" · tolerance neověřeny (funkční prvky označené na starší revizi modelu – označte je znovu)");
+  else s += tr(" · tolerance neověřeny (funkční prvky nevyznačeny)");
   if (r.unchecked.length) s += tr(" · nezkontrolováno: {0}", listText(r.unchecked, 4));
   return s;
 }

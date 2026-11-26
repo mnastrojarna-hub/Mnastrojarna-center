@@ -6,6 +6,7 @@
  */
 import { tr } from "./i18n";
 import { threadByName, threadLabel } from "./defaults";
+import { threadOfFeature } from "./thread-spec";
 import { holeDrillD, holeHeadOf } from "./hole-spec";
 import { placementOf } from "./placements";
 import type { CadDoc, Feature, Vec3 } from "./types";
@@ -231,7 +232,10 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
       case "ext": {
         // tažení po šroubovici s profilem závitu: závit M(velký Ø)×stoupání
         const d = f.data ?? {};
-        if (f.ext === "surf.helixSweep" && d.profile === "thread60" && typeof d.radius === "number" && typeof d.pitch === "number") {
+        // katalogové označení (thread=M18×1,5) má přednost: poloměr / hloubku / stoupání doplní až stavba (22d)
+        const tv = f.ext === "surf.helixSweep" ? threadOfFeature(f) : null;
+        if (tv) push(out, "thread", tv.t.d, `${threadLabel(tv.designation)}${tv.length > 0 ? ` délka ${fmt(tv.length)}` : ""}`, src);
+        else if (f.ext === "surf.helixSweep" && d.profile === "thread60" && typeof d.radius === "number" && typeof d.pitch === "number") {
           const h = typeof d.depth === "number" ? d.depth : 0;
           const internal = d.side === "internal";
           const removing = d.mode === "cut" || d.mode === "intersect";

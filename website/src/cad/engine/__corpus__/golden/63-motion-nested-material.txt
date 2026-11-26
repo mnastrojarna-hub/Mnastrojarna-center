@@ -31,7 +31,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −15 mm
  stojí: 2 („Deska A“, „Skupina“)
-Kolize: žádný průnik v 6 polohách
+Kolize: žádný průnik v 6 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
  kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 
@@ -41,7 +41,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 3 komponent (4 dílů po rozložení podsestav) · obálka 60 × 40 × 55 mm · objem Σ 25,63 cm³ · hmotnost Σ 0,201 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle nekontrolována (podrobně pohyb stav)
 === run 3 ===
 ✓ úprava podsestavy „Skupina“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 ✓ komponenta „Doraz“: poloha [40; 10; 22]

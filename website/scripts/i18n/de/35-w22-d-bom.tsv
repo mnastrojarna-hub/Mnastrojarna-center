@@ -13,7 +13,7 @@ bez čísla	ohne Nummer
 bez výkresu	ohne Zeichnung
 CSV (oddělovač ;, desetinná čárka):	CSV (Trennzeichen ;, Dezimalkomma):
 CSV (oddělovač ;, desetinná tečka):	CSV (Trennzeichen ;, Dezimalpunkt):
-díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit "{0}"	Teil „{0}“ wurde in Zeile {1} als Kopie in die Baugruppe eingefügt – die Änderung ({2}) gelangt nicht von selbst in die Baugruppe; in der Baugruppe: baugruppe aktualisieren "{0}"
+díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – v sestavě: sestava obnovit "{0}"; změna ({2}) se do sestavy sama nepromítne	Teil „{0}“ wurde in Zeile {1} als Kopie in die Baugruppe eingefügt – in der Baugruppe: baugruppe aktualisieren "{0}"; die Änderung ({2}) gelangt nicht von selbst in die Baugruppe
 díl „{0}“ není otevřený v záložce	Teil „{0}“ ist in keinem Tab geöffnet
 díl jen z importu	Teil nur aus Import
 díl nemá označení materiálu – jen třídu (materiál 1.2379 v dílu)	das Teil hat keine Werkstoffbezeichnung – nur eine Klasse (werkstoff 1.2379 im Teil)
@@ -36,8 +36,8 @@ katalog	Katalog
 katalog „{0}“	Katalog „{0}“
 katalog {0}	Katalog {0}
 Katalogové číslo	Katalognummer
-komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit {3}	Komponente „{0}“ ist älter als das Teil „{1}“ im Tab ({2}) – Stückliste und Zeichnung zeigen die Daten vom Einfügen; aktualisieren: baugruppe aktualisieren {3}
-komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje kopie v sestavě; převzít z dílu: sestava obnovit {3}	Komponente „{0}“ weicht vom Teil „{1}“ im Tab ab ({2}) – Stückliste und Zeichnung zeigen die Daten der Kopie in der Baugruppe; vom Teil übernehmen: baugruppe aktualisieren {3}
+komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – obnovit: sestava obnovit {3}; kusovník a výkres ukazují údaje z vložení	Komponente „{0}“ ist älter als das Teil „{1}“ im Tab ({2}) – aktualisieren: baugruppe aktualisieren {3}; Stückliste und Zeichnung zeigen die Daten vom Einfügen
+komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – převzít z dílu: sestava obnovit {3}; kusovník a výkres ukazují údaje kopie v sestavě	Komponente „{0}“ weicht vom Teil „{1}“ im Tab ab ({2}) – vom Teil übernehmen: baugruppe aktualisieren {3}; Stückliste und Zeichnung zeigen die Daten der Kopie in der Baugruppe
 Kopie byla upravena i v sestavě ({0}) – obnova tuto úpravu přepíše.	Die Kopie wurde auch in der Baugruppe geändert ({0}) – die Aktualisierung überschreibt diese Änderung.
 Kopie je starší než díl „{0}“ v záložce: {1}.	Die Kopie ist älter als das Teil „{0}“ im Tab: {1}.
 Kopie v sestavě se liší od dílu „{0}“ v záložce: {1}.	Die Kopie in der Baugruppe weicht vom Teil „{0}“ im Tab ab: {1}.
@@ -74,7 +74,7 @@ výrobce „{0}“	Hersteller „{0}“
 výrobce {0}	Hersteller {0}
 z knihovny normálií	aus der Normteilbibliothek
 normálie	Normteil
-díl „{0}“ je v sestavě „{1}“ jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit "{0}"	Teil „{0}“ ist in der Baugruppe „{1}“ als Kopie – die Änderung ({2}) gelangt nicht von selbst in die Baugruppe; in der Baugruppe: baugruppe aktualisieren "{0}"
+díl „{0}“ je v sestavě „{1}“ jako kopie – v sestavě: sestava obnovit "{0}"; změna ({2}) se do sestavy sama nepromítne	Teil „{0}“ ist in der Baugruppe „{1}“ als Kopie – in der Baugruppe: baugruppe aktualisieren "{0}"; die Änderung ({2}) gelangt nicht von selbst in die Baugruppe
 druh položky kusovníku: vyráběný díl (výkres, číslo, označení materiálu), normálie (norma, rozměr, pevnostní třída) nebo nakupovaný díl (katalogové číslo, výrobce); výchozí: normálie z knihovny = normálie, importovaný STEP bez prvků = nakupovaný, vlastní díl = vyráběný; kusovník je v oddílech podle druhu a výkresy se přibalují jen u vyráběných dílů	Art einer Stücklistenposition: Fertigungsteil (Zeichnung, Nummer, Werkstoffbezeichnung), Normteil (Norm, Größe, Festigkeitsklasse) oder Kaufteil (Katalognummer, Hersteller); Standard: Normteil aus der Bibliothek = Normteil, importiertes STEP ohne Features = Kaufteil, eigenes Teil = Fertigungsteil; die Stückliste ist nach Art gegliedert und Zeichnungen werden nur für Fertigungsteile beigelegt
 komponenta je kopie dílu: převezme díl ze záložky (geometrie, číslo, materiál, druh, výkresy), poloha, vazby a přezdívka zůstanou; „údaje“ = jen číslo, materiál a druh; kusovník, list sestavy a stav hlásí ⚠ asm.stale-copy, dokud je kopie starší než díl	eine Komponente ist eine Kopie des Teils: übernimmt das Teil aus seinem Tab (Geometrie, Nummer, Werkstoff, Art, Zeichnungen), Lage, Verknüpfungen und Spitzname bleiben; „daten“ = nur Nummer, Werkstoff und Art; Stückliste, Baugruppenblatt und Status melden ⚠ asm.stale-copy, solange die Kopie älter als das Teil ist
 #!dynamic
