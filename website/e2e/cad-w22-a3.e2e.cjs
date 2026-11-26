@@ -97,7 +97,9 @@ async function runs(p, tag) {
 async function exports(p, tag) {
   // fáze 2, kolo 4 (vědomá úprava, balík g – 22a): model závitu šroubovicí je přesně platný, ale soubor STEP po zpětném načtení
   // výchozí čtečkou přesnou kontrolou NEPROJDE (čtečka spočte tolerance hran menší, než je skutečná odchylka; po přepočtu
-  // tolerancí projde). Pravdivý výsledek kontroly je proto ⚠ out.reload-invalid, ne ✓ – stejně jako cad-w22-g 7c a
+  // tolerancí projde s tolerancí do meze = největší tolerance modelu, číslo v řádku – oponent kolo 4: bez meze by „geometrie
+  // souboru odpovídá“ prošlo i se souborem, jehož křivky jsou 0,1 mm od ploch). Pravdivý výsledek kontroly je proto
+  // ⚠ out.reload-invalid, ne ✓ – stejně jako cad-w22-g 7c a
   // w22/thread-g2-engine.test.ts. Dřív test čekal ✓ (napsán před přesnou kontrolou souboru z balíku g). Cesta ✓ „věrná kopie“
   // se ověřuje níže na modelu, jehož soubor přesnou kontrolou projde (válec s průchozí dírou).
   await p.evaluate((t) => window.mncad.run(t), 'nový díl "Export K"\nválec 30 20\ndíra 8 skrz v 0 0 20');
@@ -105,7 +107,7 @@ async function exports(p, tag) {
   ok(rk.job && rk.job.state === 'done' && rk.check?.ok === true && /→ věrná kopie modelu$/.test(rk.check.text) && !rk.warning, `${tag}22h: exportFile modelu bez aproximovaných hran – kontrola ✓ věrná kopie (${(rk.check?.text || '').slice(0, 160)})`);
   await p.evaluate((t) => window.mncad.run(t), THREAD('Export A', 12));
   const r = await p.evaluate(() => window.mncad.exportFile('step'));
-  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(r.check.text) && /model přesně platný/.test(r.check.text) && /po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde/.test(r.check.text) && !/věrná kopie/.test(r.check.text) && /out\.reload-invalid|NEPROJDE/.test(r.warning || '') && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile závitu šroubovicí = úloha s fázemi, kontrola ⚠ (soubor po načtení přesně neplatný, model platný – ne ✓), revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')}; ${(r.check?.text || '').slice(0, 220)})`);
+  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(r.check.text) && /model přesně platný/.test(r.check.text) && /po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde s tolerancí nejvýše [\d,]+e-\d mm \(mez [\d,]+e-\d mm = největší tolerance modelu\) → geometrie souboru odpovídá/.test(r.check.text) && !/věrná kopie/.test(r.check.text) && /out\.reload-invalid|NEPROJDE/.test(r.warning || '') && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile závitu šroubovicí = úloha s fázemi, kontrola ⚠ (soubor po načtení přesně neplatný, model platný – ne ✓), revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')}; ${(r.check?.text || '').slice(0, 220)})`);
   // zrušení exportu přes API: model se nejdřív změní (30 závitů – export pak trvá sekundy), úloha exportu se počká ve frontě
   // a zruší se, až v seznamu Exporty skutečně je (fáze 2: dřív pevných 200 ms a „upravit“ na neexistující název prvku –
   // export nezměněného modelu doběhl dřív, než přišlo zrušení)

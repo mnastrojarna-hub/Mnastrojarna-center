@@ -3,7 +3,7 @@
 import { softLimitsText, softStatusText } from "@/cad/soft-view";
 import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
-import { geometryText } from "@/cad/feature-levels";
+import { geometryText, treeStatus } from "@/cad/feature-levels";
 import { ValidityChip } from "./validity-chip";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -211,6 +211,8 @@ export function CadApp() {
   const [planePick, setPlanePick] = useState(false);
   const [tab, setTab] = useState<Tab>("create");
   const [result, setResult] = useState<BuildResult | null>(null);
+  /** stav prvků z poslední stavby CELÉHO dokumentu (dokument + otisk geometrie) – strom při úpravě se stavbou po prvek (feature-levels.ts treeStatus) */
+  const [fullStatus, setFullStatus] = useState<{ key: string; geo: string; status: BuildResult["status"] } | null>(null);
   const [core, setCore] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -1214,6 +1216,7 @@ export function CadApp() {
       if (owner === docId.current && !queued.current) {
         resultFor.current = { key: owner, geo: geoKey(d) };
         setResult(res);
+        if (resultFor.current.geo === geoKey(docRef.current)) setFullStatus({ key: owner, geo: resultFor.current.geo, status: res.status }); // stavba celého dokumentu (ne pohledu „po prvek“)
         run.end("done");
       } else run.end("superseded");
       setStale(false);
@@ -1251,6 +1254,11 @@ export function CadApp() {
       }
     }
   }, []);
+  /** stav prvků pro strom: při úpravě se stavbou po prvek doplněný z platné celé stavby téže geometrie (feature-levels.ts treeStatus) */
+  const treeSt = useMemo(() => {
+    if (!(rollback || sketchId)) return result?.status;
+    return treeStatus(result?.status, fullStatus && fullStatus.key === docId.current ? fullStatus : null, geoKey(doc), true);
+  }, [result, fullStatus, doc, rollback, sketchId]);
   restoreKernelRef.current = () => {
     if (buildDocView.kind !== "assembly") void runBuild(buildDocView);
   };
@@ -4007,7 +4015,7 @@ export function CadApp() {
               <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} />
               </>
             ) : (
-              <Manager doc={doc} status={result?.status} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
+              <Manager doc={doc} status={treeSt} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
             )}
           </aside>
 

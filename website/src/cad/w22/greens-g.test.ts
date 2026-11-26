@@ -20,6 +20,9 @@
  *                              plochami vedle tělesa, ne když se soubor nenačetl, ne bez kontroly („bez kontroly“, STL) (G3, 22c);
  *                              ne, když soubor po zpětném načtení neprojde přesnou kontrolou platnosti (⚠ out.reload-invalid),
  *                              ne bez přesné kontroly souboru (ploch nad mez – jen „odpovídá modelu; … jen rychlou kontrolou“) (22a f. 2)
+ *   „→ geometrie souboru odpovídá“ (příčina ⚠ out.reload-invalid)
+ *                              kontrola exportu – jen s tolerancí po přepočtu do meze (číslo v řádku), ne bez změřené tolerance,
+ *                              ne s tolerancí nad mezí, ne když soubor neprojde ani po přepočtu (22a f. 2, kolo 4)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { docStatusText } from "../agent";
@@ -276,6 +279,19 @@ describe("„věrná kopie modelu“ – jen po přesné kontrole platnosti soub
     expect(c.code).toBe("out.reload-invalid");
     expect(c.line.startsWith("⚠")).toBe(true);
     expect(c.line).not.toMatch(/věrná kopie|^✓/);
+  });
+  it("kolo 4 (oponent): „geometrie souboru odpovídá“ jen s tolerancí po přepočtu do meze – ne s tolerancí 0,2 mm, ne bez změřené tolerance, ne když soubor neprojde ani po přepočtu", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [20, 20, 30]];
+    const m = { solids: 1, volume: 8860, bbox: box, valid: true, validExact: true, maxTol: 6.3e-5 };
+    const f = { solids: 1, volume: 8860, bbox: box, valid: true, validExact: false, badFaces: 3, faces: 7 };
+    const ok = exportCheck(m, { ...f, retolValid: true, retolMaxTol: 6e-7 }, "STEP");
+    expect(ok.line).toMatch(/s tolerancí nejvýše 6,0e-7 mm \(mez 6,3e-5 mm = největší tolerance modelu\) → geometrie souboru odpovídá/);
+    for (const g of [{ retolValid: true, retolMaxTol: 0.2 }, { retolValid: true }, { retolValid: false, retolBadFaces: 1 }, { retolValid: false, retolBadFaces: 1, devMax: 6e-5, devOver: 0 }]) {
+      const c = exportCheck({ ...m, devMax: 6e-5 }, { ...f, ...g }, "STEP");
+      expect(c.code, JSON.stringify(g)).toBe("out.reload-invalid");
+      expect(c.line, JSON.stringify(g)).not.toMatch(/geometrie souboru odpovídá|zápis odchylku nezvětšil|věrná kopie/);
+    }
   });
   it("kontrola neproběhla nad souborem (ploch nad mez): „věrná kopie“ se nevypíše, řádek řekne „jen rychlou kontrolou“", async () => {
     const { exportCheck } = await import("../agent-out");
