@@ -230,13 +230,22 @@ function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick
                 <div className="ml-4 mt-0.5 text-[10.5px] leading-snug text-[#912018]" data-mate-lost-detail={m.id}>
                   {sides.map((k) => (
                     <span key={k} className="block">
-                      {tr("{0}: plocha {1} dílu „{2}“ – {3}", k.toUpperCase(), `${m[k]!.ent === "edge" ? "E" : m[k]!.ent === "vertex" ? "V" : "F"}${m[k]!.face + 1}`, name(m[k]!.compId), m[k]!.lost!.why === "ambiguous" ? tr("není jednoznačná") : m[k]!.lost!.why === "unknown" ? tr("nejde ověřit") : tr("po úpravě dílu neexistuje"))}
+                      {m[k]!.ent === "vertex"
+                        ? tr("{0}: vrchol {1} dílu „{2}“ – {3}", k.toUpperCase(), `V${m[k]!.face + 1}`, name(m[k]!.compId), m[k]!.lost!.why === "ambiguous" ? tr("není jednoznačný") : m[k]!.lost!.why === "unknown" ? tr("nejde ověřit") : tr("po úpravě dílu neexistuje"))
+                        : m[k]!.ent === "edge"
+                          ? tr("{0}: hrana {1} dílu „{2}“ – {3}", k.toUpperCase(), `E${m[k]!.face + 1}`, name(m[k]!.compId), m[k]!.lost!.why === "ambiguous" ? tr("není jednoznačná") : m[k]!.lost!.why === "unknown" ? tr("nejde ověřit") : tr("po úpravě dílu neexistuje"))
+                          : tr("{0}: plocha {1} dílu „{2}“ – {3}", k.toUpperCase(), `F${m[k]!.face + 1}`, name(m[k]!.compId), m[k]!.lost!.why === "ambiguous" ? tr("není jednoznačná") : m[k]!.lost!.why === "unknown" ? tr("nejde ověřit") : tr("po úpravě dílu neexistuje"))}
                     </span>
                   ))}
                   <span className="mt-0.5 flex gap-1.5">
-                    {onRepick && !m[sides[0]]!.ent && (
-                      <button type="button" data-mate-repick={m.id} onClick={(e) => { e.stopPropagation(); onRepick(m.id, sides[0]); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
-                        {repickMate === m.id ? tr("Vybírám plochu…") : tr("Vybrat plochu znovu")}
+                    {onRepick && (
+                      // ztracená plocha / hrana / vrchol: jedním klikem výběr nové entity v modelu nebo ze seznamu (mate-repick.tsx)
+                      <button type="button" data-mate-repick={m.id} data-mate-repick-ent={m[sides[0]]!.ent ?? "face"} onClick={(e) => { e.stopPropagation(); onRepick(m.id, sides[0]); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
+                        {m[sides[0]]!.ent === "edge"
+                          ? repickMate === m.id ? tr("Vybírám hranu…") : tr("Vybrat hranu znovu")
+                          : m[sides[0]]!.ent === "vertex"
+                            ? repickMate === m.id ? tr("Vybírám vrchol…") : tr("Vybrat vrchol znovu")
+                            : repickMate === m.id ? tr("Vybírám plochu…") : tr("Vybrat plochu znovu")}
                       </button>
                     )}
                     <button type="button" data-mate-delete={m.id} onClick={(e) => { e.stopPropagation(); onCommit(removeMate(doc, m.id)); }} className="rounded border border-[#d5dbe2] bg-white px-1.5 py-[1px] text-[10.5px] text-[#4a5664] hover:bg-[#f3f6f9]">

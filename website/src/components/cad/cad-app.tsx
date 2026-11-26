@@ -43,6 +43,7 @@ import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type DrawingDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, parseAgentText } from "@/cad/agent";
 import { histStep } from "@/cad/agent-edit";
+import { carryOutputs, recordOutsideHistory, undoKeepOutputs } from "@/cad/history-outputs";
 import { resolveTab, type TabInfo } from "@/cad/agent-asm";
 import type { AsmEnv, PartFaces } from "@/cad/asm-agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
@@ -194,6 +195,8 @@ const PICK_TYPES = new Set<FeatureType>(["fillet", "chamfer", "shell", "hole", "
 const NO_MATES: Record<string, MateStatus> = {};
 
 /** klíč geometrie dokumentu (prvky, proměnné, stavy) – stejný klíč = stejné těleso */
+/** listy výkresů beze změny (zápis bez kroku Zpět) */
+const sameDrawings = (a?: DrawingDoc[], b?: DrawingDoc[]) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const geoKey = (d: CadDoc) => JSON.stringify([d.features, d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null]);
 
 export function CadApp() {
@@ -402,10 +405,13 @@ export function CadApp() {
     lastStep.current = { key: merge ?? null, at: now };
   }, []);
   const liveWith = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => ({ ...h, present: fn(h.present) })), []);
+  /** záznam exportu po doběhnutí úlohy (mimo krok historie): do současného stavu i do stavů Znovu (cad/history-outputs.ts) */
+  const recordOutput = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => recordOutsideHistory(h, fn)), []);
   const undo = () => {
     flushPending("undo"); // rozepsané pole / list výkresu nejdřív jako vlastní krok – Zpět pak vrátí právě je
     lastStep.current = { key: null, at: 0 };
-    setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
+    // záznamy exportů vzniklé po cílovém stavu zůstanou – soubor na disku krok Zpět nesmaže (cad/history-outputs.ts)
+    setHist((h) => undoKeepOutputs(h));
   };
   const redo = () => {
     flushPending("redo");
@@ -553,14 +559,15 @@ export function CadApp() {
    * jen změnu listu) a neuložená změna (dotaz při zavření karty); `record: false` = založení prvního listu bez kroku.
    */
   const writeDrawings = (d: DrawingDoc[], o: { key?: string; record?: boolean } = {}) => {
-    const fn = (cur: CadDoc): CadDoc => ({ ...cur, drawings: d });
+    // beze změny listů žádný krok Zpět (uložení nezměněného listu před „+ Výkres“ / přepnutím výkresu dřív přidalo prázdný krok)
+    const fn = (cur: CadDoc): CadDoc => (sameDrawings(cur.drawings, d) ? cur : { ...cur, drawings: d });
     if (!o.key || o.key === docId.current) {
       if (o.record === false) liveWith(fn);
       else commitWith(fn);
       return;
     }
     dirty.current = true;
-    setDocTabs((list) => list.map((t) => (t.docId === o.key && t.kind !== "drawing" ? { ...t, hist: o.record === false ? { ...t.hist, present: fn(t.hist.present) } : { past: [...t.hist.past.slice(-80), t.hist.present], present: fn(t.hist.present), future: [] } } : t)));
+    setDocTabs((list) => list.map((t) => (t.docId === o.key && t.kind !== "drawing" && fn(t.hist.present) !== t.hist.present ? { ...t, hist: o.record === false ? { ...t.hist, present: fn(t.hist.present) } : { past: [...t.hist.past.slice(-80), t.hist.present], present: fn(t.hist.present), future: [] } } : t)));
   };
   /** výkres jako vlastní záložka (sdílí dokument se zdrojovou záložkou) */
   const openDrawingTab = () => {
@@ -695,7 +702,7 @@ export function CadApp() {
       let moved = 0;
       flushSync(() =>
         setHist((h) => {
-          const step = histStep(h, dir, n);
+          const step = histStep(h, dir, n, carryOutputs);
           moved = step.moved;
           return step.hist;
         }),
@@ -1340,7 +1347,7 @@ export function CadApp() {
   // Sestava › Pružina mezi díly: výběr dosedacích ploch a tabulka (components/cad/springs/spring-between.tsx)
   const springPick = useSpringBetween({ doc, isAsm, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
   // ztracená reference vazby (vlna 22, bod 20): nový výběr plochy klikem v modelu nebo ze seznamu ploch (mate-repick.tsx)
-  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
+  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, entRows: async (leaf, ent) => (await import("@/cad/asm-agent")).compEnts(histRef.current.present, leaf, ent, asmEnvRef.current()), entInfo: (k, i, e) => cad.mateEnt(k, i, e), geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
   const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
@@ -2030,7 +2037,9 @@ export function CadApp() {
       return;
     }
     if (repick.active) {
+      // ztracená plocha: klik na plochu; ztracená hrana / vrchol: klik na hranu / vrchol téhož dílu (mate-repick.tsx)
       if (it?.kind === "face" && it.compId) void repick.choose(it.compId, it.index);
+      else if ((it?.kind === "edge" || it?.kind === "vertex") && it.compId) void repick.chooseEnt(it.compId, it.index, it.kind);
       return;
     }
     if (mate) {
@@ -2581,9 +2590,11 @@ export function CadApp() {
   const pickMode: PickMode = refPick
     ? "select"
     : isAsm
-    ? mate || boltPick || springPick.active || repick.active
-      ? "asmFace"
-      : "select"
+    ? repick.active && repick.want !== "face"
+      ? "select" // ztracená hrana / vrchol vazby: výběr s filtrem hrana / vrchol (selFilter níže)
+      : mate || boltPick || springPick.active || repick.active
+        ? "asmFace"
+        : "select"
     : planePick
       ? "face-plane"
       : measure
@@ -2696,7 +2707,7 @@ export function CadApp() {
       // změnil-li uživatel model během převodu, soubor je ze starší revize – žádná lišta ✓ nad jiným modelem, hláška to řekne
       const rec = { format, file: target.name, job: r, id: h.id, ms: appRuns.get(h.id)?.ms };
       const changed = recordExportJob(histRef.current.present, rec).changed;
-      liveWith((cur) => recordExportJob(cur, rec).doc);
+      recordOutput((cur) => recordExportJob(cur, rec).doc);
       setExportChk(changed ? null : chk);
       flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check + (changed ? " · " + tr("⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu", r.modelRev) : ""));
       track("cad_export", { format });
@@ -4048,7 +4059,7 @@ export function CadApp() {
                   selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
                   onPickEdge={onPickEdge}
                   onPickFace={onPickFace}
-                  selFilter={refPick ? refFilter(refPick.want) : selFilter}
+                  selFilter={refPick ? refFilter(refPick.want) : isAsm && repick.want && repick.want !== "face" ? repick.want : selFilter}
                   snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
                   selection={measure ? measureSel : mate ? mateSelection(mate, mateHover) : featSel ? [...new Set(Object.values(featSel).flat())].map((index): SelItem => ({ kind: "face", index })) : selection}
                   onPick={onPick}
@@ -4722,7 +4733,7 @@ export function CadApp() {
             docKey={docId.current}
             onDrawingsChange={(d, o) => writeDrawings(d, o)}
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
-            onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
+            onExported={(e) => recordOutput((cur) => recordExport(cur, e).doc)}
             onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
             staleCopies={copiesNow}
             onPropsChange={(p) => commit({ ...doc, props: p })}

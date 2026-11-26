@@ -103,6 +103,46 @@ async function flow(p, tag, en = false) {
   await p.screenshot({ path: `${S}w22a2-${tag}-2-fixed.png` });
 }
 
+/**
+ * Fáze 2, kolo 4 (bod 20): ztracená HRANA vazby – oprava v GUI jedním tlačítkem, ne jen textem. Dřív seznam vazeb nabízel
+ * „Vybrat plochu znovu“ jen pro plochy; u hrany zbylo „Smazat vazbu“ a příkaz `sestava vazba 1 plocha b E2`.
+ * Vazba Shodně „Přidržovač B“ V1 → „Deska B“ E11 (vnitřní hrana schodu) → schod smazán → ztracená hrana → „Vybrat hranu znovu“ →
+ * seznam hran dílu (data-repick-ent, i bez WebGL) → E2 → vazba zase ok, odkaz B = E2 (hrana), bez ztráty.
+ */
+async function edgeFlow(p, tag) {
+  const run = (t, o) => p.evaluate(([t, o]) => window.mncad.run(t, o), [t, o]);
+  const idle = () => p.waitForFunction(() => !window.mncad.progress(), null, { timeout: 120000 });
+  const log = await run([
+    'nový díl "Deska B"', 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat',
+    'nový díl "Přidržovač B"', 'kvádr 10 10 10',
+    'nová sestava "Sestava B"', 'vložit "Deska B" ukotvit', 'vložit "Přidržovač B" v 5 10 30',
+    'sestava vazba shodně "Přidržovač B" V1 "Deska B" E11',
+  ].join('\n'));
+  ok(/✓ vazba Shodně „Přidržovač B“ V1 → „Deska B“ E11: ok/.test(log), `[${tag}] hrana: vazba Shodně V1 → E11 (hrana schodu) založena`);
+  const edit = await run(['sestava upravit "Deska B"', 'smazat "Kvádr 2"', 'sestava hotovo'].join('\n'));
+  ok(/ztracená reference B E11[^\n]*vyberte hranu znovu/.test(edit), `[${tag}] hrana: po smazání schodu ✗ ztracená hrana E11 s radou „vyberte hranu znovu“\n   ${(edit.split('\n').find((l) => /E11/.test(l) && /^✗/.test(l)) || '').slice(0, 260)}`);
+  await idle();
+  const lostOk = await p.waitForFunction(() => document.querySelector('[data-mates-list]')?.getAttribute('data-mates-lost') === '1', null, { timeout: 60000 }).then(() => true, () => false);
+  const btn = p.locator('[data-mate-repick-ent="edge"]').first();
+  const label = lostOk ? ((await btn.textContent().catch(() => '')) || '').trim() : '';
+  ok(lostOk && label === 'Vybrat hranu znovu', `[${tag}] hrana: seznam vazeb nabízí jedním klikem „Vybrat hranu znovu“ (tlačítko: „${label}“)`);
+  if (!lostOk) return;
+  await btn.click();
+  await p.locator('[data-repick-panel]').waitFor({ timeout: 15000 });
+  await p.waitForFunction(() => (document.querySelector('[data-repick-ent="edge"]')?.options.length ?? 0) > 1, null, { timeout: 60000 });
+  const opts = await p.evaluate(() => [...document.querySelector('[data-repick-ent="edge"]').options].map((o) => ({ v: o.value, t: o.textContent })));
+  const e2 = opts.find((o) => /^E2 · hrana – úsečka · \[0; 0; 10\]–\[0; 40; 10\]/.test(o.t || ''));
+  ok(!!e2 && !opts.some((o) => /\[20; 0; 5\]/.test(o.t || '')), `[${tag}] hrana: seznam hran dílu nabízí E2 [0; 0; 10]–[0; 40; 10] a nenabízí zmizelou hranu schodu (${opts.length - 1} hran: ${opts.slice(1, 4).map((o) => o.t).join(' | ')})`);
+  if (!e2) return;
+  await p.locator('[data-repick-ent="edge"]').selectOption(e2.v);
+  const okNow = await p.waitForFunction(() => document.querySelector('[data-mate]')?.getAttribute('data-mate-status') === 'ok', null, { timeout: 60000 }).then(() => true, () => false);
+  const ref = await p.evaluate(() => window.mncad.getDocument().mates[0].b);
+  ok(okNow && ref.ent === 'edge' && ref.face === 1 && !ref.lost, `[${tag}] hrana: po výběru E2 vazba zase splněna, odkaz B = hrana E2 bez ztráty (${JSON.stringify(ref).slice(0, 160)})`);
+  const list = await run('sestava vazby');
+  ok(/Vazby sestavy „Sestava B“: 1 \(1 ok\)/.test(list), `[${tag}] hrana: text sestava vazby = 1 ok (GUI = text)`);
+  await p.screenshot({ path: `${S}w22a2-${tag}-3-edge.png` });
+}
+
 const browsers = [];
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -114,6 +154,7 @@ const browsers = [];
   p.on('dialog', (d) => d.dismiss().catch(() => {}));
   await start(p, BASE + '/cad');
   await flow(p, 'webgl');
+  await edgeFlow(p, 'webgl');
   ok(errs.length === 0, 'žádná chyba stránky (WebGL): ' + errs.slice(0, 3).join(' | '));
   await ctx.close();
 
@@ -137,6 +178,7 @@ const browsers = [];
   const noGl = await p2.evaluate(() => { try { const c = document.createElement('canvas'); return !(c.getContext('webgl2') || c.getContext('webgl')); } catch { return true; } });
   ok(noGl, 'druhý průchod běží bez WebGL (softwarový náhled)');
   await flow(p2, 'nowebgl');
+  await edgeFlow(p2, 'nowebgl');
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();
