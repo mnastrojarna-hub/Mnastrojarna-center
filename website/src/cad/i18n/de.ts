@@ -8057,6 +8057,7 @@ export const DE: Record<string, string> = {
  "Rozteč Y": "Abstand Y",
  "Rozteče musí být kladné.": "Die Abstände müssen positiv sein.",
  "roztečná": "Teilkreis",
+ "roztečná kružnice Ø{0}": "Lochkreis Ø{0}",
  "Roztečný Ø čepů D_p": "Bolzenteilkreis Ø D_p",
  "Roztečný průměr": "Teilkreisdurchmesser",
  "Roztečný průměr čepů": "Bolzenteilkreisdurchmesser",
