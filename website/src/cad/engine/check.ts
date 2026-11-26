@@ -17,6 +17,7 @@ import { flattenLeaves, type Leaf } from "../asm-flatten";
 import { axisAngle, lineDist, nominalDiameter, type ClashCounts } from "../clash-class";
 import { holeDrillD, holeTip } from "../hole-spec";
 import { cadLocale, tr } from "../i18n";
+import { threadsOfFeatures } from "../thread-spec";
 import { leafByRef } from "../leaf-ref";
 import type { MeasureBody, MeasureCyl } from "../measure";
 import type { ComponentSource, CadDoc, Feature, Vec3 } from "../types";
@@ -156,10 +157,10 @@ export function holeTable(doc: CadDoc, cyls: readonly MeasureCyl[]): { holes: Ch
       if (drillSeg.tipAngle !== undefined) h.tipAngle = r3(drillSeg.tipAngle);
       if (drillSeg.tipDepth !== undefined) h.tipDepth = r3(drillSeg.tipDepth);
     }
-    if (big.length) {
-      const cb = big[0];
-      h.cbore = [r3(cb.diameter), r3(cb.length)];
-    }
+    // zahloubení je jen úsek většího průměru; úsek téhož průměru je táž díra rozdělená (drážka závitu šroubovicí dělí válcovou
+    // plochu díry na kusy – dřív z toho vzniklo nesmyslné „cbore=16.5x19.576“, 22d)
+    const cb = big.find((s) => s.diameter > drillSeg.diameter + 1e-3);
+    if (cb) h.cbore = [r3(cb.diameter), r3(cb.length)];
     merged.push(h);
   }
   // spojení s prvky: osa rovnoběžná, bod polohy na ose (polohy souřadnicemi), jinak průměr vrtáku
@@ -200,6 +201,16 @@ export function holeTable(doc: CadDoc, cyls: readonly MeasureCyl[]): { holes: Ch
       h.threadDepth = r3(t.length);
       used.set(t.id, (used.get(t.id) ?? 0) + 1);
     }
+  // vnitřní závit Tažením po šroubovici s katalogovým označením (thread=M18×1,5) – stejně jako prvek Závit (22d)
+  for (const tv of threadsOfFeatures(doc.features).filter((t) => t.source === "helixSweep" && t.internal)) {
+    const dir = featureDir({ axis: tv.axis ?? "Z", ...(tv.dirDef ? { dirDef: tv.dirDef } : {}) } as HoleF);
+    for (const h of merged)
+      if (!h.thread && (!dir || axisAngle(dir, h.drill) <= 0.5) && !tv.positionRef && onAxis(tv.position, h)) {
+        h.thread = tv.designation;
+        h.threadDepth = r3(tv.length);
+        h.feature ??= tv.name;
+      }
+  }
   const missing: { feature: string; missing: number; expected: number | null }[] = [];
   for (const f of feats) {
     const p = pts.get(f.id);

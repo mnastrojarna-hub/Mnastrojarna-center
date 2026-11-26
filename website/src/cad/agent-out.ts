@@ -17,6 +17,7 @@
  * `components/cad/agent-out-host.ts`.
  */
 import { cadLocale, tr } from "./i18n";
+import { EXACT_AUTO_FACES } from "./validity";
 import type { Vec3 } from "./types";
 import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
 import { partsText, solidVerdict, type SolidParts, type SolidStats } from "./solid-export";
@@ -397,14 +398,25 @@ export function fileLogLine(what: string, name: string, bytes: number, format: s
 /**
  * Míry modelu / znovu načteného souboru. `volume` = objem jen objemových těles (22c – skořepiny a plochy objem nemají);
  * `free` = plochy mimo tělesa, `freeShells` / `freeFaces` / `shells` / `closedShells` = složení (export-verify.ts),
- * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno).
+ * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno), `validExact` = BRepCheck přesnou metodou (null /
+ * chybí = přesná neproběhla), `badFaces` = vadných ploch podle přesné kontroly, `faces` = počet ploch.
  */
-export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null };
+export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null; faces?: number; validExact?: boolean | null; badFaces?: number };
 /**
  * Výsledek kontroly: `ok` = věrná kopie objemového modelu; `level` / `code` = jak ji hlásit (✗ out.no-solid – soubor bez
  * tělesa, ⚠ out.free-surfaces – volné plochy vedle tělesa, ⚠ / ✗ out.check-failed – soubor se od modelu liší / nenačetl se).
  */
-export type ExportCheck = { ok: boolean; line: string; volumeDiffPct: number; bboxDiff: number; solidsOk: boolean; level?: "ok" | "warn" | "error"; code?: "out.no-solid" | "out.free-surfaces" | "out.check-failed" };
+export type ExportCheck = {
+  ok: boolean;
+  line: string;
+  volumeDiffPct: number;
+  bboxDiff: number;
+  solidsOk: boolean;
+  level?: "ok" | "warn" | "error";
+  code?: "out.no-solid" | "out.free-surfaces" | "out.check-failed" | "out.reload-invalid";
+  /** která kontrola platnosti souboru proběhla (22a): přesná / jen rychlá / žádná */
+  validCheck?: "exact" | "fast" | "none";
+};
 
 /** povolená relativní odchylka objemu (B-rep se přenáší přesně, rozdíl je jen numerický) */
 export const CHECK_VOLUME_REL = 1e-3;
@@ -415,7 +427,10 @@ export const CHECK_VOLUME_REL = 1e-3;
  *  - soubor bez objemového tělesa → ✗ `out.no-solid` (nikdy „věrná kopie“, ani když model je stejně jen plochy – 22c);
  *  - soubor se od modelu liší (tělesa, plochy mimo tělesa, platnost, objem, obálka) → ⚠ `out.check-failed`;
  *  - soubor odpovídá modelu, ale vedle těles nese volné skořepiny / plochy → ⚠ `out.free-surfaces` s počty;
- *  - jinak ✓ „… → věrná kopie modelu“.
+ *  - soubor odpovídá modelu, ale po načtení neprojde přesnou kontrolou platnosti (model ano) → ⚠ `out.reload-invalid`
+ *    (22a: čtečka STEP nastaví tolerance hran pod skutečnou odchylku křivek – nezávislá kontrola souboru by ho odmítla);
+ *  - jinak ✓ „… → věrná kopie modelu“ – jen když soubor prošel i přesnou kontrolou platnosti; bez ní (ploch nad mez, míry
+ *    bez přesné kontroly) ✓ „… → odpovídá modelu; platnost souboru jen rychlou kontrolou …“ – nikdy „věrná kopie“ (22a).
  * `parts` = komponenty sestavy bez tělesa / s volnými plochami (jména do hlášky).
  */
 export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP", parts?: SolidParts): ExportCheck {
@@ -458,12 +473,42 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
   // odpovídá modelu, ale volné skořepiny / plochy vedle těles nejsou objemový model → ⚠ s počty (a jmény komponent)
   const fv = file.solids === undefined ? null : solidVerdict(statsOf(file), label, "file", parts);
   if (fv) return { ...base, ok: false, level: "warn", code: "out.free-surfaces", line: `⚠ ${tr("kontrola {0}: {1}", label, fv.body)}` };
-  return {
-    ...base,
-    ok: true,
-    level: "ok",
-    line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
-  };
+  const same = tr("soubor znovu načten jádrem – {0}objem {1} (rozdíl {2} %), obálka {3} mm (odchylka {4} mm)", solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4));
+  // 22a (fáze 2): soubor po zpětném načtení neprojde přesnou kontrolou (model ano → vadu přinesl soubor: čtečka STEP mění
+  // tolerance hran); nezávislá kontrola souboru by ho odmítla, proto ⚠ a nikdy „věrná kopie“
+  // model přesně neplatný už sám (⚠ geom.exact-invalid před exportem): soubor ho kopíruje i s vadou – také ⚠, ne ✓
+  if (file.validExact === false) {
+    const of = file.faces !== undefined ? tr("{0} z {1}", file.badFaces ?? 1, file.faces) : String(file.badFaces ?? 1);
+    const fast = file.valid === true ? tr("rychlá kontrola: platné") : file.valid === false ? tr("rychlá kontrola: NEPLATNÉ") : tr("rychlá kontrola neproběhla");
+    const m = model.validExact === true ? tr("model přesně platný") : model.validExact === false ? tr("model je přesnou kontrolou neplatný také") : "";
+    // vadu přinesla čtečka (model přesně platný): tolerance hran po načtení menší než skutečná odchylka křivek od ploch
+    const why = model.validExact === true ? tr("; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch", label) : "";
+    return {
+      ...base,
+      ok: false,
+      level: "warn",
+      code: "out.reload-invalid",
+      validCheck: "exact",
+      line: `⚠ ${tr("kontrola {0}: {1} – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti (BRepCheck přesnou metodou): vadných ploch {2} ({3}){4} – soubor nepotvrzen jako kopie modelu, jiný CAD může soubor načíst s opravou tolerancí nebo odmítnout", label, same, of, [fast, m].filter(Boolean).join("; "), why)}` + partsText(parts),
+    };
+  }
+  // přesná kontrola souboru prošla: „věrná kopie“ (ta od 22a zahrnuje i přesnou platnost souboru – návod, kódy)
+  if (file.validExact === true)
+    return {
+      ...base,
+      ok: true,
+      level: "ok",
+      validCheck: "exact",
+      line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
+    };
+  // přesná kontrola souboru neproběhla: shoda v mírách ano, „věrná kopie“ ne – řádek řekne, co chybí (slabší tvrzení)
+  const why =
+    file.validExact === null && file.faces !== undefined && file.faces > EXACT_AUTO_FACES
+      ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla ({0} ploch > {1})", file.faces, EXACT_AUTO_FACES)
+      : file.valid === true
+        ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla")
+        : tr("platnost souboru nezkontrolována");
+  return { ...base, ok: true, level: "ok", validCheck: file.valid === true ? "fast" : "none", line: `✓ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
 }
 
 /** složení souboru / modelu pro `solidVerdict` */
@@ -502,7 +547,7 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     cmd: "export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]",
     en: "export",
     de: "exportieren",
-    desc: tr("3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem, obálka) → „věrná kopie modelu“ jen s objemovým tělesem; bez tělesa ✗ out.no-solid, volné plochy vedle tělesa ⚠ out.free-surfaces (i u STL / 3MF a „bez kontroly“ podle modelu); „bez kontroly“ vynechá zpětné čtení"),
+    desc: tr("3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem, obálka) → „věrná kopie modelu“ jen s objemovým tělesem a po přesné kontrole platnosti souboru (soubor přesnou kontrolou neprojde = ⚠ out.reload-invalid); bez tělesa ✗ out.no-solid, volné plochy vedle tělesa ⚠ out.free-surfaces (i u STL / 3MF a „bez kontroly“ podle modelu); „bez kontroly“ vynechá zpětné čtení"),
   },
   {
     cmd: "export skript [cs|en|de] [název]",

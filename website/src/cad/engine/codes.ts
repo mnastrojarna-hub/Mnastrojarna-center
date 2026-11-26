@@ -47,6 +47,8 @@ export const CODES = [
   { code: "share.days-clamped", level: "warn", key: "platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})" },
   { code: "share.days-unlimited", level: "error", key: "odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“" },
   { code: "out.check-failed", level: "warn", key: "kontrola souboru: {0}" },
+  // vlna 22, bod 22a (fáze 2): soubor STEP / BREP po zpětném načtení neprojde přesnou kontrolou platnosti, model ano
+  { code: "out.reload-invalid", level: "warn", key: "soubor po zpětném načtení neprojde přesnou kontrolou platnosti: {0}" },
   // objemový export (STEP, BREP, STL, 3MF) bez tělesa / s plochami mimo tělesa – vlna 22, bod 22c (solid-export.ts)
   { code: "out.no-solid", level: "error", key: "objemový export bez tělesa: {0}" },
   { code: "out.free-surfaces", level: "warn", key: "objemový export s plochami mimo tělesa: {0}" },

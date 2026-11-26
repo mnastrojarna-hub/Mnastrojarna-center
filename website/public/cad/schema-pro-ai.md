@@ -1851,7 +1851,10 @@ sdílet
 (Text výše je **konzole prohlížeče**. V CLI a ve `window.mncad.run(text, { protocol: "short" })` má každý odkaz výpis
 `= L<n> link …` a poslední odkaz řádek `O` – příklad níže v oddílu „Sdílení“.)
 
-- Kontrola STEP / BREP: `✓ … věrná kopie modelu` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm).
+- Kontrola STEP / BREP: `✓ … věrná kopie modelu` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm) a po
+  načtení projde přesnou kontrolou platnosti; `⚠ … NEPROJDE přesnou kontrolou platnosti` (`out.reload-invalid`) = míry
+  sedí, ale soubor po načtení přesnou kontrolou neprojde; `✓ … → odpovídá modelu; platnost souboru jen rychlou kontrolou`
+  = přesná kontrola souboru neproběhla (nad 400 ploch).
   `⚠ kontrola STEP: soubor se od modelu liší – …` napíše, co nesedí (tělesa, objem, obálka) – opravte prvky s ⚠ / ✗
   (`stav`) a export zopakujte. `✗ kontrola …: soubor se nepodařilo znovu načíst` = soubor je poškozený nebo prázdný.
 - Chybný zápis skončí řádkem ✗ se správným zápisem (`export pdf` → „výkres se exportuje příkazem výkres export pdf“).
@@ -2602,6 +2605,7 @@ třídí. Nejčastější:
 | `feature.warning` ⚠ / `feature.failed` ✗ / `feature.unverified` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | `thread.tip-tangent` / `thread.no-reach` / `thread.wrong-side` / `thread.pitch-nonstandard` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | `přísně kromě thread.pitch-nonstandard` |
 | `geom.exact-invalid` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
+| `out.reload-invalid` ⚠ | soubor STEP / BREP odpovídá modelu (tělesa, objem, obálka), ale po zpětném načtení neprojde přesnou kontrolou platnosti (čtečka STEP nastaví tolerance hran menší než odchylka křivek od ploch – typicky závit šroubovicí), model ano; „věrná kopie“ se nenapíše, řádek F `check=fail`, `--strict` zastaví | soubor ověřit v cílovém CADu; `přísně kromě out.reload-invalid`, když to víte |
 | `out.no-solid` ✗ / `out.free-surfaces` ⚠ | objemový export (STEP, BREP, STL, 3MF) modelu bez objemového tělesa (jen plochy / skořepina – i uzavřená skořepina bez „Uzavřít do tělesa“) / s volnými skořepinami či plochami vedle těles (u sestavy se jmény komponent); soubor se zapíše, ale „věrná kopie modelu“ se nenapíše, řádek F `check=fail`, `--strict` zastaví | `prvek surf.close` (Plochy → Uzavřít do tělesa), `prvek surf.thicken`, volnou plochu smazat / potlačit |
 | `op.accepted` ℹ / `op.superseded` ℹ / `feature.unchecked`, `doc.unchecked` ℹ / `feature.built` ℹ / `feature.suppressed` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u `feature.unchecked` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
@@ -2677,7 +2681,9 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   STEP / BREP do 400 ploch („✓ těleso: přesná kontrola platnosti … – platné“, vada = ⚠ `geom.exact-invalid`, nad limit ℹ
   s důvodem). Výsledek platí pro tutéž geometrii: Geometrie pak končí „· přesná kontrola“, řádek D nese `vcheck=exact`
   (bez klíče = rychlá kontrola), JSON `docs[].validCheck` = `exact` | `fast`. Model se kvůli exportu neupravuje
-  (žádné „opravy tolerancí“) – STEP je přesně model.
+  (žádné „opravy tolerancí“) – STEP je přesně model. Přesně se kontroluje i soubor po zpětném načtení (do 400 ploch): čtečka
+  STEP u závitu šroubovicí nastaví tolerance hran menší než skutečná odchylka a soubor pak přesnou kontrolou neprojde, i když
+  model ano – to je ⚠ `out.reload-invalid`, ne „věrná kopie“.
 - Potlačený prvek (`potlačit`, nebo potlačený aktivní konfigurací) se nestaví: má ℹ `feature.suppressed` („potlačen – nestaví
   se“), nikdy ✓; ve výpisu `stav` „ℹ (potlačen)“ a počet „N ℹ potlačeno“, v řádku D `off=N` (nepočítá se do `feat=` mezi ✓).
 - Prvek objemového typu (primitiva, vysunutí, díra, zaoblení, pole, prvky rozšíření s operací přidat / odebrat a všechny
@@ -2906,7 +2912,9 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
 
 - **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem
   těles, obálka): řádek F `check=ok|fail`, při rozdílu ⚠ `out.check-failed` (soubor nejde načíst = ✗). „→ věrná kopie
-  modelu“ je **jen** soubor s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ `out.no-solid` (i když
+  modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
+  modelu; platnost souboru jen rychlou kontrolou …“), jinak ⚠ `out.reload-invalid` s počtem vadných ploch, a jen soubor
+  s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ `out.no-solid` (i když
   odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ `out.free-surfaces` s počty (u sestavy jména
   komponent). STL / 3MF a `export step bez kontroly` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
   hmotnost (`stav`, řádek D, JSON, `měřit těleso`) jsou jen z těles: díl bez tělesa má `V=- m=-` a „objem –“. STEP má **stejné bajty při stejném modelu** (pevný čas

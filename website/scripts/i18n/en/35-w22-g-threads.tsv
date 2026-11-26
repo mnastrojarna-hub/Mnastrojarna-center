@@ -49,3 +49,4 @@ Závit z katalogu	Catalogue thread
 Šroubovice	Helix
 #!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
 těleso „{0}“ neprošlo přesnou kontrolou platnosti: {1}	body “{0}” failed the exact validity check: {1}
+· z katalogu {0} (uložené číslo se nepoužije)	· from catalogue {0} (the stored number is not used)

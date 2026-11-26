@@ -24,3 +24,14 @@ objemový export s plochami mimo tělesa: {0}	Volumenexport mit Flächen außerh
 # fáze 2: kontrola exportu s neznámým počtem těles (agent-out.ts exportCheck)
 objem 0 mm³	Volumen 0 mm³
 kontrola {0}: počet těles v souboru nezjištěn a {1} – objemový model nepotvrzen; export zkontrolujte (stav)	{0}-Prüfung: Anzahl der Körper in der Datei nicht ermittelt und {1} – Volumenmodell nicht bestätigt; Export prüfen (status)
+# Vlna 22 fáze 2 (22a): kontrola STEP / BREP přesnou metodou – ⚠ out.reload-invalid, „věrná kopie“ jen po přesné kontrole souboru
+; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch	; der {0}-Leser setzt Kantentoleranzen kleiner als die Abweichung der Kurven von den Flächen
+kontrola {0}: {1} – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti (BRepCheck přesnou metodou): vadných ploch {2} ({3}){4} – soubor nepotvrzen jako kopie modelu, jiný CAD může soubor načíst s opravou tolerancí nebo odmítnout	{0}-Prüfung: {1} – stimmt mit dem Modell überein, aber die Datei BESTEHT nach dem Einlesen die exakte Gültigkeitsprüfung NICHT (BRepCheck, exakte Methode): fehlerhafte Flächen {2} ({3}){4} – die Datei ist nicht als Kopie des Modells bestätigt; ein anderes CAD liest sie eventuell mit Toleranzreparatur ein oder lehnt sie ab
+kontrola {0}: {1} → odpovídá modelu; {2}	{0}-Prüfung: {1} → entspricht dem Modell; {2}
+model je přesnou kontrolou neplatný také	das Modell ist nach der exakten Prüfung ebenfalls ungültig
+model přesně platný	Modell exakt gültig
+platnost souboru jen rychlou kontrolou – přesná neproběhla	Gültigkeit der Datei nur mit der schnellen Prüfung – die exakte Prüfung lief nicht
+platnost souboru jen rychlou kontrolou – přesná neproběhla ({0} ploch > {1})	Gültigkeit der Datei nur mit der schnellen Prüfung – die exakte Prüfung lief nicht ({0} Flächen > {1})
+platnost souboru nezkontrolována	Gültigkeit der Datei nicht geprüft
+soubor znovu načten jádrem – {0}objem {1} (rozdíl {2} %), obálka {3} mm (odchylka {4} mm)	Datei vom Kern neu eingelesen – {0}Volumen {1} (Differenz {2} %), Hüllquader {3} mm (Abweichung {4} mm)
+soubor po zpětném načtení neprojde přesnou kontrolou platnosti: {0}	die neu eingelesene Datei besteht die exakte Gültigkeitsprüfung nicht: {0}

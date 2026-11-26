@@ -24,3 +24,14 @@ objemový export s plochami mimo tělesa: {0}	volume export with faces outside t
 # fáze 2: kontrola exportu s neznámým počtem těles (agent-out.ts exportCheck)
 objem 0 mm³	volume 0 mm³
 kontrola {0}: počet těles v souboru nezjištěn a {1} – objemový model nepotvrzen; export zkontrolujte (stav)	{0} check: number of bodies in the file not determined and {1} – solid model not confirmed; check the export (status)
+# Vlna 22 fáze 2 (22a): kontrola STEP / BREP přesnou metodou – ⚠ out.reload-invalid, „věrná kopie“ jen po přesné kontrole souboru
+; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch	; the {0} reader sets edge tolerances smaller than the deviation of the curves from the faces
+kontrola {0}: {1} – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti (BRepCheck přesnou metodou): vadných ploch {2} ({3}){4} – soubor nepotvrzen jako kopie modelu, jiný CAD může soubor načíst s opravou tolerancí nebo odmítnout	{0} check: {1} – matches the model, but after re-reading the file FAILS the exact validity check (BRepCheck, exact method): defective faces {2} ({3}){4} – the file is not confirmed as a copy of the model; another CAD may read it with a tolerance repair or reject it
+kontrola {0}: {1} → odpovídá modelu; {2}	{0} check: {1} → matches the model; {2}
+model je přesnou kontrolou neplatný také	the model is also invalid by the exact check
+model přesně platný	model valid by the exact check
+platnost souboru jen rychlou kontrolou – přesná neproběhla	file validity by the fast check only – the exact check did not run
+platnost souboru jen rychlou kontrolou – přesná neproběhla ({0} ploch > {1})	file validity by the fast check only – the exact check did not run ({0} faces > {1})
+platnost souboru nezkontrolována	file validity not checked
+soubor znovu načten jádrem – {0}objem {1} (rozdíl {2} %), obálka {3} mm (odchylka {4} mm)	file re-read by the kernel – {0}volume {1} (difference {2} %), bounding box {3} mm (deviation {4} mm)
+soubor po zpětném načtení neprojde přesnou kontrolou platnosti: {0}	the re-read file fails the exact validity check: {0}

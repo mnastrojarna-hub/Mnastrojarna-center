@@ -3,7 +3,7 @@
 import { EntityMultiPick, describeEdge, describeFace, docBefore, useTopology } from "./entity-multi-pick";
 import type { PlaneDef, Ref } from "@/cad/refs";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
-import { tr } from "@/cad/i18n";
+import { cadLocale, tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
 import { getExt, hasExtTool, type ExtParam } from "@/cad/ext/registry";
@@ -969,6 +969,9 @@ export { FEATURE_LABEL };
 
 // ---------- prvky rozšíření: formulář z registru nebo automaticky z params ----------
 
+/** odvozené číslo ve formuláři: do 4 desetinných míst, desetinná čárka podle jazyka */
+const fmtDerived = (n: number) => (Math.round(n * 1e4) / 1e4).toLocaleString(cadLocale(), { maximumFractionDigits: 4 });
+
 function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, { type: "ext" }>; doc: CadDoc; set: (p: Record<string, unknown> | ((f: Feature) => Record<string, unknown>)) => void; sketches: Feature[]; toolFeatures: Feature[] }) {
   const def = getExt(f.ext);
   const ui = getExtUi(f.ext);
@@ -986,11 +989,27 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
     );
   }
   if (!def.params?.length) return <p className="text-[12px] text-ink-700/55">{def.hint ?? tr("Prvek nemá parametry.")}</p>;
+  // odvozená čísla (22d – Tažení po šroubovici z katalogu): živě z aktuálních dat, stejně jako stavba; uložená čísla se nepoužijí
+  let derived: ReturnType<NonNullable<typeof def.derive>> = null;
+  try {
+    derived = def.derive?.(data) ?? null;
+  } catch {
+    derived = null;
+  }
   return (
     <>
       {def.legacy && <LegacyHint text={def.legacy} />}
       {def.params.map((p: ExtParam) => {
         const v = data[p.key];
+        const dv = derived?.values[p.key];
+        if (p.kind === "number" && derived && typeof dv === "number")
+          return (
+            <Field key={p.key} label={p.label}>
+              <div className="rounded-lg border border-ink-700/8 bg-ink-700/[0.03] px-2.5 py-1.5 text-[13px]" data-ext-derived={p.key} data-value={dv}>
+                {fmtDerived(dv)} {p.unit ?? "mm"} <span className="text-[11px] text-ink-700/55">{tr("· z katalogu {0} (uložené číslo se nepoužije)", derived.source)}</span>
+              </div>
+            </Field>
+          );
         switch (p.kind) {
           case "number":
             return <Num key={p.key} label={p.label} value={typeof v === "number" ? v : 0} step={p.step ?? 1} min={p.min} suffix={p.unit ?? "mm"} hint={p.hint} bind={`${f.id}:data.${p.key}`} onChange={(n) => patch({ [p.key]: p.max != null ? Math.min(p.max, n) : n })} />;
