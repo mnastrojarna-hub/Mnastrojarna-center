@@ -8080,6 +8080,7 @@ export const EN: Record<string, string> = {
  "Rozteč Y": "Spacing Y",
  "Rozteče musí být kladné.": "The spacings must be positive.",
  "roztečná": "pitch",
+ "roztečná kružnice Ø{0}": "pitch circle Ø{0}",
  "Roztečný Ø čepů D_p": "Pin circle Ø D_p",
  "Roztečný průměr": "Pitch diameter",
  "Roztečný průměr čepů": "Pin circle diameter",

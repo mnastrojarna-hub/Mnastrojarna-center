@@ -54,6 +54,11 @@ export type DimReq = {
   point?: Vec3;
   /** díry skupiny: středy (všechny výskyty), osa, poloměr, počet */
   holes?: { centers: Vec3[]; dir: Vec3; r: number; n: number; depth?: number; entry?: number[]; /** všechny polohy děr skupiny jsou známé (čísla, ne odkazy) */ exact: boolean };
+  /**
+   * poloha výchozí díry kruhového pole na ose `axis`, když díra leží na přímce středem pole rovnoběžné s touto osou:
+   * souřadnici dává roztečná kružnice Ø `d` se středem `center` (osa pole ∥ `dir`) spolu s polohou středu na téže ose
+   */
+  pcd?: { center: Vec3; d: number; dir: Vec3 };
   /** jen hodnotou (bez geometrie) – dosavadní kontrola */
   byValue?: boolean;
   functional?: boolean;
@@ -302,6 +307,30 @@ function instances(doc: CadDoc, f: Feature, seeds: Vec3[]): Vec3[] {
   return pts;
 }
 
+/** kruhové pole, které opakuje díru `f` kolem osy rovnoběžné s osou díry (osa modelu `k`), nebo null */
+function circularOf(doc: CadDoc, f: Feature, k: 0 | 1 | 2): { center: Vec3; dir: Vec3 } | null {
+  for (const g of doc.features) {
+    if (g.suppressed || g.type !== "pattern" || g.kind !== "circular") continue;
+    const ids = g.featureIds?.length ? g.featureIds : [g.featureId];
+    if (!ids.includes(f.id)) continue;
+    const dir = AXV[g.axis] ?? [0, 0, 1];
+    if (Math.abs(dir[k]) < 0.999) return null;
+    return { center: [...g.center] as Vec3, dir };
+  }
+  return null;
+}
+/**
+ * Roztečná kružnice jako kóta polohy výchozí díry kruhového pole na ose `k` (`ka` = osa pole): jen když díra leží na
+ * přímce středem pole rovnoběžné s osou `k` (druhá souřadnice v rovině = souřadnice středu) – pak je souřadnice díry
+ * střed ± poloměr roztečné kružnice. Díra jinde na kružnici (natočená) potřebuje i úhel → roztečná kružnice nestačí.
+ */
+function pcdFor(ring: { center: Vec3; dir: Vec3 }, p: Vec3, k: 0 | 1 | 2, ka: 0 | 1 | 2): DimReq["pcd"] | null {
+  const o = ([0, 1, 2] as const).find((j) => j !== k && j !== ka)!;
+  const r = Math.abs(p[k] - ring.center[k]);
+  if (r < 1e-6 || !eq(p[o], ring.center[o])) return null;
+  return { center: ring.center, d: 2 * r, dir: ring.dir };
+}
+
 type HoleF = Extract<Feature, { type: "hole" }>;
 const holeDir = (f: HoleF): Vec3 | null => (f.dirDef?.kind === "vector" ? unit(f.dirDef.v) : f.dirDef?.kind === "axis" ? AXV[f.dirDef.axis] : f.dirDef ? null : AXV[f.axis ?? "Z"]);
 /** specifikace díry (stejné díry = jedna skupina s počtem „n×“) */
@@ -380,8 +409,13 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
           c.unchecked.push(tr("poloha {0} (šikmá osa díry)", f.name));
           break;
         }
+        const ring = circularOf(doc, f, ax.k);
         seeds.forEach((p, si) => {
-          for (const k of [0, 1, 2] as const) if (k !== ax.k) addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label: tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])), source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p });
+          for (const k of [0, 1, 2] as const) {
+            if (k === ax.k) continue;
+            const pcd = ring ? pcdFor(ring, p, k, ax.k) : null;
+            addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label: tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])), source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p, ...(pcd ? { pcd } : {}) });
+          }
         });
         break;
       }
@@ -580,9 +614,26 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
   }
   const mid = own ? (own[0] + own[1]) / 2 : ats[0];
   if (f.centers.some((x) => x.k === q.axis && eq(x.c, mid))) return done("ok", tr("osa souměrnosti"));
+  const pf = q.pcd ? pcdFact(q, f) : null;
+  if (pf) {
+    take(pf.i, pf.tol);
+    return done("ok", tr("roztečná kružnice Ø{0}", fmt(q.pcd!.d)));
+  }
   if (q.point && inTable(f, views, q.point).length) return done("ok", tr("tabulka děr"));
   if (baked) return done("unchecked", tr("kóty zapečené v pohledu – polohu nejde ověřit"));
   return done("missing");
+}
+
+/**
+ * Poloha výchozí díry kruhového pole z roztečné kružnice: kóta / popis Ø d v pohledu podél osy pole se středem ve středu
+ * pole, a poloha středu pole na téže ose je na listu (osa souměrnosti nebo délková kóta končící na středu) – jinak null.
+ */
+function pcdFact(q: DimReq, f: Facts): CircFact | null {
+  const p = q.pcd!;
+  const k = q.axis!;
+  const located = f.centers.some((x) => x.k === k && eq(x.c, p.center[k])) || f.lin.some((x) => x.k === k && (eq(x.c1, p.center[k]) || eq(x.c2, p.center[k])));
+  if (!located) return null;
+  return f.circ.find((x) => x.kind === "dia" && eq(x.value, p.d) && Math.abs(dot(x.cam.d, p.dir)) >= 0.999 && near2(x.c, projQ(x.cam, p.center), 0.05)) ?? null;
 }
 
 /* ───────────────────────── tolerance ───────────────────────── */

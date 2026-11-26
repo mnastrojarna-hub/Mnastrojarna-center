@@ -173,4 +173,31 @@ describe("bod 18 (kontrola kót pro výrobu) – engine se skutečným jádrem",
     const de = await runScript(ws, 'tab "Deska A"\nzeichnung prüfen maße', host);
     expect(formatConsole(de)).toMatch(/Maßprüfung: Größen \d+\/\d+ · Lagen \d+\/\d+/);
   }, 240_000);
+  it("kolo 4 (cad-agent-journey krok 6): příruba s kruhovým polem 6× Ø6,6 na Ø50 – Chytré kóty → polohy n/n bez „chybí“, výchozí díra roztečnou kružnicí", async () => {
+    const ws = new MemoryWorkspace();
+    const script = [
+      "nový díl Deska",
+      "skica XY",
+      "čára -60 30 -60 -35 -55 -40 55 -40 60 -35 60 30",
+      "oblouk 60 30 57,0710678 37,0710678 50 40",
+      "čára 50 40 10 40 10 34 -10 34 -10 40 -50 40",
+      "oblouk -50 40 -57,0710678 37,0710678 -60 30",
+      "vysunout 12",
+      "díra 20 skrz v 0 0",
+      "díra 6,6 skrz v 25 0",
+      "pole kruhové 6",
+      "výkres A3 na šířku pohledy přední,horní,iso",
+      "kótovat",
+      "výkres stav",
+      "výkres kontrola kót",
+    ].join("\n");
+    const r = await runScript(ws, script, hostOf());
+    const txt = formatConsole(r);
+    // stejný požadavek jako e2e cad-agent-journey krok 6 (velikosti i polohy n/n, nic nechybí)
+    expect(txt).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
+    expect(txt).toMatch(/poloha Díra 2 – X 25 – roztečná kružnice Ø50/);
+    expect(txt).not.toContain("chybí: poloha Díra 2");
+    expect(codes(r, "drawing.dims-incomplete")).toEqual([]);
+    expect(txt).toMatch(/Polohy děr: .* – na listu (\d+)\/\1/);
+  }, 240_000);
 });

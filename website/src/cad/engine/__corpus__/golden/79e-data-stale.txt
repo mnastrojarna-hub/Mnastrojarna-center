@@ -51,7 +51,7 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
 ⚠ řádek 3: vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) – vydejte novou revizi: výkres vydat B
 Exporty (2, zastaralých 1) · model je teď r·?:
   1. ⚠ PDF „Deska_A_vykres.pdf“ · list List 1 · rev. A · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky), exportujte znovu: výkres export pdf
-  2. STEP „Deska_A.step“ · z modelu r·? (?.?.????) – odpovídá modelu
+  2. STEP „Deska_A.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s · kontrola ✓ – odpovídá modelu
 Zastaralé výstupy (2) · model je teď r·?:
   1. ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) → výkres vydat B
   2. ⚠ PDF „Deska_A_vykres.pdf“ – exportováno z modelu r·? (?.?.????), model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) → výkres export pdf
