@@ -1,0 +1,23 @@
+  (* = vlastní kóta uživatele · ⚠ = po změně modelu neodpovídá geometrii – viz hlášení níže)	  (* = eigenes Maß des Benutzers · ⚠ = passt nach Modelländerung nicht mehr zur Geometrie – siehe Meldung unten)
+{0} – geometrie, ke které se kóta váže, v pohledu není; kóta se kreslí podle uložených bodů	{0} – die Geometrie, an der das Maß hängt, ist nicht in der Ansicht; das Maß wird nach den gespeicherten Punkten gezeichnet
+{0} – pohled kóty na listu není, kóta se nekreslí	{0} – die Ansicht des Maßes ist nicht auf dem Blatt, das Maß wird nicht gezeichnet
+{0} – přichycena ke změněné geometrii, na listu teď {1}	{0} – an die geänderte Geometrie angehängt, auf dem Blatt jetzt {1}
+{0} (zadáno {1})	{0} (eingegeben {1})
+{0} × značka rámu	{0} × Rahmenmarke
+{0} sestavy se zapisuje z kopie dílu: {1}	{0} der Baugruppe wird aus einer Teilkopie geschrieben: {1}
+Kóta se po změně modelu přichytila ke změněné geometrii: zadáno {0}, na listu {1}. Kliknutím ji potvrdíte (uloží se nynější geometrie).	Nach der Modelländerung hängt das Maß an der geänderten Geometrie: eingegeben {0}, auf dem Blatt {1}. Klicken bestätigt es (die jetzige Geometrie wird gespeichert).
+kótu bez geometrie vložte znovu nebo smažte (výkres smazat {0})	Maß ohne Geometrie neu einfügen oder löschen (zeichnung löschen {0})
+přichycenou kótu zkontrolujte a potvrďte (výkres upravit {0} odsazení=…)	angehängtes Maß prüfen und bestätigen (zeichnung bearbeiten {0} versatz=…)
+ruční kóty po změně modelu neodpovídají geometrii ({0}): {1} – {2}	manuelle Maße passen nach der Modelländerung nicht mehr zur Geometrie ({0}): {1} – {2}
+tabulka × rám	Tabelle × Rahmen
+tabulka přes čáru nebo centrovací značku rámu: kusovník nad razítkem / na samostatném listu (výkres kusovník nad | list) nebo jiný formát	Tabelle über einer Rahmenlinie oder Zentriermarke: Stückliste über dem Schriftfeld / auf eigenem Blatt (zeichnung stückliste oben | blatt) oder anderes Format
+Kusovník listu ukazuje údaje z vložení – kopie dílů je starší než díl v záložce ({0}): {1}	Die Stückliste des Blatts zeigt die Daten vom Einfügen – die Teilkopie ist älter als das Teil im Tab ({0}): {1}
+list „{0}“	Blatt „{0}“
+{0} se změněnými údaji dílu (název, číslo, materiál, druh položky)	{0} mit geänderten Teiledaten (Name, Nummer, Werkstoff, Positionsart)
+změna údajů dílu (název, číslo, materiál, druh položky)	Teiledaten geändert (Name, Nummer, Werkstoff, Positionsart)
+{0}: plocha F{1} označena na modelu {2}, model je teď {3} – označte ji znovu ({4})	{0}: Fläche F{1} wurde am Modell {2} markiert, das Modell ist jetzt {3} – erneut markieren ({4})
+základna {0} F{1}	bezug {0} F{1}
+funkční F{0}	funktional F{0}
+základna {0}	Bezug {0}
+ · tolerance neověřeny (funkční prvky označené na starší revizi modelu – označte je znovu)	 · Toleranzen nicht geprüft (Funktionselemente an einer älteren Modellrevision markiert – erneut markieren)
+funkční prvky a základny označené na starší revizi modelu ({0}) se nekontrolují – označte je znovu (funkční F… / základna A F…)	an einer älteren Modellrevision markierte Funktionselemente und Bezüge ({0}) werden nicht geprüft – erneut markieren (funktional F… / bezug A F…)

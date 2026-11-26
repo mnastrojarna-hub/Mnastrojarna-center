@@ -174,6 +174,7 @@ function ApprovalRow({
               </span>
             )}
             <span>· {item.proposedBy ? `připravil ${item.proposedBy} · ` : ""}{relativeTime(item.createdAt)}</span>
+            {isOutbound && <span className="font-medium text-amber-700 dark:text-amber-400">· zatím neodesláno</span>}
             {item.rawType === "purchase_order" && (
               <span className="w-full text-[11px] sm:w-auto" data-testid="po-sender">
                 Odešle se z: <span className="font-medium text-foreground">{po?.senderEmail ?? "tvé schránky"}</span>
@@ -311,7 +312,7 @@ export function ApprovalQueue({
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           {/* #25: ruční nabídky kolegů má panel „Nabídky ke schválení“ nad touto kartou — tady jen AI akce */}
-          <CardTitle className="text-base">AI akce ke schválení</CardTitle>
+          <CardTitle className="text-base">Čeká na tvé odeslání</CardTitle>
           {items.length > 0 && <Badge variant="warning">{items.length}</Badge>}
         </div>
         {mode === "full" && (
@@ -323,16 +324,16 @@ export function ApprovalQueue({
       <CardContent className="space-y-2">
         {mode === "full" && (
           <div className="rounded-lg border border-dashed bg-success/5 p-3 text-xs text-muted-foreground">
-            V režimu <span className="font-medium text-success">plné automatiky</span> AI tyto akce
-            odesílá sama. Přepni na <span className="font-medium text-foreground">Se schválením</span>,
-            pokud chceš každou akci nejprve potvrdit.
+            I v režimu <span className="font-medium text-success">plné automatiky</span> e-maily
+            neodcházejí samy — odejde jen to, co odešle člověk kliknutím.
           </div>
         )}
 
         {items.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-primary">Červené tlačítko odešle e-mail příjemci.</span>{" "}
-            Zelené jen potvrdí změnu uvnitř systému. Každý text můžeš před odesláním upravit — AI se z úprav učí.
+            <span className="font-medium text-foreground">Nic z toho zatím neodešlo a samo neodejde.</span>{" "}
+            <span className="font-medium text-primary">Červené tlačítko e-mail odešle,</span> Zamítnout ho zahodí.
+            Zelené jen potvrdí změnu uvnitř systému. Text můžeš před odesláním upravit.
           </p>
         )}
 

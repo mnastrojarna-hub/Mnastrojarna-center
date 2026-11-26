@@ -226,6 +226,43 @@ describe("sledovaná vůle (vlna 22, bod 6)", () => {
     expect(c.pairs.map((p) => [p.a, p.b].sort().join("×"))).toEqual(["strz×vedL"]);
     expect(c.pairs[0].min!.d).toBeCloseTo(0.01, 9);
   });
+
+  // fáze 2 kolo 3 (falešná zelená): „pohyblivé“ se dřív zjišťovaly jen ve větvi zjemnění – „bez zjemnění“ = žádná dvojice
+  // (souhrn „žádná dvojice blíž než 1,1 mm“, clear.pairs=0 při vůli 0,01 mm) a krok 0 se nevyhodnotil nikdy
+  it("„pohyblivé“ bez zjemnění: dvojice se najde i jen v polohách, včetně kroku 0 (11 z 11 poloh)", async () => {
+    const k = fakeKernel(shapes);
+    const res = await study(doc, { clearance: k.clearance }, 10, punch, { collisions: false, clearance: { pairs: "moving", limit: 0.05, refine: false } });
+    const c = res.clearance!;
+    expect(c.pairs.map((p) => [p.a, p.b].sort().join("×"))).toEqual(["strz×vedL"]);
+    const p = c.pairs[0];
+    expect(p.min!.d).toBeCloseTo(0.01, 9);
+    expect(p.below).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(p.series.filter((v) => v !== undefined).length).toBe(11);
+    expect(k.calls.sweep).toBe(0); // bez zjemnění žádná dráha posuvu
+  });
+
+  it("„pohyblivé“ se zjemněním: krok 0 vyhodnocen (dřív „10 z 10 poloh (kroky 1–10)“), každý krok jen jednou", async () => {
+    const k = fakeKernel(shapes);
+    const res = await study(doc, { clearance: k.clearance }, 10, punch, { collisions: false, clearance: { pairs: "moving", limit: 0.05 } });
+    const p = res.clearance!.pairs[0];
+    expect(p.below).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(p.series.length).toBe(11);
+  });
+  // fáze 2 kolo 3 (parita 74g: Node „Střižník × Vodítko“, prohlížeč „Vodítko × Střižník“): pořadí dvojice „pohyblivé“ bylo podle
+  // náhodných id komponent – nyní podle pořadí komponent v sestavě, stejně v každém běhu
+  it("„pohyblivé“: pořadí dvojice podle pořadí komponent v sestavě, ne podle náhodných id", async () => {
+    const named = (id: string, name: string, p: Placement) => ({ ...comp(id, p), name }) as AsmComponent;
+    for (const [g, s] of [["zz9", "aa1"], ["aa1", "zz9"]] as const) {
+      const sh: Record<string, Shape> = { [g]: shapes.vedL, [s]: shapes.strz };
+      const d: CadDoc = { ...emptyDoc("S6c"), kind: "assembly", components: [named(g, "Vodítko", pl(0)), named(s, "Střižník", pl(0, 0, -30))] } as CadDoc;
+      for (const refine of [false, true]) {
+        const res = await study(d, { clearance: fakeKernel(sh).clearance }, 4, (t) => ({ [s]: pl(0, 0, -30 + 20 * t) }), { collisions: false, clearance: { pairs: "moving", limit: 0.05, refine } });
+        const c = res.clearance!;
+        expect(c.pairs.map((p) => [p.a, p.b])).toEqual([[g, s]]);
+        expect(c.pairs[0].below).toEqual([0, 1, 2, 3, 4]);
+      }
+    }
+  });
 });
 
 describe("pomocné výpočty", () => {

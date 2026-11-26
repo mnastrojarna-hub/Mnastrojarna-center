@@ -71,6 +71,9 @@ export function dimCheckIssues(r: DimCompleteResult | null, o: { sheetId?: strin
         data: data({ item: q.id, functional: true }),
         ...base,
       });
+  // označené plochy / základny ze starší revize modelu: požadavek uživatele se neověřil – ⚠, ne „bez nálezů“ (bod 18, kolo 3)
+  if (o.withTol && r.tol.stale)
+    out.push({ level: "warn", code: "drawing.tolerance-missing", kind: "tolerance-missing", text: tr("funkční prvky a základny označené na starší revizi modelu ({0}) se nekontrolují – označte je znovu (funkční F… / základna A F…)", r.tol.stale), data: data({ functional: true, stale: r.tol.stale }), ...base });
   if (r.tol.over.length) out.push({ level: "note", code: "drawing.tol-nonfunctional", kind: "tol-nonfunctional", text: r.tol.over.map((x) => `${x.label} ${x.tol}`).join(", "), data: data({ anns: r.tol.over.map((x) => x.ann) }), ...base });
   return out;
 }

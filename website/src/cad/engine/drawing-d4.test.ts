@@ -23,6 +23,10 @@ import { docLine, formatConsole } from "./protocol";
 import type { RunReport } from "./protocol-types";
 import { runScript } from "./run";
 import { clearDrawingMemo, sheetOverlapsOf } from "./sheet-eval";
+import { drawExtras } from "./asm-status";
+import { sheetMeta, sheetOptions } from "../drawing-agent";
+import { withAnnotations } from "../drawing";
+import { sheetOverlaps } from "../drawing-overlaps";
 
 const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
 const FONTS = path.resolve(__dirname, "../../../public/fonts");
@@ -58,6 +62,20 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     setLang("cs");
     clearDrawingMemo();
   });
+  /** žádná čára rámu (centrovací značka) nevede z okraje listu dovnitř rámu přes tabulku; kontrola překryvů ji zná (kolo 3) */
+  const expectMarksClear = async (ws: MemoryWorkspace, name: string) => {
+    const d = docOf(ws, name);
+    const sh = d.drawings![0];
+    const res = await kernel.drawing(d, sheetMeta(d, sh, 0, await drawExtras(ws, kernel, d)), sheetOptions(sh));
+    const fr = res.frameRect!;
+    const inFrame = (p: [number, number]) => p[0] > fr.x + 0.3 && p[0] < fr.x + fr.w - 0.3 && p[1] > fr.y + 0.3 && p[1] < fr.y + fr.h - 0.3;
+    const marks = res.polys.filter((p) => p.layer === "frame" && p.pts.length === 2 && inFrame(p.pts[0] as [number, number]) !== inFrame(p.pts[1] as [number, number]));
+    const crosses = marks.filter((p) => (res.tables ?? []).some((t) => { const xs = p.pts.map((q) => q[0]); const ys = p.pts.map((q) => q[1]); return Math.max(...xs) > t.x && Math.min(...xs) < t.x + t.w && Math.max(...ys) > t.y && Math.min(...ys) < t.y + t.h; }));
+    expect(crosses).toEqual([]);
+    // značky, které tabulku míjí, zůstaly (ISO 5457) – aspoň dvě (levá a pravá / horní)
+    expect(marks.length).toBeGreaterThanOrEqual(2);
+    expect(sheetOverlaps(withAnnotations(res, sh.annotations)).byKind["table-frame"] ?? 0).toBe(0);
+  };
 
   it("30 dílů na A3: měřítko ≥ 1:2 (dřív 1:200), kusovník ve sloupcích, pozice bez překryvů, D overlaps=0", async () => {
     const ws = new MemoryWorkspace();
@@ -75,6 +93,9 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     expect(sheetOverlapsOf(docOf(ws, "Nástroj"))).toBe(0);
     expect(docLine({ ref: "Nástroj", name: "Nástroj", kind: "assembly", sheets: 1, overlaps: 0 })).toMatch(/ overlaps=0$/);
     expect(docLine({ ref: "Nástroj", name: "Nástroj", kind: "assembly", sheets: 1 })).not.toMatch(/overlaps=/);
+    // kolo 3 (fáze 2): centrovací značka uprostřed spodního rámu A3 vedla přes záhlaví 2. sloupce kusovníku („Hmotnost“), kontrola
+    // překryvů ji neznala → „Překryvy na listu: 0“. Teď se značka u tabulky nekreslí dovnitř rámu a kontrola čáry rámu zná.
+    await expectMarksClear(ws, "Nástroj");
   }, 600_000);
 
   it("100 dílů na A1 (akceptace): kusovník 100 řádků ve sloupcích bez chybějících, pozice ve více pohledech, překryvy 0", async () => {
@@ -87,6 +108,8 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     expect(st).toMatch(/nevešlo se 0/);
     expect(st).toMatch(/Překryvy na listu: 0 \(/);
     expect(codes(r, "drawing.bom-overflow")).toEqual([]);
+    // kolo 3: na A1 značka přes „Materiál“ 3. sloupce kusovníku
+    await expectMarksClear(ws, "Nástroj");
   }, 900_000);
 
   it("zámek pozice a přiřazení pohledu přežijí změnu modelu; posun; odemknout; ruční odsazení vygenerované kóty zůstane", async () => {

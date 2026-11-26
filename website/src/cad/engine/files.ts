@@ -19,6 +19,7 @@ import { embedBlobs, missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
+import { staleCopies, staleCopyText } from "../asm-refresh";
 import type { PdfFonts } from "../pdf";
 import { sketchToDxf } from "../sketch";
 import type { AsmComponent, CadDoc, ExportFormat, Feature } from "../types";
@@ -180,6 +181,36 @@ export function stableStep(bytes: Uint8Array): Uint8Array {
   const u8 = new Uint8Array(out.length);
   for (let i = 0; i < out.length; i++) u8[i] = out.charCodeAt(i);
   return u8;
+}
+
+/**
+ * Revize modelu v hlavičce STEP (vlna 22, bod 12): `FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision r\X\B7a1b2c3'),'2;1')`
+ * – druhá položka popisu (ISO 10303-21: seznam řetězců; `\X\B7` = „·“ v kódování ISO 8859-1). Soubor tak sám říká, ze které
+ * revize modelu vznikl (stejně jako .mncad `modelRev`, řádek F `rev=` a PDF Info). Stejná revize = stejné bajty v prohlížeči
+ * i v CLI. Už označený soubor se neoznačí podruhé; soubor bez hlavičky FILE_DESCRIPTION se vrátí beze změny.
+ */
+export function stampStepRev(bytes: Uint8Array, rev: string): Uint8Array {
+  let head = "";
+  const n = Math.min(bytes.length, 8192);
+  for (let i = 0; i < n; i++) head += String.fromCharCode(bytes[i]);
+  const m = /FILE_DESCRIPTION\s*\(\s*\(((?:'(?:[^']|'')*'\s*,?\s*)*)\)/.exec(head);
+  if (!m || /MNCAD model revision/.test(m[1])) return bytes;
+  const tag = `'MNCAD model revision ${rev.replace(/·/g, "\\X\\B7").replace(/[^\x20-\x7e]/g, "?")}'`;
+  const at = m.index + m[0].length - 1; // před „)“ seznamu popisu
+  const ins = (m[1].trim() ? "," : "") + tag;
+  const out = new Uint8Array(bytes.length + ins.length);
+  out.set(bytes.subarray(0, at), 0);
+  for (let i = 0; i < ins.length; i++) out[at + i] = ins.charCodeAt(i);
+  out.set(bytes.subarray(at), at + ins.length);
+  return out;
+}
+
+/** revize modelu z hlavičky STEP (`stampStepRev`) – `r·a1b2c3`, nebo null */
+export function stepRevOf(bytes: Uint8Array): string | null {
+  let head = "";
+  for (let i = 0; i < Math.min(bytes.length, 8192); i++) head += String.fromCharCode(bytes[i]);
+  const m = /'MNCAD model revision (r\\X\\B7[0-9a-f]{6})'/.exec(head);
+  return m ? m[1].replace("\\X\\B7", "·") : null;
 }
 
 /** 3D model v jádře (STEP, STL, BREP, OBJ, glTF, 3MF, VRML); STEP s pevným časem v hlavičce (`stableStep`) */
@@ -451,7 +482,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
@@ -521,6 +552,9 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   const env: DrawEnv = { kernel: host.kernel, ws, ...(host.fonts ? { fonts: host.fonts } : {}), flat: o.flat ?? true, ...(o.hooks ? { hooks: o.hooks } : {}) };
   // úplnost dokumentace sestavy (ℹ souhrn + ⚠ vyráběné bez výkresu / čísla) – u výkresu a kusovníku; job.ts opakování vynechá
   for (const n of asmDocNotes(d)) note(n);
+  // 22g (kolo 3): kusovník / výkres sestavy z kopie dílu starší než díl v záložce – export to řekne vždy (dřív jen řádek změny
+  // dílu nebo `kusovník`; CSV s prázdným číslem a „— (třída Ocel)“ se zapsal bez ⚠)
+  if (d.kind === "assembly") for (const sc of staleCopies(d, (n) => ws.findPart(n))) note({ code: "asm.stale-copy", text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", fmt.toUpperCase(), staleCopyText(sc)), level: "warn" });
   if (fmt === "csv") {
     const csv = await bomCsv(env, d);
     if (!csv) {
@@ -538,7 +572,8 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   for (const s of sheets) {
     for (const w of s.warnings) {
       // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete
-      const code = sheetWarningCode(w) === "drawing.section-miss" ? "drawing.section-miss" : sheetWarningCode(w) === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning";
+      const wc = sheetWarningCode(w);
+      const code = wc === "drawing.section-miss" || wc === "drawing.dims-incomplete" || wc === "drawing.dim-detached" ? wc : "drawing.warning";
       note({ code, args: issueArgs(code, s.issue, w), ...(code === "drawing.section-miss" ? { level: "error" as const } : {}) });
     }
     if (s.lost) note({ code: "drawing.warning", args: [s.issue, tr("Kóty a poznámky bez geometrie: {0}", s.lost)] });

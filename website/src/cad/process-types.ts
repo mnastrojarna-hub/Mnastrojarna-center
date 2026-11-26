@@ -28,7 +28,16 @@ export type ProcReq = {
   maxOps?: number;
   /** stavy, jejichž sítě se mají vrátit (index do `states`) – jen zobrazení (prohlížeč); CLI sítě nepotřebuje */
   mesh?: number[];
+  /**
+   * další operace na TÉMŽE obrobku (stejný `target`, stejné kroky studie): jádro pak vrátí i `combined` – stav obrobku po všech
+   * operacích v kroku (sjednocení odebraných objemů; společný objem se počítá jednou). Bez nich se každá operace počítá sama.
+   */
+  others?: ProcOpSpec[];
+  /** kombinované stavy, jejichž sítě se mají vrátit (index do `combined.states`) */
+  meshCombined?: number[];
 };
+/** operace bez obrobku (obrobek je společný) – `ProcReq.others` */
+export type ProcOpSpec = Pick<ProcReq, "tool" | "kind" | "depth" | "rels" | "maxOps">;
 
 /** záběr nástroje v kroku */
 export type ProcStep = {
@@ -67,6 +76,11 @@ export type ProcRes = {
   approx?: { contact: number; computed: number };
   /** chyba booleovské operace (výsledek pak jen do posledního platného stavu) */
   error?: string;
+  /**
+   * kombinovaný stav obrobku (jen s `others`): `steps[k]` = index do `states` v kroku k (0 = plný); stav = obrobek − sjednocení
+   * odebraných objemů všech operací v kroku; `scrap` = kusy sjednoceného odpadu prostřižených operací
+   */
+  combined?: { steps: number[]; states: ProcState[]; /** sjednocení selhalo (stav od té chvíle neurčen) */ error?: string };
   /** výsledek z mezipaměti jádra */
   cached?: boolean;
   /** čas výpočtu [ms] */
@@ -76,4 +90,5 @@ export type ProcRes = {
 /** výchozí strop booleovských operací na operaci */
 export const PROC_MAX_OPS = 48;
 /** klíč požadavku (bez sítí): stejná studie a geometrie = tentýž výsledek (mezipaměť jádra i sítí v prohlížeči) */
-export const procKey = (q: ProcReq): string => JSON.stringify([q.target.key, q.tool.key, q.kind, q.depth ?? null, q.maxOps ?? PROC_MAX_OPS, q.rels]);
+export const procKey = (q: ProcReq): string =>
+  JSON.stringify([q.target.key, q.tool.key, q.kind, q.depth ?? null, q.maxOps ?? PROC_MAX_OPS, q.rels, ...(q.others?.length ? [q.others.map((o) => [o.tool.key, o.kind, o.depth ?? null, o.maxOps ?? PROC_MAX_OPS, o.rels])] : [])]);

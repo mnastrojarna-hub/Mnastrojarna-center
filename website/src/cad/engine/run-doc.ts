@@ -53,10 +53,17 @@ const lastFeature = (d: CadDoc) => d.features[d.features.length - 1];
 export async function flush(ctx: OpCtx): Promise<void> {
   const r = runOf(ctx);
   if (!r.changed) return;
+  const w = (r.wrote ??= { opened: [], committed: [] }); // co běh zapsal před koncem – zrušení to vrátí / vyjmenuje (run.ts)
   if (r.openNew && !r.tabbed) {
-    await ctx.ws.openInTab(r.doc, { ...(r.docId ? { docId: r.docId } : {}), origin: r.origin ?? "new" }); // záložka běhu – opakovaný běh ji převezme (engine/runs.ts)
+    const prev = ctx.ws.present(); // znovu použitá prázdná úvodní záložka: zrušení ji vrátí do tohoto stavu
+    const t = await ctx.ws.openInTab(r.doc, { ...(r.docId ? { docId: r.docId } : {}), origin: r.origin ?? "new" }); // záložka běhu – opakovaný běh ji převezme (engine/runs.ts)
+    if (t) w.opened.push({ id: t.id, name: r.doc.name, ...(t.reused ? { prev } : {}) });
     r.tabbed = true;
-  } else ctx.ws.commit(r.doc);
+  } else {
+    ctx.ws.commit(r.doc);
+    const at = ctx.ws.tabs().find((t) => t.active)?.id; // zápis do záložky, kterou založil tento běh, vrátí její zavření
+    if (!w.opened.some((x) => x.id === at) && !w.committed.includes(r.doc.name)) w.committed.push(r.doc.name);
+  }
   r.changed = false;
 }
 

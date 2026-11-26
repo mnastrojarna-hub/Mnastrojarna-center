@@ -214,6 +214,17 @@ const row = (over: Partial<FileRowWithAnon> = {}): FileRowWithAnon => ({
 });
 
 describe("pickShareFile (matice)", () => {
+  it("kliknuté Odeslat (sendAnyway): nepovedená anonymizace → originál, čekající jen s „all“, doklad zákazníka nikdy", () => {
+    for (const st of ["failed", "unsupported"] as const) {
+      expect(pickShareFile(row({ anon_status: st }))).toMatchObject({ ok: false });
+      expect(pickShareFile(row({ anon_status: st }), { sendAnyway: "settled" })).toMatchObject({ ok: true, source: "original", audit: true });
+    }
+    expect(pickShareFile(row({ anon_status: "pending" }), { sendAnyway: "settled" })).toMatchObject({ ok: false, reason: "pending" });
+    expect(pickShareFile(row({ anon_status: "pending" }), { sendAnyway: "all" })).toMatchObject({ ok: true, source: "original" });
+    expect(pickShareFile(row({ anon_status: "done" }), { sendAnyway: "all" })).toMatchObject({ ok: true, source: "anon" });
+    expect(pickShareFile(row({ kind: "objednavka", filename: "PO.pdf", anon_status: "failed" }), { sendAnyway: "all" })).toMatchObject({ ok: false });
+    expect(pickShareFile(row({ anon_status: "failed" }), { sendAnyway: "all", priceDocument: true })).toMatchObject({ ok: false });
+  });
   it("náš doklad → originál", () => {
     expect(pickShareFile(row({ origin: "generated", anon_status: null }))).toMatchObject({ ok: true, source: "original" });
     expect(pickShareFile(row({ issuer: "my", anon_status: null }))).toMatchObject({ ok: true, source: "original" });

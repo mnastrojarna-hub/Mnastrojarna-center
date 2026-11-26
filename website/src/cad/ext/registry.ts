@@ -142,6 +142,12 @@ export type ExtDef = {
    * tělesa nástroj neukládá) – ptejte se přes `hasExtTool(f)`.
    */
   toolBody?: boolean | ((data: Record<string, unknown>) => boolean);
+  /**
+   * Číselné parametry odvozené z jiných polí (vlna 22, bod 22d: Tažení po šroubovici s „Závit z katalogu“ = poloměr, stoupání
+   * a hloubka z katalogu podle strany). Stavba používá tytéž hodnoty; formulář je ukáže živě jako „z katalogu“ místo
+   * uložených čísel, která se nepoužijí. null = nic se neodvozuje (uložená čísla platí).
+   */
+  derive?: (data: Record<string, unknown>) => { values: Record<string, number>; source: string } | null;
 };
 
 const defs = new Map<string, ExtDef>();

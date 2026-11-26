@@ -631,6 +631,8 @@ function PlainCorrection({ label, value, onChange }: { label: string; value: { o
   );
 }
 
+const AUTO_SEND_ENABLED = false as boolean;
+
 /** „Rovnou odeslat dodavateli" / plná automatika (jen s právem posílat a s novou objednávkou). */
 function SendNowBlock({ plan, state, setState, plain, className }: {
   plan: HandoffPlan; state: HandoffState; setState: (s: HandoffState) => void; plain: boolean; className?: string;
@@ -640,7 +642,8 @@ function SendNowBlock({ plan, state, setState, plain, className }: {
   const canSend = plan.permissions.canSend && orders > 0 && !plain;
   const sender = plan.automation.senderEmail;
   const disabled = !first.email || !sender;
-  const auto = canSend && autoSendsAll(plan, state);
+  // majitel 23. 11.: objednávka odejde jen kliknutím člověka (Rovnou odeslat dodavateli), nikdy sama
+  const auto = AUTO_SEND_ENABLED && canSend && autoSendsAll(plan, state);
   const reason = !plan.permissions.canSend && orders > 0 && plan.automation.reason ? plan.automation.reason : null;
   if (!auto && !canSend && !reason) return null;
   return (

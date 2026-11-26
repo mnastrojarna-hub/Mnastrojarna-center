@@ -54,7 +54,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −25 mm
  stojí: 1 („Deska A“)
-Kolize: žádný průnik v 6 polohách
+Kolize: žádný průnik v 6 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
  kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: geometrie dílu „Deska A“
@@ -68,7 +68,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −25 mm
  stojí: 1 („Deska A“)
-Kolize: žádný průnik v 6 polohách
+Kolize: žádný průnik v 6 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
  kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
@@ -79,7 +79,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 50 × 40 × 40 mm · objem Σ 13 cm³ · hmotnost Σ 0,102 kg
 Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
-Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle nekontrolována (podrobně pohyb stav)
 === run 4 ===
 ✓ vazba 1 (Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 25 mm): hodnota 25 mm · ok
   pohnuto: „Přidržovač“ poloha [40; 10; 35]
@@ -97,4 +97,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 50 × 40 × 45 mm · objem Σ 13 cm³ · hmotnost Σ 0,102 kg
 Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
-Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle nekontrolována, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)

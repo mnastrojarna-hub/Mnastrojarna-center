@@ -99,8 +99,8 @@ export function staleCopies(asm: CadDoc, partOf: PartLookup | undefined): StaleC
 export function staleCopyText(s: StaleCopy): string {
   const ref = s.comp.alias ? `"${s.comp.alias}"` : `#${s.index + 1}`;
   const base = s.legacy
-    ? tr("komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje kopie v sestavě; převzít z dílu: sestava obnovit {3}", s.comp.name, s.part, copyFieldsText(s.stale), ref)
-    : tr("komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit {3}", s.comp.name, s.part, copyFieldsText(s.stale), ref);
+    ? tr("komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – převzít z dílu: sestava obnovit {3}; kusovník a výkres ukazují údaje kopie v sestavě", s.comp.name, s.part, copyFieldsText(s.stale), ref)
+    : tr("komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – obnovit: sestava obnovit {3}; kusovník a výkres ukazují údaje z vložení", s.comp.name, s.part, copyFieldsText(s.stale), ref);
   return s.local.length ? `${base} ${tr("(pozor: kopie byla upravena i v sestavě – {0}; obnova úpravu přepíše)", copyFieldsText(s.local))}` : base;
 }
 

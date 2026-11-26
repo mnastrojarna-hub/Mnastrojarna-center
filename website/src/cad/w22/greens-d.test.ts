@@ -24,6 +24,12 @@
  * 15. „nevešlo se 0“ u pozic – jen když se všechny pozice vešly (lost = 0); `✓ pozice … zamčeny` jen s uloženým zámkem
  * 16. `✓ razítko podle šablony hlavičky` – jen když šablona existuje (jinak ✗ s přehledem); logo názvem souboru jen
  *     s nalezeným souborem (jinak ✗ „soubor není připojený“)
+ *  Fáze 2, kolo 3 (ověření po bodech na main 4a46d82):
+ * 17. `✓ výkres: list „X“ vyhodnocen bez nálezů` – nikdy nad ruční kótou, která po změně modelu neleží na geometrii (bod 20:
+ *     „60 *“ na dílu délky 30) – ⚠ drawing.dim-detached; po potvrzení `výkres upravit aN …` zase ✓
+ * 18. „Překryvy na listu: 0“ – nikdy, když centrovací značka rámu vede přes tabulku (bod 17: záhlaví kusovníku A3 / A1)
+ * 19. `✓ výkres: list „X“ vyhodnocen bez nálezů` nad sestavou se zastaralou kopií dílu – nikdy (22g); export kusovníku /
+ *     výkresu sestavy vždy s ⚠ asm.stale-copy
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
@@ -156,6 +162,65 @@ describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", async ()
     expect(has(r, "drawing.stale")).toBe(true);
   });
 
+  it("17 (kolo 3, bod 20): ruční kóta po změně modelu – žádné „✓ list vyhodnocen bez nálezů“, ⚠ drawing.dim-detached; po potvrzení ✓", async () => {
+    const ws = new MemoryWorkspace();
+    const r0 = await run(ws, `${PART}\nvýkres kóta vodorovně pohled přední 0 10 60 10 odsazení 10`);
+    clean(r0);
+    expect(txt(r0)).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    expect(has(r0, "drawing.dim-detached")).toBe(false);
+    const r = await run(ws, 'záložka "Deska A"\nupravit "Kvádr 1" size=30;40;10\nvýkres stav');
+    clean(r);
+    expect(txt(r)).not.toMatch(/vyhodnocen bez nálezů/);
+    expect(txt(r)).not.toMatch(/přední: 60 \*/); // výpis ukazuje, co je na listu, ne uloženou hodnotu
+    expect(txt(r)).toMatch(/přední: 30 \(zadáno 60\) \* ⚠/);
+    const det = r.entries.filter((e) => e.code === "drawing.dim-detached");
+    expect(det.length).toBe(1);
+    expect(det[0].text).toMatch(/a\d+ 60 \(přední\) – přichycena ke změněné geometrii, na listu teď 30/);
+    const ok = await run(ws, `záložka "Deska A"\nvýkres upravit ${/(a\d+) 60 \(přední\)/.exec(det[0].text)![1]} odsazení=10`);
+    clean(ok);
+    expect(has(ok, "drawing.dim-detached")).toBe(false);
+    expect(txt(ok)).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+  }, 240_000);
+
+  it("19 (kolo 3, 22g): list sestavy se zastaralou kopií dílu – žádné „✓ bez nálezů“; export CSV / PDF s ⚠ asm.stale-copy", async () => {
+    const ws = new MemoryWorkspace();
+    clean(await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnový díl "Přidržovač"\nkvádr 40 30 10\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 10 10 20'));
+    // ⚠ zazní u `kusovník` (jiný řádek než list) – list sestavy na dalším řádku ho musí zohlednit v konečném stavu
+    const r = await run(ws, 'záložka "Deska A"\nmateriál 1.2379\nzáložka "Nástroj"\nkusovník\nvýkres A3');
+    clean(r);
+    expect(has(r, "asm.stale-copy")).toBe(true);
+    expect(txt(r)).not.toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    // export (CLI --formats csv,pdf): ⚠ při každém výstupu, dokud se kopie neobnoví
+    const { writeDocFormat } = await import("../engine/files");
+    const asm = ws.docOf!(ws.tabs().find((t) => t.title === "Nástroj")!.id)!;
+    for (const fmt of ["csv", "pdf"] as const) {
+      const notes: { code: string; text?: string }[] = [];
+      await writeDocFormat({ kernel: real as unknown as KernelApi, files: memoryFileSink() }, ws, asm, fmt, (n) => notes.push(n));
+      expect(notes.filter((n) => n.code === "asm.stale-copy").map((n) => n.text)).toEqual([`${fmt.toUpperCase()} sestavy se zapisuje z kopie dílu: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (materiál) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení`]);
+    }
+    // po obnově: ✓ listu, export bez ⚠
+    const ok = await run(ws, 'záložka "Nástroj"\nsestava obnovit "Deska A"\nvýkres A3');
+    clean(ok);
+    expect(txt(ok)).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    const asm2 = ws.docOf!(ws.tabs().find((t) => t.title === "Nástroj")!.id)!;
+    const notes2: { code: string }[] = [];
+    await writeDocFormat({ kernel: real as unknown as KernelApi, files: memoryFileSink() }, ws, asm2, "csv", (n) => notes2.push(n));
+    expect(notes2.filter((n) => n.code === "asm.stale-copy")).toEqual([]);
+  }, 240_000);
+
+  it("20 (kolo 3, bod 20): změna jen materiálu – stav, výstupy ani přepočítat vše netvrdí „odpovídá modelu“ / „Zbývá: nic“", async () => {
+    const ws = new MemoryWorkspace();
+    clean(await run(ws, `${PART}\nvýkres vydat`));
+    const r = await run(ws, 'záložka "Deska A"\nmateriál 1.2379\nstav\nvýkres stav\nvýstupy zastaralé\npřepočítat vše');
+    clean(r);
+    const t = txt(r);
+    expect(t).not.toMatch(/Vydání: rev\. A .* – odpovídá modelu/);
+    expect(t).not.toMatch(/Zastaralé výstupy: žádné/);
+    expect(t).not.toMatch(/Zbývá: nic/);
+    expect(t).toMatch(/se změněnými údaji dílu/);
+    expect(has(r, "drawing.stale")).toBe(true);
+  }, 240_000);
+
   it("9: „Zastaralé výstupy: žádné“ jen bez změny modelu po vydání", async () => {
     const ws = new MemoryWorkspace();
     const r = await run(ws, `${PART}\nvýkres vydat\nvýstupy zastaralé`);
@@ -239,6 +304,13 @@ describe("greens D4 – čitelný výkres sestavy a šablony hlavičky (body 17,
     expect(txt).not.toMatch(/Překryvy na listu: 0/);
     expect(overlapIssueText(ov)).toMatch(/překryvů/);
     expect(docLine({ ref: "a", name: "a", kind: "assembly", sheets: 1 })).not.toMatch(/overlaps=/);
+  });
+
+  it("18 (kolo 3, bod 17): centrovací značka přes záhlaví kusovníku → překryv (nikdy „Překryvy na listu: 0“)", () => {
+    const s = sheet({ polys: [{ layer: "frame", width: 0.7, pts: [[215, 297], [215, 282]] }], tables: [{ kind: "bom", x: 50, y: 266, w: 180, h: 21 }] });
+    const ov = sheetOverlaps(s);
+    expect(ov.total).toBe(1);
+    expect(positionLines(s, {}, ov).join("\n")).not.toMatch(/Překryvy na listu: 0/);
   });
 
   it("15: „nevešlo se 0“ jen bez ztracených pozic; zámek jen s uloženou polohou", () => {

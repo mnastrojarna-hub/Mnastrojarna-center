@@ -40,7 +40,9 @@ do 3D okna (výběr hran a ploch pravidlem).
    \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem). **Běhy:** \`run\` se řadí do fronty (nikdy
    dva běhy najednou), \`window.mncad.runs()\` vrátí běhy a úlohy exportu (\`{ id: "r12", kind, state, inputRev, phase,
    phases, ms, result }\`, stav \`queued | running | done | cancelled | error\`), \`window.mncad.cancelRun(id?)\` běh zruší,
-   \`run(text, { signal })\` přijme \`AbortSignal\`, \`await window.mncad.idle()\` počká na dokončený stav. Každé volání
+   \`run(text, { signal })\` přijme \`AbortSignal\`, \`await window.mncad.idle()\` počká na dokončený stav;
+   \`window.mncad.computes(kind?)\` vrátí výpočty aplikace (stavba modelu, vazby, kolize, měření: \`{ id: "v7", what, state,
+   inputRev }\`, pozdní výsledek staršího výpočtu = \`superseded\`). Každé volání
    \`window.mncad\` nejdřív zapíše rozepsané pole a list výkresu; \`save\`, \`exportFile\`, \`exportDrawing\`, \`share\` počkají
    na doběhnutí běhů a stavby (viz „Průběh a zrušení výpočtu“).
 
@@ -886,7 +888,10 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   začátku operace = ℹ \`clash.work\` (pravidlo „proces střih 1“, jeden model s \`kolize pravidlo pracovní\`), nikdy ⚠ clash.real; nástroj,
   který obrobek nezasáhne = ⚠ \`motion.process-miss\`; neprostřiženo = ℹ \`motion.process-partial\`; strop 48 booleovských operací na
   operaci = ℹ \`motion.process-approx\`. \`pohyb krok N\` vypíše stav výrobku a hloubku zásahu; \`stav\` stav na konci. Dokument se NEMĚNÍ:
-  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava).
+  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
+  TÉMŽE obrobku se kombinuje: stav obrobku = obrobek − sjednocení odebraných objemů všech operací v kroku (druhý střih do téže díry
+  nic nepřidá: \`proc=2 removed=314.159 scrap=1\`, řádek \`„Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení …; součet
+  operací 628,319 mm³)\`), 3D ukáže obrobek po všech operacích; bez kombinace z jádra jen dolní mez \`removed=…+\` a ⚠.
   Zápis události \`pohyb událost při vazba "ZDVIH" <= 1 odeber "Razník" z "Plech"\` = totéž jako střih s podmínkou. \`pohyb úroveň\`
   (EN \`motion level\`) vypíše úroveň; úroveň se příkazem nevolí (geometrická aproximace = procesní operace).
 - **Motory při definici (bod 10):** po \`pohyb motor …\` řádek \`pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
@@ -914,7 +919,7 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   \`pohyb krok N\`, \`pohyb export\`, \`pohyb přehrát\` a \`window.mncad.motion()\` přepočítají (ℹ \`motion.recomputed\` řekne, co se
   změnilo) – starý výsledek se nikdy nevrací jako platný. Platný výsledek: \`motion=ok\` JEN když se kolize v krocích opravdu
   kontrolovaly bez průniku a k motorům není upozornění; \`motion=mates-ok\` = vazby splněny, kolize nekontrolovány; \`warn\` = ⚠ k motorům
-  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec); \`conflict\` / \`clash\` = nesplněné vazby / průnik. Dva výpočty
+  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec), ⚠ procesní vrstvy nebo sledovaná vůle pod limitem; \`conflict\` / \`clash\` = nesplněné vazby / průnik. Dva výpočty
   téhož stavu (panel + text, dvakrát API) se spojí v jeden. Panel studie má stav \`data-motion-state="ok|stale|unchecked|running"\` a
   verdikt \`data-motion-verdict\`.
 - Natočení v souhrnu (\` · natáčí se 30°\`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
@@ -1188,7 +1193,8 @@ hlavičce \`x-mncad-run\` a na konci řádku Σ (\`… run=r12\`); hlavička \`M
 počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předchozí protokol jen sbalený jako **Předchozí běh r11** – starý
 protokol se nikdy nečte jako výsledek nového běhu (atributy \`data-run-id\`, \`data-run-state\` u výstupu); tlačítko
 **Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
-✗ \`run.cancelled\` před dalším řádkem. Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+✗ \`run.cancelled\` před dalším řádkem; zapsal-li běh před zrušením jiný dokument (přechod \`nový díl\` / \`záložka\`), dokumenty, které
+založil, se zahodí a dokumenty zapsané do dřívějších záložek vyjmenuje ✗ \`run.cancelled-partial\` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
 měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny \`pohyb přehrát\` se panelu doručí až po zápisu
 dokumentu běhu.
 
@@ -1201,7 +1207,10 @@ textové \`export step\` – i export z menu) → zápis souboru. Seznam **Expor
 velikost, kontrolu a revizi modelu i po konci (\`data-export-job\`, \`data-export-state\`); úlohu jde zrušit – soubor, který
 už založil dialog „Uložit jako“, se odstraní. \`window.mncad.exportFile\` vrací \`{ …, modelRev, check, job }\`, průběh
 ukazuje \`window.mncad.exports()\`. CLI \`--progress\` vypisuje fáze jménem (\`  export:step: převod do STEP\`,
-\`  build: síť modelu\`).
+\`  build: síť modelu\`). Soubor STEP nese revizi v hlavičce (\`FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision
+r\\X\\B7a1b2c3'),…)\`). Záznam exportu v dokumentu (\`exporty\`, panel Výstupy) nese úlohu – stav, čas \`⏱ 0,4 s\`, fáze a
+kontrolu (\`kontrola ✓\` jen s provedenou kontrolou) – a revizi EXPORTOVANÉHO modelu: změní-li se model během exportu,
+záznam je hned zastaralý. Selhání převodu řekne fázi, zprávu jádra a stav modelu (těleso, prvky s chybou).
 
 ### Plech – tvářecí nástroje a křížový zlom (\`plech …\`, EN \`sheet …\`, DE \`blech …\`)
 
@@ -1805,7 +1814,10 @@ sdílet
 (Text výše je **konzole prohlížeče**. V CLI a ve \`window.mncad.run(text, { protocol: "short" })\` má každý odkaz výpis
 \`= L<n> link …\` a poslední odkaz řádek \`O\` – příklad níže v oddílu „Sdílení“.)
 
-- Kontrola STEP / BREP: \`✓ … věrná kopie modelu\` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm).
+- Kontrola STEP / BREP: \`✓ … věrná kopie modelu\` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm) a po
+  načtení projde přesnou kontrolou platnosti; \`⚠ … NEPROJDE přesnou kontrolou platnosti\` (\`out.reload-invalid\`) = míry
+  sedí, ale soubor po načtení přesnou kontrolou neprojde; \`✓ … → odpovídá modelu; platnost souboru jen rychlou kontrolou\`
+  = přesná kontrola souboru neproběhla (nad 400 ploch).
   \`⚠ kontrola STEP: soubor se od modelu liší – …\` napíše, co nesedí (tělesa, objem, obálka) – opravte prvky s ⚠ / ✗
   (\`stav\`) a export zopakujte. \`✗ kontrola …: soubor se nepodařilo znovu načíst\` = soubor je poškozený nebo prázdný.
 - Chybný zápis skončí řádkem ✗ se správným zápisem (\`export pdf\` → „výkres se exportuje příkazem výkres export pdf“).
@@ -2325,7 +2337,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | \`výkres razítko logo="firma.png"\` · \`… logo="data:image/png;base64,…"\` · \`… logo=ne\` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG/SVG, v CLI soubor ze složky \`--files\`; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek (logo SVG jako vektor), DXF/DWG jako vyplněný obrys (SOLID) |
 | \`výkres nepředepsané ISO 2768-mK\` · \`… mK\` · \`… f H\` · \`… desetinná\` · \`… desetinná ±0,1 ±0,1 ±0,01 ±0,005\` · \`… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005\` · \`… X.XX=±0,02\` · \`… ne\` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); \`ne\` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | \`výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]\` · \`výkres revize smazat B\` | tabulka revizí; poslední revize se zapíše do razítka |
-| \`výkres vydat [B] ["popis změny"] [datum …] [vše]\` · \`výkres vydat zrušit [vše]\` (\`drawing issue\` · \`zeichnung freigeben\`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu \`r·a1b2c3\` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu je vydaný list **zastaralý**: \`výkres stav\` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), \`stav\`, konec běhu, řádek D (\`stale=drawing\`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ \`drawing.stale\`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani \`přepočítat vše\` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999 |
+| \`výkres vydat [B] ["popis změny"] [datum …] [vše]\` · \`výkres vydat zrušit [vše]\` (\`drawing issue\` · \`zeichnung freigeben\`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu \`r·a1b2c3\` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu – i jen čísla, materiálu, názvu nebo druhu položky dílu (údaje razítka a kusovníku; „model je teď r·… se změněnými údaji dílu“, STEP/STL tím nezastará) – je vydaný list **zastaralý**: \`výkres stav\` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), \`stav\`, konec běhu, řádek D (\`stale=drawing\`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ \`drawing.stale\`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani \`přepočítat vše\` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999, DWG vlastnosti souboru (předmět, klíčová slova, číslo revize; R2004 a novější) |
 | \`výkres otočení 0|90|180|270\` · \`výkres řez XZ odsazení 0 poloviční|celý\` · \`výkres kusovník ano|ne\` · \`výkres balónky ano|ne\` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | \`výkres pružiny zjednodušeně|plně\` | pružiny se na výkrese kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr přes volnou délku), osa a čerchované osy drátu na středním průměru jen tam, kde je obrys vidět; v řezu se obal nešrafuje (jen obrys a osy drátu). Pružina = prvek Pružina nebo Tažení po šroubovici s profilem Kruh, který je **prvním materiálem svého tělesa** (normálie pružin, \`pružina …\` jako první prvek dílu, \`… nové těleso "Pružina"\`, i jako komponenty sestavy); těleso pak smí už jen odebírat (zabroušené konce) nebo přidat jiný tvar (očka, ramena). Šroubovice přidaná na existující těleso (chod šneku, oblý závit na hřídeli, pružina přidaná do pouzdra) se kreslí vždy přesně, stejně jako šroubovicová drážka (odebrání) – samostatnou pružinu proto zakládejte jako \`nové těleso\`. Chytré kóty čtou skutečný tvar (obal pružiny nekótují jako díru). \`plně\` = skutečná šroubovice – skrytí hran trvá u každé pružiny desítky sekund (A1 sestava se 4 pružinami: minuty). Stav listu (\`výkres stav\`) uvádí ve Volbách, jak se pružiny kreslí, jen když list nějakou pružinu má. |
 | \`kótovat základní\` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
@@ -2556,6 +2568,7 @@ třídí. Nejčastější:
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
 | \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
+| \`out.reload-invalid\` ⚠ | soubor STEP / BREP odpovídá modelu (tělesa, objem, obálka), ale po zpětném načtení neprojde přesnou kontrolou platnosti (čtečka STEP nastaví tolerance hran menší než odchylka křivek od ploch – typicky závit šroubovicí), model ano; „věrná kopie“ se nenapíše, řádek F \`check=fail\`, \`--strict\` zastaví | soubor ověřit v cílovém CADu; \`přísně kromě out.reload-invalid\`, když to víte |
 | \`out.no-solid\` ✗ / \`out.free-surfaces\` ⚠ | objemový export (STEP, BREP, STL, 3MF) modelu bez objemového tělesa (jen plochy / skořepina – i uzavřená skořepina bez „Uzavřít do tělesa“) / s volnými skořepinami či plochami vedle těles (u sestavy se jmény komponent); soubor se zapíše, ale „věrná kopie modelu“ se nenapíše, řádek F \`check=fail\`, \`--strict\` zastaví | \`prvek surf.close\` (Plochy → Uzavřít do tělesa), \`prvek surf.thicken\`, volnou plochu smazat / potlačit |
 | \`op.accepted\` ℹ / \`op.superseded\` ℹ / \`feature.unchecked\`, \`doc.unchecked\` ℹ / \`feature.built\` ℹ / \`feature.suppressed\` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u \`feature.unchecked\` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
@@ -2563,6 +2576,7 @@ třídí. Nejčastější:
 | \`drawing.tolerance-missing\` ⚠ | \`výkres kontrola tolerancí\`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | \`výkres tolerance aN …\` |
 | \`drawing.bom-overflow\` ⚠ | kusovník se na list nevejde ani ve sloupcích (počet chybějících řádků); \`drawing.overlap\` ⚠ navíc hlásí překryvy celého listu (balónky, odkazové čáry, texty, kóty, geometrie, tabulky, rám) s počtem po druzích | větší formát, \`výkres kusovník list\`, \`výkres pozice pohled …\`, \`výkres pozice zamknout …\` |
 | \`drawing.dims-incomplete\` ⚠ | kontrola kót (bod 18): na listu chybí velikost nebo poloha prvku výsledného dílu (díra, skupina děr s počtem, kapsa / okno, obrys skici) – \`výkres stav\`, konec běhu, export listu | \`výkres doplnit kóty\`, \`výkres kóta …\`, podrobně \`výkres kontrola kót\` |
+| \`drawing.dim-detached\` ⚠ | ruční kóta (ne Chytré kóty) po změně modelu neodpovídá geometrii pohledu: hrana / kružnice / vrcholy zmizely (kóta visí podle uložených bodů), nebo se kóta přichytila ke změněné geometrii (\`výkres stav\` ukáže „30 (zadáno 60) * ⚠“); pohled kóty není na listu – \`výkres stav\`, konec bloku / běhu (místo „✓ list vyhodnocen bez nálezů“), export listu | potvrdit přichycenou kótu \`výkres upravit aN odsazení=…\`, jinak \`výkres smazat aN\` |
 | \`drawing.tol-nonfunctional\` ℹ | přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na kótě, která nesplňuje žádný vyznačený funkční prvek (přetolerování) | vyznačit prvek \`funkční …\`, nebo toleranci uvolnit |
 | \`drawing.stale\` ⚠ | vydaný list (\`výkres vydat\`) neodpovídá nynější revizi modelu: \`výkres stav\`, \`stav\`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | \`výkres vydat B\` (nová revize), přehled \`výstupy zastaralé\` |
 | \`param.clamped\` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
@@ -2631,7 +2645,9 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   STEP / BREP do 400 ploch („✓ těleso: přesná kontrola platnosti … – platné“, vada = ⚠ \`geom.exact-invalid\`, nad limit ℹ
   s důvodem). Výsledek platí pro tutéž geometrii: Geometrie pak končí „· přesná kontrola“, řádek D nese \`vcheck=exact\`
   (bez klíče = rychlá kontrola), JSON \`docs[].validCheck\` = \`exact\` | \`fast\`. Model se kvůli exportu neupravuje
-  (žádné „opravy tolerancí“) – STEP je přesně model.
+  (žádné „opravy tolerancí“) – STEP je přesně model. Přesně se kontroluje i soubor po zpětném načtení (do 400 ploch): čtečka
+  STEP u závitu šroubovicí nastaví tolerance hran menší než skutečná odchylka a soubor pak přesnou kontrolou neprojde, i když
+  model ano – to je ⚠ \`out.reload-invalid\`, ne „věrná kopie“.
 - Potlačený prvek (\`potlačit\`, nebo potlačený aktivní konfigurací) se nestaví: má ℹ \`feature.suppressed\` („potlačen – nestaví
   se“), nikdy ✓; ve výpisu \`stav\` „ℹ (potlačen)“ a počet „N ℹ potlačeno“, v řádku D \`off=N\` (nepočítá se do \`feat=\` mezi ✓).
 - Prvek objemového typu (primitiva, vysunutí, díra, zaoblení, pole, prvky rozšíření s operací přidat / odebrat a všechny
@@ -2860,7 +2876,9 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do \`--out\` (řádek \
 
 - **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem
   těles, obálka): řádek F \`check=ok|fail\`, při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). „→ věrná kopie
-  modelu“ je **jen** soubor s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ \`out.no-solid\` (i když
+  modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
+  modelu; platnost souboru jen rychlou kontrolou …“), jinak ⚠ \`out.reload-invalid\` s počtem vadných ploch, a jen soubor
+  s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ \`out.no-solid\` (i když
   odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ \`out.free-surfaces\` s počty (u sestavy jména
   komponent). STL / 3MF a \`export step bez kontroly\` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
   hmotnost (\`stav\`, řádek D, JSON, \`měřit těleso\`) jsou jen z těles: díl bez tělesa má \`V=- m=-\` a „objem –“. STEP má **stejné bajty při stejném modelu** (pevný čas

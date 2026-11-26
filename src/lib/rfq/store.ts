@@ -17,7 +17,7 @@ import { normalizeDrawingNumber } from "@/lib/jobs/production-suggest";
 import { toneFor } from "@/lib/contacts/server";
 import { supplierParty } from "@/lib/pdf/components";
 import { SHARE_FILE_SELECT, pickShareFile, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "@/lib/anonymize/share";
-import { enqueueSend, sendWithoutPending } from "@/lib/anonymize/send-queue";
+import { enqueueSend, sendQueuedNow, sendWithoutPending } from "@/lib/anonymize/send-queue";
 import { appOrigin, kick } from "@/lib/anonymize/queue";
 import { renderRfqPdf } from "./pdf";
 import {
@@ -613,6 +613,12 @@ async function deliver(db: Db, user: RfqActor, d: DeliverInput): Promise<"sent" 
       return { error: q.error };
     }
     await db.from("rfq_recipients").update({ status: "ceka_na_anonymizaci", send_queue_id: q.id, sent_by: user.id, error: null }).eq("id", d.recipientId);
+    // majitel 23. 11.: odejde hned (anonymizace v požadavku; nepovedená / nestihnutá → originál)
+    const now = await sendQueuedNow(db as never, q.id, { actorId: user.id });
+    if (now.sent) {
+      await db.from("rfq_recipients").update({ status: "odeslano", sent_at: new Date().toISOString(), error: null }).eq("id", d.recipientId).eq("status", "ceka_na_anonymizaci");
+      return "sent";
+    }
     const origin = appOrigin(null);
     if (origin) await kick({ origin, table: "job_files", ids: d.files.pending.slice(0, 5), manualBy: user.id }).catch(() => undefined);
     return "waiting";

@@ -10,6 +10,8 @@
 import { getLang, tr } from "./i18n";
 import { isFault } from "./clash-rules";
 import type { ClashClass } from "./clash-class";
+import { leafLabel } from "./clash-report";
+import type { ClearanceExt } from "./motion-clearance";
 import type { CadDoc, MotionAnnotSettings, MotionStudy, MotionView, StudyCamera, StudySection, Vec3 } from "./types";
 
 export type CamView = NonNullable<StudyCamera["view"]>;
@@ -111,13 +113,38 @@ export function checkSection(s: StudySection): StudySection {
 
 export type AnnotRow = { key: "t" | "step" | "motors" | "clearance" | "cut" | "flags" | "view"; text: string; warn?: boolean };
 /**
- * Vůle v kroku z kontroly minimální vůle studie (balík C2 – `MotionStudy.clearance`). Dokud kontrola vůle neexistuje / neproběhla,
- * vrací null a řádek se nezobrazí (anotace nikdy nepíše vůli, která se nepočítala).
+ * Vůle v kroku z kontroly vůle studie (balík C2 – `MotionStudy.clearance`, výsledek `res.clearance` z cad/motion-clearance.ts:
+ * řada `series[krok]` každé dvojice). Dřív adaptér četl `step.clearance`, které žádný kód nezapisoval – řádek vůle se tak nikdy
+ * nezobrazil (vlna 22, bod 14, fáze 2). Zásada „žádné falešné zelené“:
+ *  - studie vůli nesleduje a výsledek ji nemá → null (řádek se nezobrazí, nic se netvrdí);
+ *  - studie vůli sleduje, ale výsledek ji nemá (jádro bez operace, starší výsledek) → `unchecked` („vůle: nezkontrolováno“);
+ *  - sledovaná dvojice bez hodnoty v kroku → `min: null` („nezměřeno“); dolní mez z obálek → `lower` („nejméně …“);
+ *  - „pohyblivé vůči ostatním“: jen dvojice změřené v kroku (ostatní se v kroku nepočítaly – nic se o nich netvrdí).
+ * Hodnota patří ke kroku `i` (vypočtená poloha); mezi kroky (snímek videa) ji anotace výslovně označí krokem.
  */
-export type ClearanceRow = { a: string; b: string; min: number; limit?: number };
-export function clearanceAt(step: unknown): ClearanceRow[] | null {
-  const c = (step as { clearance?: ClearanceRow[] } | null)?.clearance;
-  return Array.isArray(c) && c.length ? c : null;
+export type ClearanceRow = { a: string; b: string; min: number | null; limit?: number; lower?: boolean };
+export type ClearanceAt = { rows: ClearanceRow[]; more: number } | "unchecked";
+const ANNOT_PAIRS = 4;
+export function clearanceAt(res: unknown, doc: Pick<CadDoc, "motion" | "components">, i: number): ClearanceAt | null {
+  const c = (res as ClearanceExt | null | undefined)?.clearance;
+  const cfg = doc.motion?.clearance;
+  const wants = !!cfg?.pairs && (cfg.pairs === "moving" || cfg.pairs.length > 0);
+  if (!c) return wants ? "unchecked" : null;
+  const name = (id: string) => leafLabel(doc as CadDoc, [id]);
+  const limit = c.limit ?? undefined;
+  const rows: ClearanceRow[] = [];
+  const seen = new Set<string>();
+  for (const p of c.pairs) {
+    seen.add(`${p.a}|${p.b}`).add(`${p.b}|${p.a}`);
+    const v = p.series[i];
+    const has = v !== null && v !== undefined && Number.isFinite(v);
+    if (!has && c.moving) continue;
+    rows.push({ a: name(p.a), b: name(p.b), min: has ? v : null, ...(limit !== undefined ? { limit } : {}), ...(has && p.lower?.includes(i) ? { lower: true } : {}) });
+  }
+  // sledované dvojice, které kontrola vůbec nezměřila (komponenta bez tělesa / skrytá) – „nezměřeno“, ne mlčení
+  if (!c.moving && Array.isArray(cfg?.pairs))
+    for (const p of cfg.pairs) if (!seen.has(`${p.a}|${p.b}`) && p.a !== p.b) rows.push({ a: name(p.a), b: name(p.b), min: null, ...(limit !== undefined ? { limit } : {}) });
+  return { rows: rows.slice(0, ANNOT_PAIRS), more: Math.max(0, rows.length - ANNOT_PAIRS) };
 }
 /**
  * Hloubka geometrického zásahu nástroje (procesní vrstva, balík C3): místo pro hodnotu, kterou doplní procesní vrstva studie.
@@ -129,10 +156,18 @@ export function cutDepthAt(step: unknown): { label: string; depth: number }[] | 
 }
 
 /** vstup anotace: poloha (čas, nejbližší krok, hodnoty motorů) a krok výsledku s příznaky */
-export type AnnotPose = { t: number; step: number; steps: number; motors: number[]; stepData?: { conflicts?: string[]; clashes?: unknown[] } & Record<string, unknown> };
+export type AnnotPose = {
+  t: number;
+  step: number;
+  steps: number;
+  motors: number[];
+  stepData?: { conflicts?: string[]; clashes?: unknown[] } & Record<string, unknown>;
+  /** poloha leží mezi vypočtenými kroky (snímek videa) – hodnoty kroku (vůle) se označí krokem `step` */
+  between?: boolean;
+};
 
 /** Řádky anotace aktuální polohy – stejné v okně (DOM) i ve vypáleném obrazu exportu (PNG / WebM). */
-export function annotRows(pose: AnnotPose, doc: Pick<CadDoc, "mates" | "motion">, o: { study?: number; view?: string; settings?: MotionAnnotSettings } = {}): AnnotRow[] {
+export function annotRows(pose: AnnotPose, doc: Pick<CadDoc, "mates" | "motion" | "components">, o: { study?: number; view?: string; settings?: MotionAnnotSettings; /** výsledek studie (vůle C2 `res.clearance`) */ res?: unknown } = {}): AnnotRow[] {
   const hide = new Set(o.settings?.hide ?? []);
   const rows: AnnotRow[] = [];
   const study = doc.motion;
@@ -146,8 +181,22 @@ export function annotRows(pose: AnnotPose, doc: Pick<CadDoc, "mates" | "motion">
     };
     rows.push({ key: "motors", text: pose.motors.map((v, i) => `${label(i)} ${n(v, 2)}${study.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(" · ") });
   }
-  const cl = hide.has("clearance") ? null : clearanceAt(pose.stepData);
-  if (cl) for (const c of cl.slice(0, 4)) rows.push({ key: "clearance", text: tr("vůle {0} × {1}: {2} mm{3}", c.a, c.b, n(c.min, 3), c.limit !== undefined ? tr(" (min. {0})", n(c.limit, 3)) : ""), warn: c.limit !== undefined && c.min < c.limit });
+  const cl = hide.has("clearance") ? null : clearanceAt(o.res, doc, pose.step);
+  if (cl === "unchecked") rows.push({ key: "clearance", text: tr("vůle: nezkontrolováno"), warn: true });
+  else if (cl) {
+    const at = pose.between ? tr(" · v kroku {0}", pose.step) : "";
+    for (const c of cl.rows) {
+      const lim = c.limit !== undefined ? tr(" (min. {0})", n(c.limit, 3)) : "";
+      if (c.min === null) {
+        rows.push({ key: "clearance", text: tr("vůle {0} × {1}: nezměřeno", c.a, c.b), warn: true });
+        continue;
+      }
+      const below = c.limit !== undefined && c.min < c.limit;
+      const text = c.lower ? tr("vůle {0} × {1}: nejméně {2} mm{3}", c.a, c.b, n(c.min, 3), lim) : tr("vůle {0} × {1}: {2} mm{3}", c.a, c.b, n(c.min, 3), lim);
+      rows.push({ key: "clearance", text: `${below ? "⚠ " : ""}${text}${at}`, warn: below });
+    }
+    if (cl.more) rows.push({ key: "clearance", text: tr("… a další dvojice vůle: {0}", cl.more) });
+  }
   const cut = hide.has("cut") ? null : cutDepthAt(pose.stepData);
   if (cut) for (const c of cut.slice(0, 4)) rows.push({ key: "cut", text: tr("zásah {0}: {1} mm", c.label, n(c.depth, 3)) });
   // procesní vrstva (C3, vlna 22 bod 4): úroveň výslovně – booleovské odebrání, ne simulace materiálu

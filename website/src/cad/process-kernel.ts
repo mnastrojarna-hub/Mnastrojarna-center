@@ -31,27 +31,42 @@ const DEFAULT_MAX_OPS = PROC_MAX_OPS;
 const MESH_TOL = 0.02;
 const MESH_ANG = 0.3;
 
-/** stav s tvary (pro sítě na požádání) */
-type Held = { res: ProcRes; bodies: (Shape | null)[]; scraps: (Shape | null)[]; used: number };
+/** stav s tvary (pro sítě na požádání); `rs` = odebraný objem R stavu (kombinace operací na témže obrobku) */
+type Held = { res: ProcRes; bodies: (Shape | null)[]; scraps: (Shape | null)[]; rs: (Shape | null)[]; used: number };
 const memo = new Map<string, Held>();
+/** kombinované stavy obrobku (víc operací na témže obrobku) podle klíče požadavku s `others` */
+type Comb = { steps: number[]; states: ProcState[]; bodies: (Shape | null)[]; error?: string; used: number };
+const combMemo = new Map<string, Comb>();
 let tick = 0;
 const MAX_MEMO = 12;
+const MAX_COMB = 6;
 
 function forget(key: string) {
   const h = memo.get(key);
   if (!h) return;
-  for (const s of [...h.bodies, ...h.scraps]) s?.delete();
+  for (const s of [...h.bodies, ...h.scraps, ...h.rs]) s?.delete();
   memo.delete(key);
+}
+function forgetComb(key: string) {
+  const c = combMemo.get(key);
+  if (!c) return;
+  for (const s of c.bodies) s?.delete();
+  combMemo.delete(key);
 }
 function trimMemo() {
   while (memo.size > MAX_MEMO) {
     const old = [...memo.entries()].sort((a, b) => a[1].used - b[1].used)[0];
     forget(old[0]);
   }
+  while (combMemo.size > MAX_COMB) {
+    const old = [...combMemo.entries()].sort((a, b) => a[1].used - b[1].used)[0];
+    forgetComb(old[0]);
+  }
 }
 /** smaže zapamatované stavy (testy, uvolnění paměti) */
 export function clearProcessCache(): void {
   for (const k of [...memo.keys()]) forget(k);
+  for (const k of [...combMemo.keys()]) forgetComb(k);
 }
 
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -119,20 +134,134 @@ const overlap = (a: [Vec3, Vec3], b: [Vec3, Vec3]) => [0, 1, 2].every((i) => a[0
  * Procesní operace v jádře (viz hlavička). `req.mesh` = stavy, jejichž sítě se vrátí (obrobek po operaci a odpad).
  */
 export async function processOp(req: ProcReq): Promise<ProcRes> {
+  const { others, meshCombined, ...one } = req;
+  const held = await heldOf(one);
+  // víc operací na témže obrobku: stav obrobku po všech operacích v kroku (dřív každá z původního obrobku a odebrané objemy se
+  // sčítaly – druhý střih do téže díry = dvojnásobný objem; 3D ukázalo jen síť poslední operace)
+  let combined: ProcRes["combined"];
+  if (others?.length) {
+    const hs = [held];
+    for (const o of others) hs.push(await heldOf({ ...o, target: req.target }));
+    const c = await combinedOf(req, hs);
+    const want = new Set(meshCombined ?? []);
+    combined = { steps: c.steps, states: c.states.map((s, i) => (want.has(i) ? { ...s, mesh: meshOf(c.bodies[i]) } : s)), ...(c.error ? { error: c.error } : {}) };
+  }
+  trimMemo();
+  const states = !req.mesh?.length
+    ? held.res.states.map(({ mesh: _m, scrapMesh: _s, ...rest }) => rest)
+    : held.res.states.map((s, i) => (new Set(req.mesh).has(i) ? { ...s, mesh: meshOf(held.bodies[i]), scrapMesh: meshOf(held.scraps[i]) } : s));
+  return { ...held.res, states, ...(combined ? { combined } : {}) };
+}
+
+/** výsledek jedné operace z mezipaměti / výpočtem (klíč bez sítí a bez dalších operací) */
+async function heldOf(req: ProcReq): Promise<Held> {
   const key = procKey(req);
   let held = memo.get(key);
   if (!held) {
     held = await compute(req);
     memo.set(key, held);
-    trimMemo();
   } else held.res = { ...held.res, cached: true };
   held.used = ++tick;
-  if (!req.mesh?.length) return { ...held.res, states: held.res.states.map(({ mesh: _m, scrapMesh: _s, ...rest }) => rest) };
-  const want = new Set(req.mesh);
-  return {
-    ...held.res,
-    states: held.res.states.map((s, i) => (want.has(i) ? { ...s, mesh: meshOf(held!.bodies[i]), scrapMesh: meshOf(held!.scraps[i]) } : s)),
+  return held;
+}
+
+/** OCCT solidy tvaru (objem, těžiště) – kusy sjednoceného odpadu */
+function solidPieces(s: Shape): { volume: number; center: Vec3 }[] {
+  type GP = { Mass(): number; CentreOfMass(): { X(): number; Y(): number; Z(): number; delete(): void }; delete(): void };
+  const oc = r.getOC() as unknown as {
+    TopExp_Explorer: new () => { Init(s: unknown, a: unknown, b: unknown): void; More(): boolean; Next(): void; Current(): unknown; delete(): void };
+    TopAbs_ShapeEnum: { TopAbs_SOLID: unknown; TopAbs_SHAPE: unknown };
+    GProp_GProps: new () => GP;
+    BRepGProp: { VolumeProperties(s: unknown, p: GP, onlyClosed: boolean, skipShared: boolean, useTriangulation: boolean): void };
   };
+  const out: { volume: number; center: Vec3 }[] = [];
+  const ex = new oc.TopExp_Explorer();
+  try {
+    ex.Init(s.wrapped, oc.TopAbs_ShapeEnum.TopAbs_SOLID, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    for (; ex.More(); ex.Next()) {
+      const gp = new oc.GProp_GProps();
+      try {
+        oc.BRepGProp.VolumeProperties(ex.Current(), gp, false, false, false);
+        const v = Math.abs(gp.Mass());
+        if (v < 1e-9) continue;
+        const c = gp.CentreOfMass();
+        out.push({ volume: v, center: [c.X(), c.Y(), c.Z()] });
+        c.delete();
+      } finally {
+        gp.delete();
+      }
+    }
+  } finally {
+    ex.delete();
+  }
+  return out;
+}
+/** sjednocení kopií tvarů (vstupy zůstanou) */
+function fuseAll(list: Shape[]): Shape | null {
+  let acc: Shape | null = null;
+  for (const x of list) {
+    const next: Shape = acc ? (acc.fuse(x) as Shape) : (x.clone() as Shape);
+    acc?.delete();
+    acc = next;
+  }
+  return acc;
+}
+
+/**
+ * Kombinovaný stav obrobku pro operace `hs` (první = `req`, pak `req.others`): v kroku k stav = T − ∪ R_i(stav operace i v kroku k);
+ * společný objem (druhý střih do téže díry) se počítá jednou. Stavy se zapamatují podle n-tice stavů operací.
+ */
+async function combinedOf(req: ProcReq, hs: Held[]): Promise<Comb> {
+  const key = procKey(req);
+  const hit = combMemo.get(key);
+  if (hit) {
+    hit.used = ++tick;
+    return hit;
+  }
+  const te = await partEntry(req.target.key, req.target.source);
+  const T = te.body as Shape | null;
+  const volume0 = hs[0].res.volume0;
+  const n = req.rels.length;
+  const steps: number[] = [];
+  const states: ProcState[] = [{ removed: 0, volume: volume0, scrap: [] }];
+  const bodies: (Shape | null)[] = [null];
+  const byTuple = new Map<string, number>();
+  let error: string | undefined;
+  for (let k = 0; k < n; k++) {
+    const tuple = hs.map((h) => h.res.steps[k]?.state ?? 0);
+    if (tuple.every((x) => x === 0)) {
+      steps.push(0);
+      continue;
+    }
+    const tk = tuple.join(",");
+    const known = byTuple.get(tk);
+    if (known !== undefined) {
+      steps.push(known);
+      continue;
+    }
+    let Rc: Shape | null = null;
+    let Sc: Shape | null = null;
+    try {
+      Rc = fuseAll(hs.map((h, i) => h.rs[tuple[i]]).filter((x): x is Shape => !!x));
+      Sc = fuseAll(hs.map((h, i) => h.scraps[tuple[i]]).filter((x): x is Shape => !!x));
+      const body = T && Rc ? (T.clone().cut(Rc) as Shape) : null;
+      states.push({ removed: volumeOf(Rc), volume: body ? volumeOf(body) : volume0, scrap: Sc ? solidPieces(Sc) : [] });
+      bodies.push(body);
+    } catch (e) {
+      // selhání sjednocení: stav nejde určit – výsledek nese chybu (motion-process.ts ji ohlásí ⚠, žádný součet místo ní)
+      error ??= (e as Error)?.message ?? String(e);
+      states.push({ ...(states[states.length - 1] ?? states[0]), scrap: [] });
+      bodies.push(null);
+    } finally {
+      Rc?.delete();
+      Sc?.delete();
+    }
+    byTuple.set(tk, states.length - 1);
+    steps.push(states.length - 1);
+  }
+  const c: Comb = { steps, states, bodies, ...(error ? { error } : {}), used: ++tick };
+  combMemo.set(key, c);
+  return c;
 }
 
 async function compute(req: ProcReq): Promise<Held> {
@@ -148,7 +277,8 @@ async function compute(req: ProcReq): Promise<Held> {
   const states: ProcState[] = [{ removed: 0, volume: volume0, scrap: [] }];
   const bodies: (Shape | null)[] = [null];
   const scraps: (Shape | null)[] = [null];
-  if (!T || !P) return { res: { steps, states, dir: null, thickness: null, volume0, error: !T ? "target" : "tool", ms: Date.now() - t0 }, bodies, scraps, used: 0 };
+  const rs: (Shape | null)[] = [null];
+  if (!T || !P) return { res: { steps, states, dir: null, thickness: null, volume0, error: !T ? "target" : "tool", ms: Date.now() - t0 }, bodies, scraps, rs, used: 0 };
   const tBox = te.result.metrics?.bbox ?? (T.boundingBox.bounds as [Vec3, Vec3]);
   const pBox = pe.result.metrics?.bbox ?? (P.boundingBox.bounds as [Vec3, Vec3]);
   const pVerts = pe.result.mesh?.vertices ?? meshArrays(P, MESH_TOL, MESH_ANG).vertices;
@@ -234,6 +364,7 @@ async function compute(req: ProcReq): Promise<Held> {
       states.push({ removed, volume: volumeOf(body), scrap: scrapShape ? [{ volume: removed, center: centerOf(scrapShape) }] : [] });
       bodies.push(body);
       scraps.push(scrapShape);
+      rs.push(R.clone() as Shape);
       state = states.length - 1;
       steps[k] = { contact: true, depth, through, state };
     }
@@ -257,7 +388,7 @@ async function compute(req: ProcReq): Promise<Held> {
   };
   void contactSteps;
   void computed;
-  return { res, bodies, scraps, used: 0 };
+  return { res, bodies, scraps, rs, used: 0 };
 }
 
 /** T ∩ P(m) (zapamatováno podle matice); prázdný průnik / selhání → null */

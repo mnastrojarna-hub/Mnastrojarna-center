@@ -64,7 +64,9 @@ describe("přesná kontrola platnosti – co proběhlo, se vždy vypíše", () =
 });
 
 describe("export STEP: přesná kontrola před exportem, export = model (bez SameParameter)", () => {
-  it("vnější a vnitřní závit šroubovicí: ✓ těleso přesně platné, STEP zpětně = model (objem, obálka, tělesa), model po exportu beze změny", { timeout: 300_000 }, async () => {
+  // fáze 2 (22a, falešná zelená): dřív tu stálo „✓ kontrola STEP … → věrná kopie modelu“, ale soubor po zpětném načtení
+  // přesnou kontrolou neprojde (nezávislá kontrola souboru: valid(exact)=false). Nově ⚠ out.reload-invalid, nikdy „věrná kopie“.
+  it("vnější a vnitřní závit šroubovicí: ✓ těleso přesně platné, STEP zpětně = model (objem, obálka, tělesa), ale soubor přesně neplatný → ⚠ out.reload-invalid, ne „věrná kopie“; model po exportu beze změny", { timeout: 300_000 }, async () => {
     for (const [name, body, thr] of [
       ["Šroub", "válec 18 30", "závit M18×1,5 délka 20 v 0 0 10 šroubovice"],
       ["Matice", "trubka 30 16.5 20", "závit M18×1,5 délka 18 v 0 0 1 vnitřní šroubovice"],
@@ -76,7 +78,8 @@ describe("export STEP: přesná kontrola před exportem, export = model (bez Sam
       const at = lines.findIndex((l) => /^✓ L4 export STEP/.test(l));
       expect(at, name).toBeGreaterThanOrEqual(0);
       expect(lines[at + 1], name).toMatch(/^✓ L4 těleso: přesná kontrola platnosti \(BRepCheck přesnou metodou\) – platné, ploch \d+ · [\d,]+ s$/);
-      expect(lines[at + 2], name).toMatch(/^✓ L4 kontrola STEP: .*rozdíl 0,0000 %.*věrná kopie modelu$/);
+      expect(lines[at + 2], name).toMatch(/^⚠ L4 out\.reload-invalid .*kontrola STEP: soubor znovu načten jádrem – těles: 1, .*rozdíl 0,0000 %.* – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti \(BRepCheck přesnou metodou\): vadných ploch \d+ z \d+ \(rychlá kontrola: platné; model přesně platný\)/);
+      expect(r.full ?? "", name).not.toMatch(/věrná kopie/);
       // export model neupravil: znovu načtený soubor = model a model je i po exportu přesně platný
       const d: CadDoc = ws.present();
       expect(d.name).toBe(name);
@@ -85,10 +88,24 @@ describe("export STEP: přesná kontrola před exportem, export = model (bez Sam
       expect(file.solids).toBe(model.solids);
       expect(Math.abs(file.volume - model.volume) / model.volume).toBeLessThan(1e-6);
       for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) expect(Math.abs(file.bbox[j][i] - model.bbox[j][i])).toBeLessThan(1e-4);
+      // soubor: rychlá kontrola platné, přesná ne (tolerance hran ze čtečky STEP); model přesně platný
+      expect(file, name).toMatchObject({ valid: true, validExact: false });
+      expect(file.badFaces, name).toBeGreaterThan(0);
+      expect(model.validExact, name).toBe(true);
       const after = await h.kernel.validity(d);
       expect(after).toMatchObject({ method: "exact", valid: true });
       expect(r.docs[0], name).toMatchObject({ valid: true, validCheck: "exact" });
     }
+  });
+  it("kontrolní těleso bez závitu (válec s průchozí dírou): soubor projde i přesnou kontrolou → ✓ „věrná kopie modelu“", { timeout: 180_000 }, async () => {
+    const ws = new MemoryWorkspace();
+    const h = host();
+    const r = finalizeReport(await runReport(ws, `nový díl "Kontrola K1"\nválec 30 20\ndíra 8 skrz v 0 0 20\nexport step`, h), { full: true });
+    expect(r.full ?? "").toMatch(/^✓ L4 kontrola STEP: soubor znovu načten jádrem – těles: 1, .* → věrná kopie modelu$/m);
+    expect(r.full ?? "").not.toMatch(/out\.reload-invalid/);
+    const d: CadDoc = ws.present();
+    const { file } = await h.kernel.exportStats(d, new Uint8Array(await h.kernel.exportFile(d, "step")), "step");
+    expect(file).toMatchObject({ valid: true, validExact: true });
   });
   it("exactBeforeExport: přesná neproběhla (ploch nad mez) → ℹ s důvodem, nikdy ✓; vada → ⚠", async () => {
     const d: CadDoc = { ...emptyDoc("Velký"), features: [{ id: "a", name: "Kvádr 1", type: "box", size: [1, 1, 1], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"] };

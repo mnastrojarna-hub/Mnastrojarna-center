@@ -1,0 +1,17 @@
+# Vlna 22, fáze 2, kolo 3 (body 12, 22h): záznam úlohy exportu v dokumentu, změna modelu během exportu, zrušený běh po zápisu jiného dokumentu, diagnostika převodu
+úloha: {0}	job: {0}
+kontrola ✓	check ✓
+⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu	⚠ the model changed during the export – the file matches revision {0}, not the current model
+✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v {0} (Zpět je vrátí).	✗ Computation cancelled – the unfinished document was not written, but changes written before the cancellation remain in {0} (Undo reverts them).
+Dokumenty založené během ({0}) se zahodily.	Documents created by the run ({0}) were discarded.
+model má těleso	the model has a solid
+model NEMÁ těleso	the model has NO solid
+prvky s chybou: {0}	features with errors: {0}
+chyby parametrů: {0}	parameter errors: {0}
+model se před převodem nepřestavoval (sestava / bez přestavby)	the model was not rebuilt before the conversion (assembly / no rebuild)
+převod do {0} selhal ve fázi „{1}“: {2} · {3}	{0} conversion failed in phase “{1}”: {2} · {3}
+přepočet vazeb	mate solve
+stavba modelu	model build
+Výpočty aplikace (id, stav, revize vstupu):	Application computations (id, state, input revision):
+#!dynamic
+výpočet zrušen – změny zapsané před zrušením zůstaly v {0}	computation cancelled – changes written before the cancellation remain in {0}

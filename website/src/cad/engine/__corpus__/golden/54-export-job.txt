@@ -1,0 +1,34 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6
+  ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 12 000 mm³ (rozdíl 0,0000 %), obálka 40,00 × 30,00 × 10,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
+✓ export STEP: bez-kontroly.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+  – kontrola STEP vynechána („bez kontroly“)
+Exporty (2, zastaralých 0) · model je teď r·?:
+  1. STEP „bez-kontroly.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s – odpovídá modelu
+  2. STEP „Deska_A.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s · kontrola ✓ – odpovídá modelu
+✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 10 mm (X 0…40, Y 0…30, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · přesná kontrola
+Revize modelu: r·?
+Exporty: 2 – všechny z nynější revize modelu (výpis: exporty)
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 40 × 30 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+→ Kvádr 1: size [40; 30; 10] → [40; 30; 12] – výsledek po výpočtu níže
+Exporty (2, zastaralých 2) · model je teď r·?:
+  1. ⚠ STEP „bez-kontroly.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s – ZASTARALÝ: model je teď r·?, exportujte znovu: export step
+  2. ⚠ STEP „Deska_A.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s · kontrola ✓ – ZASTARALÝ: model je teď r·?, exportujte znovu: export step
+✓ Kvádr 1 (box) · přidáno 14400 mm³ · těleso platné
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 12 mm (X 0…40, Y 0…30, Z 0…12) · objem 14,40 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Revize modelu: r·?
+⚠ Exporty: 2 z 2 ze starší revize modelu – STEP „Deska_A.step“ r·?, STEP „bez-kontroly.step“ r·? (výpis: exporty)
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 14400 mm³ · těleso platné – 40 × 30 × 12 mm, new, roh [0; 0; 0]

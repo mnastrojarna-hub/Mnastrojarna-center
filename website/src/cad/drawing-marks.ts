@@ -89,6 +89,9 @@ const isId = (t: string) => /^a\d+$/i.test(t.trim());
 const NAME = (k: string, o?: Partial<DrawingOptions>) =>
   k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : k.startsWith("aux:") ? tr("pohled {0}", k.slice(4)) : k.startsWith("cut:") ? tr("řez {0}–{0}", k.slice(4)) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
 
+/** název pohledu poznámky (přední, řez A–A, model …) pro hlášení */
+export const annViewName = NAME;
+
 /** Seznam „a1 Ø40 (přední)“ pro chybové hlášky a stav. */
 export function annList(views: PlacedView[], anns: DrawingAnnotation[], o?: Partial<DrawingOptions>, filter: (a: DrawingAnnotation) => boolean = () => true): string {
   return anns.map((a, i) => (filter(a) ? `${shortId(i)} ${annLabel(views, a)} (${NAME(a.view, o)})` : "")).filter(Boolean).join(" · ") || "—";
@@ -494,7 +497,9 @@ export function makeManualDim(res: DrawingResult, o: Partial<DrawingOptions>, di
       const side = ((M[0] - C[0]) * n[0] + (M[1] - C[1]) * n[1] >= 0 ? 1 : -1) * flip;
       o2 = side * d;
     }
-    ann = { id, view: v.key, type: "dim", kind, a, b, offset: Math.round(o2 * 100) / 100, ...(edge ? { edge: true } : {}), ...extra };
+    // body přichycené k vrcholům (ne hrana) – po změně modelu se ověří, že tam vrcholy pořád jsou (bod 20)
+    const geo = !edge && s1.what === "point" && s2.what === "point";
+    ann = { id, view: v.key, type: "dim", kind, a, b, offset: Math.round(o2 * 100) / 100, ...(edge ? { edge: true } : {}), ...(geo ? { geo: true } : {}), ...extra };
     how = edge ? tr("hrana") : s1.what || s2.what ? tr("přichyceno ke geometrii") : tr("volné body");
   }
   return { ann, where: `${name}, ${tr(KIND_NAME[dim.kind])}${how ? `, ${how}` : ""}` };

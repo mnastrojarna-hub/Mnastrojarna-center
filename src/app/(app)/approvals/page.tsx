@@ -21,7 +21,7 @@ export default async function ApprovalsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Fronta ke schválení"
-        description="Co AI a systém připravily a čeká na tvoje potvrzení — e-maily zákazníkům a dodavatelům, objednávky dodavatelům a změny stavu zakázek z pošty. Červené tlačítko odešle e-mail ze tvé schránky, zelené jen potvrdí změnu v systému."
+        description="Co je připravené a ještě NEODESLANÉ — nic z toho neodejde samo; čeká na tvoje kliknutí — e-maily zákazníkům a dodavatelům, objednávky dodavatelům a změny stavu zakázek z pošty. Červené tlačítko odešle e-mail ze tvé schránky, zelené jen potvrdí změnu v systému."
       />
       <div className="max-w-4xl">
         <ApprovalQueue initialItems={approvals} recent={resolved} />

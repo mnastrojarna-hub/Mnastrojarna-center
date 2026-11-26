@@ -851,6 +851,13 @@ registerExt({
   order: 33,
   hint: tr("profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka"),
   toolBody: true,
+  // závit z katalogu (22d): poloměr / stoupání / hloubka z označení podle strany – stavba i formulář (živě) stejná čísla
+  derive: (d) => {
+    const des = helixSweepThread(d);
+    if (!des) return null;
+    const dims = helixThreadDims(des, str(d.side, "external") === "internal");
+    return { values: { radius: dims.radius, pitch: dims.pitch, depth: dims.depth }, source: des.name };
+  },
   make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, side: "external", leadIn: 0, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: { kind: "axis", axis: "Z" }, lefthand: false, mode: "add" }),
   params: [
     { key: "profile", label: tr("Profil"), kind: "enum", options: [{ v: "circle", l: tr("Kruh (drát)") }, { v: "thread60", l: tr("Závit 60°") }, { v: "sketch", l: tr("Skica") }] },

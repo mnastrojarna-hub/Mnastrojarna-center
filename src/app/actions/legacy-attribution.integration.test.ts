@@ -195,7 +195,8 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
     const quoteId = (q as { id: string }).id;
 
     const scope = { jobIds: [waitJob, freshJob, quoteJob] };
-    expect(await runFlowReminders(scope)).toEqual({ proposals: 1, reminders: 1 });
+    // majitel 23. 11.: připomínky nabídek (předpřipravené e-maily) zatím vypnuté — návrh stavu zůstává
+    expect(await runFlowReminders(scope)).toEqual({ proposals: 1, reminders: 0 });
     expect(await runFlowReminders(scope)).toEqual({ proposals: 0, reminders: 0 });
 
     const { data: w } = await svc.from("orders").select("flow_proposal, flow_proposal_by, inquiry_status").eq("id", waitJob).single();
@@ -208,11 +209,7 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
 
     const { data: rq } = await svc.from("approval_queue").select("id, type, target, payload, order_id, owner_id, status").eq("quote_id", quoteId);
     const rows = (rq ?? []) as Row[];
-    expect(rows).toHaveLength(1);
-    queueIds.push(String(rows[0].id));
-    expect(rows[0]).toMatchObject({ type: "reminder", target: `b3-${TAG}@local.test`, order_id: quoteJob, owner_id: id("sales"), status: "pending" });
-    // oslovení v 5. pádě podle vykání obchodníka (kontakty 30. 10.), ne „Dobrý den, Ing. Eva Testová,"
-    expect((rows[0].payload as { body: string }).body).toContain("Dobrý den, paní Testová,");
+    expect(rows).toHaveLength(0);
     expect(quoteReminderText({ number: "NAB-1", customerName: null, contact: null, validUntil: null, sentAt: null }).body).toMatch(/^Dobrý den,\n\ndovolujeme si připomenout naši cenovou nabídku NAB-1\./);
   }, 60_000);
 

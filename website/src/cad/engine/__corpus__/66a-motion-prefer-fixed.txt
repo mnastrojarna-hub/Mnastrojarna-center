@@ -1,0 +1,31 @@
+# vlna 22, fáze 2 (bod 2 × bod 8): preferovaná strana meze, kterou pevná vazba nedovolí splnit. Přidržovač drží PEVNÁ 24,5 k rámu,
+# Deska A jede motorem – preference „Mez“ (min i max) je měkká a splnit nejde. Desky ani přidržovač se nesmějí posunout v X/Y ani
+# natočit (dřív penalizační optimum ujelo o ~5,6–7,9 m s natočením kolem Z a souhrn hlásil „Vazby splněny ve všech krocích“).
+# Očekáváno: travel=17.5mm:1 (jen motor), krok 6 Deska A [0; 0; 58,75], Přidržovač [0; 0; 34,5]; totéž po statické úpravě ZDVIH.
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+nový díl "Přidržovač"
+kvádr 60 60 8
+#--- run
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+vložit "Přidržovač" v 0 0 34.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+sestava vazba vzdálenost "Přidržovač" spodní "Rám" horní hodnota 24.5 název "PEVNÁ"
+sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"
+sestava vazba "Mez" preferovat max
+pohyb motor lineární vazba "ZDVIH" 57.5..40 kroky 12
+pohyb kinematika
+pohyb krok 6
+pohyb krok 12
+#--- run
+sestava vazba "Mez" preferovat min
+pohyb spustit
+pohyb krok 12
+#--- run
+# statický přepočet s preferencí: úprava ZDVIH – polohy jen v Z, bez ujetí
+sestava vazba "ZDVIH" hodnota=45
+sestava komponenty

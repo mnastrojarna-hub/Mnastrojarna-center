@@ -13,7 +13,7 @@ bez čísla	without number
 bez výkresu	without drawing
 CSV (oddělovač ;, desetinná čárka):	CSV (separator ;, decimal comma):
 CSV (oddělovač ;, desetinná tečka):	CSV (separator ;, decimal point):
-díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit "{0}"	part “{0}” was inserted into the assembly at line {1} as a copy – the change ({2}) does not reach the assembly by itself; in the assembly: assembly refresh "{0}"
+díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – v sestavě: sestava obnovit "{0}"; změna ({2}) se do sestavy sama nepromítne	part “{0}” was inserted into the assembly at line {1} as a copy – in the assembly: assembly refresh "{0}"; the change ({2}) does not reach the assembly by itself
 díl „{0}“ není otevřený v záložce	part “{0}” is not open in a tab
 díl jen z importu	part from an import only
 díl nemá označení materiálu – jen třídu (materiál 1.2379 v dílu)	the part has no material designation – only a class (material 1.2379 in the part)
@@ -36,8 +36,8 @@ katalog	catalog
 katalog „{0}“	catalog “{0}”
 katalog {0}	catalog {0}
 Katalogové číslo	Catalog number
-komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit {3}	component “{0}” is older than part “{1}” in its tab ({2}) – the parts list and drawing show the data from insertion; refresh: assembly refresh {3}
-komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – kusovník a výkres ukazují údaje kopie v sestavě; převzít z dílu: sestava obnovit {3}	component “{0}” differs from part “{1}” in its tab ({2}) – the parts list and drawing show the data of the copy in the assembly; take over from the part: assembly refresh {3}
+komponenta „{0}“ je starší než díl „{1}“ v záložce ({2}) – obnovit: sestava obnovit {3}; kusovník a výkres ukazují údaje z vložení	component “{0}” is older than part “{1}” in its tab ({2}) – refresh: assembly refresh {3}; the parts list and drawing show the data from insertion
+komponenta „{0}“ se liší od dílu „{1}“ v záložce ({2}) – převzít z dílu: sestava obnovit {3}; kusovník a výkres ukazují údaje kopie v sestavě	component “{0}” differs from part “{1}” in its tab ({2}) – take over from the part: assembly refresh {3}; the parts list and drawing show the data of the copy in the assembly
 Kopie byla upravena i v sestavě ({0}) – obnova tuto úpravu přepíše.	The copy was also changed in the assembly ({0}) – refreshing overwrites that change.
 Kopie je starší než díl „{0}“ v záložce: {1}.	The copy is older than part “{0}” in its tab: {1}.
 Kopie v sestavě se liší od dílu „{0}“ v záložce: {1}.	The copy in the assembly differs from part “{0}” in its tab: {1}.
@@ -74,7 +74,7 @@ výrobce „{0}“	vendor “{0}”
 výrobce {0}	vendor {0}
 z knihovny normálií	from the standard-part library
 normálie	standard part
-díl „{0}“ je v sestavě „{1}“ jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit "{0}"	part “{0}” is in assembly “{1}” as a copy – the change ({2}) does not reach the assembly by itself; in the assembly: assembly refresh "{0}"
+díl „{0}“ je v sestavě „{1}“ jako kopie – v sestavě: sestava obnovit "{0}"; změna ({2}) se do sestavy sama nepromítne	part “{0}” is in assembly “{1}” as a copy – in the assembly: assembly refresh "{0}"; the change ({2}) does not reach the assembly by itself
 druh položky kusovníku: vyráběný díl (výkres, číslo, označení materiálu), normálie (norma, rozměr, pevnostní třída) nebo nakupovaný díl (katalogové číslo, výrobce); výchozí: normálie z knihovny = normálie, importovaný STEP bez prvků = nakupovaný, vlastní díl = vyráběný; kusovník je v oddílech podle druhu a výkresy se přibalují jen u vyráběných dílů	kind of a parts-list item: manufactured part (drawing, number, material designation), standard part (standard, size, property class) or purchased part (catalog number, vendor); default: library standard part = standard part, imported STEP without features = purchased, own part = manufactured; the parts list is in sections by kind and drawings are bundled only for manufactured parts
 komponenta je kopie dílu: převezme díl ze záložky (geometrie, číslo, materiál, druh, výkresy), poloha, vazby a přezdívka zůstanou; „údaje“ = jen číslo, materiál a druh; kusovník, list sestavy a stav hlásí ⚠ asm.stale-copy, dokud je kopie starší než díl	a component is a copy of a part: takes the part over from its tab (geometry, number, material, kind, drawings), position, mates and alias stay; “props” = only number, material and kind; the parts list, assembly sheet and status report ⚠ asm.stale-copy while the copy is older than the part
 #!dynamic

@@ -76,6 +76,15 @@ describe("DWG export – syntetický výkres", () => {
     expect(t[0].value).toBe("100");
   });
 
+  it("vlna 22, bod 20 (kolo 3): vlastnosti souboru nesou revizi modelu a písmeno revize (R2004+); bez údajů prázdné", async () => {
+    for (const version of ["R2018", "R2004"] as DwgVersion[]) {
+      const buf = await drawingToDwg(synthetic, { version, info: { title: "Deska A", subject: "Model r·a1b2c3 · rev. B", keywords: "model=r·a1b2c3 rev=B", revision: "B" } });
+      const si = readBack(buf).summaryInfo!;
+      expect([si.title, si.subject, si.keywords, si.revisionNumber]).toEqual(["Deska A", "Model r·a1b2c3 · rev. B", "model=r·a1b2c3 rev=B", "B"]);
+    }
+    expect(readBack(await drawingToDwg(synthetic, { version: "R2018" })).summaryInfo?.subject ?? "").toBe("");
+  });
+
   it("neznámá verze → česká chyba", async () => {
     await expect(drawingToDwg(synthetic, { version: "R1999" as DwgVersion })).rejects.toThrow(/Neznámá verze DWG/);
   });

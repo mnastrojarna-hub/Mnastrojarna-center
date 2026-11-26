@@ -180,7 +180,8 @@ describe("5 – `motion=ok` jen po skutečné kontrole", () => {
     const env2 = { ...fakeEnv(), interference: async () => [] };
     const c = await runLines(press(), env2, MATE, `${MOTOR} kolize`);
     expect(kvOf(env2, c.doc)).toMatch(/ motion=ok$/);
-    expect(motionStatusOf(slotOf(env2).store, "", c.doc)!.line).toMatch(/bez průniku těles v kontrolovaných krocích \(podrobně pohyb stav\)$/);
+    // fáze 2 kolo 3 (bod 6): bez sledované vůle „bez průniku“ výslovně s „vůle nekontrolována“
+    expect(motionStatusOf(slotOf(env2).store, "", c.doc)!.line).toMatch(/bez průniku těles v kontrolovaných krocích, vůle nekontrolována \(podrobně pohyb stav\)$/);
   });
 });
 

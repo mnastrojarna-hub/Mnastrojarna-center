@@ -28,7 +28,7 @@ import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 import { runExportJob } from "../export-job";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
-import { modelId } from "../../doc-outputs";
+import { modelId, sameModel } from "../../doc-outputs";
 import { sheetWarningCode } from "../sheet-eval";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
@@ -148,7 +148,11 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   );
   const f = job.out;
   if (!f) return;
-  recordOutput(ctx, { what: "model", format: fmt, file: f.name }); // záznam exportu s revizí modelu (bod 20)
+  // záznam exportu s revizí modelu (bod 20) a záznamem úlohy (22h: stav, čas, fáze, kontrola – trvale v dokumentu); kontrola
+  // zpětným načtením se doplní níže, až je známá (záznam téhož formátu a souboru se přepíše)
+  const jobMs = job.phases.reduce((a, p) => a + p.ms, 0);
+  const note = (check?: { ok: boolean; text: string }) => recordOutput(ctx, { what: "model", format: fmt, file: f.name, job: { state: "done", ms: jobMs, phases: job.phases, ...(check ? { check } : {}) } });
+  note();
   f.modelRev = job.modelRev;
   f.phases = job.phases;
   if (pre) {
@@ -166,12 +170,14 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     if (v) {
       e.code(v.code, { text: v.text, indent: "  ", level: v.level });
       f.check = { ok: false, text: v.text };
+      note(f.check);
     }
     return;
   }
   const c = job.check!;
   const text = c.line.replace(/^[✓⚠✗]\s*/, "");
   f.check = { ok: c.ok, text };
+  note(f.check);
   if (c.ok) {
     e.console(`  ${c.line}`);
     e.ok(text);
@@ -205,8 +211,8 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   if (f) {
     const rev = ids.length === 1 ? ((d.drawings?.find((s) => s.id === ids[0])?.meta as { revision?: string } | undefined)?.revision ?? "") : "";
     // soubor zastaralého vydaného listu nese staré písmeno revize s jiným obsahem – záznam to nese (bod 20)
-    const sig = modelId(d).sig;
-    const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && s.issued.sig !== sig; });
+    const mid = modelId(d);
+    const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && !sameModel(s.issued, mid); });
     recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
   }
   // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
