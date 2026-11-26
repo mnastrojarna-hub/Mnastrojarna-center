@@ -36,6 +36,13 @@ export interface RunState {
   docId?: string;
   /** původ nového dokumentu běhu (`startDoc`) – `flush` ho předá `openInTab`; opakovaný běh pak záložku převezme (engine/runs.ts) */
   origin?: import("../workspace").RunOrigin;
+  /**
+   * co běh zapsal do záložek PŘED koncem (`flush` při přechodu na jiný dokument – vlna 22, bod 12): nově založené záložky
+   * (zrušený běh je zavře) a názvy dokumentů zapsaných krokem historie (zrušený běh je vyjmenuje – nikdy „beze změny“)
+   */
+  wrote?: { opened: { id: string; name: string; /** záložka byla prázdná úvodní – zrušení vrátí tento dokument */ prev?: CadDoc }[]; committed: string[] };
+  /** záložka aktivní na začátku běhu (zrušený běh se do ní vrátí) */
+  startTab?: string;
   /** prvky přidané během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě */
   added?: Feature[];
   /** id prvků, které právě provedená operace přímo upravila (upravit, potlačit, přesunout …) – ověří se a ohlásí na jejím řádku */

@@ -11,7 +11,7 @@ Prvky:
     entity: e1 čára 3 b. [0; 0]→[50; 0]→[50; 30] otevřená
     profil: žádný uzavřený obrys – otevřená křivka e1 (konce [0; 0] a [50; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
  2. Plošné vysunutí [ext, id #] ✓ žádné objemové těleso – 
-ℹ export STEP: c1-plocha.step · 6,9 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: c1-plocha.step · 7,0 kB · STEP AP214 – staženo (bez dialogu)
   ✗ kontrola STEP: soubor neobsahuje objemové těleso (těles 0, volných skořepin 1, volných ploch 0) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě
 ✓ nový díl „Deska A“ – nová záložka
 → Skica 2 (sketch) přidán – výsledek po výpočtu níže

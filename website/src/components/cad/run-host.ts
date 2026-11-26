@@ -221,7 +221,7 @@ export const motionSignalHold = new SignalHold<MotionSignal>();
 /** metody, které vytvářejí výstup z dokumentu – počkají na dokončený stav (fronta běhů + stavba), nebo skončí chybou */
 export const API_WAIT = new Set(["save", "exportFile", "exportDrawing", "share", "script"]);
 /** metody bez vztahu k dokumentu (stav, nápověda, ovládání běhů) – bez bariéry */
-export const API_PLAIN = new Set(["version", "lang", "missing", "guide", "commands", "history", "progress", "cancel", "cancelRun", "runs", "exports", "pending", "idle", "perf", "hints", "settings", "attachments", "openConsole"]);
+export const API_PLAIN = new Set(["version", "lang", "missing", "guide", "commands", "history", "progress", "cancel", "cancelRun", "runs", "computes", "exports", "pending", "idle", "perf", "hints", "settings", "attachments", "openConsole"]);
 
 /**
  * Obalí `window.mncad`: každé volání nejdřív zapíše rozepsané změny (bariéra, 22e/22f); výstupy (uložit, export, sdílet,

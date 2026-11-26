@@ -55,7 +55,7 @@ Výstupy dokumentu „Nástroj“ · revize modelu r·?
 Listy (1):
   List 1: ⚠ Vydání: rev. A z modelu r·? (?.?.????) – model je teď r·?: list je ZASTARALÝ – vydejte novou revizi: výkres vydat B
 Exporty (1, zastaralých 1) · model je teď r·?:
-  1. ⚠ STEP „Nastroj.step“ · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·?, exportujte znovu: export step
+  1. ⚠ STEP „Nastroj.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s · kontrola ✓ – ZASTARALÝ: model je teď r·?, exportujte znovu: export step
 Zastaralé výstupy (2) · model je teď r·?:
   1. ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? → výkres vydat B
   2. ⚠ STEP „Nastroj.step“ – exportováno z modelu r·? (?.?.????), model je teď r·? → export step

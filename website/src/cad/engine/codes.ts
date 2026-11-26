@@ -25,6 +25,8 @@ export const CODES = [
   { code: "run.crash", level: "error", key: "výpočet spadl: {0}" },
   { code: "run.interrupted", level: "error", key: "běh přerušen" },
   { code: "run.cancelled", level: "error", key: "výpočet zrušen – dokument zůstal beze změny" },
+  // vlna 22, bod 12: zrušený běh, který už před zrušením zapsal jiný dokument (přechod `záložka` / `nový díl`) – nikdy „beze změny“
+  { code: "run.cancelled-partial", level: "error", key: "výpočet zrušen – změny zapsané před zrušením zůstaly v {0}" },
   { code: "host.app-only", level: "error", key: "příkaz funguje jen v aplikaci v prohlížeči: {0}" },
   { code: "host.fonts", level: "error", key: "písma pro PDF a text modelu nejsou k dispozici" },
   { code: "ui.no-view", level: "note", key: "bez 3D okna nemá příkaz účinek: {0}" },

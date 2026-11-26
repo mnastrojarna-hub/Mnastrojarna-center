@@ -182,6 +182,36 @@ export function stableStep(bytes: Uint8Array): Uint8Array {
   return u8;
 }
 
+/**
+ * Revize modelu v hlavičce STEP (vlna 22, bod 12): `FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision r\X\B7a1b2c3'),'2;1')`
+ * – druhá položka popisu (ISO 10303-21: seznam řetězců; `\X\B7` = „·“ v kódování ISO 8859-1). Soubor tak sám říká, ze které
+ * revize modelu vznikl (stejně jako .mncad `modelRev`, řádek F `rev=` a PDF Info). Stejná revize = stejné bajty v prohlížeči
+ * i v CLI. Už označený soubor se neoznačí podruhé; soubor bez hlavičky FILE_DESCRIPTION se vrátí beze změny.
+ */
+export function stampStepRev(bytes: Uint8Array, rev: string): Uint8Array {
+  let head = "";
+  const n = Math.min(bytes.length, 8192);
+  for (let i = 0; i < n; i++) head += String.fromCharCode(bytes[i]);
+  const m = /FILE_DESCRIPTION\s*\(\s*\(((?:'(?:[^']|'')*'\s*,?\s*)*)\)/.exec(head);
+  if (!m || /MNCAD model revision/.test(m[1])) return bytes;
+  const tag = `'MNCAD model revision ${rev.replace(/·/g, "\\X\\B7").replace(/[^\x20-\x7e]/g, "?")}'`;
+  const at = m.index + m[0].length - 1; // před „)“ seznamu popisu
+  const ins = (m[1].trim() ? "," : "") + tag;
+  const out = new Uint8Array(bytes.length + ins.length);
+  out.set(bytes.subarray(0, at), 0);
+  for (let i = 0; i < ins.length; i++) out[at + i] = ins.charCodeAt(i);
+  out.set(bytes.subarray(at), at + ins.length);
+  return out;
+}
+
+/** revize modelu z hlavičky STEP (`stampStepRev`) – `r·a1b2c3`, nebo null */
+export function stepRevOf(bytes: Uint8Array): string | null {
+  let head = "";
+  for (let i = 0; i < Math.min(bytes.length, 8192); i++) head += String.fromCharCode(bytes[i]);
+  const m = /'MNCAD model revision (r\\X\\B7[0-9a-f]{6})'/.exec(head);
+  return m ? m[1].replace("\\X\\B7", "·") : null;
+}
+
 /** 3D model v jádře (STEP, STL, BREP, OBJ, glTF, 3MF, VRML); STEP s pevným časem v hlavičce (`stableStep`) */
 export async function modelBytes(kernel: Pick<KernelApi, "exportFile">, d: CadDoc, format: Exclude<Export3dFormat, "mncad">): Promise<Uint8Array> {
   if (d.kind === "draft") throw new Error(tr("2D výkres nemá 3D model pro {0}", format.toUpperCase()));

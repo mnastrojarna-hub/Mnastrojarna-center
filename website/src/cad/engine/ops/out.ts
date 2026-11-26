@@ -148,7 +148,11 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   );
   const f = job.out;
   if (!f) return;
-  recordOutput(ctx, { what: "model", format: fmt, file: f.name }); // záznam exportu s revizí modelu (bod 20)
+  // záznam exportu s revizí modelu (bod 20) a záznamem úlohy (22h: stav, čas, fáze, kontrola – trvale v dokumentu); kontrola
+  // zpětným načtením se doplní níže, až je známá (záznam téhož formátu a souboru se přepíše)
+  const jobMs = job.phases.reduce((a, p) => a + p.ms, 0);
+  const note = (check?: { ok: boolean; text: string }) => recordOutput(ctx, { what: "model", format: fmt, file: f.name, job: { state: "done", ms: jobMs, phases: job.phases, ...(check ? { check } : {}) } });
+  note();
   f.modelRev = job.modelRev;
   f.phases = job.phases;
   if (pre) {
@@ -166,12 +170,14 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     if (v) {
       e.code(v.code, { text: v.text, indent: "  ", level: v.level });
       f.check = { ok: false, text: v.text };
+      note(f.check);
     }
     return;
   }
   const c = job.check!;
   const text = c.line.replace(/^[✓⚠✗]\s*/, "");
   f.check = { ok: c.ok, text };
+  note(f.check);
   if (c.ok) {
     e.console(`  ${c.line}`);
     e.ok(text);

@@ -116,7 +116,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     else log.coded(w.line, code, { args: w.args ?? [] });
   }
   for (const op of prog.ops) for (const d of lintOp(op, stripLineComment(srcLines[op.line - 1] ?? ""))) log.coded(op.line, d.code, { args: d.args });
-  const run: EngineRun = { doc: JSON.parse(JSON.stringify(ws.present())) as CadDoc, changed: false, openNew: false, tabbed: false, added: [], currentBody: null, openDrawingAfter: false, lastOp: prog.ops[prog.ops.length - 1], srcLines };
+  const run: EngineRun = { doc: JSON.parse(JSON.stringify(ws.present())) as CadDoc, changed: false, openNew: false, tabbed: false, added: [], currentBody: null, openDrawingAfter: false, lastOp: prog.ops[prog.ops.length - 1], srcLines, startTab: ws.tabs().find((t) => t.active)?.id };
   const ctx: OpCtx = { ws, host, opts: o, report: rb, run, line: 0, log, strict };
   /** řádek, na kterém prvek vznikl (záznamy ze stavby nesou řádek prvku – kap. 4.1) */
   const featureLine = new Map<string, number>();
@@ -230,13 +230,43 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     return await finishRun(ctx, featureLine, now, verify, stopOn);
   } catch (e) {
     if (!isCancelled(e)) throw e;
-    // zrušeno tlačítkem Zrušit: nic se nezapsalo; jádro se znovu připraví nad dosavadním dokumentem
+    // zrušeno tlačítkem Zrušit: rozpracovaný dokument se nezapíše; jádro se znovu připraví nad dosavadním dokumentem
     host.ui?.restoreKernel?.();
-    rb.code("run.cancelled");
+    // vlna 22, bod 12: co běh zapsal už před zrušením (přechod na jiný dokument – `nový díl`, `záložka` …), se nezamlčí:
+    // záložky, které běh založil, se zavřou (zrušený běh = nic nového); kroky historie dřívějších záložek se vyjmenují
+    const { closed, kept } = await rollbackRun(ws, run);
+    if (!kept.length) rb.code("run.cancelled");
+    else rb.code("run.cancelled-partial", { args: [kept.map((n) => `„${n}“`).join(", ")] });
     const present = ws.present();
-    log.tailLine(tr("✗ Výpočet zrušen – dokument zůstal beze změny."), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
+    const head = kept.length ? tr("✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v {0} (Zpět je vrátí).", kept.map((n) => `„${n}“`).join(", ")) : tr("✗ Výpočet zrušen – dokument zůstal beze změny.");
+    log.tailLine(head + (closed.length ? " " + tr("Dokumenty založené během ({0}) se zahodily.", closed.map((n) => `„${n}“`).join(", ")) : ""), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
     return log.text();
   }
+}
+
+/**
+ * Zrušený běh (vlna 22, bod 12): záložky, které běh založil před zrušením, se zavřou a znovu se aktivuje záložka, ve které
+ * běh začal; dokumenty zapsané krokem historie do dřívějších záložek zůstanou (`kept` – hláška je vyjmenuje, Zpět je vrátí).
+ */
+async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: string[]; kept: string[] }> {
+  const w = run.wrote;
+  if (!w) return { closed: [], kept: [] };
+  const closed: string[] = [];
+  for (const t of [...w.opened].reverse()) {
+    if (!ws.tabs().some((x) => x.id === t.id)) continue;
+    try {
+      if (t.prev) {
+        // znovu použitá prázdná úvodní záložka: vrátit do stavu před během (zavřít ji by vzalo i úvodní záložku aplikace)
+        await ws.activate(t.id);
+        ws.commit(t.prev);
+      } else await ws.close(t.id);
+      closed.push(t.name);
+    } catch {
+      w.committed.push(t.name); // záložku nešlo zavřít – zůstala, hláška ji vyjmenuje
+    }
+  }
+  if (run.startTab && ws.tabs().some((x) => x.id === run.startTab) && !ws.tabs().find((x) => x.id === run.startTab)?.active) await ws.activate(run.startTab).catch(() => undefined);
+  return { closed: closed.reverse(), kept: [...new Set(w.committed)] };
 }
 
 /** hloubka vnoření podsestav (sestava bez podsestav = 1); hlubší než `MAX_DEPTH` se při stavbě vynechají (5.2 č. 29) */

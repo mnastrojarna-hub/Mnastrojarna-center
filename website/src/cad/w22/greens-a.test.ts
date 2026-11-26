@@ -308,7 +308,7 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
     await runReport(ws, 'nový díl "Zrušený"\nkvádr 30 30 5', hostOf());
     const before = JSON.stringify(ws.present());
     const ac = new AbortController();
-    // (zrušení po řádku, který založil novou záložku – `nový díl` –, záložku nechá; proto tu dokument založí dřívější běh)
+    // (zrušení po `nový díl` uprostřed skriptu hlídá případ 16 – tady dokument založí dřívější běh)
     const rep = await runReport(ws, 'kvádr 20 10 10\nválec 5 10\nkvádr 1 1 1\nstav', hostOf(), { signal: ac.signal, hooks: { opEnd: () => ac.abort() } });
     rep.run = { id: "r1", inputRev: "-@r·000000", state: rep.entries.some((e) => e.code === "run.cancelled") ? "cancelled" : "done" };
     const out = formatShort(rep, { budget: Infinity, notes: true });
@@ -329,6 +329,20 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
     const withCheck = await short(ws, "export step");
     expect(con).toMatch(/✓ kontrola STEP/);
     expect(withCheck).toMatch(/^F step "Export\.step" \d+B check=ok rev=r·[0-9a-f]{6}/m);
+  }, 120_000);
+
+  it("16. zrušený běh, který před zrušením zapsal jiný dokument: nikdy „beze změny“ – ✗ run.cancelled-partial ho jmenuje; založená záložka zmizí", async () => {
+    setLang("cs");
+    const ws = new MemoryWorkspace();
+    await runReport(ws, 'nový díl "Deska A"\nkvádr 30 30 5', hostOf());
+    const ac = new AbortController();
+    const rep = await runReport(ws, 'kvádr 5 5 5 v 0 0 5\nnový díl "Deska B"\nkvádr 1 1 1\nnový díl "Deska C"\nkvádr 2 2 2', hostOf(), { signal: ac.signal, hooks: { opEnd: (l: number | null) => void (l === 4 && ac.abort()) } });
+    const out = formatShort(rep, { budget: Infinity, notes: true });
+    expect(out).toMatch(/^✗ L- run\.cancelled-partial /m);
+    expect(out).not.toMatch(/beze změny/);
+    expect(rep.console).toMatch(/zůstaly v „Deska A“/);
+    expect(rep.console).toMatch(/Dokumenty založené během \(„Deska B“\) se zahodily/);
+    expect(ws.tabs().map((t) => t.title)).not.toContain("Deska B");
   }, 120_000);
 });
 
@@ -359,5 +373,35 @@ describe("vlna 22 A4: žádné falešné zelené u ověření odkazu a softwarov
     setLang("cs");
     expect(softStatusText()).toMatch(/WebGL není dostupné/);
     expect(softStatusText()).not.toMatch(/OCCT|připraveno|✓/);
+  });
+});
+
+describe("vlna 22 fáze 2 kolo 3 (body 12, 22h): „odpovídá modelu“, „kontrola ✓“ a „beze změny“ jen tam, kde to platí", async () => {
+  const { exportLine, recordExport } = await import("../doc-outputs");
+  const { emptyDoc } = await import("../types");
+  const part = (h: number): CadDoc => ({ ...emptyDoc("Deska A"), kind: "part", features: [{ id: "b1", name: "Kvádr 1", type: "box", size: [60, 40, h], position: [0, 0, 0], centered: false, mode: "new" } as never] });
+
+  it("14. záznam exportu ze STARŠÍ revize (model změněný během exportu) nikdy „odpovídá modelu“", () => {
+    setLang("cs");
+    const exported = part(10);
+    const now = part(12); // uživatel změnil výšku, než export doběhl
+    const { doc, rec } = recordExport(now, { what: "model", format: "step", file: "Deska A.step", from: exported });
+    expect(exportLine(doc, rec)).not.toMatch(/odpovídá modelu/);
+    expect(exportLine(doc, rec)).toMatch(/ZASTARALÝ/);
+    // tentýž model → odpovídá
+    const same = recordExport(exported, { what: "model", format: "step", file: "Deska A.step", from: exported });
+    expect(exportLine(same.doc, same.rec)).toMatch(/odpovídá modelu$/);
+  });
+
+  it("15. „kontrola ✓“ v záznamu úlohy jen s provedenou a úspěšnou kontrolou; neúspěšná = ⚠ s důvodem", () => {
+    setLang("cs");
+    const d = part(10);
+    const none = recordExport(d, { what: "model", format: "step", file: "a.step", job: { state: "done", ms: 400 } });
+    expect(exportLine(none.doc, none.rec)).not.toMatch(/kontrola/);
+    const bad = recordExport(d, { what: "model", format: "step", file: "b.step", job: { state: "done", ms: 400, check: { ok: false, text: "těles: 0" } } });
+    expect(exportLine(bad.doc, bad.rec)).toMatch(/kontrola ⚠ těles: 0/);
+    expect(exportLine(bad.doc, bad.rec)).not.toMatch(/✓/);
+    const ok = recordExport(d, { what: "model", format: "step", file: "c.step", job: { state: "done", ms: 400, check: { ok: true, text: "věrná kopie" } } });
+    expect(exportLine(ok.doc, ok.rec)).toMatch(/úloha: dokončeno ⏱ 0,4 s · kontrola ✓/);
   });
 });

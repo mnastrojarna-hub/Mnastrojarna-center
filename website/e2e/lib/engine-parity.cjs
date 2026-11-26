@@ -57,6 +57,8 @@ function normalize(text) {
         .replace(/ · [\d.,]+ s$/, '')
         // doba výpočtu dynamické studie uprostřed řádku `Dynamika: … · výpočet 0,41 s` (vlna 21)
         .replace(/ · výpočet [\d.,]+ s(?= |$)/, '')
+        // doba úlohy exportu v záznamu exportu (vlna 22, bod 22h – doc-outputs.ts jobTime) `⏱ 0,4 s` → `⏱ ? s`
+        .replace(/⏱ [\d.,\u00a0]+ s/g, '⏱ ? s')
         // nápověda k neznámému příkazu = seznam příkazů z AGENT_COMMANDS (s novým příkazem se prodlouží) – jen jeho začátek
         .replace(/^(✗ řádek \d+: neznámý příkaz „[^“]*“ – příkazy: )(.*?)( ← „.*“)?$/, '$1…$3')
         .replace(/\bid [a-z0-9]{1,9}\]/g, 'id #]')

@@ -18,10 +18,12 @@ import type { Export3dFormat, ExportCheck } from "../agent-out";
 import type { CadDoc } from "../types";
 import type { SolidParts } from "../solid-export";
 import { embedBlobs } from "../blobs";
-import { isEmptyDoc, modelBytes, verifyExport } from "./files";
+import { isEmptyDoc, modelBytes, stampStepRev, verifyExport } from "./files";
 import type { KernelApi } from "./kernel";
 import { modelRev } from "./result-key";
 import { EXPORT_PHASES, exportPhaseText, type ExportPhase } from "./export-phases";
+import { tr } from "../i18n";
+import { CodedError } from "./codes";
 
 export { EXPORT_PHASES, exportPhaseText, type ExportPhase };
 
@@ -48,6 +50,8 @@ export type ExportJobOptions = {
 };
 
 export type ExportJobResult<T> = {
+  /** exportovaný dokument (stav v okamžiku startu úlohy) – záznam exportu nese jeho revizi, ne revizi dokumentu po konci */
+  doc: CadDoc;
   data: Uint8Array;
   out: T;
   check?: ExportCheck;
@@ -60,6 +64,42 @@ export type ExportJobResult<T> = {
 export const exportModelRev = (doc: CadDoc): string => modelRev(embedBlobs(doc) as unknown as CadDoc);
 
 const verifiable = (f: ExportFormat3d): f is "step" | "brep" => f === "step" || f === "brep";
+
+type CheckOut = Awaited<ReturnType<KernelApi["check"]>>;
+
+/** chyba převodu s diagnostikou (vlna 22, bod 22h): ve které fázi, co řeklo jádro a v jakém stavu byl model */
+export class ExportConvertError extends Error {
+  constructor(
+    message: string,
+    readonly diag: { phase: "convert"; format: string; kernel: string; solid?: boolean; failed: { name: string; error: string }[]; paramErrors: string[] },
+  ) {
+    super(message);
+    this.name = "ExportConvertError";
+  }
+}
+
+/**
+ * Diagnostika selhání převodu (bod 22h – „nebylo možné oddělit dlouhý výpočet, problém exportu…“): text jádra + fáze + stav
+ * modelu z fáze přestavby (těleso ano/ne, prvky s chybou, chyby parametrů). Zrušení (`CadCancelled`) projde beze změny.
+ * Vnitřní průběh zapisovače STEP v jádře (WASM) není k dispozici – fáze převodu je jedno volání jádra.
+ */
+export function convertError(e: unknown, doc: CadDoc, format: string, built?: CheckOut): unknown {
+  // zrušení, kódované chyby (protokol je třídí podle kódu) a chyby ještě před jádrem (prázdný model, 2D výkres) beze změny
+  if (e instanceof CadCancelled || e instanceof CodedError || doc.kind === "draft" || isEmptyDoc(doc)) return e;
+  const kernel = e instanceof Error ? e.message : String(e);
+  const names = new Map(doc.features.map((f) => [f.id, f.name]));
+  const failed = (built?.status ?? []).filter((x) => !x.ok && !x.suppressed).map((x) => ({ name: names.get(x.id) ?? x.id, error: x.error ?? "?" }));
+  const paramErrors = built?.paramErrors ?? [];
+  const facts = built
+    ? [
+        built.solid ? tr("model má těleso") : tr("model NEMÁ těleso"),
+        ...(failed.length ? [tr("prvky s chybou: {0}", failed.map((f) => `„${f.name}“ (${f.error})`).join(", "))] : []),
+        ...(paramErrors.length ? [tr("chyby parametrů: {0}", paramErrors.join("; "))] : []),
+      ]
+    : [tr("model se před převodem nepřestavoval (sestava / bez přestavby)")];
+  const msg = tr("převod do {0} selhal ve fázi „{1}“: {2} · {3}", format.toUpperCase(), exportPhaseText("convert", format), kernel, facts.join(" · "));
+  return new ExportConvertError(msg, { phase: "convert", format, kernel, ...(built ? { solid: built.solid } : {}), failed, paramErrors });
+}
 
 /** Export jako úloha s fázemi (viz hlavička modulu). */
 export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps: ExportJobDeps<T>, o: ExportJobOptions = {}): Promise<ExportJobResult<T>> {
@@ -79,12 +119,17 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
   const rev = exportModelRev(doc);
   // prázdný model a 2D výkres: bez přestavby – převod skončí srozumitelnou chybou (`modelBytes`)
   const rebuild = o.rebuild ?? (doc.kind !== "assembly" && doc.kind !== "draft" && !isEmptyDoc(doc));
+  let built: CheckOut | undefined;
   if (rebuild) {
     step("model");
-    await deps.kernel.check(doc);
+    built = await deps.kernel.check(doc);
   }
   step("convert");
-  const data = await modelBytes(deps.kernel, doc, format);
+  // STEP nese revizi modelu v hlavičce (vlna 22, bod 12 – files.ts stampStepRev); chyba převodu = diagnostika (bod 22h)
+  const raw = await modelBytes(deps.kernel, doc, format).catch((e: unknown) => {
+    throw convertError(e, doc, format, built);
+  });
+  const data = format === "step" ? stampStepRev(raw, rev) : raw;
   const wantCheck = o.check !== false && verifiable(format);
   let check: ExportCheck | undefined;
   let out: T;
@@ -104,5 +149,5 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
     out = await deps.write(data);
   }
   close();
-  return { data, out, ...(check ? { check } : {}), modelRev: rev, phases };
+  return { doc, data, out, ...(check ? { check } : {}), modelRev: rev, phases };
 }

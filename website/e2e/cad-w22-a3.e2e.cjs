@@ -125,6 +125,44 @@ async function exports(p, tag) {
   ok((await p.locator('[data-export-list] [data-export-job]').count()) >= 2 && (await p.locator('[data-export-state="cancelled"]').count()) >= 1, `${tag}22h: seznam Exporty drží dokončené i zrušené úlohy`);
 }
 
+/* ───────────── fáze 2, kolo 3 (body 12, 22h): výpočty s id, STEP s revizí, zrušení po `nový díl` ───────────── */
+async function round3(p, tag) {
+  // výpočty aplikace mají id a revizi vstupu (dřív jen vnitřní SeqGuard bez viditelného stavu)
+  await p.evaluate((t) => window.mncad.run(t), 'nový díl "Kolo 3"\nkvádr 30 20 10');
+  await p.evaluate(() => window.mncad.idle());
+  await p.waitForFunction(() => (window.mncad.computes('build') || []).some((x) => x.state === 'done' && x.doc === 'Kolo 3'), null, { timeout: 120000 });
+  const comp = await p.evaluate(() => {
+    const b = window.mncad.computes('build').filter((x) => x.doc === 'Kolo 3').slice(-1)[0];
+    const el = document.querySelector('[data-compute-run]');
+    return { b, attr: el ? { id: el.getAttribute('data-compute-run'), state: el.getAttribute('data-compute-state'), rev: el.getAttribute('data-compute-rev'), kind: el.getAttribute('data-compute-kind') } : null, all: window.mncad.computes().map((x) => `${x.id}:${x.what}:${x.state}`).slice(-6) };
+  });
+  ok(comp.b && /^v\d+$/.test(comp.b.id) && /@r·[0-9a-f]{6}$/.test(comp.b.inputRev) && comp.b.state === 'done', `${tag}12: stavba modelu má id a revizi vstupu (${comp.b && comp.b.id} ${comp.b && comp.b.inputRev} ${comp.b && comp.b.state}; ${comp.all.join(' ')})`);
+  ok(!!comp.attr && /^v\d+$/.test(comp.attr.id) && ['done', 'superseded', 'running', 'queued', 'error', 'cancelled'].includes(comp.attr.state) && /^r·[0-9a-f]{6}$/.test(comp.attr.rev), `${tag}12: stavový řádek ukazuje poslední výpočet (${JSON.stringify(comp.attr)})`);
+  // soubor STEP nese revizi modelu v hlavičce = modelRev výsledku
+  const st = await p.evaluate(async () => {
+    const r = await window.mncad.exportFile('step');
+    const head = atob(r.base64).slice(0, 3000);
+    const m = /'MNCAD model revision (r\\X\\B7[0-9a-f]{6})'/.exec(head);
+    return { rev: r.modelRev, inFile: m ? m[1].replace('\\X\\B7', '·') : null, check: r.check && r.check.ok };
+  });
+  ok(st.inFile && st.inFile === st.rev && st.check === true, `${tag}12: STEP nese revizi modelu v hlavičce (${st.inFile} = ${st.rev}), kontrola zpětným načtením ok`);
+  // zrušení běhu po `nový díl` uprostřed skriptu: založená záložka zmizí, hláška nelže
+  const c = await p.evaluate(async (t) => {
+    const before = window.mncad.tabs().map((x) => x.title);
+    const pr = window.mncad.run(t);
+    for (let t0 = Date.now(); Date.now() - t0 < 60000 && !window.mncad.tabs().some((x) => x.title === 'Zrušit B'); ) await new Promise((r) => setTimeout(r, 20));
+    const had = window.mncad.tabs().some((x) => x.title === 'Zrušit B');
+    await new Promise((r) => setTimeout(r, 400));
+    const hit = window.mncad.cancelRun();
+    const log = await pr;
+    await new Promise((r) => setTimeout(r, 500));
+    return { before, after: window.mncad.tabs().map((x) => x.title), had, hit, log };
+  }, 'nový díl "Zrušit B"\nkvádr 10 10 10\n' + THREAD('Zrušit C', 30));
+  const line = (c.log.split('\n').find((l) => /Výpočet zrušen|Computation cancelled|Berechnung abgebrochen/.test(l)) || '').trim();
+  ok(c.had && c.hit && !c.after.includes('Zrušit B') && !c.after.includes('Zrušit C') && c.after.join('|') === c.before.join('|'), `${tag}12: zrušený běh po \`nový díl\` – záložka, kterou založil, zmizela (před ${c.before.length}, po ${c.after.length}: ${c.after.slice(-3).join(', ')})`);
+  ok(/Dokumenty založené během \(„Zrušit B“\) se zahodily/.test(line) && /beze změny/.test(line) && !/zůstaly v/.test(line), `${tag}12: hláška zrušení odpovídá stavu („${line}“)`);
+}
+
 /* ───────────────────────── 22e: rozepsaná hodnota a název ───────────────────────── */
 async function fields(p, tag, lang) {
   const L = { cs: { depth: 'Hloubka závitu', dec: '0,82' }, en: { depth: 'Thread depth', dec: '0.82' }, de: { depth: 'Gewindetiefe', dec: '0,82' } }[lang];
@@ -213,8 +251,10 @@ async function menuExport(b, tag) {
     window.showSaveFilePicker = async (o) => {
       const name = o?.suggestedName || 'x';
       window.__fs.picked.push(name);
-      return { name, kind: 'file', createWritable: async () => ({ write: async (blob) => window.__fs.writes.push([name, blob.size]), close: async () => undefined }), remove: async () => void window.__fs.removed.push(name) };
+      // zápis čeká na `__fs.gate` (je-li nastavená) – test tak deterministicky změní model, zatímco úloha exportu ještě běží
+      return { name, kind: 'file', createWritable: async () => ({ write: async (blob) => { window.__fs.waiting = true; if (window.__fs.gate) await window.__fs.gate; window.__fs.writes.push([name, blob.size]); }, close: async () => undefined }), remove: async () => void window.__fs.removed.push(name) };
     };
+    window.__fs.hold = () => { window.__fs.waiting = false; window.__fs.gate = new Promise((r) => (window.__fs.release = () => { window.__fs.gate = null; r(); })); };
   });
   const p = await ctx.newPage();
   await start(p, `${BASE}/cad?agent=0`);
@@ -236,6 +276,35 @@ async function menuExport(b, tag) {
   ok((await done.getAttribute('data-export-check')) === 'ok' && /^r·[0-9a-f]{6}$/.test(await done.getAttribute('data-export-rev')), `${tag}22h: export z menu – kontrola zpětným načtením ok, revize modelu v záznamu`);
   await p.waitForTimeout(10000);
   ok(await done.isVisible(), `${tag}22h: záznam exportu zůstal i 10 s po konci`);
+  // kolo 3 (falešná zelená): model změněný BĚHEM exportu z menu (Ctrl+Z, když převod běží) – záznam v dokumentu nese revizi
+  // exportovaného modelu a je hned zastaralý, lišta ✓ kontroly se neukáže, hláška to řekne; úloha (stav, čas) je v dokumentu
+  const nDone = await p.locator('[data-export-job][data-export-state="done"]').count();
+  await p.getByRole('button', { name: 'Soubor', exact: true }).click();
+  // zápis souboru (poslední fáze úlohy) podrží brána – změna modelu tak nastane jistě uprostřed úlohy, ne až po jejím konci
+  // (dřív Ctrl+Z ve fázi kontroly: krátká kontrola doběhla dřív, Zpět pak vrátilo i hotový záznam a test měřil něco jiného)
+  await p.evaluate(() => window.__fs.hold());
+  await p.getByRole('button', { name: /STEP/ }).first().click();
+  await p.waitForSelector('[data-export-job][data-export-state="running"]', { timeout: 30000 });
+  await p.waitForFunction(() => window.__fs.waiting === true, null, { timeout: 300000 });
+  // Ctrl+Z z klávesnice (ne window.mncad.undo – to je textový běh a čekal by ve frontě za exportem)
+  const n0 = await p.evaluate(() => window.mncad.getDocument().features.length);
+  await p.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+  await p.keyboard.press('Control+z');
+  await p.waitForTimeout(300);
+  const undone = { before: n0, after: await p.evaluate(() => window.mncad.getDocument().features.length), running: await p.locator('[data-export-job][data-export-state="running"]').count() };
+  ok(undone.after !== undone.before && undone.running >= 1, `${tag}22h: model změněn (Ctrl+Z), zatímco úloha exportu běží (${JSON.stringify(undone)})`);
+  await p.evaluate(() => window.__fs.release());
+  await p.waitForFunction((n) => document.querySelectorAll('[data-export-job][data-export-state="done"]').length > n, nDone, { timeout: 300000 });
+  await p.waitForTimeout(800);
+  const chg = await p.evaluate(() => {
+    const d = window.mncad.getDocument();
+    const rec = (d.outputs || []).slice(-1)[0];
+    return { rec, bar: !!document.querySelector('div[data-export-check][data-export-format]'), text: document.body.innerText };
+  });
+  const list = await p.evaluate(() => window.mncad.run('exporty'));
+  const recLine = (list.split('\n').find((l) => l.includes(chg.rec && chg.rec.file)) || '').trim();
+  ok(!!chg.rec && chg.rec.job && chg.rec.job.state === 'done' && typeof chg.rec.job.ms === 'number' && /ZASTARALÝ/.test(recLine) && !/odpovídá modelu/.test(recLine), `${tag}22h: model změněn během exportu → záznam zastaralý, ne „odpovídá modelu“ (${recLine}; undo ${JSON.stringify(undone)})`);
+  ok(!chg.bar && /model se během exportu změnil/.test(chg.text), `${tag}22h: bez lišty ✓ kontroly nad změněným modelem, hláška o změně během exportu`);
   await p.screenshot({ path: S + 'a3-exports.png' });
   await ctx.close();
 }
@@ -253,7 +322,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
     const p = await ctx.newPage();
     const errs = []; p.on('pageerror', (e) => errs.push(e.message));
     await start(p, url);
-    if (!tag) { await runs(p, tag); await exports(p, tag); }
+    if (!tag) { await runs(p, tag); await exports(p, tag); await round3(p, tag); }
     await fields(p, tag, lang);
     await drawing(p, tag, lang);
     ok(!errs.length, `${tag}bez chyb stránky (${errs.slice(0, 2).join(' | ')})`);
@@ -267,6 +336,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   const p = await ctx.newPage();
   await start(p, `${BASE}/cad`);
   await runs(p, '[bez WebGL] ');
+  await round3(p, '[bez WebGL] ');
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
   await nogl.close();

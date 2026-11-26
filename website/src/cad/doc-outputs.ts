@@ -172,7 +172,15 @@ export function staleSheets(doc: CadDoc, id: ModelId = modelId(doc)): { idx: num
 /** nejvýš tolik záznamů exportů v dokumentu (nejstarší odpadnou) */
 export const OUTPUTS_MAX = 40;
 
-export type ExportInput = Pick<ExportRecord, "what" | "format" | "file"> & Partial<Pick<ExportRecord, "sheets" | "rev" | "revStale" | "job" | "at">>;
+export type ExportInput = Pick<ExportRecord, "what" | "format" | "file"> &
+  Partial<Pick<ExportRecord, "sheets" | "rev" | "revStale" | "job" | "at">> & {
+    /**
+     * dokument, ZE KTERÉHO soubor vznikl (vlna 22, body 12 a 22h): export z menu běží jako úloha a záznam se zapisuje až po
+     * jejím konci do dokumentu, který mezitím mohl uživatel změnit – revize a otisk záznamu musí patřit exportovanému modelu,
+     * jinak by soubor ze starší revize hlásil „odpovídá modelu“. Bez `from` = `doc` (text: export běží nad dokumentem běhu).
+     */
+    from?: CadDoc;
+  };
 
 /**
  * Záznam exportu do dokumentu: revize modelu a čas. Stejný formát + soubor = novější záznam nahradí starší (soubor na disku
@@ -180,14 +188,15 @@ export type ExportInput = Pick<ExportRecord, "what" | "format" | "file"> & Parti
  */
 export function recordExport(doc: CadDoc, e: ExportInput): { doc: CadDoc; rec: ExportRecord } {
   const id = modelId(doc);
+  const src = e.from ? modelId(e.from) : id;
   const at = e.at ?? new Date().toISOString();
   const rec: ExportRecord = {
     id: hashPair(`${e.format}|${e.file}|${at}`)[0].toString(36),
     what: e.what,
     format: e.format.toLowerCase(),
     file: e.file,
-    modelRev: id.rev,
-    sig: id.sig,
+    modelRev: src.rev,
+    sig: src.sig,
     at,
     ...(e.sheets?.length ? { sheets: e.sheets } : {}),
     ...(e.rev ? { rev: e.rev } : {}),
@@ -228,12 +237,29 @@ export function reexportCmd(doc: CadDoc, rec: ExportRecord): string {
   return `výkres export ${rec.format}${rec.sheets && rec.sheets.length > 1 ? " vše" : idx >= 0 && (doc.drawings?.length ?? 0) > 1 ? ` list ${idx + 1}` : ""}`;
 }
 
+/** doba úlohy `⏱ 0,4 s` (značka ⏱ – zlaté snímky korpusu čas normalizují, engine-parity.cjs) */
+export const jobTime = (ms: number): string => `⏱ ${(ms / 1000).toLocaleString(cadLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
+
+/**
+ * úloha exportu uložená se záznamem (vlna 22, bod 22h): stav, doba a výsledek kontroly zpětným načtením – trvale v dokumentu,
+ * ne jen v seznamu Exporty relace; bez kontroly se nic „✓“ nepíše
+ */
+function jobText(rec: ExportRecord): string {
+  const j = rec.job;
+  if (!j?.state) return "";
+  const st = RUN_STATE_TEXT[j.state]?.() ?? j.state;
+  const time = j.ms !== undefined ? ` ${jobTime(j.ms)}` : "";
+  const check = j.check ? ` · ${j.check.ok ? tr("kontrola ✓") : `${tr("kontrola")} ⚠ ${j.check.text}`}` : "";
+  return ` · ${tr("úloha: {0}", st)}${time}${check}`;
+}
+const RUN_STATE_TEXT: Record<string, () => string> = { done: () => tr("dokončeno"), cancelled: () => tr("zrušeno"), error: () => tr("chyba") };
+
 /** jeden řádek záznamu exportu (`exporty`, panel) */
 export function exportLine(doc: CadDoc, rec: ExportRecord, id: ModelId = modelId(doc)): string {
   const sheets = sheetNames(doc, rec.sheets);
   const head = tr("{0} „{1}“", formatName(rec.format), rec.file) + (sheets.length ? ` · ${sheets.length > 1 ? tr("listy {0}", sheets.join(", ")) : tr("list {0}", sheets[0])}` : "") + (rec.rev ? ` · ${tr("rev. {0}", rec.rev)}` : "");
   const when = tr("z modelu {0} ({1})", rec.modelRev, fmtDate(rec.at));
-  const job = rec.job?.state ? ` · ${tr("úloha {0}", rec.job.state)}` : "";
+  const job = jobText(rec);
   if (exportState(doc, rec, id) === "current") return `${head} · ${when}${job} – ${tr("odpovídá modelu")}`;
   return rec.sig === id.sig ? `⚠ ${head} · ${when}${job} – ${tr("NESE ZASTARALÉ PÍSMENO REVIZE: rev. {0} byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu: {1}", rec.rev ?? "?", reexportCmd(doc, rec))}` : `⚠ ${head} · ${when}${job} – ${tr("ZASTARALÝ: model je teď {0}, exportujte znovu: {1}", id.rev, reexportCmd(doc, rec))}`;
 }
