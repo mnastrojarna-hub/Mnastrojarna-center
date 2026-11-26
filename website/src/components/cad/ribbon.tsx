@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
+import { BottomSheet, SheetCloseButton } from "./bottom-sheet";
 import { MicroTipLayer, hideTip, nativeTitle, useMicroTip, type TipSpec } from "./micro-tip";
 
 export type RItem = {
@@ -295,22 +296,11 @@ function Floating({ anchor, close, children }: { anchor: HTMLElement; close: () 
   }, [anchor]);
   if (typeof document === "undefined") return null;
   if (pos === "sheet") {
+    // spodní list: táhnout dolů za úchyt nebo za obsah posunutý nahoře, klepnout na podklad, Zpět, Esc (bottom-sheet.tsx)
     return createPortal(
-      <>
-        <div className="fixed inset-0 z-[94] bg-black/30" aria-hidden />
-        <div
-          ref={ref}
-          data-cad-menu
-          role="menu"
-          className="fixed inset-x-0 bottom-0 z-[95] max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-[#cfd6de] bg-white pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_32px_-8px_rgba(15,23,42,.35)]"
-        >
-          <div className="mx-auto mb-1 mt-2 h-1 w-10 rounded-full bg-[#cfd6de]" />
-          <div className="py-1 [&_button]:min-h-[44px] [&_button]:text-[14px]">{children}</div>
-          <button type="button" onClick={close} className="mx-3 mt-1 h-11 w-[calc(100%-24px)] rounded-lg bg-[#eef2f6] text-[14px] font-medium text-[#26303b]">
-            {tr("Zavřít")}
-          </button>
-        </div>
-      </>,
+      <BottomSheet sheetRef={ref} onClose={close} data-cad-menu role="menu" footer={<SheetCloseButton onClose={close} />}>
+        <div className="py-1 [&_button]:min-h-[44px] [&_button]:text-[14px]">{children}</div>
+      </BottomSheet>,
       document.body,
     );
   }
