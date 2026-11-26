@@ -733,7 +733,10 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \
    komponenta se kvůli ní nehýbe, stav „ztracená reference“, \`mates=0/1(lost=1)\`, souhrn \`sestava hotovo\` je bez ✓
    („→ … vrácen … – stav vazeb níže“). Oprava: \`sestava vazba 1 plocha b F6\` (nová plocha strany B, F-číslo nebo pravidlo
    jako u nové vazby; bez strany = ztracená strana) nebo \`sestava vazba 1 smazat\`; vrátí-li další úprava tutéž plochu,
-   reference se obnoví (ℹ \`mate.restored\`).
+   reference se obnoví (ℹ \`mate.restored\`). Totéž platí pro \`sestava obnovit\` (díl změněný v záložce, GUI „Obnovit z dílu“) a pro
+   **dosedací plochy pružin**: ztracená dosedací plocha = ✗ \`mate.lost\` s názvem pružiny, řádek „pružina „P“ … – ztracená reference: …“
+   ve výpisu \`sestava vazby\` (hlavička „· pružiny se ztracenou dosedací plochou: N“), \`sestava pružiny\` / \`stav\` bez délky, síly a ✓
+   („délka a síla nezkontrolovány“); oprava \`sestava pružina "P" mezi "Deska A" F6 "Přidržovač" F5\` nebo \`… odebrat\`.
 9. \`kusovník [strukturovaně] [csv]\` – tabulka \`Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks\`; \`kolize\` = průniky.
    Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
    řádek nerozdělí; jiné číslo výkresu (\`číslo "…"\`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.

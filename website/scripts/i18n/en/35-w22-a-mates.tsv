@@ -17,7 +17,6 @@ Nová plocha vazby – komponenta „{0}“	New mate face – component “{0}�
 plocha {0} → {1}	face {0} → {1}
 Plocha vazby vybrána znovu (F{0}) – vazba se zase řeší.	Mate face picked again (F{0}) – the mate is solved again.
 po úpravě dílu neexistuje	no longer exists after the part change
-pružina „{0}“ – ztracená dosedací plocha {1} {2}: délka pružiny se z ní nepočítá; zadejte dosedací plochy znovu (sestava pružina "{0}" mezi "A" <plocha> "B" <plocha>)	spring “{0}” – lost seat face {1} {2}: the spring length is not computed from it; enter the seat faces again (assembly spring "{0}" between "A" <face> "B" <face>)
 původní geometrie neznámá	original geometry unknown
 sestava vazba {0} plocha {1} <plocha> | smazat	assembly mate {0} face {1} <face> | delete
 táž plocha, nové číslo	same face, new number

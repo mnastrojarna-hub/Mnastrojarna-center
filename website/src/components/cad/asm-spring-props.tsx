@@ -8,6 +8,7 @@ import { useState } from "react";
 import { aliasProblem, fmt } from "@/cad/agent-asm";
 import { springGeom } from "@/cad/asm-spring-geom";
 import { solidOf, springVerdict } from "@/cad/asm-spring";
+import { springFixCmd, springLostSideTexts } from "@/cad/spring-lost";
 import { tr } from "@/cad/i18n";
 import type { AsmComponent, CadDoc } from "@/cad/types";
 import { Num } from "./props";
@@ -33,6 +34,8 @@ export function AsmInstanceProps({ c, doc, onChange, onRun }: { c: AsmComponent;
   const [solid, setSolid] = useState(s?.solid ?? 0);
   const [rate, setRate] = useState(s?.rate ?? 0);
   const state = s?.length !== undefined ? springVerdict(s.seat ?? s.length, s.free, solidOf(c)) : null;
+  // ztracená dosedací plocha (po změně dílu): uložená délka neplatí – žádné ✓ ani délka/síla, jen která plocha chybí (spring-lost.ts)
+  const lost = s ? springLostSideTexts(doc, c) : [];
   return (
     <div className="space-y-3">
       <label className="block">
@@ -59,7 +62,18 @@ export function AsmInstanceProps({ c, doc, onChange, onRun }: { c: AsmComponent;
       {g && onRun && (
         <fieldset className="space-y-2 rounded border border-[#dfe5eb] p-2" data-asm-spring>
           <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-ink-700/60">{tr("Pružina mezi komponentami")}</legend>
-          {s && (
+          {s && lost.length > 0 && (
+            <p className="rounded border border-[#f3c4c0] bg-[#fef3f2] px-2 py-1 text-[11.5px] text-[#912018]" data-asm-spring-state data-asm-spring-lost={lost.length}>
+              ✗ {tr("Ztracená dosedací plocha – délka a síla pružiny se nekontrolují:")}
+              {lost.map((t) => (
+                <span key={t} className="block">
+                  {t}
+                </span>
+              ))}
+              <span className="block">{tr("Vyberte komponenty A a B a klikněte na Upravit pružinu (dosedací plocha = nejbližší kolmá rovinná plocha), nebo textem: {0}", springFixCmd(doc, c))}</span>
+            </p>
+          )}
+          {s && !lost.length && (
             <p className="text-[11.5px] text-[#4a5563]" data-asm-spring-state>
               {state?.level === "error" ? "✗" : state?.level === "warn" ? "⚠" : "✓"} {tr("délka {0} mm", fmt(s.length ?? s.free, 3))} · L0 {fmt(s.free, 3)}
               {solidOf(c) !== undefined ? ` · Ln ${fmt(solidOf(c)!, 3)}` : ""}

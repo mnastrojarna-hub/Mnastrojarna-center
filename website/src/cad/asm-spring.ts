@@ -13,6 +13,7 @@ import { springGeom, springPosRound, springRound, springShapeLen, springWorldAxi
 import { getLang, tr } from "./i18n";
 import { worldGeo, type GeoProvider } from "./mates";
 import type { AsmComponent, CadDoc, Mate, Vec3 } from "./types";
+import { lostSpringComps, springLostNote, springLostSides } from "./spring-lost";
 
 export type SpringLevel = "ok" | "warn" | "error";
 /** Stav jedné pružiny: `seat` = vzdálenost dosedacích ploch, `length` = délka tvaru (≤ L0), `offset` = posun začátku na plochu A. */
@@ -231,7 +232,8 @@ export function springStatusLine(doc: CadDoc, check?: SpringCheck): string | nul
   const base = springStatusLine0(doc);
   if (!base || !check) return base;
   if (check.stale.length) return `${base} – ⚠ ${check.stale.map(springDriftText).join("; ")}`;
-  if (!check.checked) return `${base.replace(/ ✓/g, "")} – ${tr("uložená délka, s dosedacími plochami nezkontrolováno")}`;
+  // ztracená dosedací plocha má vlastní text v řádku (spring-lost.ts); dovětek o uložené délce jen když jsou i jiné pružiny
+  if (!check.checked) return lostSpringComps(doc).length === springComps(doc).length ? base.replace(/ ✓/g, "") : `${base.replace(/ ✓/g, "")} – ${tr("uložená délka, s dosedacími plochami nezkontrolováno")}`;
   return `${base} – ${tr("délka odvozená z dosedacích ploch (řídí polohy komponent)")}`;
 }
 
@@ -243,6 +245,8 @@ function springStatusLine0(doc: CadDoc): string | null {
     c,
     text: (ref: string) => {
       const s = c.spring!;
+      // ztracená dosedací plocha: uložená délka neplatí – žádná délka, síla ani ✓ (vlna 22, bod 20 – kolo 4)
+      if (springLostSides(s).length) return springLostNote(doc, c, ref);
       if (s.length === undefined) return tr("„{0}“{1} – délka zatím nespočtena (sestava pružina / přepočet vazeb)", c.name, ref);
       const solid = solidOf(c);
       const v = springVerdict(s.seat ?? s.length, s.free, solid);
@@ -263,7 +267,8 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
   for (const c of springComps(doc)) {
     const rows = steps.map((s) => ({ i: s.i, st: s.springs?.[c.id] })).filter((r): r is { i: number; st: SpringStep } => !!r.st);
     if (!rows.length) {
-      items.push({ c, text: (ref) => tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref) });
+      if (springLostSides(c.spring).length) items.push({ c, text: (ref) => tr("⚠ pružina {0}", springLostNote(doc, c, ref)) });
+      else items.push({ c, text: (ref) => tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref) });
       continue;
     }
     const L = rows.map((r) => r.st.length);
