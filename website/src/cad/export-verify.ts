@@ -22,7 +22,7 @@ import { EXACT_AUTO_FACES } from "./validity";
  * po zpětném načtení přesnou kontrolou neprojde; „věrná kopie“ se pak napsat nesmí. `null` = přesná kontrola neproběhla
  * (ploch nad mez), `badFaces` = vadných ploch podle přesné kontroly, `faces` = počet ploch.
  */
-export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3]; shells: number; closedShells: number; freeShells: number; closedFree: number; freeFaces: number; free: number; valid: boolean | null; faces: number; validExact: boolean | null; badFaces?: number };
+export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3]; shells: number; closedShells: number; freeShells: number; closedFree: number; freeFaces: number; free: number; valid: boolean | null; faces: number; validExact: boolean | null; badFaces?: number; retolValid?: boolean; retolBadFaces?: number };
 
 /** nad kolik ploch se platnost souboru při kontrole exportu nekontroluje (drahé) – `valid: null` */
 export const EXPORT_VALID_FACES = 3000;
@@ -52,6 +52,31 @@ export function shapeStats(s: r.AnyShape, exact = false): KernelShapeStats {
 }
 
 /**
+ * Rozbor souboru, který po zpětném načtení přesnou kontrolou neprojde (22a, fáze 2, kolo 4): tolerance hran a vrcholů
+ * znovu načteného tvaru se přepočtou ze skutečné odchylky křivek od ploch (`BRepLib::UpdateEdgeTolerance` + `UpdateTolerances`
+ * – krok, který dělá přijímající CAD při opravě tolerancí) a přesná kontrola se zopakuje. Výsledek jen dokládá PŘÍČINU
+ * v hlášce `out.reload-invalid` (vadné tolerance po načtení × vadná geometrie souboru) – „věrnou kopii“ z něj nikdy nedělá:
+ * nezávislá kontrola výchozí čtečkou soubor odmítne tak jako tak. Mění tolerance předaného tvaru: volat jen nad
+ * jednorázovým tvarem načteným ze souboru, nikdy nad tělesem modelu (mezipaměť stavby).
+ *
+ * Proč se to neopraví v zápisu (zjištěno pokusy, kolo 4): STEP tolerance hran nenese; čtečka OCCT je po načtení spočte
+ * vzorkováním a u hran z aproximovaných průsečnic (šroubovice, ale i válec − koule) vyjdou menší než skutečná odchylka.
+ * Nastavení zapisovače (`write.precision.mode` min / průměr / max, `write.surfacecurve.mode` bez p-křivek) výsledek čtení
+ * nezmění; BREP, který tolerance nese, projde i přesnou kontrolou.
+ */
+function retolExact(s: r.AnyShape): { valid: boolean; badFaces: number } | null {
+  try {
+    const o = r.getOC() as unknown as { BRepLib: { UpdateEdgeTolerance(s: unknown, min: number, max: number): boolean; UpdateTolerances(s: unknown, face: boolean): void } };
+    o.BRepLib.UpdateEdgeTolerance(s.wrapped, 1e-7, 1);
+    o.BRepLib.UpdateTolerances(s.wrapped, false);
+    const x = exactCheck(s);
+    return { valid: x.valid, badFaces: x.badFaces };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Model (díl / sestava) a znovu načtený soubor STEP / BREP – míry pro porovnání (`exportCheck` v agent-out.ts). Soubor se
  * kontroluje i přesnou metodou (do `EXACT_AUTO_FACES` ploch, 22a); model přesně jen tehdy, když soubor přesnou kontrolou
  * neprojde (aby hláška rozlišila „vadu přinesl soubor“ od „model je vadný už sám“) – u platného souboru se čas neplýtvá.
@@ -64,6 +89,9 @@ export async function exportStats(doc: CadDoc, bytes: Uint8Array, format: "step"
     file = format === "step" ? await r.importSTEP(new Blob([bytes as BlobPart])) : importBREP(new TextDecoder().decode(bytes));
     if (!file || (file as { isNull?: boolean }).isNull) throw new Error(tr("soubor neobsahuje žádný tvar"));
     const fileStats = shapeStats(file, true);
+    // soubor přesně neplatný: příčina doložená přepočtem tolerancí (jen nad načteným souborem, viz retolExact)
+    const rt = fileStats.validExact === false ? retolExact(file) : null;
+    if (rt) Object.assign(fileStats, { retolValid: rt.valid }, rt.valid ? {} : { retolBadFaces: rt.badFaces });
     return { model: shapeStats(body, fileStats.validExact === false), file: fileStats };
   } finally {
     free(file);

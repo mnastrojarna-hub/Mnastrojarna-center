@@ -401,7 +401,7 @@ export function fileLogLine(what: string, name: string, bytes: number, format: s
  * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno), `validExact` = BRepCheck přesnou metodou (null /
  * chybí = přesná neproběhla), `badFaces` = vadných ploch podle přesné kontroly, `faces` = počet ploch.
  */
-export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null; faces?: number; validExact?: boolean | null; badFaces?: number };
+export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null; faces?: number; validExact?: boolean | null; badFaces?: number; retolValid?: boolean; retolBadFaces?: number };
 /**
  * Výsledek kontroly: `ok` = věrná kopie objemového modelu; `level` / `code` = jak ji hlásit (✗ out.no-solid – soubor bez
  * tělesa, ⚠ out.free-surfaces – volné plochy vedle tělesa, ⚠ / ✗ out.check-failed – soubor se od modelu liší / nenačetl se).
@@ -481,8 +481,15 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
     const of = file.faces !== undefined ? tr("{0} z {1}", file.badFaces ?? 1, file.faces) : String(file.badFaces ?? 1);
     const fast = file.valid === true ? tr("rychlá kontrola: platné") : file.valid === false ? tr("rychlá kontrola: NEPLATNÉ") : tr("rychlá kontrola neproběhla");
     const m = model.validExact === true ? tr("model přesně platný") : model.validExact === false ? tr("model je přesnou kontrolou neplatný také") : "";
-    // vadu přinesla čtečka (model přesně platný): tolerance hran po načtení menší než skutečná odchylka křivek od ploch
-    const why = model.validExact === true ? tr("; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch", label) : "";
+    // příčina jen doložená (kolo 4): po přepočtu tolerancí hran a vrcholů načteného souboru (export-verify.ts retolExact)
+    // přesná kontrola projde → vadné jsou jen tolerance ze čtečky; neprojde → příčina není jen v tolerancích. Bez rozboru
+    // se příčina nepíše (dřív se věta o čtečce psala vždy, když byl model přesně platný – i tam, kde přepočet nepomůže)
+    const why =
+      file.retolValid === true
+        ? tr("; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch – po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde (geometrie souboru odpovídá)", label)
+        : file.retolValid === false
+          ? tr("; ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde (vadných ploch {0}) – příčina není jen v tolerancích po načtení", file.retolBadFaces ?? 1)
+          : "";
     return {
       ...base,
       ok: false,

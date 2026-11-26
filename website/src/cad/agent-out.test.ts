@@ -233,6 +233,20 @@ describe("kontrola exportu STEP / BREP", () => {
     expect(both.code).toBe("out.reload-invalid");
     expect(both.line).toMatch(/vadných ploch 3 z 19 \(rychlá kontrola: platné; model je přesnou kontrolou neplatný také\)/);
     expect(both.line).not.toMatch(/věrná kopie modelu|model přesně platný/);
+    // příčina se bez rozboru nepíše (kolo 4: dřív „čtečka nastaví tolerance …“ vždy, i bez ověření)
+    expect(c.line).not.toMatch(/čtečka STEP nastaví|přepočtu tolerancí/);
+  });
+  it("22a kolo 4: příčinu ⚠ out.reload-invalid doloží přepočet tolerancí načteného souboru – projde = jen tolerance čtečky, neprojde = řečeno; ✓ nikdy", () => {
+    const m = { ...model, valid: true, validExact: true, faces: 8 };
+    const f = { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: false, badFaces: 2, faces: 8 };
+    const tol = exportCheck(m, { ...f, retolValid: true }, "STEP");
+    expect(tol).toMatchObject({ ok: false, level: "warn", code: "out.reload-invalid" });
+    expect(tol.line).toMatch(/vadných ploch 2 z 8 \(rychlá kontrola: platné; model přesně platný\); čtečka STEP nastaví tolerance hran menší než odchylka křivek od ploch – po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde \(geometrie souboru odpovídá\) – soubor nepotvrzen jako kopie modelu/);
+    expect(tol.line).not.toMatch(/věrná kopie modelu/);
+    const geo = exportCheck(m, { ...f, retolValid: false, retolBadFaces: 1 }, "STEP");
+    expect(geo).toMatchObject({ ok: false, level: "warn", code: "out.reload-invalid" });
+    expect(geo.line).toMatch(/model přesně platný\); ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde \(vadných ploch 1\) – příčina není jen v tolerancích po načtení – soubor nepotvrzen/);
+    expect(geo.line).not.toMatch(/čtečka STEP nastaví|věrná kopie/);
   });
   it("22a: přesná kontrola souboru neproběhla (ploch nad mez) → ✓ jen „odpovídá modelu; platnost souboru jen rychlou kontrolou …“, ne „věrná kopie“", () => {
     const c = exportCheck({ ...model, valid: true }, { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: null, faces: 812 }, "STEP");

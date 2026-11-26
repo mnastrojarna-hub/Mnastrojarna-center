@@ -267,6 +267,16 @@ describe("„věrná kopie modelu“ – jen po přesné kontrole platnosti soub
     expect(r.protocol).not.toMatch(/check=ok/);
     expect(r.entries.some((e) => e.code === "out.reload-invalid" && e.level === "warn")).toBe(true);
   });
+  it("kolo 4: soubor projde přesnou kontrolou až po přepočtu tolerancí hran – pořád ⚠ out.reload-invalid (výchozí čtečka ho odmítne), nikdy „věrná kopie“ ani ✓", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [20, 20, 30]];
+    const c = exportCheck({ solids: 1, volume: 8860, bbox: box, valid: true, validExact: true }, { solids: 1, volume: 8860, bbox: box, valid: true, validExact: false, badFaces: 3, faces: 7, retolValid: true }, "STEP");
+    expect(c.ok).toBe(false);
+    expect(c.level).toBe("warn");
+    expect(c.code).toBe("out.reload-invalid");
+    expect(c.line.startsWith("⚠")).toBe(true);
+    expect(c.line).not.toMatch(/věrná kopie|^✓/);
+  });
   it("kontrola neproběhla nad souborem (ploch nad mez): „věrná kopie“ se nevypíše, řádek řekne „jen rychlou kontrolou“", async () => {
     const { exportCheck } = await import("../agent-out");
     const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [10, 10, 10]];

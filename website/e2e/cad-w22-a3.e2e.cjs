@@ -95,9 +95,17 @@ async function runs(p, tag) {
 
 /* ───────────────────────── 22h: export jako úloha ───────────────────────── */
 async function exports(p, tag) {
+  // fáze 2, kolo 4 (vědomá úprava, balík g – 22a): model závitu šroubovicí je přesně platný, ale soubor STEP po zpětném načtení
+  // výchozí čtečkou přesnou kontrolou NEPROJDE (čtečka spočte tolerance hran menší, než je skutečná odchylka; po přepočtu
+  // tolerancí projde). Pravdivý výsledek kontroly je proto ⚠ out.reload-invalid, ne ✓ – stejně jako cad-w22-g 7c a
+  // w22/thread-g2-engine.test.ts. Dřív test čekal ✓ (napsán před přesnou kontrolou souboru z balíku g). Cesta ✓ „věrná kopie“
+  // se ověřuje níže na modelu, jehož soubor přesnou kontrolou projde (válec s průchozí dírou).
+  await p.evaluate((t) => window.mncad.run(t), 'nový díl "Export K"\nválec 30 20\ndíra 8 skrz v 0 0 20');
+  const rk = await p.evaluate(() => window.mncad.exportFile('step'));
+  ok(rk.job && rk.job.state === 'done' && rk.check?.ok === true && /→ věrná kopie modelu$/.test(rk.check.text) && !rk.warning, `${tag}22h: exportFile modelu bez aproximovaných hran – kontrola ✓ věrná kopie (${(rk.check?.text || '').slice(0, 160)})`);
   await p.evaluate((t) => window.mncad.run(t), THREAD('Export A', 12));
   const r = await p.evaluate(() => window.mncad.exportFile('step'));
-  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === true && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile = úloha s fázemi, kontrola ✓, revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')})`);
+  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(r.check.text) && /model přesně platný/.test(r.check.text) && /po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde/.test(r.check.text) && !/věrná kopie/.test(r.check.text) && /out\.reload-invalid|NEPROJDE/.test(r.warning || '') && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile závitu šroubovicí = úloha s fázemi, kontrola ⚠ (soubor po načtení přesně neplatný, model platný – ne ✓), revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')}; ${(r.check?.text || '').slice(0, 220)})`);
   // zrušení exportu přes API: model se nejdřív změní (30 závitů – export pak trvá sekundy), úloha exportu se počká ve frontě
   // a zruší se, až v seznamu Exporty skutečně je (fáze 2: dřív pevných 200 ms a „upravit“ na neexistující název prvku –
   // export nezměněného modelu doběhl dřív, než přišlo zrušení)
@@ -273,7 +281,10 @@ async function menuExport(b, tag) {
   await p.getByRole('button', { name: /STEP/ }).first().click();
   await p.waitForSelector('[data-export-job][data-export-state="done"]', { timeout: 300000 });
   const done = p.locator('[data-export-job][data-export-state="done"]').last();
-  ok((await done.getAttribute('data-export-check')) === 'ok' && /^r·[0-9a-f]{6}$/.test(await done.getAttribute('data-export-rev')), `${tag}22h: export z menu – kontrola zpětným načtením ok, revize modelu v záznamu`);
+  // kolo 4 (vědomá úprava, viz exports()): soubor závitu šroubovicí přesnou kontrolou po načtení neprojde → záznam úlohy „fail“
+  // a v dokumentu ⚠ text kontroly s doloženou příčinou; nikdy „věrná kopie“ (dřív test čekal „ok“)
+  const menuRec = await p.evaluate(() => ((window.mncad.getDocument().outputs || []).slice(-1)[0] || {}).job || null);
+  ok((await done.getAttribute('data-export-check')) === 'fail' && !!menuRec && menuRec.check && menuRec.check.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(menuRec.check.text) && !/věrná kopie/.test(menuRec.check.text) && /^r·[0-9a-f]{6}$/.test(await done.getAttribute('data-export-rev')), `${tag}22h: export z menu – kontrola zpětným načtením provedena: ⚠ soubor po načtení přesně neplatný (ne ✓), revize modelu v záznamu (${((menuRec && menuRec.check && menuRec.check.text) || '').slice(0, 160)})`);
   await p.waitForTimeout(10000);
   ok(await done.isVisible(), `${tag}22h: záznam exportu zůstal i 10 s po konci`);
   // kolo 3 (falešná zelená): model změněný BĚHEM exportu z menu (Ctrl+Z, když převod běží) – záznam v dokumentu nese revizi

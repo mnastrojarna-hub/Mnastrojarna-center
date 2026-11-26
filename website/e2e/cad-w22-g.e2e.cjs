@@ -160,6 +160,9 @@ const start = async (p, url) => {
   ok(by['Zaoblení 1'] && by['Zaoblení 1'].state === 'error' && !by['Zaoblení 1'].levels, '3: neproveditelné zaoblení: ✗ ve stromu, bez úrovní');
   // aktivní prvek ukáže úrovně pod řádkem
   await p.locator('[data-feature-row][data-feature-name="Díra 1"]').click();
+  // fáze 2, kolo 4: poznámka se pod aktivním řádkem vyplní až po výběru (pod zátěží později) – počkat, až v ní text je
+  // (dřív innerText hned po objevení prvku → prázdný text pod zátěží); tvrzení níže zůstává přesná shoda s popiskem stromu
+  await p.waitForFunction(() => { const n = document.querySelector('[data-feature-levels-note]'); return !!n && n.textContent.trim().length > 0; }, null, { timeout: 60000 }).catch(() => {});
   const note = await p.locator('[data-feature-levels-note]').first().innerText({ timeout: 10000 }).catch(() => '');
   ok(note === by['Díra 1'].levels, '3: úrovně pod aktivním prvkem: ' + note);
   await p.screenshot({ path: S + 'w22g-tree.png' });
