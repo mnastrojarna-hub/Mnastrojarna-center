@@ -100,7 +100,7 @@ zobraz horní`);
     const p = parseAgentText("materiál nerez\nmateriál ČSN 11 423\nmaterial Hliník");
     expect(p.errors).toEqual([]);
     expect(p.ops[0]).toMatchObject({ k: "meta", patch: { material: "nerez" } });
-    expect(p.ops[1]).toMatchObject({ k: "meta", patch: { materialName: "ČSN 11 423" } });
+    expect(p.ops[1]).toMatchObject({ k: "meta", patch: { materialName: "ČSN 11 423", material: "ocel" } }); // ČSN 1x xxx = ocel (materialClass)
     expect(p.ops[2]).toMatchObject({ k: "meta", patch: { material: "hlinik" } });
     const t = docStatusText({ ...emptyDoc("X"), material: "ocel", materialName: "ČSN 11 423" }, null);
     expect(t).toContain("materiál ČSN 11 423 (hustota podle: Ocel)");

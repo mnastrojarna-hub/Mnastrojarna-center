@@ -21,7 +21,7 @@ import { findSnap, orthoPoint, polarPoint, type SnapHit } from "@/cad/draft/snap
 import { spatialIndex } from "@/cad/draft/spatial";
 import { extents } from "@/cad/draft/status";
 import { perfMark } from "@/cad/perf-log";
-import { boxMode, CLICK_PX, clickMode, HOLD_MS, HOLD_SLOP_PX, holdPhase, isCrossing, isDrag, rectFrom, type BoxMods, type ClickMode } from "@/cad/box-select-2d";
+import { boxMode, CLICK_PX, clickMode, HOLD_MS, HOLD_SLOP_PX, holdPhase, isCrossing, isDoubleClick, isDrag, rectFrom, type BoxMods, type ClickMode } from "@/cad/box-select-2d";
 import { boxLabel, drawBoxSelect } from "../box-select-2d-ui";
 
 export type DraftPrefs = {
@@ -98,7 +98,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     snap: null as SnapHit | null,
     hover: null as string | null,
     /** okno výběru: rohy (px), tažené / dvěma kliky, modifikátory (stisk, puštění, poslední pohyb), vynucené o / k, dotykem */
-    win: null as { a: Vec2; b: Vec2; drag: boolean; mods: BoxMods[]; cur?: BoxMods; force?: "window" | "crossing"; touch?: boolean } | null,
+    win: null as { a: Vec2; b: Vec2; drag: boolean; mods: BoxMods[]; cur?: BoxMods; force?: "window" | "crossing"; touch?: boolean; t?: number } | null,
     /** stisk levého tlačítka ve výběru: klik (entita pod kurzorem), nebo po posunu ≥ 5 px okno */
     press: null as { a: Vec2; hit: string | null; mods: BoxMods } | null,
     /** čeká se na první roh okna zadaného volbou o / k */
@@ -481,6 +481,18 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     }
     if (e.button !== 0) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // poklepání do prázdna není druhý roh okna zadaného dvěma kliky: okno otevřené prvním klikem se zruší a stisk
+    // dostane rozšíření (poklepání do výřezu rozvržení = modelový prostor); jinak se stisk spolkne (žádné nové okno)
+    const win0 = s.win;
+    if (e.pointerType !== "touch" && win0 && !win0.drag && !win0.force && win0.t !== undefined && isDoubleClick(win0.a, win0.t, scr, Date.now())) {
+      s.win = null;
+      s.live = null;
+      s.press = null;
+      host.current?.removeAttribute("data-boxsel-live");
+      schedule("over");
+      if (!pr.current.prompt && hook("down", scr, e)) hooked.current = true;
+      return;
+    }
     if (e.pointerType !== "touch" && !pr.current.prompt && !s.win && !s.force && hook("down", scr, e)) {
       hooked.current = true;
       return;
@@ -574,7 +586,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
       schedule("over");
       return;
     }
-    s.win = { a: pr0.a, b: scr, drag: false, mods: [pr0.mods] };
+    s.win = { a: pr0.a, b: scr, drag: false, mods: [pr0.mods], t: Date.now() };
     schedule("over");
   };
 
