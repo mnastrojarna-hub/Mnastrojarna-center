@@ -57,6 +57,14 @@ export function springLostNote(doc: CadDoc, c: AsmComponent, ref = ""): string {
   return tr("„{0}“{1} – ztracená dosedací plocha {2}: délka a síla nezkontrolovány – {3}", c.name, ref, springLostShort(doc, c), springFixCmd(doc, c));
 }
 
+/**
+ * `sestava pružina #k odebrat` – tentýž textový příkaz jako tlačítko „Odebrat“ v panelu pružiny (asm-spring-props.tsx): GUI seznam
+ * vazeb jde přes agenta, takže v protokolu je „✓ pružina odebrána“ a záznam agenta, ne tichá změna dokumentu.
+ */
+export function springRemoveCmd(doc: CadDoc, id: string): string {
+  return `sestava pružina #${(doc.components ?? []).findIndex((x) => x.id === id) + 1} odebrat`;
+}
+
 /** sestava bez definice pružiny komponenty `id` (komponenta zůstává – jako `sestava pružina "P" odebrat`) */
 export function withoutSpringOf(doc: CadDoc, id: string): CadDoc {
   return {

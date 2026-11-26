@@ -34,7 +34,7 @@ import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
 import { AsmInstanceProps } from "./asm-spring-props";
-import { lostSpringComps, springLostSides, springLostSideTexts, withoutSpringOf } from "@/cad/spring-lost";
+import { lostSpringComps, springLostSides, springLostSideTexts, springRemoveCmd, withoutSpringOf } from "@/cad/spring-lost";
 import { AsmSupplyFields } from "./asm-supply";
 import { kindsIn, supplySection, supplyWord } from "@/cad/bom-model";
 import { renameProblem } from "@/cad/agent-asm";
@@ -61,6 +61,7 @@ export function AsmTree({
   picked,
   onRepick,
   repickMate,
+  onRun,
 }: {
   doc: CadDoc;
   selected: string | null;
@@ -84,6 +85,8 @@ export function AsmTree({
   onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void;
   /** vazba, jejíž plocha se právě vybírá znovu */
   repickMate?: string | null;
+  /** textový příkaz přes agenta (protokol + záznam) – např. `sestava pružina #k odebrat`; bez něj přímá změna dokumentu */
+  onRun?: (text: string) => void;
 }) {
   const comps = doc.components ?? [];
   const groups = groupComponents(comps); // „Normálie“ i „Standard parts“ = jedna skupina (asm-groups.ts)
@@ -155,7 +158,7 @@ export function AsmTree({
             ))}
         </div>
       ))}
-      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} />
+      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} onRun={onRun} />
     </div>
   );
 }
@@ -168,7 +171,7 @@ const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "ko
  * v poli (číslo i výraz), otočit, potlačit nebo smazat – každá změna jde přes `onCommit`, které sestavu znovu přepočítá.
  * Vazba Ukotvit se týká jedné komponenty; jejím smazáním / potlačením se komponenta uvolní.
  */
-function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null }) {
+function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate, onRun }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null; onRun?: (text: string) => void }) {
   const mates = doc.mates ?? [];
   const [closed, setClosed] = useState(false);
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
@@ -304,7 +307,7 @@ function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick
                   <button type="button" data-spring-fix={c.id} onClick={(e) => { e.stopPropagation(); onSelect(c.id); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
                     {tr("Zadat dosedací plochy znovu")}
                   </button>
-                  <button type="button" data-spring-remove={c.id} onClick={(e) => { e.stopPropagation(); onCommit(withoutSpringOf(doc, c.id)); }} className="rounded border border-[#d5dbe2] bg-white px-1.5 py-[1px] text-[10.5px] text-[#4a5664] hover:bg-[#f3f6f9]">
+                  <button type="button" data-spring-remove={c.id} onClick={(e) => { e.stopPropagation(); if (onRun) onRun(springRemoveCmd(doc, c.id)); else onCommit(withoutSpringOf(doc, c.id)); }} className="rounded border border-[#d5dbe2] bg-white px-1.5 py-[1px] text-[10.5px] text-[#4a5664] hover:bg-[#f3f6f9]">
                     {tr("Odebrat pružinu")}
                   </button>
                 </span>

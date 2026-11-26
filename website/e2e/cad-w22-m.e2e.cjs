@@ -14,6 +14,8 @@
 //     motor na mezi (stopped + odchylky), „na mezi: chyba“ → neplatný krok s rámečkem v 3D, statická úprava za mezí ⚠, preferovaná strana.
 //  kolo 4 (fáze 2, bod 20 – pružina): díl změněn v záložce → klik „Obnovit z dílu“ → seznam vazeb ukazuje pružinu se ztracenou dosedací
 //     plochou (data-mate-spring, data-springs-lost), nic se nepřichytí jinam, panel pružiny ✗ bez délky; oprava = Upravit pružinu → ✓.
+//  kolo 5: `stav` stručně nese `springs.lost=1` v = status / D / Σ (i sestava jen s pružinou bez vazeb); „Odebrat pružinu“ v seznamu
+//     vazeb jde textovým příkazem `sestava pružina #k odebrat` (✓ pružina odebrána).
 // Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -516,6 +518,10 @@ async function open(b, path) {
   const holderS = (await getDoc()).components.find((c) => c.name === 'Držák S').placement;
   ok(JSON.stringify(holderS.position) === '[5,15,30]' && holderS.rotation.every((x) => Math.abs(x) < 1e-9), `kolo 4: Držák se nepohnul ani nenatočil (${JSON.stringify(holderS)}) – dřív vazba přichycená na boční plochu −Y, natočení 90°`);
   ok(((await getDoc()).components.find((c) => c.name === 'Pružina S').spring?.a?.lost?.why) === 'none', 'kolo 4: dokument nese ztracenou referenci dosedací plochy A (otisk)');
+  // kolo 5 (oponent): ztracená dosedací plocha pružiny je i ve strojových řádcích (= status, D, Σ), ne jen v lidském „Pružiny:“
+  const shS = String(await p.evaluate(() => window.mncad.run('stav', { protocol: 'short' })));
+  // (řádek D / Σ nese jen hlavní dokument běhu = poslední sestava záložek – to je níže Sestava R; tady stav aktivní sestavy)
+  ok(/^= L\d+ status "Sestava S" asm .*\bmates=0\/1\(lost=1\).*\bsprings\.lost=1\b/m.test(shS), `kolo 5: stav (stručný protokol) „Sestava S“ nese springs.lost=1 vedle mates=0/1(lost=1) – ${line(shS, /^= L\d+ status/)}`);
   if (SHOTS) await p.screenshot({ path: SHOTS + `w22-m-r4-spring-lost${NOGL ? '-nogl' : ''}.png` });
   // klik „Zadat dosedací plochy znovu“ → panel pružiny: ✗ bez délky a síly, žádné ✓
   await p.locator('[data-spring-fix]').first().click();
@@ -532,6 +538,24 @@ async function open(b, path) {
   ok(spS && !spS.a.lost && spS.a.face === 5 && Math.abs((spS.length ?? 0) - 25) < 1e-6, `kolo 4: nové dosedací plochy F6 → F5, délka 25 mm (${JSON.stringify({ a: spS?.a, len: spS?.length })})`);
   const stS = (await p.locator('[data-asm-spring-state]').first().innerText().catch(() => '')).trim();
   ok(/^✓ délka 25 mm/.test(stS), `kolo 4: panel pružiny po opravě ✓ – ${stS}`);
+  // kolo 5: jen pružina (bez vazby) se ztracenou dosedací plochou po sestava hotovo – strojové řádky bez falešné zelené, pak
+  // „Odebrat pružinu“ v seznamu vazeb = tentýž textový příkaz jako panel pružiny (✓ pružina odebrána v hlášce, ne tichá změna)
+  await run(['nový díl "Deska R"', 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat', 'nový díl "Držák R"', 'kvádr 10 10 10', 'nový díl "Pružina R"', 'pružina tlačná d 1 De 8 L0 30 n 6 konce broušené'].join('\n'));
+  await run('záložka "Deska R"');
+  const featR = ((await getDoc()).features || []).map((f) => f.name);
+  const logR = await run(['nová sestava "Sestava R"', 'vložit "Deska R" ukotvit', 'vložit "Držák R" v 5 15 30', 'vložit "Pružina R" v 10 20 5', 'sestava pružina "Pružina R" mezi "Deska R" F3 "Držák R" F5 volná 30 blok 8 tuhost 2',
+    'sestava upravit "Deska R"', `smazat "${featR[1]}"`, 'sestava hotovo'].join('\n'));
+  ok(featR.length === 2 && /^✗ .*pružina „Pružina R“.*ztracená reference/m.test(logR) && !/^✓ „Deska R“ vrácen/m.test(logR), `kolo 5: sestava hotovo – ✗ ztracená dosedací plocha pružiny, bez ✓ návratu – ${line(logR, /pružina „Pružina R“.*ztracená/)}`);
+  const shR = String(await p.evaluate(() => window.mncad.run('stav', { protocol: 'short' })));
+  const dR = line(shR, /^D "Sestava R"/);
+  ok(/\bsprings\.lost=1\b/.test(dR) && !/\bmates=/.test(dR) && /^= L\d+ status "Sestava R" asm .*\bsprings\.lost=1\b/m.test(shR) && /^Σ .*\bcomp=3\b.*\bsprings\.lost=1\b/m.test(shR), `kolo 5: jen pružina – D, = status i Σ nesou springs.lost=1 (dřív čistý řádek bez značky) – ${dR} · ${line(shR, /^Σ/)}`);
+  await p.waitForFunction(() => document.querySelector('[data-mates-list]')?.getAttribute('data-springs-lost') === '1', null, { timeout: 30000 }).catch(() => {});
+  const rmBtn = p.locator('[data-spring-remove]').first();
+  ok(await rmBtn.waitFor({ timeout: 20000 }).then(() => true, () => false), 'kolo 5: seznam vazeb sestavy bez vazeb ukazuje ztracenou pružinu s tlačítkem Odebrat pružinu');
+  await rmBtn.click();
+  const removedNote = await p.waitForFunction(() => /✓ pružina odebrána: „Pružina R“/.test(document.body.innerText), null, { timeout: 30000 }).then(() => true, () => false);
+  const compR = (await getDoc()).components.find((c) => c.name === 'Pružina R');
+  ok(removedNote && compR && !compR.spring && (await p.locator('[data-mate-spring]').count()) === 0, `kolo 5: „Odebrat pružinu“ jde textovým příkazem (hláška ✓ pružina odebrána ${removedNote ? 'ano' : 'ne'}), pružina bez definice, komponenta zůstává`);
   ok(errs.length === 0, 'kolo 4: bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
 
   // ── EN a DE: stejný příkaz, protokol i panel bez českých zlomků ──

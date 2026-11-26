@@ -8,7 +8,7 @@ import { useState } from "react";
 import { aliasProblem, fmt } from "@/cad/agent-asm";
 import { springGeom } from "@/cad/asm-spring-geom";
 import { solidOf, springVerdict } from "@/cad/asm-spring";
-import { springFixCmd, springLostSideTexts } from "@/cad/spring-lost";
+import { springFixCmd, springLostSideTexts, springRemoveCmd } from "@/cad/spring-lost";
 import { tr } from "@/cad/i18n";
 import type { AsmComponent, CadDoc } from "@/cad/types";
 import { Num } from "./props";
@@ -118,7 +118,7 @@ export function AsmInstanceProps({ c, doc, onChange, onRun }: { c: AsmComponent;
               {s ? tr("Upravit pružinu") : tr("Nastavit pružinu")}
             </button>
             {s && (
-              <button type="button" onClick={() => onRun(`sestava pružina ${ref(c.id)} odebrat`)} className="rounded border border-[#cfd6de] px-2 py-1.5 text-[12px] hover:bg-[#f3f6f9]">
+              <button type="button" onClick={() => onRun(springRemoveCmd(doc, c.id))} className="rounded border border-[#cfd6de] px-2 py-1.5 text-[12px] hover:bg-[#f3f6f9]">
                 {tr("Odebrat")}
               </button>
             )}

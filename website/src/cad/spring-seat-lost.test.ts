@@ -18,10 +18,11 @@ import { setHostAssets } from "./host-assets";
 import { makeKernelClient } from "./kernel-client";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "./engine/host";
 import { MemoryWorkspace } from "./engine/memory-workspace";
-import { formatFull } from "./engine/protocol";
+import { formatFull, shortProtocol } from "./engine/protocol";
 import { runScript } from "./engine/run";
+import { runReport } from "./engine/run-protocol";
 import { setLang } from "./i18n";
-import { lostSpringComps, springFixCmd, springLostSideTexts, withoutSpringOf } from "./spring-lost";
+import { lostSpringComps, springFixCmd, springLostSideTexts, springRemoveCmd, withoutSpringOf } from "./spring-lost";
 import type { CadDoc } from "./types";
 
 const WASM = path.resolve(__dirname, "../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
@@ -122,6 +123,36 @@ describe("ztracená dosedací plocha pružiny po změně dílu (skutečné jádr
     expect(mates).not.toMatch(/ztracen/);
     expect(block(full, n + 8)).toContain("  Pružiny: „Pružina“ 25 mm (L0 30 · Ln 8) · F 10 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)");
   }, 300_000);
+
+  // kolo 5 (oponent): jen pružina, bez vazby – dřív řádky D / = status / Σ / kontrola sestava bez jakékoli značky (`D "Sestava A" asm
+  // comp=3 parts=3 V.sum=…`) a po uložení a novém otevření `MNCAD/1 OK … err=0` s čistým řádkem D: agent četl zelenou sestavu
+  it("strojové řádky: ztracená dosedací plocha pružiny = springs.lost=1 v = status, D, Σ a kontrola sestava – i po novém otevření dokumentu", async () => {
+    const lines = [...BASE.filter((l) => !l.startsWith("sestava vazba")), 'sestava upravit "Deska A"', 'smazat "Kvádr 2"', "sestava hotovo", "kontrola sestava", "stav"];
+    const n = lines.length;
+    const ws = new MemoryWorkspace();
+    const r = await runReport(ws, lines.join("\n"), host()); // závěr běhu jako CLI / window.mncad.run (řádky D, Σ)
+    const full = formatFull(r);
+    const short = shortProtocol(r, { budget: Infinity }).text;
+    const dLine = short.split("\n").find((l) => l.startsWith('D "Sestava A" '))!;
+    expect(dLine).toMatch(/^D "Sestava A" asm comp=3 parts=3 .*\bsprings\.lost=1$/);
+    expect(dLine).not.toMatch(/\bmates=/); // bez vazeb žádné mates=, značka nese jen pružina
+    expect(short).toMatch(new RegExp(`^= L${n} status "Sestava A" asm comp=3 parts=3 V\\.sum=\\S+ m=\\S+ bbox=\\S+ springs\\.lost=1 clash=`, "m"));
+    expect(short).toMatch(/^Σ docs=\d+ comp=3 .*\bsprings\.lost=1 files=/m);
+    expect(block(full, n - 1)).toMatch(/^= L\d+ check "Sestava A" asm comp=3 parts=3 .* springs\.lost=1 clash=/);
+    expect(block(full, n - 1)).toContain("· pružiny se ztracenou dosedací plochou: 1");
+    // uložený dokument otevřený znovu (jako `mncad run stav.txt --open "Sestava A.mncad"`): značka je vlastnost dokumentu
+    const asm = ws.listDocs().find((x) => x.doc.name === "Sestava A")!.doc;
+    const ws2 = new MemoryWorkspace();
+    await ws2.openInTab(JSON.parse(JSON.stringify(asm)) as CadDoc);
+    const r2 = await runReport(ws2, "stav", host());
+    const short2 = shortProtocol(r2, { budget: Infinity }).text;
+    expect(short2).toMatch(/^= L1 status "Sestava A" asm .*\bsprings\.lost=1\b/m);
+    expect(short2).toMatch(/^D "Sestava A" asm .*\bsprings\.lost=1$/m);
+    expect(short2).toMatch(/^Σ .*\bsprings\.lost=1\b/m);
+    // po opravě dosedacích ploch značka zmizí (nikdy natrvalo „červená“)
+    const r3 = await runReport(new MemoryWorkspace(), [...lines.slice(0, -2), 'sestava pružina "Pružina" mezi "Deska A" F6 "Přidržovač" F5', "stav"].join("\n"), host());
+    expect(shortProtocol(r3, { budget: Infinity }).text).not.toMatch(/springs\.lost/);
+  }, 300_000);
 });
 
 describe("GUI funkce ztracené dosedací plochy (spring-lost.ts)", () => {
@@ -146,6 +177,8 @@ describe("GUI funkce ztracené dosedací plochy (spring-lost.ts)", () => {
     const without = withoutSpringOf(doc, "p");
     expect(without.components!.find((x) => x.id === "p")!.spring).toBeUndefined();
     expect(lostSpringComps(without)).toEqual([]);
+    // tlačítko „Odebrat pružinu“ v seznamu vazeb = tentýž textový příkaz jako panel pružiny (protokol ✓ pružina odebrána, záznam agenta)
+    expect(springRemoveCmd(doc, "p")).toBe("sestava pružina #3 odebrat");
     expect(doc.components!.find((x) => x.id === "p")!.spring).toBeDefined(); // původní dokument beze změny (krok zpět)
     setLang("en");
     expect(springLostSideTexts(doc, c)).toEqual(["A: seat face F3 of part “Deska A” – is ambiguous"]);
