@@ -41,7 +41,11 @@ stav`;
   const log = await p.evaluate((t) => window.mncad.run(t), PART);
   const bad = log.split('\n').filter((l) => l.startsWith('✗'));
   ok(bad.length === 0, 'díl vytvořen bez chyb' + (bad.length ? '\n' + bad.join('\n') : ''));
-  ok(/materiál „ČSN 11 423“ = označení do razítka; hustota zůstává podle třídy „Ocel“/.test(log), 'materiál: označení do razítka s jasným upozorněním na hustotu');
+  // ČSN 11 423 je ocel třídy 11: označení se pozná (materialClass, ℹ material.class) a hustota se nastaví podle třídy
+  // Ocel – protokol to napíše výslovně, nesmí přitom tvrdit „hustota zůstává“ (⚠ material.density-assumed patří jen
+  // k označení, ze kterého se třída nepozná). Dřívější text testu („hustota zůstává podle třídy Ocel“) platil před
+  // rozpoznáváním tříd z označení (5.2 č. 37) – výsledná hustota je stejná, hláška teď říká pravdu o tom, proč.
+  ok(/materiál „ČSN 11 423“ = označení do razítka, třída „Ocel“ \(7[.,]85 g\/cm³\)/.test(log) && !/materiál „ČSN 11 423“ = označení do razítka; hustota zůstává/.test(log), 'materiál: označení do razítka, třída Ocel rozpoznána z označení, hustota 7,85 g/cm³ výslovně');
   ok(/materiál ČSN 11 423 \(hustota podle: Ocel\)/.test(log), 'stav: označení i třída hustoty');
   const vol0 = volumeOf(log);
   ok(vol0 > 100 && /Rozměry: 240 × 160 × 30 mm/.test(log), `stav: rozměry 240 × 160 × 30 mm, objem ${vol0} cm³`);

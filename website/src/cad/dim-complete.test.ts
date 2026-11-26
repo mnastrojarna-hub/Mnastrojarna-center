@@ -220,3 +220,57 @@ describe("bod 18 – podrobný výpis a návrh kóty („Přidat kótu“)", () 
     expect(viewsBbox(VIEWS)).toEqual([[0, 0, 0], [100, 60, 20]]);
   });
 });
+
+/**
+ * Fáze 2, kolo 4 (cad-agent-journey krok 6): výchozí díra kruhového pole na roztečné kružnici. Chytré kóty kreslí u pole
+ * roztečnou kružnici „Ø50“ a „6× … rovnoměrně“ (střed pole poloha / osy souměrnosti), ne kótu „X 25“ k výchozí díře – ta
+ * by byla zdvojená (= Ø50 / 2). Kontrola dřív roztečnou kružnici jako polohu nepoznala → „chybí: poloha Díra 2 – X 25“.
+ * Teď ji přijme JEN tehdy, když geometrie polohu opravdu určuje: Ø = 2 × vzdálenost díry od středu pole, střed kružnice
+ * = střed pole v pohledu podél osy pole, poloha středu na téže ose je na listu a díra leží na přímce středem rovnoběžné
+ * s kontrolovanou osou (natočenou díru by určoval ještě úhel).
+ */
+describe("bod 18 – kruhové pole: roztečná kružnice jako poloha výchozí díry", () => {
+  const seedAt = (x: number, y: number) => {
+    const bore = F({ name: "Díra 1", type: "hole", position: [50, 30, 20], axis: "Z", flip: false, diameter: 20, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "simple" });
+    const seed = hole("Díra 2", x, y, 6.6);
+    const pat = F({ name: "Pole 1", type: "pattern", kind: "circular", featureId: seed.id, count: 6, angle: 360, axis: "Z", center: [50, 30, 20] });
+    return { d: doc([plate(), bore, seed, pat]), seed };
+  };
+  const axes = () => [centerline(top(-5, 30), top(105, 30)), centerline(top(50, -5), top(50, 65))];
+  const calls = (sx: number, sy: number, pcd: number) => [callout(top(50, 30), 10, ["Ø20 skrz"]), callout(top(sx, sy), 3.3, ["6× Ø6,6 skrz rovnoměrně"]), callout(top(50, 30), pcd / 2, [`Ø${pcd}`])];
+  const pos = (r: ReturnType<typeof checkSheet>, label: string) => r.items.find((q) => q.label === label)!;
+
+  it("Ø40 se středem v ose pole + osy souměrnosti → poloha Díra 2 – X 70 splněná (roztečná kružnice), Y 30 osou; žádné ⚠", () => {
+    const { d } = seedAt(70, 30);
+    const r = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), ...axes(), ...calls(70, 30, 40)], dimensions: "smart" });
+    expect([pos(r, "poloha Díra 2 – X 70").status, pos(r, "poloha Díra 2 – X 70").why]).toEqual(["ok", "roztečná kružnice Ø40"]);
+    expect(pos(r, "poloha Díra 2 – Y 30").status).toBe("ok");
+    expect(r.pos.ok).toBe(r.pos.total);
+    expect(dimCheckLine(r)).not.toContain("chybí: poloha Díra 2");
+  });
+  it("bez roztečné kružnice, s jiným Ø nebo se středem mimo osu pole → poloha X 70 dál chybí (žádná falešná zelená)", () => {
+    const { d } = seedAt(70, 30);
+    const none = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), ...axes(), ...calls(70, 30, 40).slice(0, 2)], dimensions: "smart" });
+    expect(pos(none, "poloha Díra 2 – X 70").status).toBe("missing");
+    expect(dimCheckLine(none)).toContain("chybí: poloha Díra 2 – X 70");
+    const wrong = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), ...axes(), ...calls(70, 30, 50)], dimensions: "smart" });
+    expect(pos(wrong, "poloha Díra 2 – X 70").status).toBe("missing");
+    const off = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), ...axes(), ...calls(70, 30, 40).slice(0, 2), callout(top(55, 30), 20, ["Ø40"])], dimensions: "smart" });
+    expect(pos(off, "poloha Díra 2 – X 70").status).toBe("missing");
+  });
+  it("poloha středu pole na ose X na listu není (bez svislé osy souměrnosti a bez kóty k X 50) → X 70 chybí", () => {
+    const { d } = seedAt(70, 30);
+    const r = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), axes()[0], ...calls(70, 30, 40)], dimensions: "smart" });
+    expect(pos(r, "poloha Díra 2 – X 70").status).toBe("missing");
+    expect(pos(r, "poloha Díra 1 – X 50").status).toBe("missing");
+  });
+  it("výchozí díra natočená mimo osy středu (30°) → roztečná kružnice samotná nestačí, X ani Y nesplní", () => {
+    const x = 50 + 20 * Math.cos(Math.PI / 6);
+    const y = 30 + 20 * Math.sin(Math.PI / 6);
+    const { d } = seedAt(x, y);
+    const r = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), ...axes(), ...calls(x, y, 40)], dimensions: "smart" });
+    const seedPos = r.items.filter((q) => q.kind === "pos" && q.source === "Díra 2");
+    expect(seedPos.length).toBe(2);
+    expect(seedPos.every((q) => q.status === "missing")).toBe(true);
+  });
+});

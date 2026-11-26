@@ -19,6 +19,7 @@ import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } f
 import { MATE_LABEL, axisLabel, dirLabel, lostSides, mateLost, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
 import { isKinMate } from "./mates-kin";
 import { springStatusLine, type SpringCheck } from "./asm-spring";
+import { lostSpringComps, springFixCmd } from "./spring-lost";
 import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, CadDoc, LostRef, Mate, MateRef, SupplyKind, Vec3 } from "./types";
 
@@ -1215,7 +1216,7 @@ const LOST_WHY: Record<LostRef["why"], string> = {
   gone: "díl v podsestavě už není",
 };
 /** Strany vazby se ztracenou referencí: „B F3 dílu „Deska A“ (rovinná +Z · střed [10; 20; 5] · 800 mm²) po úpravě dílu neexistuje“. */
-export function lostRefsText(doc: CadDoc, m: Mate): string {
+export function lostRefsText(doc: CadDoc, m: Partial<Record<"a" | "b" | "c" | "d", MateRef>>): string {
   const comp = (id: string) => doc.components?.find((x) => x.id === id)?.name ?? "?";
   return (["a", "b", "c", "d"] as const)
     .filter((k) => m[k]?.lost)
@@ -1239,10 +1240,28 @@ function leafNames(doc: CadDoc, path: string[]): string {
   return out.join(" › ") || "?";
 }
 /** Argumenty kódu `mate.lost` (engine/codes.ts) pro vazbu `m`: číslo + text vazby, ztracené strany, oprava (nový výběr / smazání). */
+/**
+ * Pružina se ztracenou dosedací plochou (vlna 22, bod 20 – kolo 4): „„Pružina“ „Deska A“ F3 → „Přidržovač“ F5 – ztracená reference:
+ * A F3 dílu „Deska A“ (otisk) po úpravě dílu neexistuje – sestava pružina … | … odebrat“ – řádek výpisu vazeb a text ✗ mate.lost.
+ */
+export function springLostDetail(doc: CadDoc, c: AsmComponent): string {
+  const s = c.spring!;
+  const name = (id: string) => doc.components?.find((x) => x.id === id)?.name ?? "?";
+  return tr("pružina „{0}“ „{1}“ {2} → „{3}“ {4} – {5}: {6} – {7}", c.name, name(s.a.compId), refEntText(s.a), name(s.b.compId), refEntText(s.b), STATUS_TEXT("lost"), lostRefsText(doc, { a: s.a, b: s.b }), springFixCmd(doc, c));
+}
+
 export function mateLostArgs(doc: CadDoc, m: Mate): [string, string, string] {
   const no = (doc.mates ?? []).indexOf(m) + 1;
   const side = (["a", "b", "c", "d"] as const).find((k) => m[k]?.lost) ?? "a";
-  return [`${no} ${mateText(doc, m)}`, lostRefsText(doc, m), tr("vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)];
+  // ztracená hrana / vrchol: oprava číslem téže entity (E… / V…) – v aplikaci „Vybrat hranu / vrchol znovu“ v seznamu vazeb
+  const ent = m[side]?.ent;
+  const fix =
+    ent === "edge"
+      ? tr("vyberte hranu znovu (sestava vazba {0} plocha {1} E…), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)
+      : ent === "vertex"
+        ? tr("vyberte vrchol znovu (sestava vazba {0} plocha {1} V…), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)
+        : tr("vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)", no, side);
+  return [`${no} ${mateText(doc, m)}`, lostRefsText(doc, m), fix];
 }
 
 /** Souhrn vazeb: „3 (2 ok, 1 konflikt)“. */
@@ -1301,10 +1320,13 @@ function kinMateParts(m: Mate, face: (r: Mate["a"]) => string, name: (id: string
 /** Výpis vazeb (`sestava vazby`): číslo, druh, komponenty a plochy, hodnota, stav. */
 export function mateLines(doc: CadDoc, status?: Record<string, MateStatus>): string[] {
   const mates = doc.mates ?? [];
-  const out = [tr("Vazby sestavy „{0}“: {1}", doc.name, matesSummary(doc, status))];
+  // dosedací plochy pružin jsou reference jako strany vazeb: ztracená se ve výpisu vazeb ukáže vždy (kolo 4, spring-lost.ts)
+  const lostSprings = lostSpringComps(doc);
+  const out = [tr("Vazby sestavy „{0}“: {1}", doc.name, matesSummary(doc, status)) + (lostSprings.length ? tr(" · pružiny se ztracenou dosedací plochou: {0}", lostSprings.length) : "")];
   // ztracená reference je vlastnost dokumentu (ne výsledek řešení): vždy „ztracená reference“ s otiskem a opravou
   mates.forEach((m, i) => out.push(` ${i + 1}. ${mateText(doc, m)} – ${mateLost(m) ? `${STATUS_TEXT("lost")}: ${lostRefsText(doc, m)} – ${tr("sestava vazba {0} plocha {1} <plocha> | smazat", i + 1, lostSides(m)[0])}` : STATUS_TEXT(status?.[m.id] ?? (m.suppressed ? "suppressed" : undefined))}`));
   if (!mates.length) out.push(tr(" (žádné – sestava vazba kontakt|souosost … \"A\" <plocha> \"B\" <plocha>)"));
+  for (const c of lostSprings) out.push(` ${springLostDetail(doc, c)}`);
   return out;
 }
 

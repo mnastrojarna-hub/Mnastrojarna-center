@@ -346,6 +346,8 @@ export function outFileName(given: string | undefined, fallback: string, exts: s
 }
 
 const num = (v: number, d: number) => v.toLocaleString(cadLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+/** malá délka [mm] do hlášky: od 0,001 mm na 4 místa, menší ve tvaru 6,1e-5 (desetinný oddělovač podle jazyka) */
+const tiny = (v: number) => (v >= 0.001 ? num(v, 4) : v.toExponential(1).replace(".", num(1.5, 1).charAt(1)));
 /** velikost souboru pro protokol: 812 B, 12,3 kB, 1,4 MB */
 export function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -401,7 +403,14 @@ export function fileLogLine(what: string, name: string, bytes: number, format: s
  * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno), `validExact` = BRepCheck přesnou metodou (null /
  * chybí = přesná neproběhla), `badFaces` = vadných ploch podle přesné kontroly, `faces` = počet ploch.
  */
-export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null; faces?: number; validExact?: boolean | null; badFaces?: number };
+export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null; faces?: number; validExact?: boolean | null; badFaces?: number; maxTol?: number; retolValid?: boolean; retolBadFaces?: number; retolMaxTol?: number; devMax?: number; devOver?: number; devSamples?: number };
+/**
+ * Mez tolerance po přepočtu (22a, kolo 4), do které smí kontrola exportu říct „geometrie souboru odpovídá“: největší tolerance
+ * hran a vrcholů modelu (`maxTol`), nejméně 1e-6 mm a nejvýš `RETOL_TOL_MAX`; bez míry modelu `RETOL_TOL_MAX`. Přepočet
+ * tolerance jen zvětší – soubor s křivkami 0,01–0,5 mm od ploch by po něm prošel také, proto bez meze žádná shoda geometrie.
+ */
+export const RETOL_TOL_MAX = 1e-3;
+export const retolLimit = (modelMaxTol?: number) => (modelMaxTol === undefined || !(modelMaxTol >= 0) ? RETOL_TOL_MAX : Math.min(RETOL_TOL_MAX, Math.max(1e-6, modelMaxTol)));
 /**
  * Výsledek kontroly: `ok` = věrná kopie objemového modelu; `level` / `code` = jak ji hlásit (✗ out.no-solid – soubor bez
  * tělesa, ⚠ out.free-surfaces – volné plochy vedle tělesa, ⚠ / ✗ out.check-failed – soubor se od modelu liší / nenačetl se).
@@ -428,7 +437,7 @@ export const CHECK_VOLUME_REL = 1e-3;
  *  - soubor se od modelu liší (tělesa, plochy mimo tělesa, platnost, objem, obálka) → ⚠ `out.check-failed`;
  *  - soubor odpovídá modelu, ale vedle těles nese volné skořepiny / plochy → ⚠ `out.free-surfaces` s počty;
  *  - soubor odpovídá modelu, ale po načtení neprojde přesnou kontrolou platnosti (model ano) → ⚠ `out.reload-invalid`
- *    (22a: čtečka STEP nastaví tolerance hran pod skutečnou odchylku křivek – nezávislá kontrola souboru by ho odmítla);
+ *    (22a: tolerance hran po načtení menší než skutečná odchylka křivek – nezávislá kontrola souboru by ho odmítla; příčina jen doložená rozborem);
  *  - jinak ✓ „… → věrná kopie modelu“ – jen když soubor prošel i přesnou kontrolou platnosti; bez ní (ploch nad mez, míry
  *    bez přesné kontroly) ✓ „… → odpovídá modelu; platnost souboru jen rychlou kontrolou …“ – nikdy „věrná kopie“ (22a).
  * `parts` = komponenty sestavy bez tělesa / s volnými plochami (jména do hlášky).
@@ -481,8 +490,30 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
     const of = file.faces !== undefined ? tr("{0} z {1}", file.badFaces ?? 1, file.faces) : String(file.badFaces ?? 1);
     const fast = file.valid === true ? tr("rychlá kontrola: platné") : file.valid === false ? tr("rychlá kontrola: NEPLATNÉ") : tr("rychlá kontrola neproběhla");
     const m = model.validExact === true ? tr("model přesně platný") : model.validExact === false ? tr("model je přesnou kontrolou neplatný také") : "";
-    // vadu přinesla čtečka (model přesně platný): tolerance hran po načtení menší než skutečná odchylka křivek od ploch
-    const why = model.validExact === true ? tr("; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch", label) : "";
+    // příčina jen doložená (kolo 4, export-verify.ts retolExact / edgeDeviation) – bez rozboru se příčina nepíše:
+    //  – po přepočtu tolerancí hran a vrcholů načteného souboru přesná kontrola projde a tolerance po přepočtu jsou do meze
+    //    (největší tolerance modelu, číslo v řádku) → vadné byly jen tolerance ze čtečky, geometrie souboru odpovídá;
+    //  – projde, ale tolerance po přepočtu nad mezí (nebo neznámé) → shoda geometrie nepotvrzena (přepočet tolerance jen zvětší,
+    //    takže „projde po přepočtu“ samo nic neříká – soubor s křivkami 0,1 mm od ploch by prošel také);
+    //  – neprojde ani po přepočtu: naměřená odchylka křivek hran od ploch souboru × modelu (týž počet vzorků) – není větší
+    //    a na vadných plochách přesahuje toleranci hran → tolerance podhodnocené i přepočtem vzorkováním, zápis odchylku
+    //    nezvětšil; větší → vadu přinesl zápis nebo čtení souboru; jinak příčina nezjištěna
+    const limit = retolLimit(model.maxTol);
+    const limitText = model.maxTol !== undefined ? tr("{0} mm = největší tolerance modelu", tiny(limit)) : tr("{0} mm", tiny(limit));
+    const devSame = file.devMax !== undefined && model.devMax !== undefined && file.devMax <= model.devMax * 1.01 + 1e-9;
+    const devText = file.devMax !== undefined && model.devMax !== undefined ? tr("odchylka křivek hran od ploch v souboru nejvýše {0} mm, v modelu {1} mm (vzorkováno {2} bodů na hranu)", tiny(file.devMax), tiny(model.devMax), file.devSamples ?? model.devSamples ?? 0) : "";
+    const why =
+      file.retolValid === true
+        ? file.retolMaxTol !== undefined && file.retolMaxTol <= limit
+          ? tr("; čtečka {0} nastaví tolerance hran menší než odchylka křivek od ploch – po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde s tolerancí nejvýše {1} mm (mez {2}) → geometrie souboru odpovídá", label, tiny(file.retolMaxTol), limitText)
+          : tr("; po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde, ale s tolerancí {0} (mez {1}) – shoda geometrie souboru s modelem nepotvrzena", file.retolMaxTol !== undefined ? tr("{0} mm", tiny(file.retolMaxTol)) : tr("nezjištěnou"), limitText)
+        : file.retolValid === false
+          ? devSame && (file.devOver ?? 0) > 0 && file.devMax! <= RETOL_TOL_MAX
+            ? tr("; ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde (vadných ploch {0}): {1}; na vadných plochách přesahuje odchylka toleranci hrany i po přepočtu (hran: {2}; přepočet vzorkuje) – zápis odchylku nezvětšil, čtečka {3} a přepočet tolerance hran podhodnotí", file.retolBadFaces ?? 1, devText, file.devOver ?? 0, label)
+            : devText && !devSame
+              ? tr("; ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde (vadných ploch {0}): {1} – v souboru větší než v modelu, vadu přinesl zápis nebo čtení souboru", file.retolBadFaces ?? 1, devText)
+              : tr("; ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde (vadných ploch {0}) – příčina nezjištěna{1}", file.retolBadFaces ?? 1, devText ? ` (${devText})` : "")
+          : "";
     return {
       ...base,
       ok: false,

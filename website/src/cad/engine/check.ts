@@ -26,7 +26,7 @@ import { noteValidity } from "./validity-store";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { asmStatus } from "./asm-status";
 import { IDENT } from "./asm-box";
-import { kv, matesCount, num, vec } from "./kv";
+import { kv, matesCount, num, springsCount, vec } from "./kv";
 import { quote } from "./protocol";
 import { docKeyOf, runOf } from "./run-doc";
 import { asmHooks, coded, sayKv, sayKvAs, type OpCtx, type OpHandler } from "./ops/util";
@@ -440,6 +440,7 @@ async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void
   clashFindings(ctxOut(ctx), d, list, res);
   const vUnion = vSum - res.reduce((a, x) => a + x.volume, 0);
   const mates = matesCount(d, st?.mates);
+  const springs = springsCount(d);
   const validN = [...parts.values()].filter((p) => p.m.check.valid !== false).length;
   const head = `asm ${kv([
     ["comp", (d.components ?? []).length],
@@ -449,6 +450,7 @@ async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void
     ["m", num(mSum, 3, "kg")],
     ["bbox", box ? bboxKv(box) : undefined],
     ["mates", mates ? `${mates.ok}/${mates.total}` : undefined],
+    ["springs.lost", springs?.lost], // ztracená dosedací plocha pružiny (vlna 22, bod 20)
   ])} clash=${clashKvShort(cls.counts)} valid=${validN}/${parts.size}`;
   const c = cls.counts;
   const text = tr(
@@ -468,8 +470,8 @@ async function checkAssembly(ctx: OpCtx, d: CadDoc, cmd: CheckCmd): Promise<void
     c.undetermined,
     validN,
     parts.size,
-  );
-  const data = { assembly: d.name, components: (d.components ?? []).length, parts: parts.size, volume_mm3: vSum, volume_union_mm3: vUnion, mass_kg: mSum, bbox: box, mates, clashes: c, partChecks: [...parts.values()].map((p) => ({ ...p.m.check, n: p.n })) };
+  ) + (springs ? tr(" · pružiny se ztracenou dosedací plochou: {0}", springs.lost) : "");
+  const data = { assembly: d.name, components: (d.components ?? []).length, parts: parts.size, volume_mm3: vSum, volume_union_mm3: vUnion, mass_kg: mSum, bbox: box, mates, ...(springs ? { springs } : {}), clashes: c, partChecks: [...parts.values()].map((p) => ({ ...p.m.check, n: p.n })) };
   sayData(ctx, d.name, head, data, [text]);
   // výpis po dílech (nejnižší priorita rozpočtu stručného protokolu)
   const rows: string[] = [];

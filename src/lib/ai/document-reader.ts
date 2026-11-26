@@ -208,6 +208,8 @@ export function systemPrompt(): string {
       `- my = doklad vystavila naše firma ${COMPANY.name} — naše nabídka, potvrzení objednávky, dodací list, faktura, ` +
       "nebo naše objednávka / poptávka u dodavatele. Poznáš podle našeho názvu, IČO či loga v hlavičce.\n" +
       "- dodavatel = doklad vystavil náš dodavatel / kooperant nám (jeho nabídka, potvrzení naší objednávky, dodací list, faktura).\n" +
+      `- DODACÍ LIST: náš (my) = dodavatel / odesílatel na dokladu je ${COMPANY.name}, zboží jde našemu zákazníkovi; ` +
+      "od dodavatele (dodavatel) = odesílatel je cizí firma a odběratel / příjemce jsme my (často s číslem naší objednávky).\n" +
       "- neznamy = nelze určit.",
 
     "STRANY:\n" +

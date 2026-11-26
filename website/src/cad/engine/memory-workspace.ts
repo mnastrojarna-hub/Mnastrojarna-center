@@ -12,6 +12,7 @@
 import { b64ToBytes, embedBlobs, internBlobs, putBlobAs, type SavedDoc } from "../blobs";
 import { docHasContent, docTabKind, normalizeDraftDoc } from "../draft/doc";
 import { tr } from "../i18n";
+import { carryOutputs } from "../history-outputs";
 import { emptyDoc, uid, type CadDoc } from "../types";
 import { HISTORY_MAX, newAsmCaches, type AsmCaches, type DocKey, type RunDocKind, type RunOrigin, type TabInfo, type Workspace } from "./workspace";
 
@@ -150,7 +151,7 @@ export class MemoryWorkspace implements Workspace {
     const want = steps(n);
     while (moved < want && h.past.length) {
       h.future.unshift(h.present);
-      h.present = h.past.pop()!;
+      h.present = carryOutputs(h.past.pop()!, h.present); // záznam exportu = soubor na disku, krok Zpět ho nesmaže (history-outputs.ts)
       moved++;
     }
     return { moved };

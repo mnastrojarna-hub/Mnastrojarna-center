@@ -402,6 +402,8 @@ export function docKv(d: DocSummary): string {
     if (d.mass_kg !== undefined) kv.push(`m=${fmtNum(d.mass_kg, 2)}kg`);
     if (d.bbox) kv.push(`bbox=${bboxSize(d.bbox)}`);
     if (d.clashes) kv.push(`clash=${clashD(d.clashes)}`);
+    // pružina se ztracenou dosedací plochou (vlna 22, bod 20): délka a síla nezkontrolovány – na konci skupiny sestavy, jen nenulové
+    if (d.springs?.lost) kv.push(`springs.lost=${d.springs.lost}`);
   } else if (d.kind === "part") {
     if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
     kv.push(`V=${volCm3(d.volume_mm3)}`);
@@ -492,6 +494,7 @@ export function sigmaLine(r: RunReport): string {
     kv.push(`V.sum=${volCm3(m.volume_mm3)}`);
     if (m.volume_union_mm3 !== undefined) kv.push(`V.union=${volCm3(m.volume_union_mm3)}`);
     if (m.clashes) kv.push(`clash=${clashSigma(m.clashes)}`);
+    if (m.springs?.lost) kv.push(`springs.lost=${m.springs.lost}`); // ztracená dosedací plocha pružiny (vlna 22, bod 20)
   } else if (m?.kind === "part") {
     kv.push(`V=${volCm3(m.volume_mm3)}`);
     if (m.mass_kg !== undefined) kv.push(`m=${fmtNum(m.mass_kg, 3)}kg`);

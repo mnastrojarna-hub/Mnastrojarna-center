@@ -199,6 +199,38 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     expect(springStatusLine(doc, { checked: false, stale: [] })).not.toContain("✓");
     expect(springStatusLine(doc, { checked: true, stale: [{ id: "s", name: "P", stored: 25, derived: 57.5, seat: 57.5, offset: 0 }] })).toMatch(/– ⚠ pružina „P“: uložená délka 25 mm neodpovídá dosedacím plochám \(57,5 mm\)/);
   });
+  it("„Pružiny: … ✓“ / „✓ pružina“ ne, když je dosedací plocha po změně dílu ztracená – ani s uloženou délkou, ani v pohybu (kolo 4)", async () => {
+    const { springStatusLine, springMotionLines } = await import("../asm-spring");
+    const { mateLines } = await import("../agent-asm");
+    const spring = { a: { compId: "rám", face: 1, lost: { kind: "plane" as const, origin: [10, 20, 5] as [number, number, number], normal: [0, 0, 1] as [number, number, number], area: 800, why: "none" as const } }, b: { compId: "deska-a", face: 0 }, free: 32, solid: 14, rate: 2, length: 25, offset: 0, seat: 25 };
+    const doc: CadDoc = { ...press(), components: [...press().components!, { id: "s", name: "P", source: { kind: "part", doc: (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc }, placement: { position: [0, 0, 10], rotation: [0, 0, 0] }, spring }] };
+    for (const line of [springStatusLine(doc)!, springStatusLine(doc, { checked: false, stale: [] })!]) {
+      expect(line).not.toContain("✓");
+      expect(line).not.toMatch(/25 mm|F 14 N|uložená délka/);
+      expect(line).toMatch(/„P“ – ztracená dosedací plocha A F2 \(„Rám“\): délka a síla nezkontrolovány – sestava pružina "P" mezi "Rám" <plocha> "Deska A" F1/);
+    }
+    expect(springMotionLines(doc, [{ i: 0, t: 0 }]).join("\n")).toMatch(/^⚠ pružina „P“ – ztracená dosedací plocha A F2/);
+    const list = mateLines(doc, {}).join("\n");
+    expect(list).toContain("· pružiny se ztracenou dosedací plochou: 1");
+    expect(list).toMatch(/pružina „P“ „Rám“ F2 → „Deska A“ F1 – ztracená reference: A F2 dílu „Rám“ \(rovinná \+Z · střed \[10; 20; 5\] · 800 mm²\) po úpravě dílu neexistuje/);
+  });
+  it("strojové „mates=N/N“ bez značky ne, když má pružina ztracenou dosedací plochu – springs.lost=1 v = status, D a Σ (kolo 5)", async () => {
+    const { docKv, sigmaLine } = await import("../engine/protocol");
+    const { docSummaryOf } = await import("../engine/kv");
+    const spring = { a: { compId: "rám", face: 1, lost: { kind: "plane" as const, origin: [10, 20, 5] as [number, number, number], normal: [0, 0, 1] as [number, number, number], area: 800, why: "none" as const } }, b: { compId: "deska-a", face: 0 }, free: 32, length: 25 };
+    const base = press();
+    const doc: CadDoc = { ...base, components: [...base.components!, { id: "s", name: "P", source: { kind: "part", doc: (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc }, placement: { position: [0, 0, 10], rotation: [0, 0, 0] }, spring }] };
+    const okMates = Object.fromEntries((doc.mates ?? []).map((m) => [m.id, "ok" as const]));
+    const lost = docSummaryOf(doc, null, { mates: okMates } as never);
+    expect(lost.springs).toEqual({ total: 1, lost: 1 });
+    expect(docKv(lost)).toMatch(/\bsprings\.lost=1$/);
+    expect(statusKv(doc, null, { mates: okMates } as never)).toMatch(/ springs\.lost=1 /);
+    expect(sigmaLine({ docs: [{ ...lost, main: true }], files: [], entries: [], ms: 0, peakMB: 0, counts: { lines: 0, ops: 0, errors: 0, warnings: 0, notes: 0 } } as never)).toMatch(/ springs\.lost=1 /);
+    // tytéž dosedací plochy bez ztráty: žádná značka (dřívější řádky beze změny)
+    const fine: CadDoc = { ...doc, components: doc.components!.map((c) => (c.id === "s" ? { ...c, spring: { ...spring, a: { compId: "rám", face: 1 } } } : c)) };
+    expect(docSummaryOf(fine, null, { mates: okMates } as never).springs).toBeUndefined();
+    expect(docKv(docSummaryOf(fine, null, { mates: okMates } as never))).not.toMatch(/springs/);
+  });
   it("„Úroveň simulace: kvazistatika“ ne u kinematického výpočtu", async () => {
     const env = fakeEnv();
     const a = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57,5..40 kroky 2");

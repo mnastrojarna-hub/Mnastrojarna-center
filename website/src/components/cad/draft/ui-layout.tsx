@@ -13,6 +13,7 @@
  *   panel Atributy, na blok bez atributů = úprava bloku;
  * - panely Bloky, Atributy, Vzhled stránky (formát, styl tisku, výřezy: měřítko, zámek, zmrazené hladiny; razítko) a Tisk.
  */
+import { isDoubleClick } from "@/cad/box-select-2d";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { tr } from "@/cad/i18n";
 import { xfPt, type Affine } from "@/cad/draft/geom";
@@ -375,7 +376,7 @@ let lastDown: { t: number; x: number; y: number } | null = null;
 function pointerHook(api: DraftUiApi, ev: { kind: string; world: Vec2; screen: Vec2; button: number }): boolean {
   if (ev.kind !== "down" || ev.button !== 0) return false;
   const now = Date.now();
-  const dbl = !!lastDown && now - lastDown.t < 350 && Math.hypot(ev.screen[0] - lastDown.x, ev.screen[1] - lastDown.y) < 6;
+  const dbl = !!lastDown && isDoubleClick([lastDown.x, lastDown.y], lastDown.t, ev.screen, now);
   lastDown = dbl ? null : { t: now, x: ev.screen[0], y: ev.screen[1] };
   if (!dbl) return false;
   const m = api.model;

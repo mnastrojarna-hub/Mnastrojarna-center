@@ -61,9 +61,15 @@ function wireVolume(p: SpringPath): number {
   return vol;
 }
 
-/** objem ze sítě (součet čtyřstěnů) – nezávislý na integraci BRepGProp */
+/**
+ * objem ze sítě (součet čtyřstěnů) – nezávislý na integraci BRepGProp. Používá se jen v poměru broušená / neoříznutá
+ * pružina se stejnou sítí, takže chyba teselace se vykrátí. Síť 0,05 mm / 0,2 rad (dřív 0,01 / 0,1): teselace té jemné
+ * sítě (270–360 tis. trojúhelníků) trvala 8–23 s na těleso, celý případ 64–68 s a překračoval limit 60 s, i když prvek
+ * sám se staví pod 1,1 s (profil vlna 22, fáze 2, kolo 4). Hrubší síť: případ 16,5 s místo 66 s, odchylka poměru od drátu
+ * 4·10⁻⁵ (n 8) a 3·10⁻⁵ (n 20) proti 1,4·10⁻⁴ a 2·10⁻⁵ u jemné – limit 0,001 zůstává beze změny.
+ */
 function meshVol(sh: r.Shape3D): number {
-  const m = sh.mesh({ tolerance: 0.01, angularTolerance: 0.1 });
+  const m = sh.mesh({ tolerance: 0.05, angularTolerance: 0.2 });
   const v = m.vertices;
   const t = m.triangles;
   let vol = 0;

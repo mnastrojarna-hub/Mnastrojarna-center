@@ -233,6 +233,49 @@ describe("kontrola exportu STEP / BREP", () => {
     expect(both.code).toBe("out.reload-invalid");
     expect(both.line).toMatch(/vadných ploch 3 z 19 \(rychlá kontrola: platné; model je přesnou kontrolou neplatný také\)/);
     expect(both.line).not.toMatch(/věrná kopie modelu|model přesně platný/);
+    // příčina se bez rozboru nepíše (kolo 4: dřív „čtečka nastaví tolerance …“ vždy, i bez ověření)
+    expect(c.line).not.toMatch(/čtečka STEP nastaví|přepočtu tolerancí/);
+  });
+  it("22a kolo 4: příčinu ⚠ out.reload-invalid doloží přepočet tolerancí načteného souboru – „geometrie souboru odpovídá“ jen s tolerancí po přepočtu do meze (číslo v řádku); ✓ nikdy", () => {
+    const m = { ...model, valid: true, validExact: true, faces: 8, maxTol: 6.3e-5 };
+    const f = { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: false, badFaces: 2, faces: 8 };
+    // tolerance po přepočtu 6e-7 mm ≤ mez 6,3e-5 mm (největší tolerance modelu) → jen tolerance ze čtečky, geometrie odpovídá
+    const tol = exportCheck(m, { ...f, retolValid: true, retolMaxTol: 6e-7 }, "STEP");
+    expect(tol).toMatchObject({ ok: false, level: "warn", code: "out.reload-invalid" });
+    expect(tol.line).toMatch(/vadných ploch 2 z 8 \(rychlá kontrola: platné; model přesně platný\); čtečka STEP nastaví tolerance hran menší než odchylka křivek od ploch – po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde s tolerancí nejvýše 6,0e-7 mm \(mez 6,3e-5 mm = největší tolerance modelu\) → geometrie souboru odpovídá – soubor nepotvrzen jako kopie modelu/);
+    expect(tol.line).not.toMatch(/věrná kopie modelu/);
+    // oponent kolo 4: křivky hran 0,01–0,5 mm od ploch – přepočet tolerance zvětší (0,5 mm) a soubor projde; to NENÍ shoda geometrie
+    const wide = exportCheck(m, { ...f, retolValid: true, retolMaxTol: 0.5 }, "STEP");
+    expect(wide).toMatchObject({ ok: false, level: "warn", code: "out.reload-invalid" });
+    expect(wide.line).toMatch(/; po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde, ale s tolerancí 0,5000 mm \(mez 6,3e-5 mm = největší tolerance modelu\) – shoda geometrie souboru s modelem nepotvrzena/);
+    expect(wide.line).not.toMatch(/geometrie souboru odpovídá|čtečka STEP nastaví|věrná kopie/);
+    // nad mez i o málo (tolerance modelu 6,3e-5, po přepočtu 1e-4) → nepotvrzeno
+    expect(exportCheck(m, { ...f, retolValid: true, retolMaxTol: 1e-4 }, "STEP").line).toMatch(/s tolerancí 1,0e-4 mm \(mez 6,3e-5 mm = největší tolerance modelu\) – shoda geometrie souboru s modelem nepotvrzena/);
+    // tolerance po přepočtu nezměřena → nepotvrzeno; bez míry modelu mez 0,001 mm
+    expect(exportCheck(m, { ...f, retolValid: true }, "STEP").line).toMatch(/projde, ale s tolerancí nezjištěnou \(mez 6,3e-5 mm = největší tolerance modelu\) – shoda geometrie souboru s modelem nepotvrzena/);
+    expect(exportCheck({ ...m, maxTol: undefined }, { ...f, retolValid: true, retolMaxTol: 4e-4 }, "STEP").line).toMatch(/s tolerancí nejvýše 4,0e-4 mm \(mez 0,0010 mm\) → geometrie souboru odpovídá/);
+    expect(exportCheck({ ...m, maxTol: undefined }, { ...f, retolValid: true, retolMaxTol: 2e-3 }, "STEP").line).toMatch(/s tolerancí 0,0020 mm \(mez 0,0010 mm\) – shoda geometrie souboru s modelem nepotvrzena/);
+    // tolerance modelu nad 0,001 mm: mez zůstane 0,001 mm (shoda geometrie se netvrdí s tolerancí 0,05 mm jen proto, že model ji má)
+    expect(exportCheck({ ...m, maxTol: 0.05 }, { ...f, retolValid: true, retolMaxTol: 0.04 }, "STEP").line).toMatch(/s tolerancí 0,0400 mm \(mez 0,0010 mm = největší tolerance modelu\) – shoda geometrie souboru s modelem nepotvrzena/);
+  });
+  it("22a kolo 4: soubor neprojde ani po přepočtu – příčina jen z naměřené odchylky křivek hran od ploch (soubor × model, týž počet vzorků); bez měření „příčina nezjištěna“", () => {
+    const m = { ...model, valid: true, validExact: true, faces: 19, maxTol: 9.7e-5, devMax: 6.05e-5, devSamples: 1000 };
+    const f = { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: false, badFaces: 15, faces: 19, retolValid: false, retolBadFaces: 2, retolMaxTol: 8.2e-5, devSamples: 1000 };
+    // stejná odchylka jako model a na vadných plochách nad tolerancí hran → tolerance podhodnocené, zápis odchylku nezvětšil
+    const same = exportCheck(m, { ...f, devMax: 6.05e-5, devOver: 3 }, "STEP");
+    expect(same).toMatchObject({ ok: false, level: "warn", code: "out.reload-invalid" });
+    expect(same.line).toMatch(/model přesně platný\); ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde \(vadných ploch 2\): odchylka křivek hran od ploch v souboru nejvýše 6,1e-5 mm, v modelu 6,1e-5 mm \(vzorkováno 1000 bodů na hranu\); na vadných plochách přesahuje odchylka toleranci hrany i po přepočtu \(hran: 3; přepočet vzorkuje\) – zápis odchylku nezvětšil, čtečka STEP a přepočet tolerance hran podhodnotí – soubor nepotvrzen/);
+    expect(same.line).not.toMatch(/geometrie souboru odpovídá|věrná kopie/);
+    // v souboru větší odchylka než v modelu → vadu přinesl zápis / čtení (export, ne tolerance)
+    const worse = exportCheck(m, { ...f, devMax: 0.02, devOver: 5 }, "STEP");
+    expect(worse.line).toMatch(/neprojde \(vadných ploch 2\): odchylka křivek hran od ploch v souboru nejvýše 0,0200 mm, v modelu 6,1e-5 mm \(vzorkováno 1000 bodů na hranu\) – v souboru větší než v modelu, vadu přinesl zápis nebo čtení souboru/);
+    expect(worse.line).not.toMatch(/zápis odchylku nezvětšil|geometrie souboru odpovídá/);
+    // stejná odchylka, ale žádná hrana nad tolerancí → vadné plochy nevysvětluje → příčina nezjištěna (s čísly)
+    expect(exportCheck(m, { ...f, devMax: 6.05e-5, devOver: 0 }, "STEP").line).toMatch(/neprojde \(vadných ploch 2\) – příčina nezjištěna \(odchylka křivek hran od ploch v souboru nejvýše 6,1e-5 mm, v modelu 6,1e-5 mm \(vzorkováno 1000 bodů na hranu\)\)/);
+    // bez měření odchylky → příčina nezjištěna (dřív nedoložené „příčina není jen v tolerancích po načtení“)
+    const none = exportCheck(m, { ...f }, "STEP");
+    expect(none.line).toMatch(/neprojde \(vadných ploch 2\) – příčina nezjištěna – soubor nepotvrzen/);
+    expect(none.line).not.toMatch(/čtečka STEP nastaví|příčina není jen|zápis odchylku/);
   });
   it("22a: přesná kontrola souboru neproběhla (ploch nad mez) → ✓ jen „odpovídá modelu; platnost souboru jen rychlou kontrolou …“, ne „věrná kopie“", () => {
     const c = exportCheck({ ...model, valid: true }, { solids: 1, volume: 120_000, bbox: box(100, 60, 20), valid: true, validExact: null, faces: 812 }, "STEP");

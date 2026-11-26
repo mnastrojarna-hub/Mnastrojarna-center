@@ -2,7 +2,7 @@ import { Sparkles } from "lucide-react";
 import { AssistantChat } from "./assistant-chat";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 
-/** AI asistent (super admin) — dotazy přirozenou řečí nad daty firmy. */
+/** AI asistent — dotazy přirozenou řečí nad daty firmy (vidí jen to, co smí uživatel), uložené konverzace. */
 export default async function AssistantPage() {
   const user = await requireFeature("ai_assistant");
   const { ctx } = await getAccess();
@@ -15,7 +15,7 @@ export default async function AssistantPage() {
         </span>
         <div>
           <h1 className="text-xl font-semibold tracking-tight">AI asistent</h1>
-          <p className="text-sm text-muted-foreground">Ptej se běžnou řečí na zakázky, ceny, zákazníky, dodavatele i provize.</p>
+          <p className="text-sm text-muted-foreground">Ptej se běžnou řečí (i hlasem) na zakázky, poštu, dokumenty, faktury, ceny, zákazníky i dodavatele. Konverzace si pamatuje.</p>
         </div>
       </div>
       <AssistantChat configured={ctx.aiConfigured} userName={user.fullName} />

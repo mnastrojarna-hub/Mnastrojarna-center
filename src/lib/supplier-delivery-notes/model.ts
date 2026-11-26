@@ -28,6 +28,8 @@ export interface SupplierDlRow {
 
 export interface RawDlFile {
   id: string; job_id: string; filename: string; title: string | null; created_at: string;
+  /** Kdo doklad vystavil (my / zákazník / dodavatel) — z AI čtení nebo ručně. */
+  issuer?: string | null;
   dl_no?: string | null; dl_date?: string | null; sup_name?: string | null; po_no?: string | null;
   job?: { number?: string | null; title?: string | null; customer?: { name?: string | null } | null } | null;
 }
@@ -42,8 +44,26 @@ const clean = (v: string | null | undefined): string | null => {
   return t ? t : null;
 };
 
-export function toDlRows(files: RawDlFile[], pos: RawPo[]): SupplierDlRow[] {
-  return files.map((f) => {
+/** Naše firma v názvu „dodavatele" na dokladu (= náš dodací list, ne dodavatelův). */
+const OUR_NAME_RE = /m\s*n[aá]str[oó]j[aá]rn/i;
+
+/**
+ * Je to NÁŠ dodací list (majitel 26. 11.: „v Dodacích listech dodavatelů mám naše dodací listy")? Vystavili
+ * jsme ho my / zákazník, jeho číslo je naše číslo DL zakázky, nebo je na něm jako dodavatel naše firma.
+ * Doklad s číslem naší objednávky dodavateli je vždy dodavatelův.
+ */
+export function isOurDeliveryNote(f: RawDlFile, ourDlNumbers: readonly string[], pos: readonly RawPo[]): boolean {
+  const poNo = clean(f.po_no);
+  if (poNo && pos.some((p) => p.number && docNumbersEqual(p.number, poNo))) return false;
+  if (f.issuer === "my" || f.issuer === "zakaznik") return true;
+  if (f.issuer === "dodavatel") return false;
+  const no = clean(f.dl_no);
+  if (no && ourDlNumbers.some((n) => docNumbersEqual(n, no))) return true;
+  return OUR_NAME_RE.test(searchNormalize(f.sup_name ?? "")) || OUR_NAME_RE.test(String(f.sup_name ?? ""));
+}
+
+export function toDlRows(files: RawDlFile[], pos: RawPo[], ourDlNumbers: readonly string[] = []): SupplierDlRow[] {
+  return files.filter((f) => !isOurDeliveryNote(f, ourDlNumbers, pos)).map((f) => {
     const poNo = clean(f.po_no);
     const po = poNo ? pos.find((p) => p.job_id === f.job_id && p.number && docNumbersEqual(p.number, poNo))
       ?? pos.find((p) => p.number && docNumbersEqual(p.number, poNo)) ?? null : null;
