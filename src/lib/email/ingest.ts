@@ -38,6 +38,9 @@ import { aiToneFor, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/
 const AI_AUTO_SEND = false as boolean;
 /** AI návrhy odpovědí na příchozí poštu se negenerují (majitel 23. 11.: „AI balast" na každý mail — zatím vypnuto). */
 const AI_REPLY_DRAFTS = false as boolean;
+/** AI třídění PŘED uložením e-mailu (zdržovalo zobrazení nové pošty) — vypnuto, třídí se po uložení. */
+const INLINE_AI_CATEGORIZE = false as boolean;
+type SavedCategory = import("@/lib/supabase/database.types").EmailCategory;
 
 /**
  * Stahování a (volitelně) AI-analýza pošty.
@@ -411,20 +414,22 @@ export async function ingestEmailsProgress(
   /** Naše adresy (schránky, uživatelé, doména) — nikdy se nepřiřadí zákazníkovi jako fakturační apod. */
   let ownFilter: ((email: string) => boolean) | null = null;
 
+  /** Uložené nové e-maily této dávky — 2. fáze (zakázky) proběhne až po uložení všech. */
+  const saved: { emailId: string; e: (typeof emails)[number]; direction: string; isSpam: boolean; customerId?: string | null; supplierId?: string | null; category: SavedCategory; analysis: EmailAnalysis | null }[] = [];
+  let processedUntil = emails.length;
   for (let i = 0; i < emails.length; i++) {
     if (!isFresh[i]) continue;
-    if (timeUp()) return { processed: i, ingested: count }; // zbytek příště
+    if (timeUp()) { processedUntil = i; break; } // zbytek příště (uložené projdou 2. fází níže)
     const e = emails[i];
     const direction = e.direction ?? "in";
-    let analysis: EmailAnalysis | null = null;
-    if (direction === "in" && useAi && isRecent(e.receivedAt, policy.recentDays) && policy.budget.left > 0) {
-      policy.budget.left--;
-      try {
-        analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) });
-      } catch (err) {
+    // majitel 25. 11. („maily strašně pomalu nabíhají"): e-mail se uloží HNED (kategorie z pravidel,
+    // ai_pending) — AI ho roztřídí až po uložení celé dávky (aiCatchUp), nic na AI nečeká
+    const analysis: EmailAnalysis | null = INLINE_AI_CATEGORIZE && direction === "in" && useAi && isRecent(e.receivedAt, policy.recentDays) && policy.budget.left-- > 0
+      ? await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) }).catch((err: unknown) => {
         console.error(`[mail:ingest] AI kategorizace selhala: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
+        return null;
+      })
+      : null;
     const rule = direction === "in" && !analysis ? ruleCategorize({ fromEmail: e.fromEmail, fromName: e.fromName, subject: e.subject, body: e.body, headers: e.headers }) : null;
     // odeslaná pošta ze serveru (složka Odeslané): kategorie podle předmětu, jako u odeslání z aplikace
     const category = analysis && isDbEmailCategory(analysis.category)
@@ -486,6 +491,11 @@ export async function ingestEmailsProgress(
     // signál stavu zakázky z AI (zvlášť — vložení e-mailu na novém sloupci nezávisí)
     if (analysis?.job_signal) await db.from("emails").update({ ai_job_signal: analysis.job_signal } as never).eq("id", emailId);
     await saveAttachments(db, emailId, e);
+    saved.push({ emailId, e, direction, isSpam, customerId, supplierId, category, analysis });
+  }
+
+  // 2. fáze (až jsou všechny nové e-maily vidět): přiřazení k zakázkám (AI, přílohy), e-maily podle účelu
+  for (const { emailId, e, direction, isSpam, customerId, supplierId, category, analysis } of saved) {
     try {
       jobActor ??= aiMailActor(opts.ownerId ?? null);
       // stará pošta (Stáhnout vše, první stažení): jen přiřadit — žádné změny položek, přílohy ani faktury
@@ -556,7 +566,7 @@ export async function ingestEmailsProgress(
       console.error(`[mail:ingest] Návrh odpovědi selhal: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  return { processed: emails.length, ingested: count };
+  return { processed: processedUntil, ingested: count };
 }
 
 /**

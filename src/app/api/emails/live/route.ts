@@ -6,6 +6,7 @@ import { getMailStamp } from "@/lib/data/mail-threads";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { LIVE_FAST_MIN_INTERVAL_MS, LIVE_MIN_INTERVAL_MS } from "@/lib/email/live-poll";
+import { ensureMailTickTarget } from "@/lib/email/mail-tick-target";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
   } catch {
     // bez těla = jen počty
   }
+  // plánovač pošty v databázi (každé 2 min i bez otevřené aplikace) potřebuje adresu a tajemství aplikace
+  await ensureMailTickTarget().catch(() => undefined);
   let remaining = 0;
   let ingested = 0;
   let error: string | undefined;
