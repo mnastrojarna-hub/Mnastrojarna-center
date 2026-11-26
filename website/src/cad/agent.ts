@@ -1872,6 +1872,8 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
    * done | cancelled | error | superseded), revize vstupu, fáze, čas, výsledek; `kind` = jen jeden druh
    */
   runs?: (kind?: "script" | "export") => RunSnapshot[];
+  /** výpočty aplikace s id a revizí vstupu (vlna 22, bod 12): stavba modelu, přepočet vazeb, kontrola kolizí, měření – `v12`, stav queued / running / done / superseded / cancelled / error */
+  computes?: (kind?: "build" | "mates" | "clash" | "measure") => RunSnapshot[];
   /** zruší běh `id` (bez id: běžící, jinak nejstarší čekající) – čekající se neprovede, běžící skončí ✗ run.cancelled */
   cancelRun?: (id?: string) => boolean;
   /** počká, až doběhnou všechny běhy a stavba modelu (dokončený stav – uložit / export / sdílet čekají samy) */

@@ -534,8 +534,14 @@ export type ExportRecord = {
   rev?: string;
   /** soubor nese písmeno revize listu vydaného z jiné revize modelu (export zastaralého vydaného listu) */
   revStale?: boolean;
-  job?: { id?: string; state?: string };
+  /**
+   * úloha exportu (vlna 22, bod 22h – trvalý záznam v dokumentu, ne jen v relaci): id, stav, celkový čas, časy fází, kontrola
+   * zpětným načtením (engine/export-job.ts)
+   */
+  job?: ExportJobRecord;
 };
+/** záznam úlohy exportu v dokumentu (bod 22h): stav, čas, fáze a výsledek kontroly – zůstane s dokumentem i po zavření relace */
+export type ExportJobRecord = { id?: string; state?: string; ms?: number; phases?: { phase: string; ms: number }[]; check?: { ok: boolean; text: string } };
 
 // ---------------- vazby sestavy ----------------
 

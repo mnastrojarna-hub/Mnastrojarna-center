@@ -114,11 +114,13 @@ import { ComputeChip, progressLabel } from "./compute-chip";
 // vlna 22, body 12, 22e, 22f, 22h: fronta a identita běhů, bariéra rozepsaných změn, export jako úloha, čekání výstupů
 import { discardPending, flushPending, historyRule, pendingCount, setDocKeyGetter } from "./flush-barrier";
 import { appRuns, guardApi, motionSignalHold, outputGate, runsSnapshot, textRun } from "./run-host";
-import { discardTarget, exportRun, type ExportRunDeps } from "./export-run";
+import { computeBegin, computesSnapshot, tracked, type ComputeKind, type ComputeRun } from "./compute-runs";
+import { ComputeStatus } from "./compute-status";
+import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
 import { ExportList, RunWaitChip } from "./run-chip";
 import { projectJson, stripModelRev } from "@/cad/engine/project-json";
-import { isRunCancelled, SeqGuard, type RunStamp } from "@/cad/engine/run-queue";
+import { isRunCancelled, SeqGuard, type RunStamp, type SeqTicket } from "@/cad/engine/run-queue";
 import { modelRev } from "@/cad/engine/result-key";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { applyBoxIdx, applyBoxSel, boxHelpText, featureFacesOf, featureOwnerCache, measureMany, mouseHint, setBoxThrough, useBoxThrough, type BoxMode } from "./box-pick-3d";
@@ -791,7 +793,7 @@ export function CadApp() {
           // konzole vždy s reportem jako CLI (souhrn, historie, filtr, JSON – vlna 22, bod 15)
           const withReport = protocol !== "console" || opts.source === "console";
           const r = withReport ? await runReport(ws, text, host, { inPlace: opts.inPlace, signal }) : await runScript(ws, text, host, { inPlace: opts.inPlace, signal });
-          cancelled = r.entries.some((e) => e.code === "run.cancelled");
+          cancelled = r.entries.some((e) => e.code === "run.cancelled" || e.code === "run.cancelled-partial");
           r.run = { ...stamp, state: cancelled ? "cancelled" : "done" };
           return { text: protocol !== "console" ? formatRun(r, opts) : formatConsole(r), cancelled, ...(opts.source === "console" ? { report: r } : {}) };
         } finally {
@@ -1057,6 +1059,7 @@ export function CadApp() {
       },
       // běhy a úlohy (vlna 22, bod 12 a 22h – run-host.ts): seznam, zrušení, dokončený stav, rozepsané změny
       runs: (kind) => runsSnapshot(kind),
+      computes: (kind) => computesSnapshot(kind as ComputeKind | undefined),
       cancelRun: (id) => appRuns.cancel(id),
       idle: async () => {
         flushPending("api:idle");
@@ -1156,6 +1159,8 @@ export function CadApp() {
 
   const inflight = useRef(false);
   const queued = useRef<CadDoc | null>(null);
+  /** záznam čekající stavby (compute-runs.ts – „čeká“, pak „počítá“) */
+  const queuedRun = useRef<ComputeRun | null>(null);
   /** pro který dokument (klíč záložky + otisk geometrie) je zobrazený výsledek stavby `result` */
   const resultFor = useRef<{ key: string; geo: string } | null>(null);
   /** klíč geometrie naposledy úspěšně postaveného dokumentu – podle něj se po zrušení výpočtu pozná, že čeká jen poslední změna */
@@ -1187,12 +1192,20 @@ export function CadApp() {
   );
   const runBuild = useCallback(async (d: CadDoc) => {
     if (inflight.current) {
+      // čekající stavba: viditelný výpočet „čeká“ (compute-runs.ts); dřívější čekající je nahrazen novějším stavem
+      queuedRun.current?.end("superseded");
+      queuedRun.current = computeBegin("build", docId.current, d, { queued: true });
       queued.current = d;
       return;
     }
     inflight.current = true;
     setBusy(true);
     const owner = docId.current; // vlna 22, bod 12: výsledek patří dokumentu, pro který se počítal
+    // výpočet s id a revizí vstupu (bod 12): čekal-li tento stav ve frontě, převezme jeho záznam
+    const pend = queuedRun.current;
+    queuedRun.current = null;
+    const run = pend ?? computeBegin("build", owner, d);
+    if (pend) pend.start();
     try {
       const res = await cad.build(d);
       // pozdní odpověď: mezitím jiná záložka, nebo čeká novější stav téhož dokumentu → výsledek „nahrazen“, nezobrazí se
@@ -1200,13 +1213,17 @@ export function CadApp() {
       if (owner === docId.current && !queued.current) {
         resultFor.current = { key: owner, geo: geoKey(d) };
         setResult(res);
-      }
+        run.end("done");
+      } else run.end("superseded");
       setStale(false);
       builtKey.current = geoKey(d);
       settleImportRef.current(d, res, null);
     } catch (e) {
       settleImportRef.current(d, null, e);
+      run.end(isCancelled(e) ? "cancelled" : "error", (e as Error)?.message);
       if (isCancelled(e)) {
+        (queuedRun.current as ComputeRun | null)?.end("cancelled"); // čekající stav se po Zrušit nepostaví
+        queuedRun.current = null;
         queued.current = null;
         // Zrušit = vrátit dokument do stavu před výpočtem: čeká-li na výpočet jen poslední změna, vrátí se zpět (Ctrl+Y ji obnoví);
         // jinak (otevřený soubor, návrat v historii) zůstane dokument tak, jak je, a model se přepočítá až na pokyn.
@@ -1610,8 +1627,11 @@ export function CadApp() {
     if (d.kind !== "assembly" || (!d.mates?.length && !springs)) return;
     const key = docId.current; // výsledek patří dokumentu, pro který se počítá – do jiné záložky se nezapíše ani nezobrazí
     const ticket = mateGuard.current.begin(); // vlna 22, bod 12: řešení staršího stavu nepřepíše novější (vzor seq)
+    return tracked("mates", key, d, (run) => resolveMatesRun(d, key, ticket, run, anchorId, o, springs));
+  };
+  const resolveMatesRun = async (d: CadDoc, key: string, ticket: SeqTicket, run: ComputeRun, anchorId: string | null | undefined, o: { equilibrium?: boolean }, springs: boolean) => {
     const mates = await ensureMateGeo(d);
-    if (!ticket.current()) return; // nahrazeno novějším přepočtem vazeb
+    if (!ticket.current()) return run.end("superseded"); // nahrazeno novějším přepočtem vazeb
     const withMates = { ...d, mates };
     const r = solveStatic(withMates, geoProvider(withMates), anchorId, { equilibrium: o.equilibrium ?? true });
     if (r.conflict) flash(tr("Vazby nelze splnit spolu – polohy komponent zůstaly beze změny: {0}", conflictText(r.conflict)));
@@ -1634,7 +1654,7 @@ export function CadApp() {
     const ws = engineRef.current?.ws;
     if (ws && !engineBusy.current && d.mates?.length) stampMateStatus(ws, key, apply(d), r.status);
     if (!r.moved.length && !matesChanged && !springs) return;
-    if (docId.current !== key) return; // mezitím jiná záložka: řešení jiného dokumentu se do zobrazeného nezapíše
+    if (docId.current !== key) return run.end("superseded"); // mezitím jiná záložka: řešení jiného dokumentu se do zobrazeného nezapíše
     // aplikovat na aktuální dokument (uživatel mohl mezitím pokračovat) – funkčně nad nejnovějším stavem: `docRef` se obnoví až při
     // vykreslení, takže hned po commit() mimo obsluhu události (výběr plochy přes worker) by vrátil dokument ještě bez nové vazby a ta by se ztratila
     liveWith(apply);
@@ -1942,12 +1962,19 @@ export function CadApp() {
     measurePending.current = null;
     const seq = ++measureSeq.current;
     const id = viewId("measure");
+    const run = computeBegin("measure", id.doc, histRef.current.present); // id výpočtu a revize vstupu (bod 12)
+    const settle = () => run.end(seq === measureSeq.current && id.doc === docId.current ? "done" : "superseded");
     try {
-      if (items.length > 2) return keepMeasure(await measureMany(items, (it) => cad.inspect(srcOf(it), refOf(it), densityOf(it))), id, seq);
+      if (items.length > 2) {
+        keepMeasure(await measureMany(items, (it) => cad.inspect(srcOf(it), refOf(it), densityOf(it))), id, seq);
+        return settle();
+      }
       const a = { src: srcOf(items[0]), ref: refOf(items[0]) };
       const b = items[1] ? { src: srcOf(items[1]), ref: refOf(items[1]) } : null;
       keepMeasure(await cad.measureEnt(a, b), id, seq);
+      settle();
     } catch (e) {
+      run.end(isCancelled(e) ? "cancelled" : "error", (e as Error)?.message);
       flash((e as Error).message);
     }
   };
@@ -2347,14 +2374,15 @@ export function CadApp() {
     setClashOpen(true);
     setClashBusy(key);
     flash(tr("Kontroluji kolize…"));
+    const run = computeBegin("clash", key, target); // id výpočtu a revize vstupu (bod 12, compute-runs.ts)
     try {
       const res = await cad.interference(target);
-      if (!ticket.current()) return; // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
+      if (!ticket.current()) return run.end("superseded"); // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
       // třídy dvojic geometricky v jádře jako příkaz „kolize“ (vlna 22, bod 5): šroub v závitu / pod hlavou / skutečná… – panel,
       // zvýraznění i stav pak čtou zařazený seznam, ne surové průniky
       const { list } = await classifyClashes(cad, target, res);
       const classes = entryCounts({ res, list }, target);
-      if (!ticket.current()) return; // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
+      if (!ticket.current()) return run.end("superseded"); // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
       const at = new Date().toLocaleTimeString(cadLocale());
       const comps = flattenLeaves(target).filter((l) => !l.hidden).length;
       ws.asm.clash.set(key, stampResult({ res, list, at, comps, sig, classes }, resultId("clash", key, target, { sig, comps, at, pose: step ? "step" : "doc" })));
@@ -2362,7 +2390,9 @@ export function CadApp() {
       const shown = shownAsmRef.current;
       const here = docId.current === key && !!shown && clashSig(shown) === sig;
       flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez průniku těles (vůle nekontrolována) – výsledek je v panelu Kolize i ve stavu dokumentu"));
+      run.end("done");
     } catch (e) {
+      run.end(isCancelled(e) ? "cancelled" : "error", (e as Error)?.message);
       flash((e as Error).message);
     } finally {
       setClashBusy((k) => (k === key ? null : k));
@@ -2661,9 +2691,13 @@ export function CadApp() {
       const chk: GuiExportCheck | null = r.check
         ? { level: r.check.level ?? (r.check.ok ? "ok" : "warn"), text: r.check.line, format }
         : await guiExportCheck(cad, histRef.current.present, format, r.data, isAsm ? solidsOfLeaves(leaves, (k) => asmCache.current.get(k)?.metrics) : result?.metrics?.solids !== undefined ? { solids: result.metrics.solids, free: result.metrics.free ?? 0 } : null);
-      setExportChk(chk);
-      flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check);
-      liveWith((cur) => recordExport(cur, { what: "model", format, file: target.name }).doc); // záznam exportu s revizí modelu (bod 20)
+      // záznam exportu s revizí EXPORTOVANÉHO modelu a úplným záznamem úlohy (body 12, 20, 22h – export-run.ts recordExportJob):
+      // změnil-li uživatel model během převodu, soubor je ze starší revize – žádná lišta ✓ nad jiným modelem, hláška to řekne
+      const rec = { format, file: target.name, job: r, id: h.id, ms: appRuns.get(h.id)?.ms };
+      const changed = recordExportJob(histRef.current.present, rec).changed;
+      liveWith((cur) => recordExportJob(cur, rec).doc);
+      setExportChk(changed ? null : chk);
+      flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check + (changed ? " · " + tr("⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu", r.modelRev) : ""));
       track("cad_export", { format });
     } catch (e) {
       if (isRunCancelled(e) || isCancelled(e)) flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
@@ -3779,6 +3813,7 @@ export function CadApp() {
               tr("OCCT · {0}", result ? `${result.ms} ms` : "připraveno")
             )}
           </span>
+          <ComputeStatus />
           <QBtn icon="measure" title={tr("Paleta příkazů (Ctrl+K)")} onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title={tr("Nastavení (Ctrl+,)")} onClick={() => setSettingsOpen(true)} />
           <ShareCta

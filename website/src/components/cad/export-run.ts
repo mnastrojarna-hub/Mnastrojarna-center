@@ -13,7 +13,8 @@ import { tr } from "@/cad/i18n";
 import { exportModelRev, runExportJob, type ExportFormat3d, type ExportJobResult } from "@/cad/engine/export-job";
 import type { KernelApi } from "@/cad/engine/kernel";
 import { inputRevOf, isRunCancelled, type RunHandle, type RunSource, type RunTracker } from "@/cad/engine/run-queue";
-import type { CadDoc } from "@/cad/types";
+import { modelId, recordExport } from "@/cad/doc-outputs";
+import type { CadDoc, ExportRecord } from "@/cad/types";
 
 /** cíl zápisu z dialogu „Uložit jako“ (`handle` = File System Access API, null = stažení do složky Stažené) */
 export type ExportTarget = { name: string; handle: unknown | null };
@@ -82,4 +83,23 @@ export function exportRun(tracker: RunTracker, o: { format: ExportFormat3d; labe
     tracker.update(h.id, { result: { ok: false, written: false, removed, note: notWritten(o.target, removed) } });
   });
   return h;
+}
+
+/**
+ * Záznam dokončeného exportu do dokumentu `cur` (vlna 22, body 12 a 22h). Úloha exportovala dokument `job.doc` (stav při jejím
+ * startu); uživatel mohl model během převodu změnit. Záznam proto nese revizi a otisk EXPORTOVANÉHO modelu (ne `cur`) – soubor
+ * ze starší revize se ukáže jako zastaralý, nikdy jako „odpovídá modelu“ – a celý záznam úlohy (id, stav, čas, fáze, kontrola),
+ * který zůstane s dokumentem i po zavření relace. `changed` = model se během exportu změnil (hláška, žádná lišta ✓).
+ */
+export function recordExportJob(cur: CadDoc, o: { format: string; file: string; job: ExportJobResult<unknown>; id?: string; ms?: number }): { doc: CadDoc; rec: ExportRecord; changed: boolean } {
+  const c = o.job.check;
+  const ms = o.ms ?? o.job.phases.reduce((a, p) => a + p.ms, 0);
+  const { doc, rec } = recordExport(cur, {
+    what: "model",
+    format: o.format,
+    file: o.file,
+    from: o.job.doc,
+    job: { ...(o.id ? { id: o.id } : {}), state: "done", ms, phases: o.job.phases.map((p) => ({ phase: p.phase, ms: p.ms })), ...(c ? { check: { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") } } : {}) },
+  });
+  return { doc, rec, changed: modelId(cur).sig !== modelId(o.job.doc).sig };
 }

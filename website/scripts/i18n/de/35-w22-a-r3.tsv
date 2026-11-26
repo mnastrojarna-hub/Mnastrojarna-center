@@ -1,0 +1,17 @@
+# Vlna 22, fáze 2, kolo 3 (body 12, 22h): záznam úlohy exportu v dokumentu, změna modelu během exportu, zrušený běh po zápisu jiného dokumentu, diagnostika převodu
+úloha: {0}	Auftrag: {0}
+kontrola ✓	Prüfung ✓
+⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu	⚠ das Modell wurde während des Exports geändert – die Datei entspricht der Revision {0}, nicht dem aktuellen Modell
+✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v {0} (Zpět je vrátí).	✗ Berechnung abgebrochen – das unfertige Dokument wurde nicht geschrieben, aber vor dem Abbruch geschriebene Änderungen bleiben in {0} (Rückgängig macht sie rückgängig).
+Dokumenty založené během ({0}) se zahodily.	Vom Lauf angelegte Dokumente ({0}) wurden verworfen.
+model má těleso	das Modell hat einen Körper
+model NEMÁ těleso	das Modell hat KEINEN Körper
+prvky s chybou: {0}	fehlerhafte Features: {0}
+chyby parametrů: {0}	Parameterfehler: {0}
+model se před převodem nepřestavoval (sestava / bez přestavby)	das Modell wurde vor der Konvertierung nicht neu aufgebaut (Baugruppe / ohne Neuaufbau)
+převod do {0} selhal ve fázi „{1}“: {2} · {3}	Konvertierung nach {0} in Phase „{1}“ fehlgeschlagen: {2} · {3}
+přepočet vazeb	Verknüpfungen lösen
+stavba modelu	Modellaufbau
+Výpočty aplikace (id, stav, revize vstupu):	Berechnungen der Anwendung (ID, Zustand, Eingaberevision):
+#!dynamic
+výpočet zrušen – změny zapsané před zrušením zůstaly v {0}	Berechnung abgebrochen – vor dem Abbruch geschriebene Änderungen bleiben in {0}

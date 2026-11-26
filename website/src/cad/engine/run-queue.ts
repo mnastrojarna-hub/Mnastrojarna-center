@@ -44,9 +44,10 @@ export function runStateText(s: RunState): string {
   }
 }
 
-export type RunKind = "script" | "export";
+/** `compute` = výpočet uvnitř aplikace (stavba modelu, vazby, kolize, měření – components/cad/compute-runs.ts) */
+export type RunKind = "script" | "export" | "compute";
 /** odkud běh přišel: konzole, `window.mncad`, menu aplikace, `mncad run`, `mncad serve` */
-export type RunSource = "console" | "api" | "menu" | "cli" | "http";
+export type RunSource = "console" | "api" | "menu" | "cli" | "http" | "app";
 
 /** identita běhu v protokolu (`RunReport.run`, JSON, HTTP, Σ `run=`) */
 export type RunStamp = { id: string; inputRev: string; state?: RunState };
@@ -81,6 +82,8 @@ export type RunEntry = {
   source: RunSource;
   /** krátký popis (první řádek skriptu, „STEP · Deska A.step“) */
   label: string;
+  /** druh výpočtu aplikace (`build`, `mates`, `clash`, `measure`) */
+  what?: string;
   doc?: string;
   docKey?: string;
   inputRev?: string;
@@ -102,6 +105,7 @@ export type RunSpec = {
   kind: RunKind;
   source: RunSource;
   label: string;
+  what?: string;
   doc?: string;
   docKey?: string;
   inputRev?: string;
@@ -200,6 +204,7 @@ export class RunTracker {
       kind: spec.kind,
       source: spec.source,
       label: spec.label,
+      ...(spec.what !== undefined ? { what: spec.what } : {}),
       ...(spec.doc !== undefined ? { doc: spec.doc } : {}),
       ...(spec.docKey !== undefined ? { docKey: spec.docKey } : {}),
       ...(spec.inputRev !== undefined ? { inputRev: spec.inputRev } : {}),
@@ -412,6 +417,7 @@ export class RunTracker {
       source: e.source,
       state: e.state,
       label: e.label,
+      ...(e.what !== undefined ? { what: e.what } : {}),
       ...(e.doc !== undefined ? { doc: e.doc } : {}),
       ...(e.inputRev !== undefined ? { inputRev: e.inputRev } : {}),
       queuedAt: new Date(e.queuedAt).toISOString(),
@@ -433,6 +439,7 @@ export type RunSnapshot = {
   source: RunSource;
   state: RunState;
   label: string;
+  what?: string;
   doc?: string;
   inputRev?: string;
   queuedAt: string;

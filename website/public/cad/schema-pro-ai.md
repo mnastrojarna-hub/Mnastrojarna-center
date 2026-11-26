@@ -80,7 +80,9 @@ do 3D okna (výběr hran a ploch pravidlem).
    `window.mncad.cancel()` ho zruší (dokument zůstane ve stavu před výpočtem). **Běhy:** `run` se řadí do fronty (nikdy
    dva běhy najednou), `window.mncad.runs()` vrátí běhy a úlohy exportu (`{ id: "r12", kind, state, inputRev, phase,
    phases, ms, result }`, stav `queued | running | done | cancelled | error`), `window.mncad.cancelRun(id?)` běh zruší,
-   `run(text, { signal })` přijme `AbortSignal`, `await window.mncad.idle()` počká na dokončený stav. Každé volání
+   `run(text, { signal })` přijme `AbortSignal`, `await window.mncad.idle()` počká na dokončený stav;
+   `window.mncad.computes(kind?)` vrátí výpočty aplikace (stavba modelu, vazby, kolize, měření: `{ id: "v7", what, state,
+   inputRev }`, pozdní výsledek staršího výpočtu = `superseded`). Každé volání
    `window.mncad` nejdřív zapíše rozepsané pole a list výkresu; `save`, `exportFile`, `exportDrawing`, `share` počkají
    na doběhnutí běhů a stavby (viz „Průběh a zrušení výpočtu“).
 
@@ -1228,7 +1230,8 @@ hlavičce `x-mncad-run` a na konci řádku Σ (`… run=r12`); hlavička `MNCAD/
 počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předchozí protokol jen sbalený jako **Předchozí běh r11** – starý
 protokol se nikdy nečte jako výsledek nového běhu (atributy `data-run-id`, `data-run-state` u výstupu); tlačítko
 **Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
-✗ `run.cancelled` před dalším řádkem. Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+✗ `run.cancelled` před dalším řádkem; zapsal-li běh před zrušením jiný dokument (přechod `nový díl` / `záložka`), dokumenty, které
+založil, se zahodí a dokumenty zapsané do dřívějších záložek vyjmenuje ✗ `run.cancelled-partial` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
 měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny `pohyb přehrát` se panelu doručí až po zápisu
 dokumentu běhu.
 
@@ -1241,7 +1244,10 @@ textové `export step` – i export z menu) → zápis souboru. Seznam **Exporty
 velikost, kontrolu a revizi modelu i po konci (`data-export-job`, `data-export-state`); úlohu jde zrušit – soubor, který
 už založil dialog „Uložit jako“, se odstraní. `window.mncad.exportFile` vrací `{ …, modelRev, check, job }`, průběh
 ukazuje `window.mncad.exports()`. CLI `--progress` vypisuje fáze jménem (`  export:step: převod do STEP`,
-`  build: síť modelu`).
+`  build: síť modelu`). Soubor STEP nese revizi v hlavičce (`FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision
+r\X\B7a1b2c3'),…)`). Záznam exportu v dokumentu (`exporty`, panel Výstupy) nese úlohu – stav, čas `⏱ 0,4 s`, fáze a
+kontrolu (`kontrola ✓` jen s provedenou kontrolou) – a revizi EXPORTOVANÉHO modelu: změní-li se model během exportu,
+záznam je hned zastaralý. Selhání převodu řekne fázi, zprávu jádra a stav modelu (těleso, prvky s chybou).
 
 ### Plech – tvářecí nástroje a křížový zlom (`plech …`, EN `sheet …`, DE `blech …`)
 
