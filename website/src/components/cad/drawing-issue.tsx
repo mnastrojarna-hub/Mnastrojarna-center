@@ -7,7 +7,7 @@
  *  * oddíl u tabulky revizí: stav vydání a tlačítko „Vydat list jako rev. X“ / „Zrušit vydání“.
  * Žádný zelený stav: vydaný list z nynějšího modelu je neutrální „odpovídá modelu r·…“.
  */
-import { defaultIssueRev, fmtDate, nextRev, sheetIssueLine, sheetState, type ModelId } from "@/cad/doc-outputs";
+import { defaultIssueRev, fmtDate, nextRev, nowRev, sheetIssueLine, sheetState, type ModelId } from "@/cad/doc-outputs";
 import { tr } from "@/cad/i18n";
 import type { CadDoc, DrawingDoc } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -17,7 +17,7 @@ export function IssueBadge({ doc, sheet, mid }: { doc: CadDoc; sheet: Pick<Drawi
   if (!sheet?.issued || !mid) return null;
   const stale = sheetState(doc, sheet, mid) === "stale";
   const is = sheet.issued;
-  const title = stale ? tr("Vydáno jako rev. {0} z modelu {1} ({2}) – model je teď {3}: list je zastaralý", is.rev, is.modelRev, fmtDate(is.at), mid.rev) : tr("Vydáno jako rev. {0} z modelu {1} ({2}) – odpovídá modelu", is.rev, is.modelRev, fmtDate(is.at));
+  const title = stale ? tr("Vydáno jako rev. {0} z modelu {1} ({2}) – model je teď {3}: list je zastaralý", is.rev, is.modelRev, fmtDate(is.at), nowRev(is, mid)) : tr("Vydáno jako rev. {0} z modelu {1} ({2}) – odpovídá modelu", is.rev, is.modelRev, fmtDate(is.at));
   return (
     <span data-sheet-issued={is.rev} data-sheet-stale={stale ? "1" : undefined} title={title} className={cn("rounded px-1 text-[10px] font-semibold leading-4", stale ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300" : "bg-ink-700/10 text-ink-700/70")}>
       {stale ? "⚠ " : ""}
@@ -34,7 +34,7 @@ export function StaleSheetBanner({ doc, sheet, mid, onIssue, onRecompute }: { do
   return (
     <div role="alert" data-drawing-stale-banner={is.rev} className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] text-amber-900">
       <span className="font-semibold">⚠ {tr("Model se změnil po vydání rev. {0}", is.rev)}</span>
-      <span>{tr("List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.", is.modelRev, fmtDate(is.at), mid.rev, is.rev)}</span>
+      <span>{tr("List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.", is.modelRev, fmtDate(is.at), nowRev(is, mid), is.rev)}</span>
       <span className="ml-auto flex gap-1.5">
         {onRecompute && (
           <button type="button" data-stale-recompute onClick={onRecompute} className="rounded border border-amber-400 bg-white px-2 py-0.5 hover:border-brand hover:text-brand">

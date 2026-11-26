@@ -34,10 +34,10 @@ Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
 === run 3 ===
 ✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
 → Kvádr 1: size [100; 60; 20] → [100; 60; 25] – výsledek po výpočtu níže
-⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – změna (geometrie) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Deska A"
+⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – v sestavě: sestava obnovit "Deska A"; změna (geometrie) se do sestavy sama nepromítne
 ✓ záložka „Nástroj“ (sestava) je aktivní – další příkazy pracují s ní
 Zastaralé výstupy (1) · model je teď r·?:
-  1. ⚠ Deska A – komponenta „Deska A“ je starší než díl „Deska A“ v záložce (geometrie) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1 → sestava obnovit #1 (přepočítat vše)
+  1. ⚠ Deska A – komponenta „Deska A“ je starší než díl „Deska A“ v záložce (geometrie) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení → sestava obnovit #1 (přepočítat vše)
 ✓ komponenta „Deska A“ obnovena z dílu (geometrie)
 ✓ komponenta „Přidržovač“ už odpovídá dílu v záložce
 kolize: 1 – šroub v závitu 0, skutečné 1

@@ -195,8 +195,8 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           // vložený tímto během (řádek vložení), jinak díl, jehož kopie je v otevřené sestavě (dřívější běh, konzole, --resume)
           const asmName = ins === undefined ? asmWithCopy(ws, run.doc.name) : undefined;
           const once = !rb.entries.some((e) => e.code === "asm.stale-copy" && e.doc === run.doc.name);
-          if (once && ins !== undefined) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, ins, what) });
-          else if (once && asmName) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě „{1}“ jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, asmName, what) });
+          if (once && ins !== undefined) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – v sestavě: sestava obnovit \"{0}\"; změna ({2}) se do sestavy sama nepromítne", run.doc.name, ins, what) });
+          else if (once && asmName) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě „{1}“ jako kopie – v sestavě: sestava obnovit \"{0}\"; změna ({2}) se do sestavy sama nepromítne", run.doc.name, asmName, what) });
           if (ins !== undefined) run.inserted!.delete(run.doc.name.trim().toLowerCase());
         }
         // přímo upravené prvky (i ty, které běh sám přidal) a místo v historii, od kterého operace model změnila: výsledek

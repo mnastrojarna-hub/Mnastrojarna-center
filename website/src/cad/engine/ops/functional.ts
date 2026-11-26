@@ -9,6 +9,7 @@ import { runMeasure } from "../../agent-measure-run";
 import { markLabel } from "../../dim-complete";
 import { tr } from "../../i18n";
 import type { CadDoc, Feature, FunctionalMark, Vec3 } from "../../types";
+import { modelRev } from "../result-key";
 import { runOf } from "../run-doc";
 import { say, type OpHandler } from "./util";
 
@@ -116,7 +117,7 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
       const geom = await faceGeom(ctx, d, index);
       if (geom?.t !== "plane") throw new Error(tr("základna {0}: plocha F{1} není rovinná – základnou může být jen rovinná plocha", cmd.label, index + 1));
       const next = ms.filter((m) => !(m.kind === "datum" && m.label === cmd.label));
-      next.push({ id: nextId(next), kind: "datum", label: cmd.label, face: { index }, geom });
+      next.push({ id: nextId(next), kind: "datum", label: cmd.label, face: { index }, geom, rev: modelRev(d) });
       commit(next, tr("✓ základna {0} = F{1} ({2}) – polohy funkčních prvků se kontrolují od ní", cmd.label, index + 1, geomText(next[next.length - 1])));
       return;
     }
@@ -133,7 +134,7 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
         const hole = geom?.t === "cyl" ? holeOfCylinder(d, geom) : undefined;
         mark = hole
           ? { id: "", kind: "functional", feature: hole.id, ...(t.tol ? { tol: t.tol } : {}) }
-          : { id: "", kind: "functional", face: { index: t.face! }, ...(geom ? { geom } : {}), ...(t.tol ? { tol: t.tol } : {}) };
+          : { id: "", kind: "functional", face: { index: t.face! }, ...(geom ? { geom } : {}), ...(t.tol ? { tol: t.tol } : {}), rev: modelRev(d) };
       }
       const same = (m: FunctionalMark) => m.kind === "functional" && ((mark.feature && m.feature === mark.feature) || (mark.face && m.face?.index === mark.face.index));
       const next = ms.filter((m) => !same(m));

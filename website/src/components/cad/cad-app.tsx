@@ -4687,6 +4687,7 @@ export function CadApp() {
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
             onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
             onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
+            staleCopies={copiesNow}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onTitleTemplates={(t) => commitWith((cur) => ({ ...cur, titleTemplates: t?.length ? t : undefined }))}
             onClose={() => {

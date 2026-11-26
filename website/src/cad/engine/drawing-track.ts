@@ -8,6 +8,7 @@
  *   nálezy, které už protokol má (blok, `výkres stav`, export), se neopakují. Normální režim tak hlásí totéž co přísný
  *   (např. ✗ `drawing.section-miss`), jen bez zastavení – nezávisle na tom, jestli se list exportuje (`--formats`).
  */
+import { staleCopies, staleCopyText } from "../asm-refresh";
 import { isCancelled } from "../kernel-client";
 import type { CadDoc } from "../types";
 import { drawExtras } from "./asm-status";
@@ -110,8 +111,12 @@ export class DrawingTracker {
       try {
         const extras = () => drawExtras(ctx.ws, ctx.host.kernel, d, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
         for (const x of await evaluateSheet(d, idx, compute, extras, { knownTexts: this.known.get(t.sheetId) ?? [] })) this.addSheet(line, x, d.name, t.lines);
+        // 22g (kolo 3): list sestavy, jejíž komponenta je kopie starší než díl v záložce, ukazuje v kusovníku / razítku údaje
+        // z vložení – ⚠ asm.stale-copy (v konečném stavu) a žádné „✓ bez nálezů“, i když ⚠ zazněl dřív na jiném řádku
+        const stale = d.kind === "assembly" ? staleCopies(d, (n) => ctx.ws.findPart(n)) : [];
+        for (const sc of stale) this.add1(line, "asm.stale-copy", d.name, staleCopyText(sc), t.lines);
         // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku
-        if (!rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
+        if (!stale.length && !rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
       } catch (e) {
         if (isCancelled(e)) throw e;
         this.add1(line, "op.failed", d.name, codeText("op.failed", errMessage(e)), t.lines);

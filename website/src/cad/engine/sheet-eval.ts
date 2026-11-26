@@ -17,7 +17,7 @@
  * export PDF (CLI `--formats`) téhož listu se nepočítají dvakrát (projekce sestavy trvá desítky sekund).
  */
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
-import { DIMS_INCOMPLETE_KEY, SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
+import { DIM_DETACHED_KEY, DIMS_INCOMPLETE_KEY, SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
 import { tr } from "../i18n";
 import type { CadDoc, DrawingAnnotation } from "../types";
 import { codeText, type Code, type CodeLevel } from "./codes";
@@ -47,6 +47,7 @@ export const clearDrawingMemo = (): void => void (memo = []);
 export function sheetWarningCode(text: string): Code {
   if (isTextOfKey(text, SECTION_MISS_BADGE)) return "drawing.section-miss";
   if (isTextOfKey(text, DIMS_INCOMPLETE_KEY)) return "drawing.dims-incomplete"; // kontrola kót (bod 18)
+  if (isTextOfKey(text, DIM_DETACHED_KEY)) return "drawing.dim-detached"; // ruční kóta po změně modelu (bod 20)
   return "drawing.warning";
 }
 
@@ -99,6 +100,9 @@ export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCo
   if (skipped.length) out.push({ code: "drawing.warning", sheet: name, text: tr("vynecháno: {0}", skipped.join("; ")) });
   // kontrola kót pro výrobní úplnost (vlna 22, bod 18): ⚠ drawing.dims-incomplete, ℹ drawing.tol-nonfunctional
   out.push(...(await dimSheetIssues(doc, s, res, o)).map((i) => sheetIssue(i, name)));
+  // ruční kóty, které po změně modelu neodpovídají geometrii (vlna 22, bod 20): ⚠ drawing.dim-detached – jinak „✓ bez nálezů“ nad visící kótou
+  const det = await dimAttachSheetIssue(s, res, o);
+  if (det) out.push(sheetIssue(det, name));
   // překryvy celého listu (vlna 22, bod 17): balónky, odkazy, texty, kóty, geometrie, tabulky, rám → ⚠ drawing.overlap s počtem a radou
   const ov = await sheetOverlapIssue(doc, s, res, o, o2.knownTexts);
   if (ov) out.push(sheetIssue(ov, name));
@@ -147,6 +151,14 @@ async function dimSheetIssues(doc: CadDoc, s: NonNullable<CadDoc["drawings"]>[nu
   let anns = s.annotations;
   if (o.dimensions === "smart" && res.smart) anns = mergeSmart(anns, o, res.smart)?.annotations ?? anns;
   return dimCheckIssues(sheetDimCheck(doc, withAnnotations(res, anns), anns, o), { sheetId: s.id });
+}
+
+/** ruční kóty listu po změně modelu (poznámky se sloučenými Chytrými kótami – id jako ve `výkres stav`) → hlášení nebo null */
+async function dimAttachSheetIssue(s: NonNullable<CadDoc["drawings"]>[number], res: Awaited<ReturnType<DrawingCompute>>, o: ReturnType<typeof import("../drawing-agent").sheetOptions>): Promise<DrawingIssue | null> {
+  const [{ mergeSmart }, { dimAttachIssue }] = await Promise.all([import("../drawing-agent"), import("../drawing-dim-attach")]);
+  let anns = s.annotations;
+  if (o.dimensions === "smart" && res.smart) anns = mergeSmart(anns, o, res.smart)?.annotations ?? anns;
+  return dimAttachIssue(res.views, anns, o, s.id);
 }
 
 /**

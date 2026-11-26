@@ -50,13 +50,15 @@ export type DrawingIssueKind =
   | "dims-incomplete"
   /** přesná tolerance na rozměru, který není funkční (přetolerování; ℹ – vlna 22, bod 18) */
   | "tol-nonfunctional"
+  /** ruční kóta po změně modelu neodpovídá geometrii pohledu (`data.dims`: id, stav lost/moved/noView, hodnoty – vlna 22, bod 20) */
+  | "dim-detached"
   /** ostatní varování jádra výkresu (text jako odznak) */
   | "other";
 
 export type DrawingIssue = {
   level: "error" | "warn" | "note";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.bom-overflow" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.bom-overflow" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional" | "drawing.dim-detached";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;
@@ -81,6 +83,8 @@ export function issuesOf(res: Pick<DrawingResult, "warnings"> & { issues?: Drawi
 
 /** varování neúplných kót listu (kontrola kót, bod 18 – cad/drawing-dimcheck.ts) – klíč překladu; export i stav ho poznají podle klíče */
 export const DIMS_INCOMPLETE_KEY = "kóty neúplné – {0}";
+/** klíč hlášení ruční kóty bez geometrie po změně modelu (cad/drawing-dim-attach.ts, vlna 22 bod 20) */
+export const DIM_DETACHED_KEY = "ruční kóty po změně modelu neodpovídají geometrii ({0}): {1} – {2}";
 
 /** odznak řezu mimo těleso (drawing.ts) – klíč překladu */
 export const SECTION_MISS_BADGE = "Rovina řezu neprotíná těleso – upravte odsazení.";
@@ -96,6 +100,7 @@ export function isTextOfKey(text: string, key: string): boolean {
 /** Hlášení z textu varování jádra bez strukturovaného hlášení (export listů): odznak řezu mimo těleso = ✗ drawing.section-miss. */
 export function warningIssue(text: string): DrawingIssue {
   if (isTextOfKey(text, DIMS_INCOMPLETE_KEY)) return { level: "warn", code: "drawing.dims-incomplete", kind: "dims-incomplete", text };
+  if (isTextOfKey(text, DIM_DETACHED_KEY)) return { level: "warn", code: "drawing.dim-detached", kind: "dim-detached", text };
   return isTextOfKey(text, SECTION_MISS_BADGE) ? { level: "error", code: "drawing.section-miss", kind: "section-miss", text } : { level: "warn", code: "drawing.warning", kind: "other", text };
 }
 

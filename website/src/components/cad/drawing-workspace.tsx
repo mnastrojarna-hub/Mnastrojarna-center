@@ -11,7 +11,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
-import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
+import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, dimLabel, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
+import { settleDim, userDimAttach } from "@/cad/drawing-dim-attach";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
@@ -34,7 +35,7 @@ import { OverlapMarkers, PositionsPanel } from "./drawing-positions-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
 import { registerFlush } from "./flush-barrier";
-import { issueSheet, modelId, staleExportText, withdrawIssue, type ExportInput } from "@/cad/doc-outputs";
+import { issueSheet, modelId, sameModel, staleExportText, withdrawIssue, type ExportInput } from "@/cad/doc-outputs";
 import { IssueBadge, IssueSection, StaleSheetBanner } from "./drawing-issue";
 
 type Props = {
@@ -71,6 +72,8 @@ type Props = {
   onExported?: (e: ExportInput) => void;
   /** „Přepočítat“ u zastaralého vydaného listu = text `přepočítat vše` (engine/outputs-ops.ts) */
   onRecomputeAll?: () => void;
+  /** komponenty sestavy, jejichž kopie dílu je starší než díl v záložce (asm-refresh.ts) – kusovník a razítko listu ukazují údaje z vložení (22g) */
+  staleCopies?: { name: string; why: string }[];
 };
 
 type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
@@ -170,7 +173,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll, staleCopies }: Props) {
   /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
   const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
@@ -590,7 +593,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const out = useMemo(() => (res ? withAnnotations(res, ann) : null), [res, ann]);
   /** stav kót a poznámek vůči aktuální geometrii (ztracená hrana / kružnice, pohled mimo list) */
   const annState = useMemo(() => (res ? annotationStatus(res, ann) : {}), [res, ann]);
-  const flagged = ann.filter((a) => (annState[a.id] ?? "ok") !== "ok").length;
+  /** ruční kóty přichycené ke změněné geometrii (jiná hodnota, než uživatel zadal – vlna 22, bod 20): ⚠ s potvrzením kliknutím */
+  const annMoved = useMemo(() => new Map(res ? userDimAttach(res.views, ann).filter((x) => x.state === "moved").map((x) => [x.ann.id, x] as const) : []), [res, ann]);
+  const flagged = ann.filter((a) => (annState[a.id] ?? "ok") !== "ok" || annMoved.has(a.id)).length;
   /** kóty, jejichž hrana / kružnice v pohledu není – na obrazovce se zvýrazní oranžově (do exportu se zvýraznění nepromítá) */
   const lostGeom = useMemo(() => {
     const lost = ann.filter((a) => annState[a.id] === "lost");
@@ -624,13 +629,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const exportedIds = () => (exportAll ? sheets.map((x) => x.id) : [saved?.id ?? ""]).filter(Boolean);
   /** záznam exportu do dokumentu (revize modelu, čas) – vlna 22, bod 20 */
   const noteExport = (format: DrawingExportFormat, file: string) => {
-    const revStale = !!mid && (exportAll ? sheets : saved ? [saved] : []).some((x) => x.issued && x.issued.sig !== mid.sig);
+    const revStale = !!mid && (exportAll ? sheets : saved ? [saved] : []).some((x) => x.issued && !sameModel(x.issued, mid));
     onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}), ...(revStale ? { revStale } : {}) });
   };
   /** vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → upozornění u exportu */
   const staleNote = () => {
     if (!mid) return "";
-    const st = (exportAll ? sheets : saved ? [saved] : []).filter((x) => x.issued && x.issued.sig !== mid.sig);
+    const st = (exportAll ? sheets : saved ? [saved] : []).filter((x) => x.issued && !sameModel(x.issued, mid));
     return st.length ? ` · ⚠ ${staleExportText(st[0].name, st[0].issued!, mid)}` : "";
   };
   /** hotové listy aktivního výkresu (aktivní list s rozpracovanými změnami) */
@@ -1193,6 +1198,17 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       </div>
       {/* vydaný list ze starší revize modelu (vlna 22, bod 20) */}
       <StaleSheetBanner doc={doc} sheet={saved} mid={mid} onIssue={onDrawingsChange ? issueNow : undefined} onRecompute={onRecomputeAll} />
+      {/* list sestavy z kopie dílu starší než díl v záložce (22g, kolo 3) – kusovník a razítko ukazují údaje z vložení */}
+      {staleCopies?.length ? (
+        <div data-drawing-stale-copy={staleCopies.length} className="border-b border-[#f0c36d] bg-[#fff8e6] px-3 py-1.5 text-[11.5px] leading-snug text-[#7a5300]">
+          ⚠ {tr("Kusovník listu ukazuje údaje z vložení – kopie dílů je starší než díl v záložce ({0}): {1}", staleCopies.length, staleCopies.map((c) => c.name).join(", "))}
+          {onRecomputeAll ? (
+            <button type="button" data-drawing-stale-copy-refresh className="ml-2 rounded border border-[#e0b050] bg-white px-2 py-0.5 text-[11px] hover:bg-[#fff1cc]" title={staleCopies.map((c) => c.why).join("\n")} onClick={onRecomputeAll}>
+              {tr("Přepočítat vše")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         {/* nastavení */}
@@ -1276,6 +1292,20 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   <li key={a.id} data-ann-row={a.id} data-ann-selected={bsel.sel.includes(a.id) ? "1" : undefined} className={cn("flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100", bsel.sel.includes(a.id) && "bg-blue-50 ring-1 ring-blue-300")}>
                     <span className="w-16 shrink-0 cursor-pointer text-ink-700/50" onClick={(e) => bsel.rowClick(a.id, e)} title={tr("Vybrat (Ctrl+klik přidá)")}>{tr(ANN_LABEL[a.type])}</span>
                     <span className="min-w-0 flex-1 cursor-pointer truncate" onClick={(e) => bsel.rowClick(a.id, e)}>{a.type === "dim" ? `${dimSymbol(a)} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.type === "callout" ? a.lines.join(" · ") : a.type === "centerline" ? tr("osa souměrnosti") : a.label}</span>
+                    {(annState[a.id] ?? "ok") === "ok" && annMoved.has(a.id) && res && (
+                      <button
+                        type="button"
+                        data-ann-flag="moved"
+                        className="shrink-0 cursor-pointer text-amber-600"
+                        title={tr("Kóta se po změně modelu přichytila ke změněné geometrii: zadáno {0}, na listu {1}. Kliknutím ji potvrdíte (uloží se nynější geometrie).", dimLabel(annMoved.get(a.id)!.ann, annMoved.get(a.id)!.was), dimLabel(annMoved.get(a.id)!.ann, annMoved.get(a.id)!.now))}
+                        onClick={() => {
+                          setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? settleDim(res.views, x) : x)));
+                          markDirty();
+                        }}
+                      >
+                        ⚠
+                      </button>
+                    )}
                     {(annState[a.id] ?? "ok") !== "ok" && (
                       <span data-ann-flag={annState[a.id]} className="shrink-0 cursor-help text-amber-600" title={annState[a.id] === "noView" ? (a.type === "dim" ? tr("Pohled kóty není na listu – kóta se nekreslí.") : tr("Pohled, ke kterému se poznámka váže, není na listu.")) : tr("Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.")}>
                         ⚠
