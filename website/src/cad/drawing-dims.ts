@@ -25,6 +25,7 @@ import { holeDrillD, holeHeadOf, holeKindOf, holeTip } from "./hole-spec";
 import { expectedDims } from "./dim-check";
 import { primHoles } from "./drawing-prim";
 import { placementOf } from "./placements";
+import { threadsOfFeatures, type ThreadView } from "./thread-spec";
 import { cadLocale, tr } from "./i18n";
 import { uid, type CadDoc, type DrawingAnnotation, type Feature, type SketchPlane, type Vec2, type Vec3 } from "./types";
 
@@ -567,8 +568,9 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
 
   // závity (vnější) na této ose
   // poloha a osa i odkazem / libovolným směrem (placements.ts – vyřešené stavbou)
-  const thrPl = (f: Extract<Feature, { type: "thread" }>) => placementOf(f) ?? { position: f.position, dir: AXV[f.axis] ?? [0, 0, 1] };
-  const threads = c.doc.features.filter((f): f is Extract<Feature, { type: "thread" }> => f.type === "thread" && !f.suppressed && !f.internal && Math.abs(Math.abs(dot(thrPl(f).dir, ax.dir)) - 1) < 1e-6 && onAxis(ax, thrPl(f).position).rad < 1e-3);
+  // prvek Závit i Tažení po šroubovici s katalogovým označením (thread=M18×1,5) – jeden pohled na závit (thread-spec.ts, 22d)
+  const thrPl = (f: ThreadView) => placementOf(f) ?? { position: f.position, dir: AXV[f.axis ?? "Z"] ?? [0, 0, 1] };
+  const threads = threadsOfFeatures(c.doc.features).filter((f) => !f.internal && Math.abs(Math.abs(dot(thrPl(f).dir, ax.dir)) - 1) < 1e-6 && onAxis(ax, thrPl(f).position).rad < 1e-3);
 
   // --- průměry: válce seřazené podél osy, přístupné z konce (všechno za nimi je menší) → naskládat na tu stranu
   const cylSegs = segs.filter((s) => s.cyl).sort((a, b) => a.t0 - b.t0);
@@ -588,7 +590,7 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
     else if (clearHi) stacks.hi.push({ s, i });
     else interior.push({ s, i });
   });
-  const diaLabel = (s: Seg1): { prefix: string; suffix?: string; what: string; thread?: Extract<Feature, { type: "thread" }> } => {
+  const diaLabel = (s: Seg1): { prefix: string; suffix?: string; what: string; thread?: ThreadView } => {
     const th = threads.find((f) => {
       const t = threadByName(f.designation);
       return t && Math.abs(t.d / 2 - s.r) < 0.02;
