@@ -1,0 +1,26 @@
+# Vlna 22, fáze 2, kolo 4 (track a, bod 20): ztracená hrana / vrchol vazby – nový výběr v aplikaci jedním tlačítkem (seznam hran / vrcholů dílu)
+— hrana ({0}) —	— edge ({0}) —
+— vrchol ({0}) —	— vertex ({0}) —
+{0}: hrana {1} dílu „{2}“ – {3}	{0}: edge {1} of part “{2}” – {3}
+{0}: vrchol {1} dílu „{2}“ – {3}	{0}: vertex {1} of part “{2}” – {3}
+Hrana vazby vybrána znovu (E{0}) – vazba se zase řeší.	Mate edge picked again (E{0}) – the mate is solved again.
+Hranu / vrchol se nepodařilo načíst.	The edge / vertex could not be loaded.
+Klikněte na hranu komponenty „{0}“ (nebo ji vyberte ze seznamu hran) – nahradí ztracenou hranu vazby.	Click an edge of component “{0}” (or pick it from the edge list) – it replaces the lost edge of the mate.
+Klikněte na hranu v modelu, nebo ji vyberte ze seznamu (souřadnice dílu):	Click an edge in the model, or pick it from the list (part coordinates):
+Klikněte na vrchol komponenty „{0}“ (nebo ho vyberte ze seznamu vrcholů) – nahradí ztracený vrchol vazby.	Click a vertex of component “{0}” (or pick it from the vertex list) – it replaces the lost vertex of the mate.
+Klikněte na vrchol v modelu, nebo ho vyberte ze seznamu (souřadnice dílu):	Click a vertex in the model, or pick it from the list (part coordinates):
+načítám hrany…	loading edges…
+načítám vrcholy…	loading vertices…
+není jednoznačný	is ambiguous
+Nová hrana vazby – komponenta „{0}“	New mate edge – component “{0}”
+Nový vrchol vazby – komponenta „{0}“	New mate vertex – component “{0}”
+Vrchol vazby vybrán znovu (V{0}) – vazba se zase řeší.	Mate vertex picked again (V{0}) – the mate is solved again.
+Vyberte hranu / vrchol dílu „{0}“ – na tento díl vazba ukazovala.	Pick an edge / vertex of part “{0}” – the mate referred to this part.
+vyberte hranu znovu (sestava vazba {0} plocha {1} E…), nebo vazbu smažte (sestava vazba {0} smazat)	pick the edge again (assembly mate {0} face {1} E…), or delete the mate (assembly mate {0} delete)
+vyberte vrchol znovu (sestava vazba {0} plocha {1} V…), nebo vazbu smažte (sestava vazba {0} smazat)	pick the vertex again (assembly mate {0} face {1} V…), or delete the mate (assembly mate {0} delete)
+Vybírám hranu…	Picking an edge…
+Vybírám vrchol…	Picking a vertex…
+Vybrat hranu znovu	Pick edge again
+Vybrat vrchol znovu	Pick vertex again
+Ztracená reference byl vrchol – vyberte vrchol.	The lost reference was a vertex – pick a vertex.
+Ztracená reference byla hrana – vyberte hranu.	The lost reference was an edge – pick an edge.

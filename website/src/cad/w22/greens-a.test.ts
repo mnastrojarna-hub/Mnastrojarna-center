@@ -404,4 +404,19 @@ describe("vlna 22 fáze 2 kolo 3 (body 12, 22h): „odpovídá modelu“, „kon
     const ok = recordExport(d, { what: "model", format: "step", file: "c.step", job: { state: "done", ms: 400, check: { ok: true, text: "věrná kopie" } } });
     expect(exportLine(ok.doc, ok.rec)).toMatch(/úloha: dokončeno ⏱ 0,4 s · kontrola ✓/);
   });
+
+  it("17. (kolo 4) Ctrl+Z hned po exportu: seznam výstupů nesmí být „čistý“ – záznam zůstane a k vrácenému modelu je ZASTARALÝ", async () => {
+    setLang("cs");
+    const { undoKeepOutputs, recordOutsideHistory } = await import("../history-outputs");
+    const { staleExports, exportsText } = await import("../doc-outputs");
+    const before = part(10);
+    const exported = part(12);
+    let h = { past: [before], present: exported, future: [] as CadDoc[] };
+    h = recordOutsideHistory(h, (d) => recordExport(d, { what: "model", format: "step", file: "Deska A.step", from: exported }).doc);
+    const u = undoKeepOutputs(h);
+    const text = exportsText(u.present);
+    expect(text).not.toMatch(/žádné|odpovídá modelu/);
+    expect(text).toMatch(/Deska A\.step[^\n]*ZASTARALÝ/);
+    expect(staleExports(u.present).length).toBe(1);
+  });
 });

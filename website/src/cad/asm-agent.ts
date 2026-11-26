@@ -43,6 +43,7 @@ import {
   findComp,
   findMate,
   fmt,
+  lostPrintText,
   materialId,
   mateLines,
   mateLostArgs,
@@ -254,6 +255,20 @@ export async function compFaces(doc: CadDoc, compId: string, env: AsmEnv): Promi
     }
   }
   return { rows, truncated, failed };
+}
+
+/** hrana / vrchol dílu ve výběru GUI (oprava ztracené reference vazby – vlna 22, bod 20); popis v souřadnicích dílu jako otisk */
+export type CompEntRow = { leafId: string; index: number; ent: "edge" | "vertex"; ref: string; text: string };
+/**
+ * Hrany / vrcholy listového dílu `leaf` (id listu = `MateRef.leaf ?? compId`) pro nový výběr ztracené reference hrany / vrcholu
+ * v aplikaci (mate-repick.tsx) – stejné entity, jaké přijme text `sestava vazba N plocha a E3` (jen týž díl jako původní reference).
+ */
+export async function compEnts(doc: CadDoc, leaf: string, ent: "edge" | "vertex", env: AsmEnv): Promise<CompEntRow[]> {
+  const l = flattenAssembly(doc).find((x) => leafId(x) === leaf);
+  if (!l) return [];
+  const built = await ensureBuilt(env, [l]);
+  const tag = ent === "edge" ? "E" : "V";
+  return (await entList(env, l.key, built.get(l.key), ent)).map((c) => ({ leafId: leaf, index: c.index, ent, ref: `${tag}${c.index + 1}`, text: `${tag}${c.index + 1} · ${lostPrintText({ ...entPrint(c.info), why: "none" })}` }));
 }
 
 /* ───────────────────────── reference vazeb po změně dílu (vlna 22, bod 20) ───────────────────────── */

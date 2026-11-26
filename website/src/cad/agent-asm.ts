@@ -1242,7 +1242,15 @@ function leafNames(doc: CadDoc, path: string[]): string {
 export function mateLostArgs(doc: CadDoc, m: Mate): [string, string, string] {
   const no = (doc.mates ?? []).indexOf(m) + 1;
   const side = (["a", "b", "c", "d"] as const).find((k) => m[k]?.lost) ?? "a";
-  return [`${no} ${mateText(doc, m)}`, lostRefsText(doc, m), tr("vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)];
+  // ztracená hrana / vrchol: oprava číslem téže entity (E… / V…) – v aplikaci „Vybrat hranu / vrchol znovu“ v seznamu vazeb
+  const ent = m[side]?.ent;
+  const fix =
+    ent === "edge"
+      ? tr("vyberte hranu znovu (sestava vazba {0} plocha {1} E…), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)
+      : ent === "vertex"
+        ? tr("vyberte vrchol znovu (sestava vazba {0} plocha {1} V…), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)
+        : tr("vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)", no, side);
+  return [`${no} ${mateText(doc, m)}`, lostRefsText(doc, m), fix];
 }
 
 /** Souhrn vazeb: „3 (2 ok, 1 konflikt)“. */

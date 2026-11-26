@@ -407,9 +407,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
+    // krok Zpět jen za změnu uživatele; uložení nezměněného listu a samotné sloučení Chytrých kót po výpočtu listu (odvozená
+    // data, ne úprava) se zapíšou bez kroku – jinak by Ctrl+Z hned po „+ Výkres“ vrátil jen sloučení kót, ne nový výkres
+    const record = dirty.current && !autoOnly.current;
     dirty.current = false;
+    autoOnly.current = false;
     unregister();
-    return emit(next);
+    return emit(next, record);
   };
   const persistRef = useRef(persistNow);
   persistRef.current = persistNow;
@@ -430,7 +434,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ann, opts, meta, sheetName]);
-  const markDirty = () => {
+  /** rozepsaná změna je jen odvozená (sloučení Chytrých kót po výpočtu listu) – žádná úprava uživatele */
+  const autoOnly = useRef(false);
+  const markDirty = (auto = false) => {
+    if (!auto) autoOnly.current = false;
+    else if (!dirty.current) autoOnly.current = true;
     dirty.current = true;
     dirtyKey.current ??= docKeyRef.current ?? null;
     // bariéra: rozepsaný list se zapíše dřív, než se přepne záložka / uloží / exportuje (zápis do `dirtyKey`, nikdy jinam)
@@ -573,11 +581,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       if (!m) return;
       setAnn(m.annotations);
       setOpts((o) => ({ ...o, smartGen: m.gen }));
-      markDirty();
+      markDirty(true);
     } else if (opts.dimensions !== "smart" && ann.some((a) => a.auto)) {
       setAnn((l) => l.filter((a) => !a.auto));
       setOpts((o) => ({ ...o, smartGen: undefined, smartOff: undefined }));
-      markDirty();
+      markDirty(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res]);

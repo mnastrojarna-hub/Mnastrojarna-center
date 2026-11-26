@@ -1,0 +1,26 @@
+# Vlna 22, fáze 2, kolo 4 (track a, bod 20): ztracená hrana / vrchol vazby – nový výběr v aplikaci jedním tlačítkem (seznam hran / vrcholů dílu)
+— hrana ({0}) —	— Kante ({0}) —
+— vrchol ({0}) —	— Eckpunkt ({0}) —
+{0}: hrana {1} dílu „{2}“ – {3}	{0}: Kante {1} des Teils „{2}“ – {3}
+{0}: vrchol {1} dílu „{2}“ – {3}	{0}: Eckpunkt {1} des Teils „{2}“ – {3}
+Hrana vazby vybrána znovu (E{0}) – vazba se zase řeší.	Kante der Verknüpfung neu gewählt (E{0}) – die Verknüpfung wird wieder gelöst.
+Hranu / vrchol se nepodařilo načíst.	Die Kante / der Eckpunkt konnte nicht geladen werden.
+Klikněte na hranu komponenty „{0}“ (nebo ji vyberte ze seznamu hran) – nahradí ztracenou hranu vazby.	Klicken Sie auf eine Kante der Komponente „{0}“ (oder wählen Sie sie aus der Kantenliste) – sie ersetzt die verlorene Kante der Verknüpfung.
+Klikněte na hranu v modelu, nebo ji vyberte ze seznamu (souřadnice dílu):	Klicken Sie auf eine Kante im Modell oder wählen Sie sie aus der Liste (Teilekoordinaten):
+Klikněte na vrchol komponenty „{0}“ (nebo ho vyberte ze seznamu vrcholů) – nahradí ztracený vrchol vazby.	Klicken Sie auf einen Eckpunkt der Komponente „{0}“ (oder wählen Sie ihn aus der Eckpunktliste) – er ersetzt den verlorenen Eckpunkt der Verknüpfung.
+Klikněte na vrchol v modelu, nebo ho vyberte ze seznamu (souřadnice dílu):	Klicken Sie auf einen Eckpunkt im Modell oder wählen Sie ihn aus der Liste (Teilekoordinaten):
+načítám hrany…	Kanten werden geladen…
+načítám vrcholy…	Eckpunkte werden geladen…
+není jednoznačný	ist nicht eindeutig
+Nová hrana vazby – komponenta „{0}“	Neue Kante der Verknüpfung – Komponente „{0}“
+Nový vrchol vazby – komponenta „{0}“	Neuer Eckpunkt der Verknüpfung – Komponente „{0}“
+Vrchol vazby vybrán znovu (V{0}) – vazba se zase řeší.	Eckpunkt der Verknüpfung neu gewählt (V{0}) – die Verknüpfung wird wieder gelöst.
+Vyberte hranu / vrchol dílu „{0}“ – na tento díl vazba ukazovala.	Wählen Sie eine Kante / einen Eckpunkt des Teils „{0}“ – die Verknüpfung verwies auf dieses Teil.
+vyberte hranu znovu (sestava vazba {0} plocha {1} E…), nebo vazbu smažte (sestava vazba {0} smazat)	Kante neu wählen (baugruppe verknüpfung {0} fläche {1} E…) oder Verknüpfung löschen (baugruppe verknüpfung {0} löschen)
+vyberte vrchol znovu (sestava vazba {0} plocha {1} V…), nebo vazbu smažte (sestava vazba {0} smazat)	Eckpunkt neu wählen (baugruppe verknüpfung {0} fläche {1} V…) oder Verknüpfung löschen (baugruppe verknüpfung {0} löschen)
+Vybírám hranu…	Kante wird gewählt…
+Vybírám vrchol…	Eckpunkt wird gewählt…
+Vybrat hranu znovu	Kante neu wählen
+Vybrat vrchol znovu	Eckpunkt neu wählen
+Ztracená reference byl vrchol – vyberte vrchol.	Die verlorene Referenz war ein Eckpunkt – wählen Sie einen Eckpunkt.
+Ztracená reference byla hrana – vyberte hranu.	Die verlorene Referenz war eine Kante – wählen Sie eine Kante.

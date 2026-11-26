@@ -1126,15 +1126,18 @@ export function paramStatusLines(doc: CadDoc): string[] {
 
 /* ───────────────────────── zpět / znovu ───────────────────────── */
 export type Hist<T> = { past: T[]; present: T; future: T[] };
-/** N kroků historie zpět / znovu (stejně jako Ctrl+Z / Ctrl+Y); `moved` = kolik kroků se skutečně provedlo */
-export function histStep<T>(h: Hist<T>, dir: "undo" | "redo", n: number): { hist: Hist<T>; moved: number } {
+/**
+ * N kroků historie zpět / znovu (stejně jako Ctrl+Z / Ctrl+Y); `moved` = kolik kroků se skutečně provedlo. `carry` = co krok Zpět
+ * přenese ze současného stavu do cílového (záznamy exportů – cad/history-outputs.ts `carryOutputs`, jako Ctrl+Z v aplikaci)
+ */
+export function histStep<T>(h: Hist<T>, dir: "undo" | "redo", n: number, carry?: (target: T, from: T) => T): { hist: Hist<T>; moved: number } {
   let { past, present, future } = h;
   let moved = 0;
   for (; moved < n; moved++) {
     if (dir === "undo") {
       if (!past.length) break;
       future = [present, ...future];
-      present = past[past.length - 1];
+      present = carry ? carry(past[past.length - 1], present) : past[past.length - 1];
       past = past.slice(0, -1);
     } else {
       if (!future.length) break;

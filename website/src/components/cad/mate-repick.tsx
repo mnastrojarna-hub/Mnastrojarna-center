@@ -5,9 +5,14 @@
  * ukazovala, zmizet nebo být nejednoznačná (cad/mate-remap.ts). Vazba je pak mimo řešení a v seznamu vazeb červeně; tlačítko
  * „Vybrat plochu znovu“ zapne výběr: klik na plochu komponenty v modelu (i v softwarovém zobrazení bez WebGL), nebo výběr ze
  * seznamu ploch komponenty (`data-repick-face`). Totéž textem: `sestava vazba N plocha b F6`.
+ * Ztracená HRANA / VRCHOL (fáze 2, kolo 4): „Vybrat hranu znovu“ / „Vybrat vrchol znovu“ – klik na hranu / vrchol téhož dílu
+ * v modelu, nebo výběr ze seznamu hran / vrcholů dílu (`data-repick-ent`, popis jako otisk ztracené reference) = text
+ * `sestava vazba N plocha a E3`.
  */
 import { useEffect, useState } from "react";
 import { faceShort, type CompFaceRow } from "@/cad/agent-asm";
+import type { CompEntRow } from "@/cad/asm-agent";
+import { entKey } from "@/cad/mate-geo";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
 import { tr } from "@/cad/i18n";
 import type { CadDoc, MateRef } from "@/cad/types";
@@ -20,6 +25,10 @@ export function useMateRepick(o: {
   leaves: Leaf[];
   faceInfo: (key: string, face: number) => Promise<MateFaceInfo | null>;
   faceRows: (compId: string) => Promise<CompFaceRow[]>;
+  /** hrany / vrcholy listového dílu (ztracená reference hrany / vrcholu) */
+  entRows: (leaf: string, ent: "edge" | "vertex") => Promise<CompEntRow[]>;
+  /** geometrie hrany / vrcholu dílu (`klíč dílu`, index) */
+  entInfo: (key: string, index: number, ent: "edge" | "vertex") => Promise<MateFaceInfo | null>;
   /** geometrie ploch vazeb (mezipaměť aplikace, `klíč:index`) */
   geo: Map<string, MateFaceInfo>;
   /** zapíše opravenou sestavu a přepočítá vazby */
@@ -28,8 +37,11 @@ export function useMateRepick(o: {
 }) {
   const [active, setActive] = useState<{ mate: string; side: Side } | null>(null);
   const [rows, setRows] = useState<CompFaceRow[] | null>(null);
+  const [ents, setEnts] = useState<CompEntRow[] | null>(null);
   const mate = active ? o.doc.mates?.find((m) => m.id === active.mate) : undefined;
   const old: MateRef | undefined = active && mate ? mate[active.side] : undefined;
+  /** co se vybírá: plocha, nebo (ztracená hrana / vrchol) táž entita jako původní reference */
+  const want: "face" | "edge" | "vertex" = old?.ent ?? "face";
   const compName = (id?: string) => o.doc.components?.find((c) => c.id === id)?.name ?? "?";
   // vazba zmizela (smazána, krok zpět, jiná záložka) → výběr končí
   useEffect(() => {
@@ -39,7 +51,9 @@ export function useMateRepick(o: {
   useEffect(() => {
     let live = true;
     setRows(null);
-    if (old) void o.faceRows(old.compId).then((r) => live && setRows(r)).catch(() => live && setRows([]));
+    setEnts(null);
+    if (old?.ent) void o.entRows(old.leaf ?? old.compId, old.ent).then((r) => live && setEnts(r)).catch(() => live && setEnts([]));
+    else if (old) void o.faceRows(old.compId).then((r) => live && setRows(r)).catch(() => live && setRows([]));
     return () => {
       live = false;
     };
@@ -51,11 +65,35 @@ export function useMateRepick(o: {
     const m = o.doc.mates?.find((x) => x.id === mateId);
     if (!m?.[side]) return;
     setActive({ mate: mateId, side });
-    o.flash(tr("Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.", compName(m[side]!.compId)));
+    const ent = m[side]!.ent;
+    o.flash(
+      ent === "edge"
+        ? tr("Klikněte na hranu komponenty „{0}“ (nebo ji vyberte ze seznamu hran) – nahradí ztracenou hranu vazby.", compName(m[side]!.compId))
+        : ent === "vertex"
+          ? tr("Klikněte na vrchol komponenty „{0}“ (nebo ho vyberte ze seznamu vrcholů) – nahradí ztracený vrchol vazby.", compName(m[side]!.compId))
+          : tr("Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.", compName(m[side]!.compId)),
+    );
+  };
+  /** nová hrana / vrchol strany vazby: jen týž díl jako původní reference (jako text `sestava vazba N plocha a E3`) */
+  const chooseEnt = async (leafId: string, index: number, ent: "edge" | "vertex") => {
+    if (!active || !mate || !old?.ent || index < 0) return;
+    if (ent !== old.ent) return o.flash(old.ent === "edge" ? tr("Ztracená reference byla hrana – vyberte hranu.") : tr("Ztracená reference byl vrchol – vyberte vrchol."));
+    const leaf = o.leaves.find((l) => l.id === leafId);
+    if (!leaf) return;
+    if (leaf.id !== (old.leaf ?? old.compId)) return o.flash(tr("Vyberte hranu / vrchol dílu „{0}“ – na tento díl vazba ukazovala.", compName(old.compId)));
+    const info = await o.entInfo(leaf.key, index, ent).catch(() => null);
+    if (!info) return o.flash(tr("Hranu / vrchol se nepodařilo načíst."));
+    o.geo.set(entKey(leaf.key, { face: index, ent }), info);
+    const ref: MateRef = { compId: leaf.topId, ...(leaf.id !== leaf.topId ? { leaf: leaf.id } : {}), face: index, ent };
+    const next: CadDoc = { ...o.doc, mates: (o.doc.mates ?? []).map((m) => (m.id === mate.id ? { ...m, [active.side]: ref } : m)) };
+    setActive(null);
+    o.apply(next);
+    o.flash(ent === "edge" ? tr("Hrana vazby vybrána znovu (E{0}) – vazba se zase řeší.", index + 1) : tr("Vrchol vazby vybrán znovu (V{0}) – vazba se zase řeší.", index + 1));
   };
   /** nová plocha strany vazby: `leafId` = list (díl), `face` = index plochy v dílu */
   const choose = async (leafId: string, face: number) => {
     if (!active || !mate || !old || face < 0) return;
+    if (old.ent) return o.flash(old.ent === "edge" ? tr("Ztracená reference byla hrana – vyberte hranu.") : tr("Ztracená reference byl vrchol – vyberte vrchol."));
     const leaf = o.leaves.find((l) => l.id === leafId);
     if (!leaf) return;
     if (leaf.topId !== old.compId) return o.flash(tr("Vyberte plochu komponenty „{0}“ – tuto komponentu vazba spojuje.", compName(old.compId)));
@@ -72,7 +110,29 @@ export function useMateRepick(o: {
   const panel =
     active && old ? (
       <div data-repick-panel={active.mate} className="mx-2 mb-2 rounded border border-[#f3c4c0] bg-[#fef3f2] p-2 text-[11.5px] leading-snug text-[#912018]">
-        <p className="mb-1 font-semibold">{tr("Nová plocha vazby – komponenta „{0}“", compName(old.compId))}</p>
+        <p className="mb-1 font-semibold">{want === "edge" ? tr("Nová hrana vazby – komponenta „{0}“", compName(old.compId)) : want === "vertex" ? tr("Nový vrchol vazby – komponenta „{0}“", compName(old.compId)) : tr("Nová plocha vazby – komponenta „{0}“", compName(old.compId))}</p>
+        {old.ent ? (
+          <>
+            <p className="mb-1.5">{want === "edge" ? tr("Klikněte na hranu v modelu, nebo ji vyberte ze seznamu (souřadnice dílu):") : tr("Klikněte na vrchol v modelu, nebo ho vyberte ze seznamu (souřadnice dílu):")}</p>
+            <select
+              data-repick-ent={want}
+              className="mb-1.5 w-full rounded border border-[#d5dbe2] bg-white px-1 py-0.5 text-[11.5px] text-[#1f2933]"
+              value=""
+              onChange={(e) => {
+                const [leafId, i] = e.target.value.split("|");
+                if (leafId) void chooseEnt(leafId, Number(i), want as "edge" | "vertex");
+              }}
+            >
+              <option value="">{ents ? (want === "edge" ? tr("— hrana ({0}) —", ents.length) : tr("— vrchol ({0}) —", ents.length)) : want === "edge" ? tr("načítám hrany…") : tr("načítám vrcholy…")}</option>
+              {(ents ?? []).map((r) => (
+                <option key={`${r.leafId}|${r.index}`} value={`${r.leafId}|${r.index}`}>
+                  {r.text}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <>
         <p className="mb-1.5">{tr("Klikněte na plochu v modelu, nebo ji vyberte ze seznamu:")}</p>
         <select
           data-repick-face
@@ -92,10 +152,12 @@ export function useMateRepick(o: {
               </option>
             ))}
         </select>
+          </>
+        )}
         <button type="button" data-repick-cancel onClick={() => setActive(null)} className="rounded border border-[#d5dbe2] bg-white px-2 py-0.5 text-[11px] text-[#4a5664] hover:bg-[#f3f6f9]">
           {tr("Zrušit výběr")}
         </button>
       </div>
     ) : null;
-  return { active, start, choose, cancel: () => setActive(null), panel };
+  return { active, want: active ? want : null, start, choose, chooseEnt, cancel: () => setActive(null), panel };
 }

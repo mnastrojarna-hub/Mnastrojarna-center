@@ -306,7 +306,41 @@ async function menuExport(b, tag) {
   ok(!!chg.rec && chg.rec.job && chg.rec.job.state === 'done' && typeof chg.rec.job.ms === 'number' && /ZASTARALÝ/.test(recLine) && !/odpovídá modelu/.test(recLine), `${tag}22h: model změněn během exportu → záznam zastaralý, ne „odpovídá modelu“ (${recLine}; undo ${JSON.stringify(undone)})`);
   ok(!chg.bar && /model se během exportu změnil/.test(chg.text), `${tag}22h: bez lišty ✓ kontroly nad změněným modelem, hláška o změně během exportu`);
   await p.screenshot({ path: S + 'a3-exports.png' });
+  await undoAfterExport(p, tag);
   await ctx.close();
+}
+
+/**
+ * Kolo 4 (fáze 2): Ctrl+Z HNED PO dokončeném exportu z menu nesmí smazat záznam exportu – soubor na disku existuje. Dřív se záznam
+ * zapsal jen do současného stavu historie a Zpět vrátil stav bez něj: seznam Exporty / čip „Zastaralé výstupy“ zmizel (falešně
+ * čisto). Teď: záznam zůstane, k vrácenému modelu je ZASTARALÝ (čip ⚠ 1); Ctrl+Y = zase „odpovídá modelu“ (cad/history-outputs.ts).
+ */
+async function undoAfterExport(p, tag) {
+  await p.evaluate(() => window.mncad.run('nový díl "Deska U"\nkvádr 60 40 10'));
+  await p.evaluate(() => window.mncad.run('upravit "Kvádr 1" size=50;40;10'));
+  await p.evaluate(() => window.mncad.idle());
+  const nDone = await p.locator('[data-export-job][data-export-state="done"]').count();
+  await p.getByRole('button', { name: 'Soubor', exact: true }).click();
+  await p.getByRole('button', { name: /STEP/ }).first().click();
+  await p.waitForFunction((n) => document.querySelectorAll('[data-export-job][data-export-state="done"]').length > n, nDone, { timeout: 300000 });
+  await p.waitForFunction(() => (window.mncad.getDocument().outputs || []).some((r) => /Deska.U/.test(r.file)), null, { timeout: 30000 });
+  const rec = await p.evaluate(() => (window.mncad.getDocument().outputs || []).filter((r) => /Deska.U/.test(r.file)).slice(-1)[0]);
+  const size0 = await p.evaluate(() => JSON.stringify(window.mncad.getDocument().features[0].size));
+  await p.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+  await p.keyboard.press('Control+z');
+  await p.waitForFunction((s) => JSON.stringify(window.mncad.getDocument().features[0]?.size) !== s, size0, { timeout: 30000 }).catch(() => {});
+  await p.waitForTimeout(600);
+  const u = await p.evaluate((id) => ({ size: JSON.stringify(window.mncad.getDocument().features[0]?.size), has: (window.mncad.getDocument().outputs || []).some((r) => r.id === id), chip: document.querySelector('[data-outputs-chip]')?.getAttribute('data-outputs-chip') ?? null }), rec.id);
+  const list = await p.evaluate(() => window.mncad.run('exporty'));
+  const line = (list.split('\n').find((l) => l.includes(rec.file)) || '').trim();
+  ok(u.size !== size0 && u.has && /ZASTARALÝ/.test(line) && !/odpovídá modelu/.test(line), `${tag}kolo 4: Ctrl+Z hned po exportu – model vrácen (${size0} → ${u.size}), záznam „${rec.file}“ zůstal a je ZASTARALÝ (${line})`);
+  ok(u.chip !== null && Number(u.chip) >= 1, `${tag}kolo 4: čip Zastaralé výstupy po Ctrl+Z ukazuje soubor (data-outputs-chip=${u.chip}), ne „čisto“`);
+  await p.keyboard.press('Control+y');
+  await p.waitForFunction((s) => JSON.stringify(window.mncad.getDocument().features[0]?.size) === s, size0, { timeout: 30000 }).catch(() => {});
+  await p.waitForTimeout(600);
+  const list2 = await p.evaluate(() => window.mncad.run('exporty'));
+  const line2 = (list2.split('\n').find((l) => l.includes(rec.file)) || '').trim();
+  ok(/odpovídá modelu/.test(line2), `${tag}kolo 4: Ctrl+Y vrátí model exportu – záznam zase „odpovídá modelu“ (${line2})`);
 }
 
 const browsers = [];
