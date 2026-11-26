@@ -181,6 +181,14 @@ describe("razítko a metadata souborů nesou revizi modelu", () => {
     expect(/^[\x00-\x7f]*$/.test(dxf.split("\n")[1])).toBe(true);
     expect(dxfWithRevs("0\nSECTION\n", {})).toBe("0\nSECTION\n");
   });
+  it("kolo 3: DWG export listu nese revizi modelu a písmeno revize ve vlastnostech souboru (dřív jen patička)", async () => {
+    const { drawingFile } = await import("./drawing-export");
+    const { DwgReader } = await import("@node-projects/acad-ts");
+    const out = { sheet: { name: "A4", w: 297, h: 210 }, polys: [{ pts: [[10, 10], [100, 10]], layer: "visible" }], texts: [{ x: 20, y: 20, s: "Deska A", size: 5 }] } as unknown as Parameters<typeof drawingFile>[0];
+    const f = await drawingFile(out, "dwg", { base: "Deska_A", title: "Deska A", modelRev: "r·a1b2c3", rev: "B" });
+    const si = DwgReader.readFromStream(f.data.buffer.slice(f.data.byteOffset, f.data.byteOffset + f.data.byteLength) as ArrayBuffer).summaryInfo!;
+    expect([si.title, si.subject, si.keywords, si.revisionNumber]).toEqual(["Deska A", "Model r·a1b2c3 · rev. B", "model=r·a1b2c3 rev=B", "B"]);
+  });
 });
 
 describe("textové příkazy (CS / EN / DE)", () => {

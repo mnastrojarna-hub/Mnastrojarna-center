@@ -61,8 +61,8 @@ describe("bod 22g – metadata dílu po vložení do sestavy", () => {
     const st = codes(r, "asm.stale-copy");
     expect(st.map((e) => [e.line, e.level])).toEqual([[2, "warn"], [4, "warn"]]);
     // díl vložený v dřívějším běhu (konzole, --resume): sestava jmenovaná, rada = jedna funkce obnovy
-    expect(st[0].text).toBe('díl „Deska A“ je v sestavě „Nástroj“ jako kopie – změna (materiál) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Deska A"');
-    expect(st[1].text).toBe("komponenta „Deska A“ je starší než díl „Deska A“ v záložce (materiál) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1");
+    expect(st[0].text).toBe('díl „Deska A“ je v sestavě „Nástroj“ jako kopie – v sestavě: sestava obnovit "Deska A"; změna (materiál) se do sestavy sama nepromítne');
+    expect(st[1].text).toBe("komponenta „Deska A“ je starší než díl „Deska A“ v záložce (materiál) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení");
     // kusovník ukazuje kopii z vložení – ale označeně (— (třída Ocel)) a s ⚠, ne tiché „Ocel“
     expect(text(r)).toMatch(/1 \| Deska A \|  \| 1 \| — \(třída Ocel\) \|/);
     expect(codes(r, "bom.make-incomplete").map((e) => e.text)).toContain("vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu");
@@ -99,7 +99,7 @@ describe("bod 22g – metadata dílu po vložení do sestavy", () => {
     const r = await run(ws, 'sestava obnovit "Přidržovač" údaje\nkusovník');
     expect(text(r)).toMatch(/obnovena z dílu \(materiál\)/);
     // geometrie (přidaný kvádr) se údaji neobnovila → dál ⚠ s polem geometrie
-    expect(codes(r, "asm.stale-copy").map((e) => e.text)).toEqual(["komponenta „Přidržovač“ je starší než díl „Přidržovač“ v záložce (geometrie) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #2"]);
+    expect(codes(r, "asm.stale-copy").map((e) => e.text)).toEqual(["komponenta „Přidržovač“ je starší než díl „Přidržovač“ v záložce (geometrie) – obnovit: sestava obnovit #2; kusovník a výkres ukazují údaje z vložení"]);
     const bad = await run(ws, 'sestava obnovit "Nic"');
     expect(text(bad)).toMatch(/komponenta „Nic“ v sestavě není/);
   });

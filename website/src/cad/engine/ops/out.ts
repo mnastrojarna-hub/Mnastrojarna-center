@@ -28,7 +28,7 @@ import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 import { runExportJob } from "../export-job";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
-import { modelId } from "../../doc-outputs";
+import { modelId, sameModel } from "../../doc-outputs";
 import { sheetWarningCode } from "../sheet-eval";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
@@ -211,8 +211,8 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   if (f) {
     const rev = ids.length === 1 ? ((d.drawings?.find((s) => s.id === ids[0])?.meta as { revision?: string } | undefined)?.revision ?? "") : "";
     // soubor zastaralého vydaného listu nese staré písmeno revize s jiným obsahem – záznam to nese (bod 20)
-    const sig = modelId(d).sig;
-    const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && s.issued.sig !== sig; });
+    const mid = modelId(d);
+    const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && !sameModel(s.issued, mid); });
     recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
   }
   // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning

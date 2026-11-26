@@ -20,12 +20,39 @@ import { hashPair } from "./assembly";
 import { geometrySig, modelRev } from "./engine/result-key";
 import { cadLocale, tr } from "./i18n";
 import type { RevisionItem } from "./drawing";
-import type { CadDoc, DrawingDoc, ExportRecord, IssuedSheet } from "./types";
+import type { CadDoc, DrawingDoc, ExportRecord, IssuedSheet, SupplyInfo } from "./types";
 
 /* ───────────────────────── revize modelu ───────────────────────── */
 
-/** revize modelu dokumentu: `rev` = `r·a1b2c3` (zobrazení), `sig` = 64bitový otisk `geometrySig` (shoda) */
-export type ModelId = { rev: string; sig: string };
+/**
+ * revize modelu dokumentu: `rev` = `r·a1b2c3` (zobrazení), `sig` = 64bitový otisk `geometrySig` (shoda); `data` = otisk údajů,
+ * které nese razítko a kusovník listu (název, číslo, materiál, druh položky – i u kopií dílů v sestavě). Revize modelu je
+ * geometrie (A1); vydaný list a výkres / CSV kusovníku ale zastarají i po změně jen čísla nebo materiálu (vlna 22, bod 20 – kolo 3).
+ */
+export type ModelId = { rev: string; sig: string; data: string };
+
+type DataTree = (string | null | DataTree | SupplyInfo)[];
+/** údaje dokumentu, které ukazuje razítko / kusovník (bez geometrie, bez náhodných id) */
+function docData(d: CadDoc, depth = 0): DataTree {
+  const out: DataTree = [d.name ?? "", d.material ?? "", d.materialName ?? "", d.props?.number ?? "", d.supply ?? null];
+  if (d.kind === "assembly" && depth < 12)
+    out.push((d.components ?? []).map((c): DataTree => [c.name, c.number ?? "", c.material ?? "", c.group ?? "", c.supply ?? null, c.source.kind === "file" ? c.source.fileName : docData(c.source.doc, depth + 1)]));
+  return out;
+}
+/** otisk údajů razítka / kusovníku (`ModelId.data`) */
+export function docDataSig(doc: CadDoc): string {
+  const [a, b] = hashPair(JSON.stringify(docData(doc)));
+  return a.toString(36) + b.toString(36);
+}
+
+/** záznam (vydání listu, export výkresu / kusovníku) odpovídá revizi `id`: táž geometrie a – má-li záznam otisk údajů – tytéž údaje */
+export const sameModel = (rec: { sig: string; data?: string }, id: ModelId): boolean => rec.sig === id.sig && (rec.data === undefined || rec.data === id.data);
+/** změnily se jen údaje (číslo, materiál…), geometrie je táž */
+const dataOnly = (rec: { sig: string; data?: string }, id: ModelId): boolean => rec.sig === id.sig && rec.data !== undefined && rec.data !== id.data;
+/** „model je teď …“: jiná geometrie = nová revize; táž geometrie s jinými údaji = revize + „se změněnými údaji …“ */
+export const nowRev = (rec: { sig: string; data?: string }, id: ModelId): string => (dataOnly(rec, id) ? tr("{0} se změněnými údaji dílu (název, číslo, materiál, druh položky)", id.rev) : id.rev);
+/** export nese údaje razítka / kusovníku (výkres, CSV kusovníku) – jen ten po změně čísla / materiálu zastará */
+const carriesData = (e: { what: string; format: string }): boolean => e.what === "drawing" || e.format.toLowerCase() === "csv";
 
 const idMemo = new WeakMap<CadDoc, ModelId>();
 /** revize modelu dokumentu (v mezipaměti podle objektu dokumentu – GUI ji čte při každém překreslení) */
@@ -35,7 +62,7 @@ export function modelId(doc: CadDoc): ModelId {
     const g = geometrySig(doc);
     const [a, b] = hashPair(g);
     // rev = A1 modelRev (bez náhodných id – stejný model = stejná revize v prohlížeči i v CLI), sig = otisk s id (shoda záznamu)
-    idMemo.set(doc, (id = { rev: modelRev(doc), sig: a.toString(36) + b.toString(36) }));
+    idMemo.set(doc, (id = { rev: modelRev(doc), sig: a.toString(36) + b.toString(36), data: docDataSig(doc) }));
   }
   return id;
 }
@@ -58,7 +85,7 @@ export type SheetState = "none" | "current" | "stale";
 
 export function sheetState(doc: CadDoc, s: Pick<DrawingDoc, "issued"> | undefined, id: ModelId = modelId(doc)): SheetState {
   if (!s?.issued) return "none";
-  return s.issued.sig === id.sig ? "current" : "stale";
+  return sameModel(s.issued, id) ? "current" : "stale";
 }
 
 /** další písmeno revize: A → B, Z → AA, 1 → 2, 01 → 02, A9 → A10 (prázdné → A) */
@@ -121,7 +148,7 @@ export function issueSheet(doc: CadDoc, s: DrawingDoc, o: { rev?: string; note?:
   const revs: RevisionItem[] = [...(m.revisions ?? [])];
   const prev = s.issued;
   const i = revs.findIndex((r) => r.rev.toUpperCase() === rev);
-  const note = o.note?.trim() || (prev && prev.sig !== id.sig ? tr("změna modelu {0} → {1}", prev.modelRev, id.rev) : tr("první vydání"));
+  const note = o.note?.trim() || (prev && dataOnly(prev, id) ? tr("změna údajů dílu (název, číslo, materiál, druh položky)") : prev && !sameModel(prev, id) ? tr("změna modelu {0} → {1}", prev.modelRev, id.rev) : tr("první vydání"));
   const date = o.date?.trim() || new Date(o.at ?? Date.now()).toLocaleDateString(cadLocale());
   let added = false;
   if (i < 0) {
@@ -130,9 +157,9 @@ export function issueSheet(doc: CadDoc, s: DrawingDoc, o: { rev?: string; note?:
   } else if (o.note?.trim()) revs[i] = { ...revs[i], note: o.note.trim() };
   m.revisions = revs;
   m.revision = rev;
-  const unchanged = !!prev && prev.rev === rev && prev.sig === id.sig;
-  const issued: IssuedSheet = unchanged ? prev! : { rev, modelRev: id.rev, sig: id.sig, at: o.at ?? new Date().toISOString(), ...(o.note?.trim() ? { note: o.note.trim() } : {}) };
-  return { sheet: { ...s, meta: m as Record<string, unknown>, issued }, rev, id, added, ...(prev ? { prev } : {}), sameRevChanged: !!prev && prev.rev === rev && prev.sig !== id.sig, unchanged };
+  const unchanged = !!prev && prev.rev === rev && sameModel(prev, id);
+  const issued: IssuedSheet = unchanged ? prev! : { rev, modelRev: id.rev, sig: id.sig, data: id.data, at: o.at ?? new Date().toISOString(), ...(o.note?.trim() ? { note: o.note.trim() } : {}) };
+  return { sheet: { ...s, meta: m as Record<string, unknown>, issued }, rev, id, added, ...(prev ? { prev } : {}), sameRevChanged: !!prev && prev.rev === rev && !sameModel(prev, id), unchanged };
 }
 
 /** zruší vydání listu (list zůstane, tabulka revizí také) */
@@ -148,23 +175,23 @@ export function sheetIssueLine(doc: CadDoc, s: DrawingDoc, id: ModelId = modelId
   if (st === "none") return tr("Vydání: nevydáno · list z modelu {0} (vydat: výkres vydat {1})", id.rev, defaultIssueRev(doc, s, id));
   const is = s.issued!;
   if (st === "current") return tr("Vydání: rev. {0} z modelu {1} ({2}) – odpovídá modelu", is.rev, is.modelRev, fmtDate(is.at));
-  return tr("⚠ Vydání: rev. {0} z modelu {1} ({2}) – model je teď {3}: list je ZASTARALÝ – vydejte novou revizi: výkres vydat {4}", is.rev, is.modelRev, fmtDate(is.at), id.rev, nextRev(is.rev));
+  return tr("⚠ Vydání: rev. {0} z modelu {1} ({2}) – model je teď {3}: list je ZASTARALÝ – vydejte novou revizi: výkres vydat {4}", is.rev, is.modelRev, fmtDate(is.at), nowRev(is, id), nextRev(is.rev));
 }
 
 /** text ⚠ drawing.stale pro list (protokol, `stav`, konec běhu) */
 export function staleSheetText(sheetName: string, is: IssuedSheet, id: ModelId): string {
-  return tr("list „{0}“ vydán jako rev. {1} z modelu {2} ({3}), model je teď {4} – vydejte novou revizi: výkres vydat {5}", sheetName, is.rev, is.modelRev, fmtDate(is.at), id.rev, nextRev(is.rev));
+  return tr("list „{0}“ vydán jako rev. {1} z modelu {2} ({3}), model je teď {4} – vydejte novou revizi: výkres vydat {5}", sheetName, is.rev, is.modelRev, fmtDate(is.at), nowRev(is, id), nextRev(is.rev));
 }
 
 /** text ⚠ drawing.stale při exportu vydaného zastaralého listu (soubor nese staré písmeno revize s jiným obsahem) */
 export function staleExportText(sheetName: string, is: IssuedSheet, id: ModelId): string {
-  return tr("list „{0}“ se exportuje s revizí {1}, ale rev. {1} byla vydána z modelu {2} a model je teď {3} – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat {4}", sheetName, is.rev, is.modelRev, id.rev, nextRev(is.rev));
+  return tr("list „{0}“ se exportuje s revizí {1}, ale rev. {1} byla vydána z modelu {2} a model je teď {3} – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat {4}", sheetName, is.rev, is.modelRev, nowRev(is, id), nextRev(is.rev));
 }
 
 /** zastaralé vydané listy dokumentu: index v `doc.drawings`, list, vydání */
 export function staleSheets(doc: CadDoc, id: ModelId = modelId(doc)): { idx: number; sheet: DrawingDoc; issued: IssuedSheet }[] {
   if (doc.kind === "draft") return [];
-  return (doc.drawings ?? []).flatMap((s, idx) => (s.issued && s.issued.sig !== id.sig ? [{ idx, sheet: s, issued: s.issued }] : []));
+  return (doc.drawings ?? []).flatMap((s, idx) => (s.issued && !sameModel(s.issued, id) ? [{ idx, sheet: s, issued: s.issued }] : []));
 }
 
 /* ───────────────────────── záznamy exportů ───────────────────────── */
@@ -197,6 +224,7 @@ export function recordExport(doc: CadDoc, e: ExportInput): { doc: CadDoc; rec: E
     file: e.file,
     modelRev: src.rev,
     sig: src.sig,
+    ...(carriesData(e) ? { data: src.data } : {}),
     at,
     ...(e.sheets?.length ? { sheets: e.sheets } : {}),
     ...(e.rev ? { rev: e.rev } : {}),
@@ -214,14 +242,14 @@ export function recordExport(doc: CadDoc, e: ExportInput): { doc: CadDoc; rec: E
  * stav záznamu exportu: z nynější revize modelu / ze starší revize; soubor, který nese písmeno revize vydané z jiného modelu
  * (export zastaralého vydaného listu – `revStale`), je zastaralý i při shodě modelu (papír rev. A ≠ soubor rev. A)
  */
-export const exportState = (doc: CadDoc, rec: ExportRecord, id: ModelId = modelId(doc)): "current" | "stale" => (rec.sig === id.sig && !rec.revStale ? "current" : "stale");
+export const exportState = (doc: CadDoc, rec: ExportRecord, id: ModelId = modelId(doc)): "current" | "stale" => (sameModel(rec, id) && !rec.revStale ? "current" : "stale");
 
 /** zastaralé záznamy exportů */
 export const staleExports = (doc: CadDoc, id: ModelId = modelId(doc)): ExportRecord[] => (doc.outputs ?? []).filter((r) => exportState(doc, r, id) === "stale");
 
 /** důvod zastaralého záznamu exportu (text seznamu zastaralých výstupů) */
 const exportWhy = (r: ExportRecord, id: ModelId): string =>
-  r.sig !== id.sig ? tr("exportováno z modelu {0} ({1}), model je teď {2}", r.modelRev, fmtDate(r.at), id.rev) : tr("soubor nese rev. {0}, která byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu", r.rev ?? "?");
+  !sameModel(r, id) ? tr("exportováno z modelu {0} ({1}), model je teď {2}", r.modelRev, fmtDate(r.at), nowRev(r, id)) : tr("soubor nese rev. {0}, která byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu", r.rev ?? "?");
 
 const FMT_LABEL: Record<string, string> = { step: "STEP", stl: "STL", brep: "BREP", obj: "OBJ", glb: "GLB", "3mf": "3MF", wrl: "VRML", pdf: "PDF", dxf: "DXF", dwg: "DWG", svg: "SVG", csv: "CSV", png: "PNG" };
 export const formatName = (f: string): string => FMT_LABEL[f.toLowerCase()] ?? f.toUpperCase();
@@ -261,7 +289,7 @@ export function exportLine(doc: CadDoc, rec: ExportRecord, id: ModelId = modelId
   const when = tr("z modelu {0} ({1})", rec.modelRev, fmtDate(rec.at));
   const job = jobText(rec);
   if (exportState(doc, rec, id) === "current") return `${head} · ${when}${job} – ${tr("odpovídá modelu")}`;
-  return rec.sig === id.sig ? `⚠ ${head} · ${when}${job} – ${tr("NESE ZASTARALÉ PÍSMENO REVIZE: rev. {0} byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu: {1}", rec.rev ?? "?", reexportCmd(doc, rec))}` : `⚠ ${head} · ${when}${job} – ${tr("ZASTARALÝ: model je teď {0}, exportujte znovu: {1}", id.rev, reexportCmd(doc, rec))}`;
+  return sameModel(rec, id) ? `⚠ ${head} · ${when}${job} – ${tr("NESE ZASTARALÉ PÍSMENO REVIZE: rev. {0} byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu: {1}", rec.rev ?? "?", reexportCmd(doc, rec))}` : `⚠ ${head} · ${when}${job} – ${tr("ZASTARALÝ: model je teď {0}, exportujte znovu: {1}", nowRev(rec, id), reexportCmd(doc, rec))}`;
 }
 
 /** výpis `exporty` */
@@ -313,7 +341,7 @@ export function staleOutputs(doc: CadDoc, o: { analyses?: readonly string[]; cop
     const d = ANALYSIS[a];
     out.push({ kind: "analysis", label: d ? d.label() : a, why: tr("výsledek je ze starší revize modelu"), fix: d?.fix ?? a, auto: d?.auto ?? false });
   }
-  for (const x of staleSheets(doc, id)) out.push({ kind: "sheet", label: tr("list „{0}“ rev. {1}", x.sheet.name, x.issued.rev), why: tr("vydán z modelu {0}, model je teď {1}", x.issued.modelRev, id.rev), fix: `výkres vydat ${nextRev(x.issued.rev)}`, auto: false, ref: x.sheet.id });
+  for (const x of staleSheets(doc, id)) out.push({ kind: "sheet", label: tr("list „{0}“ rev. {1}", x.sheet.name, x.issued.rev), why: tr("vydán z modelu {0}, model je teď {1}", x.issued.modelRev, nowRev(x.issued, id)), fix: `výkres vydat ${nextRev(x.issued.rev)}`, auto: false, ref: x.sheet.id });
   for (const r of staleExports(doc, id)) out.push({ kind: "export", label: tr("{0} „{1}“", formatName(r.format), r.file), why: exportWhy(r, id), fix: reexportCmd(doc, r), auto: false, ref: r.id });
   return out;
 }

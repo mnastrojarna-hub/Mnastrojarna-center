@@ -2057,7 +2057,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
 
   // rám, centrovací značky, zóny, razítko
-  frame(SW, SH, polys);
+  const marks = frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
   const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, tablesH, bomPlan.h0);
   let yTop = SH - M - TB.h;
@@ -2111,6 +2111,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   const revZoneAt = meta.revisions?.length ? revisionTable(SW, meta.revisions, polys, texts, !!zones) : [];
   if (meta.revisions?.length) tables.push({ kind: "revisions", x: SW - M - 124, y: M, w: 124, h: 6 + (meta.revisions.length + 1) * 6 });
+  trimCentringMarks(marks, tables, SW, SH);
 
   return {
     sheet: { name: sheet, w: SW, h: SH },
@@ -2854,13 +2855,36 @@ function rect(polys: Poly[], x: number, y: number, w: number, h: number, layer: 
   polys.push({ layer, width, pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]] });
 }
 
-function frame(W: number, H: number, polys: Poly[]) {
+/** Rám a centrovací značky listu; vrací značky (úsečka od okraje papíru 5 mm za čáru rámu) – `trimCentringMarks` je zkrátí u tabulek. */
+function frame(W: number, H: number, polys: Poly[]): Poly[] {
   rect(polys, M_LEFT, M, W - M_LEFT - M, H - 2 * M, "frame", 0.7);
   // centrovací značky (ISO 5457)
   const cxm = (M_LEFT + W - M) / 2;
   const cym = H / 2;
-  polys.push({ layer: "frame", width: 0.7, pts: [[cxm, 0], [cxm, M + 5]] }, { layer: "frame", width: 0.7, pts: [[cxm, H], [cxm, H - M - 5]] });
-  polys.push({ layer: "frame", width: 0.7, pts: [[0, cym], [M_LEFT + 5, cym]] }, { layer: "frame", width: 0.7, pts: [[W, cym], [W - M - 5, cym]] });
+  const marks: Poly[] = [
+    { layer: "frame", width: 0.7, pts: [[cxm, 0], [cxm, M + 5]] },
+    { layer: "frame", width: 0.7, pts: [[cxm, H], [cxm, H - M - 5]] },
+    { layer: "frame", width: 0.7, pts: [[0, cym], [M_LEFT + 5, cym]] },
+    { layer: "frame", width: 0.7, pts: [[W, cym], [W - M - 5, cym]] },
+  ];
+  polys.push(...marks);
+  return marks;
+}
+
+/**
+ * Centrovací značka nesmí vést přes tabulku (razítko, kusovník ve sloupcích u spodního rámu, tabulka revizí – vlna 22, bod 17:
+ * značka uprostřed spodního rámu A3 protínala záhlaví druhého sloupce kusovníku). Část za čárou rámu se u tabulky nekreslí –
+ * značka zůstane v okraji listu (od okraje papíru po rám).
+ */
+function trimCentringMarks(marks: Poly[], tables: readonly { x: number; y: number; w: number; h: number }[], W: number, H: number): void {
+  const across = (lo: number, hi: number, a: number, b: number) => Math.max(lo, Math.min(a, b)) < Math.min(hi, Math.max(a, b));
+  for (const p of marks) {
+    const [a, b] = p.pts;
+    const vertical = Math.abs(a[0] - b[0]) < 1e-9;
+    const hit = tables.some((t) => (vertical ? a[0] > t.x && a[0] < t.x + t.w && across(t.y, t.y + t.h, a[1], b[1]) : a[1] > t.y && a[1] < t.y + t.h && across(t.x, t.x + t.w, a[0], b[0])));
+    if (!hit) continue;
+    p.pts = vertical ? [a, [a[0], a[1] < H / 2 ? M : H - M]] : [a, [a[0] < W / 2 ? M_LEFT : W - M, a[1]]];
+  }
 }
 
 /** Razítko listu podle šablony (cad/title-block.ts): pole bez zkracování, značka promítání ISO 5456-2, logo, patička nad tabulkami. */
@@ -3316,7 +3340,7 @@ function bomOnlySheet(meta: DrawingMeta, opts: DrawingOptions): DrawingResult {
   const texts: DText[] = [];
   const warnings: string[] = [];
   const issues: DrawingIssue[] = [];
-  frame(p.W, p.H, polys);
+  const marks = frame(p.W, p.H, polys);
   const tables: NonNullable<DrawingResult["tables"]> = [{ kind: "title", x: p.W - M - TBS.w, y: p.H - M - TBS.h, w: TBS.w, h: TBS.h }];
   p.cols.forEach((col, i) => {
     if (!col.length) return;
@@ -3326,6 +3350,7 @@ function bomOnlySheet(meta: DrawingMeta, opts: DrawingOptions): DrawingResult {
     tables.push({ kind: "bom", x, y: yb - bomBlockH(col.length), w: BOM_W, h: bomBlockH(col.length) });
   });
   const tbInfo = drawTitleBlock({ W: p.W, H: p.H, margin: M, ctx: { sheet, scaleLabel: "—", projection: opts.projection }, meta, polys, texts, above: bomBlockH(p.cols[0]?.length ?? 0) });
+  trimCentringMarks(marks, tables, p.W, p.H);
   if (!rows.length) warnings.push(tr("List kusovníku: sestava nemá kusovník."));
   if (p.hidden) {
     const t = tr("Kusovník ({0} řádků) se na list {1} nevejde ani ve sloupcích – {2} řádků chybí; zvolte větší formát nebo kusovník na samostatném listu (výkres kusovník list)", rows.length, sheet, p.hidden);
@@ -3869,7 +3894,7 @@ export function dimFromPicks(d: Pick<DrawingResult, "views">, sel: DimSel[], at:
     const v = d.views.find((x) => x.key === view);
     return view === "sheet" || !v ? q : sheetToAnn(v, q);
   };
-  const linear = (a: Vec2, b: Vec2, edge: boolean): NewDim => {
+  const linear = (a: Vec2, b: Vec2, edge: boolean, geo = false): NewDim => {
     const A = S(a);
     const B = S(b);
     const dx = B[0] - A[0];
@@ -3881,12 +3906,13 @@ export function dimFromPicks(d: Pick<DrawingResult, "views">, sel: DimSel[], at:
     else kind = Math.abs(dx) > 3 * Math.abs(dy) ? "horizontal" : Math.abs(dy) > 3 * Math.abs(dx) ? "vertical" : "aligned";
     if (l < 1e-6) kind = "horizontal";
     const offset = kind === "horizontal" ? at[1] - A[1] : kind === "vertical" ? at[0] - A[0] : -(dy / (l || 1)) * (at[0] - A[0]) + (dx / (l || 1)) * (at[1] - A[1]);
-    return { view, type: "dim", a, b, kind, offset, ...(edge ? { edge: true } : {}) };
+    return { view, type: "dim", a, b, kind, offset, ...(edge ? { edge: true } : {}), ...(geo ? { geo: true } : {}) };
   };
   const p1 = s1.pick;
   if (p1.kind === "point") {
     if (!s2 || s2.pick.kind !== "point") return null;
-    return linear(p1.p, s2.view === view ? s2.pick.p : local(annToSheet(d.views, s2.view, s2.pick.p)), false);
+    // dva vrcholy pohledu (výběr myší) – po změně modelu se ověří, že tam pořád jsou (vlna 22, bod 20)
+    return linear(p1.p, s2.view === view ? s2.pick.p : local(annToSheet(d.views, s2.view, s2.pick.p)), false, s2.view === view);
   }
   if (p1.kind === "circle") {
     const v = d.views.find((x) => x.key === view);

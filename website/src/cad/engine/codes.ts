@@ -184,6 +184,8 @@ export const CODES = [
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
   // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
   { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
+  // ruční kóta po změně modelu neleží na geometrii / přichytila se ke změněné geometrii (vlna 22, bod 20 – cad/drawing-dim-attach.ts)
+  { code: "drawing.dim-detached", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },

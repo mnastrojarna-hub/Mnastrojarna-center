@@ -4,6 +4,7 @@
  * prostředí: výkres listu z jádra → vložení Chytrých kót, které ještě nejsou na listu → kóty a značky (withAnnotations) →
  * SVG / DXF R12 / PDF (jsPDF) / DWG (acad-ts) / PNG (rastr SVG v prohlížeči).
  */
+import { dimAttachText, userDimAttach } from "./drawing-dim-attach";
 import { annotationStatus, bomToCsv, withAnnotations, type DrawingMeta, type DrawingResult } from "./drawing";
 import { activeSheetIndex, lostEditsText, mergeSmart, newSheet, resolveSheet, sheetMeta, sheetOptions, type DrawingCompute, type DrawingExtras } from "./drawing-agent";
 import { drawingKey, drawingLabel, drawingSets, setSheets } from "./drawing-sets";
@@ -77,7 +78,7 @@ export async function drawingFile(
       const version = o.dwgVersion ?? "R2018";
       if (!DWG_VERSIONS.some((v) => v.id === version)) throw new Error(tr("Neznámá verze DWG „{0}“ – {1}", version, DWG_VERSIONS.map((v) => v.id).join(", ")));
       const { drawingToDwg } = await import("./formats/dwg");
-      return { name: `${o.base}_vykres.dwg`, mime: MIME.dwg, data: new Uint8Array(await drawingToDwg(out, { version })) };
+      return { name: `${o.base}_vykres.dwg`, mime: MIME.dwg, data: new Uint8Array(await drawingToDwg(out, { version, info: { title: o.title, ...pdfInfo(o), ...(o.rev ? { revision: o.rev } : {}) } })) };
     }
     case "png": {
       const r = await svgToPng(out.svg, out.sheet.w, out.sheet.h, o.width ?? 2000);
@@ -139,8 +140,10 @@ export async function renderSheet(doc: CadDoc, idx: number, compute: DrawingComp
   const out = withAnnotations(res, anns);
   // neúplné kóty a funkční prvky bez tolerance – export je ohlásí u listu (vlna 22, bod 18 – cad/drawing-dimcheck.ts)
   const dims = has ? dimExportWarnings(sheetDimCheck(doc, out, anns, o)) : [];
+  // ruční kóty, které po změně modelu neodpovídají geometrii – export je ohlásí (vlna 22, bod 20 – cad/drawing-dim-attach.ts)
+  const det = has ? dimAttachText(userDimAttach(res.views, anns), o) : null;
   // ruční úpravy kót, které se při přegenerování ztratily, nikdy tiše (zkouška 959, nález 8)
-  return { out, meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: [...res.warnings, ...(userLost ? [lostEditsText(userLost)] : []), ...dims] };
+  return { out, meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: [...res.warnings, ...(userLost ? [lostEditsText(userLost)] : []), ...dims, ...(det ? [det] : [])] };
 }
 
 /**

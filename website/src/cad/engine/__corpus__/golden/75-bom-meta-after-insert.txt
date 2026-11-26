@@ -24,7 +24,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 ✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
 ✓ materiál „1.2379“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
 ℹ řádek 3: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
-⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – změna (materiál) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Deska A"
+⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – v sestavě: sestava obnovit "Deska A"; změna (materiál) se do sestavy sama nepromítne
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → razítko: číslo „DA-001“ – výsledek po vyhodnocení listu níže
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
@@ -33,7 +33,7 @@ Kusovník „Nástroj“ (plochý): položek 2, kusů 2, hmotnost Σ 1,036 kg
 Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
 1 | Deska A |  | 1 | — (třída Ocel) | 0,942
 2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
-⚠ řádek 6: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo, materiál, výkres) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1
+⚠ řádek 6: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo, materiál, výkres) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení
 ⚠ řádek 6: vyráběné díly bez čísla výkresu: Deska A, Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
 ⚠ řádek 6: vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu
 

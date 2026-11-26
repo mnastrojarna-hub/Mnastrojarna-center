@@ -1,0 +1,23 @@
+  (* = vlastní kóta uživatele · ⚠ = po změně modelu neodpovídá geometrii – viz hlášení níže)	  (* = user's own dimension · ⚠ = no longer matches the geometry after a model change – see the message below)
+{0} – geometrie, ke které se kóta váže, v pohledu není; kóta se kreslí podle uložených bodů	{0} – the geometry the dimension is attached to is not in the view; the dimension is drawn from its stored points
+{0} – pohled kóty na listu není, kóta se nekreslí	{0} – the dimension's view is not on the sheet, the dimension is not drawn
+{0} – přichycena ke změněné geometrii, na listu teď {1}	{0} – snapped to the changed geometry, now {1} on the sheet
+{0} (zadáno {1})	{0} (entered {1})
+{0} × značka rámu	{0} × frame mark
+{0} sestavy se zapisuje z kopie dílu: {1}	assembly {0} is written from a part copy: {1}
+Kóta se po změně modelu přichytila ke změněné geometrii: zadáno {0}, na listu {1}. Kliknutím ji potvrdíte (uloží se nynější geometrie).	After the model change the dimension snapped to the changed geometry: entered {0}, on the sheet {1}. Click to confirm it (the current geometry is stored).
+kótu bez geometrie vložte znovu nebo smažte (výkres smazat {0})	insert the dimension without geometry again or delete it (drawing delete {0})
+přichycenou kótu zkontrolujte a potvrďte (výkres upravit {0} odsazení=…)	check the snapped dimension and confirm it (drawing edit {0} offset=…)
+ruční kóty po změně modelu neodpovídají geometrii ({0}): {1} – {2}	manual dimensions no longer match the geometry after a model change ({0}): {1} – {2}
+tabulka × rám	table × frame
+tabulka přes čáru nebo centrovací značku rámu: kusovník nad razítkem / na samostatném listu (výkres kusovník nad | list) nebo jiný formát	table over a frame line or centring mark: parts list above the title block / on its own sheet (drawing bom above | sheet) or another format
+Kusovník listu ukazuje údaje z vložení – kopie dílů je starší než díl v záložce ({0}): {1}	The sheet parts list shows the data from insertion – the part copy is older than the part in its tab ({0}): {1}
+list „{0}“	sheet “{0}”
+{0} se změněnými údaji dílu (název, číslo, materiál, druh položky)	{0} with changed part data (name, number, material, item kind)
+změna údajů dílu (název, číslo, materiál, druh položky)	part data changed (name, number, material, item kind)
+{0}: plocha F{1} označena na modelu {2}, model je teď {3} – označte ji znovu ({4})	{0}: face F{1} was marked on model {2}, the model is now {3} – mark it again ({4})
+základna {0} F{1}	datum {0} F{1}
+funkční F{0}	functional F{0}
+základna {0}	datum {0}
+ · tolerance neověřeny (funkční prvky označené na starší revizi modelu – označte je znovu)	 · tolerances not verified (functional features marked on an older model revision – mark them again)
+funkční prvky a základny označené na starší revizi modelu ({0}) se nekontrolují – označte je znovu (funkční F… / základna A F…)	functional features and datums marked on an older model revision ({0}) are not checked – mark them again (functional F… / datum A F…)

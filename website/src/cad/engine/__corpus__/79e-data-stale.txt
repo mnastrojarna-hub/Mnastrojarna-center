@@ -1,0 +1,23 @@
+# vlna 22, bod 20 + 18 (fáze 2, kolo 3): vydaný list zastará i po změně jen materiálu (údaje razítka, revize geometrie stejná);
+# export výkresu zastará, STEP ne; označená plocha / základna ze starší revize modelu se nekontroluje podle starého snímku
+nový díl "Deska A"
+kvádr 60 40 10
+výkres A4
+výkres nepředepsané ISO 2768-mK
+funkční F2 ±0,02
+základna A F1
+výkres vydat
+export step
+výkres export pdf
+#--- run
+# jen materiál – geometrie (revize r·…) beze změny
+materiál 1.2379
+výkres stav
+exporty
+výstupy zastaralé
+#--- run
+výkres vydat
+#--- run
+# změna rozměru: snímek označené plochy F2 a základny A je ze starého modelu
+upravit "Kvádr 1" size=50;40;10
+výkres kontrola kót

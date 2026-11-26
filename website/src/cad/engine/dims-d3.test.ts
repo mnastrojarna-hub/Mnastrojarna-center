@@ -139,6 +139,29 @@ describe("bod 18 (kontrola kót pro výrobu) – engine se skutečným jádrem",
     expect(s).toMatch(/^funkční základna A F1$/m);
   }, 240_000);
 
+  it("kolo 3: označená plocha / základna po změně modelu – nekontroluje se podle starého snímku (nezkontrolováno, označit znovu)", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf();
+    const r0 = await runScript(ws, 'nový díl "Deska F"\nkvádr 60 40 10\nvýkres A4\nfunkční F2 ±0,02\nzákladna A F1\nvýkres kontrola kót', host);
+    const t0 = formatConsole(r0);
+    expect(t0).not.toMatch(/označena na modelu/);
+    const d0 = docOf(ws, "Deska F");
+    expect(d0.functional?.every((m) => /^r·[0-9a-f]{6}$/.test(m.rev ?? ""))).toBe(true);
+    // změna rozměru: snímek roviny F2 (poloha) je ze starého modelu – dřív se kontrolovala poloha podle něj
+    const r1 = await runScript(ws, 'záložka "Deska F"\nupravit "Kvádr 1" size=30;40;10\nvýkres kontrola kót', host);
+    const t1 = formatConsole(r1);
+    expect(t1).toMatch(/funkční F2: plocha F2 označena na modelu r·\w{6}, model je teď r·\w{6} – označte ji znovu \(funkční F2 ±0,02\)/);
+    expect(t1).toMatch(/základna A: plocha F1 označena na modelu r·\w{6}, model je teď r·\w{6} – označte ji znovu \(základna A F1\)/);
+    // požadavek uživatele se neověřil: ne „funkční prvky nevyznačeny“ a ne „✓ … bez nálezů“, ale ⚠
+    expect(t1).not.toMatch(/funkční prvky nevyznačeny/);
+    expect(t1).toMatch(/tolerance neověřeny \(funkční prvky označené na starší revizi modelu – označte je znovu\)/);
+    expect(codes(r1, "drawing.tolerance-missing").map((e) => e.text)).toContain("funkční prvky a základny označené na starší revizi modelu (2) se nekontrolují – označte je znovu (funkční F… / základna A F…)");
+    expect(t1).not.toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    // po novém označení zase kontrolováno
+    const r2 = await runScript(ws, 'záložka "Deska F"\nfunkční F2 ±0,02\nzákladna A F1\nvýkres kontrola kót', host);
+    expect(formatConsole(r2)).not.toMatch(/označena na modelu/);
+  }, 240_000);
+
   it("EN / DE: functional datum, drawing check dims / zeichnung prüfen maße", async () => {
     const ws = new MemoryWorkspace();
     const host = hostOf();

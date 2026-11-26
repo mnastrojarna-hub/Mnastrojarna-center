@@ -166,6 +166,16 @@ async function scenario(args, label) {
   log = await run('záložka "Deska V"\nvýstupy');
   ok(/List 1: Vydání: rev\. B z modelu r·\w{6} .* – odpovídá modelu/.test(log) && /Zastaralé výstupy \(1\)/.test(log), `${label}: výstupy – list rev. B odpovídá, zbývá jen STEP`);
   await closeConsole();
+  // kolo 3 (bod 20): změna jen materiálu (geometrie a revize r·… stejné) – vydaný list rev. B je zastaralý (údaje razítka), STEP ne
+  await openConsole();
+  log = await run('záložka "Deska V"\nmateriál 1.2379\nvýkres stav');
+  ok(/⚠ Vydání: rev\. B z modelu (r·\w{6}) .* model je teď \1 se změněnými údaji dílu/.test(log), `${label}: kolo 3 – jen materiál: ⚠ vydaný list rev. B zastaralý (údaje dílu) – ` + line(log, /Vydání: rev\. B/));
+  await run('výkres');
+  await closeConsole();
+  const banner2 = p.locator('[data-drawing-stale-banner="B"]').first();
+  await banner2.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await banner2.count()) === 1 && /se změněnými údaji dílu/.test(await banner2.innerText().catch(() => '')) && (await p.locator('[data-sheet-stale="1"]').count()) >= 1, `${label}: kolo 3 – pruh a odznak ⚠ po změně jen materiálu`);
+  await p.keyboard.press('Escape').catch(() => {});
 
   // ── D3 (bod 18): kontrola kót pro výrobu ──
   await openConsole();
@@ -310,6 +320,57 @@ async function scenario(args, label) {
   log = await run('záložka "Deska H2"\nvýkres razítko');
   ok(/nástrojářská/.test(log) && /firma „Firma s\.r\.o\.“/.test(log) && /šablona hlavičky „Firma“/.test(log), `${label}: výběr šablony hlavičky v panelu → razítko podle šablony`);
   await closeConsole();
+
+  // ── kolo 3 (fáze 2): ruční kóta po změně modelu (bod 20) a list sestavy ze zastaralé kopie (22g) – GUI ──
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('nový díl "Deska R"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres kóta vodorovně pohled přední 0 10 60 10 odsazení 10');
+  ok(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/.test(log), `${label}: kolo 3 – ruční kóta 60 na listu, list bez nálezů`);
+  log = await run('záložka "Deska R"\nupravit "Kvádr 1" size=30;40;10\nvýkres stav');
+  ok(/drawing\.dim-detached|neodpovídají geometrii/.test(log) && /30 \(zadáno 60\) \* ⚠/.test(log) && !/vyhodnocen bez nálezů/.test(log), `${label}: kolo 3 – po změně ⚠ odpojená kóta, žádné „bez nálezů“ – ` + line(log, /zadáno 60/));
+  await run('výkres');
+  await closeConsole();
+  // konzole nad výkresem (s WebGL se „Zavřít“ občas netrefí) – zavřít zkratkou, jinak modální okno kryje seznam kót
+  // („Zavřít“ .last() může trefit jiné tlačítko Zavřít na stránce – zavřít tlačítkem v okně konzole)
+  const consoleBox = p.locator('div.fixed.inset-0.z-\\[70\\]').filter({ has: input });
+  for (let k = 0; k < 3 && (await input.isVisible().catch(() => false)); k++) {
+    await consoleBox.getByRole('button', { name: 'Zavřít', exact: true }).first().click().catch(() => {});
+    await input.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  }
+  if (await input.isVisible().catch(() => false)) {
+    console.log('KONZOLE zůstala otevřená:', JSON.stringify(await p.getByRole('button', { name: 'Zavřít', exact: true }).evaluateAll((els) => els.map((e) => (e.closest('[class]') || e).className.slice(0, 80)))));
+    await p.screenshot({ path: process.argv[2] + '/kolo3-konzole.png' }).catch(() => {});
+  }
+  const moved = p.locator('[data-ann-flag="moved"]');
+  await moved.first().waitFor({ timeout: 60000 }).catch(() => {});
+  ok((await moved.count()) === 1 && (await p.locator('[data-ann-flagged]').count()) === 1, `${label}: kolo 3 – seznam kót: ⚠ u přichycené kóty a souhrn ve stavovém řádku`);
+  // list se po otevření ještě dopočítává (Chytré kóty) – jako v cad-drawing-dims: počkat a klikat, dokud značka nezmizí
+  // (nejvýš 5×); počet kliknutí je ve zprávě, 0 kliknutí = neprošlo (značka zmizela jinak než potvrzením)
+  await p.waitForTimeout(2000);
+  // otevřené modální okno (z-[70]) nad výkresem – jen vypsat (diagnostika; klik by nedopadl na seznam kót)
+  const modal = p.locator('div.fixed.inset-0.z-\\[70\\]');
+  if ((await modal.count()) > 0) console.log('MODAL:', (await modal.first().innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 400));
+  let clicks = 0;
+  for (; clicks < 5 && (await moved.count()) > 0; clicks++) {
+    await moved.first().click().catch((e) => console.log('klik:', String(e).replace(/\s+/g, ' ').slice(0, 1500)));
+    await p.waitForTimeout(1500);
+  }
+  ok(clicks >= 1 && (await p.locator('[data-ann-flag]').count()) === 0 && (await p.locator('[data-ann-row]').count()) > 0, `${label}: kolo 3 – kliknutím potvrzená kóta už označená není (kliknutí: ${clicks}, seznam kót otevřený)`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska R"\nvýkres stav');
+  ok(!/drawing\.dim-detached|neodpovídají geometrii/.test(log) && /přední: 30 \*/.test(log), `${label}: kolo 3 – po potvrzení v GUI text bez ⚠, kóta 30 *`);
+  log = await run('nový díl "Deska S"\nkvádr 50 30 10\nnová sestava "Nástroj S"\nvložit "Deska S" ukotvit\nzáložka "Deska S"\nmateriál 1.2379\nzáložka "Nástroj S"\nvýkres A3');
+  ok(/starší než díl/.test(log) && !/✓ výkres: list „List 1“ vyhodnocen bez nálezů/.test(log), `${label}: kolo 3 – list sestavy se zastaralou kopií bez „bez nálezů“`);
+  await run('výkres');
+  await closeConsole();
+  const sc = p.locator('[data-drawing-stale-copy]').first();
+  await sc.waitFor({ timeout: 60000 }).catch(() => {});
+  ok(Number(await sc.getAttribute('data-drawing-stale-copy').catch(() => '0')) === 1 && /Deska S/.test(await sc.innerText().catch(() => '')), `${label}: kolo 3 – výkresové prostředí sestavy: odznak „kusovník z kopie starší než díl“`);
+  await p.locator('[data-drawing-stale-copy-refresh]').first().click().catch(() => {});
+  await p.waitForFunction(() => !document.querySelector('[data-drawing-stale-copy]'), null, { timeout: 120000 }).catch(() => {});
+  ok((await p.locator('[data-drawing-stale-copy]').count()) === 0, `${label}: kolo 3 – Přepočítat vše obnoví kopii, odznak zmizí`);
+  await p.keyboard.press('Escape').catch(() => {});
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

@@ -221,7 +221,15 @@ const near = (a, b, e = 0.06) => Math.abs(a - b) <= e;
   t = await sheetTexts();
   ok(t.includes('Ø14H7') && t.includes('R7'), 'po změně průměru díry kóty ukazují Ø14H7 a R7 (drží se kružnice ve stejném středu)');
   ok(t.includes('100±0,1'), 'kóta délky hrany sleduje delší hranu: 100±0,1');
-  ok((await p.locator('[data-ann-flag]').count()) === 0, 'žádná kóta není označená – geometrie byla dohledána');
+  // vlna 22, bod 20 (fáze 2, kolo 3): kóta, která se přichytila ke změněné geometrii (Ø12 → Ø14, R6 → R7, 80 → 100), má jinou
+  // hodnotu, než uživatel zadal – v seznamu ⚠ „moved“ s potvrzením kliknutím (dřív bez označení); ztracená není žádná
+  const movedFlags = p.locator('[data-ann-flag="moved"]');
+  ok((await p.locator('[data-ann-flag="lost"]').count()) === 0 && (await movedFlags.count()) >= 3, `geometrie dohledána (žádná ztracená); přichycené kóty se změněnou hodnotou označené ⚠ k potvrzení: ${await movedFlags.count()}`);
+  for (let k = 0; k < 10 && (await movedFlags.count()) > 0; k++) {
+    await movedFlags.first().click();
+    await p.waitForTimeout(400);
+  }
+  ok((await p.locator('[data-ann-flag]').count()) === 0, 'po potvrzení kliknutím žádná kóta není označená');
   await closeDrawing();
   // sražení odstraněno → šikmá hrana úhlových kót zmizí
   const d3 = JSON.parse(JSON.stringify(await getDoc()));

@@ -470,7 +470,7 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
 export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** ručně umístěná vygenerovaná kóta / popis (odsazení, posun) – přegenerování po změně modelu polohu zachová (vlna 22, bod 17) */ placed?: "user"; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
-  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean; /** souřadnicová kóta (ISO 129-1): `a` = počátek (základna), `b` = bod; kreslí se jen vynášecí čára z `b` a hodnota na jejím konci, `jog` = posun textu podél řady [mm listu] (cad/drawing-ordinate.ts) */ ord?: boolean; jog?: number }
+  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean; /** kóta dvou bodů přichycených k vrcholům pohledu – po změně modelu se ověří, že tam vrcholy pořád jsou (cad/drawing-dim-attach.ts) */ geo?: boolean; /** souřadnicová kóta (ISO 129-1): `a` = počátek (základna), `b` = bod; kreslí se jen vynášecí čára z `b` a hodnota na jejím konci, `jog` = posun textu podél řady [mm listu] (cad/drawing-ordinate.ts) */ ord?: boolean; jog?: number }
   /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
   | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
   /** úhel dvou hran pohledu (a–b, a2–b2): oblouk o poloměru `offset` [mm listu] v sektoru, kam míří směr `ang` [°] */
@@ -514,10 +514,16 @@ export type FunctionalMark = {
   face?: { index: number; sig?: Sig };
   geom?: { t: "plane"; n: Vec3; c: Vec3 } | { t: "cyl"; axis: Vec3; c: Vec3; r: number } | { t: "other"; c: Vec3 };
   tol?: string;
+  /**
+   * revize modelu `r·…` (engine/result-key.ts `modelRev`), na které byla plocha označena – snímek `geom` platí jen pro ni;
+   * po změně modelu se plocha nekontroluje (nezkontrolováno, označit znovu), ne podle starého snímku (vlna 22, bod 18 – kolo 3)
+   */
+  rev?: string;
 };
 
 /** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
-export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string };
+/** `data` = otisk údajů dílu / kusovníku na listu (název, číslo, materiál, druh položky – `modelId().data`); starší záznamy ho nemají */
+export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string; data?: string };
 /**
  * Záznam exportu v dokumentu (bod 20): co (3D model / výkres / skica), formát, název souboru, revize modelu a otisk, čas ISO;
  * výkres navíc listy (id) a písmeno revize listu v době exportu. `job` = stav úlohy exportu (balík A3, RunTracker).
@@ -530,6 +536,8 @@ export type ExportRecord = {
   modelRev: string;
   sig: string;
   at: string;
+  /** otisk údajů dílu / kusovníku (název, číslo, materiál, druh položky) – jen výkres a CSV kusovníku, které je nesou */
+  data?: string;
   sheets?: string[];
   rev?: string;
   /** soubor nese písmeno revize listu vydaného z jiné revize modelu (export zastaralého vydaného listu) */
