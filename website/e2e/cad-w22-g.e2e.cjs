@@ -160,8 +160,19 @@ const start = async (p, url) => {
   ok(by['Zaoblení 1'] && by['Zaoblení 1'].state === 'error' && !by['Zaoblení 1'].levels, '3: neproveditelné zaoblení: ✗ ve stromu, bez úrovní');
   // aktivní prvek ukáže úrovně pod řádkem
   await p.locator('[data-feature-row][data-feature-name="Díra 1"]').click();
+  // fáze 2, kolo 4: poznámka se pod aktivním řádkem vyplní až po výběru (pod zátěží později) – počkat, až v ní text je
+  // (dřív innerText hned po objevení prvku → prázdný text pod zátěží); tvrzení níže zůstává přesná shoda s popiskem stromu
+  await p.waitForFunction(() => { const n = document.querySelector('[data-feature-levels-note]'); return !!n && n.textContent.trim().length > 0; }, null, { timeout: 60000 }).catch(() => {});
   const note = await p.locator('[data-feature-levels-note]').first().innerText({ timeout: 10000 }).catch(() => '');
   ok(note === by['Díra 1'].levels, '3: úrovně pod aktivním prvkem: ' + note);
+  // fáze 2, kolo 4b (příčina nestálého kroku 3): výběr díry otevře úpravu se stavbou modelu jen po ni (rollback) – stav
+  // upravovaného a dalších prvků se doplní z celé stavby téže geometrie (feature-levels.ts treeStatus), ne „nic“. Ověřeno po
+  // doběhnutí stavby pohledu: poznámka pod dírou a ✗ zaoblení ve stromu zůstanou
+  // (tvrzení platí v každém okamžiku; čeká se na začátek a konec stavby pohledu, aby se ověřil i stav PO ní)
+  await p.waitForFunction(() => document.querySelector('[data-core-status]')?.getAttribute('data-core-status') === 'busy', null, { timeout: 3000 }).catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-core-status]')?.getAttribute('data-core-status') !== 'busy', null, { timeout: 60000 }).catch(() => {});
+  const afterRb = await p.evaluate(() => ({ note: document.querySelector('[data-feature-levels-note]')?.textContent || '', fillet: document.querySelector('[data-feature-row][data-feature-name="Zaoblení 1"]')?.getAttribute('data-feature-state') || '' }));
+  ok(afterRb.note === by['Díra 1'].levels && afterRb.fillet === 'error', `3: úprava díry (stavba po ni): úrovně díry i ✗ zaoblení ve stromu zůstanou (${afterRb.note} | ${afterRb.fillet})`);
   await p.screenshot({ path: S + 'w22g-tree.png' });
   await p.keyboard.press('Escape').catch(() => {});
 

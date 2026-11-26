@@ -192,6 +192,18 @@ export function levelsText(s: Pick<FeatureStatus, "ok" | "effect" | "body" | "su
   return [effectText(s.effect), bodyText(s.body)].filter(Boolean).join(" · ");
 }
 
+/**
+ * Stav prvků pro strom historie, když se model při úpravě prvku staví jen po něj (zaoblení, díra, skica… – „rollback“):
+ * stavba pohledu nemá výsledek upravovaného a dalších prvků, takže by aktivní řádek neměl úrovně a další řádky stav.
+ * Doplní se z poslední stavby CELÉHO dokumentu – ale jen když byla postavena pro tutéž geometrii (`fullGeo === docGeo`);
+ * po změně parametru upravovaného prvku výsledek celé stavby neplatí a doplněk se nepoužije (žádný starý ✓ – vlna 22).
+ */
+export function treeStatus<S extends { id: string }>(view: readonly S[] | undefined, full: { geo: string; status: readonly S[] } | null, docGeo: string, rolledBack: boolean): S[] | undefined {
+  if (!view || !rolledBack || !full || full.geo !== docGeo) return view ? [...view] : undefined;
+  const have = new Set(view.map((s) => s.id));
+  return [...view, ...full.status.filter((s) => !have.has(s.id))];
+}
+
 export type LevelsData = {
   built: boolean;
   /** potlačený prvek (nestavěl se) */
