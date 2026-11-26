@@ -1,0 +1,41 @@
+# vlna 22, bod 3 (fáze 2): celý cyklus v jedné studii SPOLU se skutečným střihem – nájezd, sevření přidržovače na plechu, střih
+# razníkem Ø20 skrz plech 1 mm (procesní vrstva, geometrická aproximace), návrat. Očekáváno: phases=4/4, každá fáze nesplněné vazby 0,
+# Střih začne při ZDVIH ≤ 51 (dotyk razníku), prostřiženo v kroku 22, odebráno 314,159 mm³, odpad 1 ks; přidržovač stojí na plechu
+# (kroky 19–24) a na konci je zpět ve výchozí poloze; pracovní záběr = ℹ clash.work (ne ⚠ clash.real), úroveň kin+geo.
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl Plech
+kvádr 80 80 1
+nový díl Horní deska
+kvádr 100 100 10
+nový díl Razník
+válec 20 40
+nový díl Přidržovač
+kvádr 30 30 8
+#--- run
+nová sestava Cyklus
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Horní deska" v 0 0 81
+vložit "Razník" v 50 50 31
+vložit "Přidržovač" v 5 5 30
+sestava vazba vzdálenost "Horní deska" spodní "Deska A" horní hodnota 71 název "ZDVIH"
+sestava vazba zarovnat "Horní deska" +X "Deska A" +X
+sestava vazba zarovnat "Horní deska" +Y "Deska A" +Y
+sestava vazba zámek "Razník" "Horní deska"
+sestava vazba zámek "Přidržovač" "Horní deska" název "NESENÍ"
+sestava vazba vzdálenost "Přidržovač" spodní "Plech" horní hodnota 19 název "MEZERA"
+sestava vazba "MEZERA" potlačit
+pohyb fáze "Nájezd"
+pohyb fáze "Sevření" při vazba "MEZERA" <= 0 potlačit vazba "NESENÍ" zapnout vazba "MEZERA"
+pohyb fáze "Střih" při vazba "ZDVIH" <= 51
+pohyb fáze "Návrat" při vazba "ZDVIH" >= 52 zapnout vazba "NESENÍ" potlačit vazba "MEZERA"
+pohyb motor lineární vazba "ZDVIH" 71..49 pak 71 kroky 44 kolize
+pohyb proces střih "Razník" "Plech"
+pohyb fáze
+pohyb krok 0
+pohyb krok 20
+pohyb krok 22
+pohyb krok 44
+pohyb proces

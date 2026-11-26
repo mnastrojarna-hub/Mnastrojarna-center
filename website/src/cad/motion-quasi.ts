@@ -175,6 +175,32 @@ export type StepOutcome<T = unknown> = {
 
 const vec = (ts: Term[], k = 1) => () => ts.flatMap((t) => (k === 1 ? t.r() : t.r().map((v) => v * k)));
 const worst = (ts: Term[]) => ts.reduce((m, t) => Math.max(m, norm(t.r())), 0);
+const energy = (ts: Term[]) => ts.reduce((s, t) => s + t.r().reduce((a, v) => a + v * v, 0), 0);
+/** člen, který drží nynější hodnotu zbytku členu `t` (zbytek − zbytek teď) */
+const heldOf = (t: Term): Term => {
+  const r0 = t.r();
+  return { id: t.id, r: () => t.r().map((v, i) => v - (r0[i] ?? 0)) };
+};
+
+/**
+ * Nejmenší změna od polohy `from`, která dá tytéž hodnoty měkkých členů jako nynější poloha (fáze 2, bod 2): penalizační úloha
+ * s měkkým členem, který tvrdé podmínky nedovolí splnit (preference meze proti pevné vazbě, pružina proti dorazu), nemá v nedourčených
+ * stupních volnosti (posuv v rovině, natočení kolem normály) dno – optimum „uklouzne“ o metry s nepatrným náklonem a úklid tvrdými
+ * podmínkami pak ujetí nechá (tvrdé splněné, „Vazby splněny“ – falešná zelená). Měkké členy určují jen svou hodnotu (mezeru, délku
+ * pružiny), ne volné stupně volnosti: poloha = `from` + nejmenší změna na tytéž hodnoty. Nepovede-li se (tvrdé / `keep` nesplněné
+ * nebo znatelně vyšší energie), zůstane nynější poloha (vrací false).
+ */
+function leastChange(poses: Map<string, Pose>, vars: SolveVar[], from: Map<string, Pose>, hard: Term[], keep: Term[], soft: Term[], o: { maxIter: number; groups?: RigidGroups }): boolean {
+  const cur = new Map(poses);
+  const e0 = energy(soft);
+  const held = soft.map(heldOf);
+  for (const [k, v] of from) poses.set(k, v);
+  solvePoses(poses, vars, () => [...vec(hard)(), ...vec(keep)(), ...vec(held)()], o);
+  // energie smí být vyšší jen o numerický šum řešiče (polohy ~1e-7 mm): jinak by nová poloha nebyla stejně dobré optimum
+  if (worst(hard) <= CONFLICT_TOL && worst(keep) <= CONFLICT_TOL && energy(soft) <= e0 * (1 + 1e-4) + 1e-6) return true;
+  for (const [k, v] of cur) poses.set(k, v);
+  return false;
+}
 
 /**
  * Krok s prioritou tvrdé ≫ pohon ≫ měkké (viz hlavička modulu). `poses` = počáteční odhad (předchozí krok / dokument) – po návratu
@@ -200,7 +226,11 @@ export function solveStep<T = unknown>(
     settle(poses, vars, T.hard, (H) => () => [...vec(H, K)(), ...vec(T.drive, K)(), ...vec(T.soft)()], { maxIter: it + 60, groups });
     solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
   } else solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
-  if (worst(T.hard) <= CONFLICT_TOL && worst(T.drive) <= CONFLICT_TOL) return { status: "ok", blocking: [], short: [] };
+  if (worst(T.hard) <= CONFLICT_TOL && worst(T.drive) <= CONFLICT_TOL) {
+    // měkké členy neurčují volné stupně volnosti: poloha = nejmenší změna od počátečního odhadu na tytéž hodnoty měkkých členů
+    if (soft) leastChange(poses, vars, snap, T.hard, T.drive, T.soft, { maxIter: it, groups });
+    return { status: "ok", blocking: [], short: [] };
+  }
   // (B) z poslední platné polohy: tvrdé podmínky s přednostní vahou, pohon dojede, kam smí
   restore();
   settle(poses, vars, T.hard, (H) => () => [...vec(H, K)(), ...drive(), ...(soft ? vec(T.soft, 1 / K)() : [])], { maxIter: it + 60, groups });
@@ -242,6 +272,7 @@ export function solveStep<T = unknown>(
         // nesplní. Taková poloha není rovnováha, ale numerický artefakt (bod 8: tuhé díly se nesmějí rozjet ani naklonit) → zůstane
         // poloha zastavení (tvrdé podmínky splněné, motor na dosažené hodnotě, nejmenší změna od posledního platného kroku)
         if (worst(T.hard) > CONFLICT_TOL || worst(held2) > CONFLICT_TOL) for (const [k, v] of atStop) poses.set(k, v);
+        else leastChange(poses, vars, atStop, T.hard, held2, T.soft, { maxIter: it, groups });
       }
       return { status: "stopped", cause: "motor", blocking, short, ...(o.describe ? { info: o.describe(blocking, short) } : {}) };
     }

@@ -27,7 +27,7 @@ const G: Record<string, Record<string, FaceGeo>> = {
 const geo: GeoProvider = (r) => G[r.compId]?.[`f${r.face}`] ?? null;
 
 /** sestava bodu 2: `hz` = výchozí Z přidržovače (34,5 = mezera 25, 44,5 = mezera 15), `dosed` = mez k rámu, `prefer` = preferovaná strana „Mez“ */
-function rig(o: { hz?: number; az?: number; dosed?: boolean; prefer?: "min" | "max"; fixedH?: number; spring?: boolean } = {}): CadDoc {
+function rig(o: { hz?: number; az?: number; dosed?: boolean; prefer?: "min" | "max"; fixedH?: number; spring?: boolean; hxy?: [number, number] } = {}): CadDoc {
   const hz = o.hz ?? 34.5;
   const spring = compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc; // osa Z, začátek −1, L0 32, Ln (6+1)·2 = 14
   const mates: Mate[] = [
@@ -37,7 +37,7 @@ function rig(o: { hz?: number; az?: number; dosed?: boolean; prefer?: "min" | "m
     ...(o.fixedH !== undefined ? [{ id: "pevna", name: "PEVNÁ", type: "distance", a: f("H", 1), b: f("R", 0), value: o.fixedH } as Mate] : []),
     ...(o.spring === false ? [] : [{ id: "zamek", type: "lock", a: f("S", -1), b: f("H", -1) } as Mate]),
   ];
-  const comps: AsmComponent[] = [comp("R", P(), { fixed: true }), comp("A", P([0, 0, o.az ?? 67.5])), comp("H", P([20, 20, hz]))];
+  const comps: AsmComponent[] = [comp("R", P(), { fixed: true }), comp("A", P([0, 0, o.az ?? 67.5])), comp("H", P([...(o.hxy ?? [20, 20]), hz] as Vec3))];
   if (o.spring !== false) comps.push({ id: "S", name: "Pružina", source: { kind: "part", doc: spring }, placement: P([50, 50, hz + 8 + 1]), spring: { a: f("H", 0), b: f("A", 0), free: 32, solid: 14, rate: 20 } });
   return { ...emptyDoc("Mechanika"), kind: "assembly", components: comps, mates };
 }
@@ -133,6 +133,35 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
     expect(res.conflictSteps).toBe(0);
     expect(res.undetermined).toBeUndefined(); // poloha je určená pevnou vazbou
   });
+
+  it.each([
+    ["min", [0, 0]],
+    ["max", [0, 0]],
+    ["min", [5, 13]],
+    ["max", [20, 20]],
+  ] as ["min" | "max", [number, number]][])(
+    "preference %s, kterou pevná vazba nedovolí splnit, neposune desku ani přidržovač %j v X/Y a nenatočí je (fáze 2: dřív ujetí ~7,9 m a „Vazby splněny“)",
+    async (prefer, hxy) => {
+      // repro bodu 8 (PEVNÁ 24,5) + preferovaná strana „Mez“ + motor 57,5 → 40: preferenci nelze splnit (deska jede motorem, přidržovač
+      // drží pevná vazba) – měkký člen nesmí v penalizační úloze „uklouznout“ do volných stupňů volnosti (posuv v rovině, natočení kolem Z)
+      const d = rig({ prefer, dosed: false, fixedH: 24.5, spring: false, hxy });
+      const res = await runMotion(d, geo, { ...study(57.5, 40), mode: "kinematic" });
+      for (const s of res.steps) {
+        expect(s.status ?? "ok", `krok ${s.i}`).not.toBe("invalid");
+        expect(s.place.A.position[0], `krok ${s.i} A x`).toBeCloseTo(0, 6);
+        expect(s.place.A.position[1], `krok ${s.i} A y`).toBeCloseTo(0, 6);
+        expect(s.place.H.position[0], `krok ${s.i} H x`).toBeCloseTo(hxy[0], 6);
+        expect(s.place.H.position[1], `krok ${s.i} H y`).toBeCloseTo(hxy[1], 6);
+        expect(s.place.H.position[2], `krok ${s.i} H z`).toBeCloseTo(34.5, 6);
+        expect(Math.max(...s.place.A.rotation.map(Math.abs)), `krok ${s.i} A ∠`).toBeLessThan(1e-6);
+        expect(Math.max(...s.place.H.rotation.map(Math.abs)), `krok ${s.i} H ∠`).toBeLessThan(1e-6);
+      }
+      for (let k = 0; k <= 12; k++) expect(az(res, k), `krok ${k} A z`).toBeCloseTo(67.5 - (17.5 * k) / 12, 4);
+      expect(res.conflictSteps).toBe(0);
+      // souhrn bez ujetí: celkový posuv přidržovače 0, desky 17,5 mm (jen motor)
+      expect(motionKv(res, null, 2)).toMatch(/ travel=17\.5mm:1 /);
+    },
+  );
 
   it("délka pružiny na doraz Ln je tvrdý doraz: motor se zastaví, když by pružinu stlačil pod Ln (dřív prošel a řádek pružiny byl ✗)", async () => {
     const res = await runMotion(rig({ dosed: false, fixedH: 24.5 }), geo, study(57.5, 40));
