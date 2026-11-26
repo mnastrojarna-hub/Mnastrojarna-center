@@ -1,0 +1,6 @@
+# vlna 22, balík V, fáze 2 (bod 14): vůle v anotaci přehrávání a exportu ze skutečné kontroly vůle
+vůle: nezkontrolováno	Spiel: nicht geprüft
+ · v kroku {0}	 · in Schritt {0}
+vůle {0} × {1}: nezměřeno	Spiel {0} × {1}: nicht gemessen
+vůle {0} × {1}: nejméně {2} mm{3}	Spiel {0} × {1}: mindestens {2} mm{3}
+… a další dvojice vůle: {0}	… und weitere Spielpaare: {0}

@@ -298,7 +298,7 @@ export async function exportMotion(res: MotionResult, doc: CadDoc, o: ExportOpts
         records[j].push({ pose: key, sig });
         if (k > 1 && v) drawAnnot(ctx, [{ key: "view", text: v.name }], x + tw - Math.round(8 * scale) - Math.min(tw / 2, v.name.length * 7 * scale), y + Math.round(8 * scale), scale * 0.9);
       }
-      if (o.annot) drawAnnot(ctx, annotRows({ t: pose.t, step: pose.step, steps: res.steps.length, motors: pose.motors, stepData: res.steps[pose.step] as unknown as Record<string, unknown> }, doc, { study: T, settings: o.annotSettings }), Math.round(10 * scale), Math.round(10 * scale), scale);
+      if (o.annot) drawAnnot(ctx, annotRows({ t: pose.t, step: pose.step, steps: res.steps.length, motors: pose.motors, stepData: res.steps[pose.step] as unknown as Record<string, unknown>, between: pose.alpha > 1e-6 && pose.alpha < 1 - 1e-6 }, doc, { study: T, settings: o.annotSettings, res }), Math.round(10 * scale), Math.round(10 * scale), scale);
       await enc.add(cv, i);
       prevKey = key;
     }

@@ -54,6 +54,8 @@ export type ClearancePair = {
   pts: ([Vec3, Vec3] | null)[];
   /** kroky pod limitem */
   below: number[];
+  /** kroky, kde je hodnota řady jen dolní mez z obálek (jádro dvojici přesně nezměřilo) – anotace píše „nejméně …“ */
+  lower?: number[];
   /** průnik v některé poloze (vzdálenost 0) */
   contact?: boolean;
   /** úseky, kde zjemnění nepotvrdilo, že vůle mezi polohami neklesne pod nalezené minimum (mez hloubky / rozpočtu) */
@@ -356,6 +358,8 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
     if (step !== null) {
       p.series[step] = d.d;
       p.pts[step] = d.p1 && d.p2 ? [d.p1, d.p2] : null;
+      if (!d.exact) (p.lower ??= []).push(step);
+      else if (p.lower?.includes(step)) p.lower = p.lower.filter((k) => k !== step);
       if (limit !== null && d.d < limit) p.below.push(step);
     }
     if (d.d <= 0) p.contact = true;
