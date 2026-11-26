@@ -26,3 +26,18 @@ describe("dodací listy dodavatelů (19. 11.)", () => {
     expect(rows.filter((r) => matchesDl(r, "kalirna")).map((r) => r.fileId)).toEqual(["f2"]);
   });
 });
+
+describe("naše dodací listy do knihy dodavatelů nepatří (26. 11.)", () => {
+  const base = { job_id: "j1", filename: "dl.pdf", title: null, created_at: "2026-11-20T10:00:00Z" };
+  const pos = [{ id: "p1", job_id: "j1", number: "OV2026/025-1", supplier: { name: "Kovo s.r.o." } }];
+  it("vyřadí naše DL: vystavili jsme ho my, naše číslo DL, naše firma jako dodavatel; dodavatelův DL zůstane", () => {
+    const rows = toDlRows([
+      { ...base, id: "a", issuer: "my", dl_no: "DL-2026-010" },
+      { ...base, id: "b", dl_no: "DL 2026/011" },
+      { ...base, id: "c", sup_name: "Mnástrojárna s.r.o.", dl_no: "123" },
+      { ...base, id: "d", sup_name: "Kovo s.r.o.", dl_no: "K-77" },
+      { ...base, id: "e", issuer: "my", po_no: "OV2026/025-1", dl_no: "K-78" },
+    ], pos, ["DL-2026-011"]);
+    expect(rows.map((r) => r.fileId).sort()).toEqual(["d", "e"]);
+  });
+});
