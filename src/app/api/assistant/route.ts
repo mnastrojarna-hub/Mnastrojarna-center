@@ -1,103 +1,81 @@
 import { NextResponse } from "next/server";
-import { askAssistant } from "@/lib/ai/claude";
-import { apiRequire, getAccess } from "@/lib/auth/session";
-import { getCustomers, getSuppliers, getDrawings, getCommissions } from "@/lib/data/queries";
-import { listJobs, listQuotes } from "@/lib/data/jobs";
-import { STAGES } from "@/lib/jobs/stages";
-import { quoteStatusLabel } from "@/lib/data/labels";
+import { apiRequire } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import { runAssistant } from "@/lib/ai/assistant/run";
+import { getAssistantMessages, listAssistantConversations } from "@/lib/data/assistant";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+// asistent si data dohledává v několika krocích (nástroje) — delší limit funkce
+export const maxDuration = 300;
 
-const MAX_QUESTION = 2000;
+const MAX_QUESTION = 4000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function czk(n: number | null | undefined): string {
-  return n === null || n === undefined ? "bez ceny" : `${Math.round(n)} Kč`;
+function today(): string {
+  return new Intl.DateTimeFormat("cs-CZ", { timeZone: "Europe/Prague", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
 }
 
-/** Sestaví kompaktní kontext z firemních dat (RAG-lite) pro AI asistenta. */
-async function buildContext(): Promise<string> {
-  const { can } = await getAccess();
-  const [customers, suppliers, jobs, quotes, drawings, commissions] = await Promise.all([
-    getCustomers(),
-    getSuppliers(),
-    listJobs({ sort: "updated", dir: "desc", limit: 60 }),
-    listQuotes({ includeArchived: false }),
-    can("drawings") ? getDrawings() : Promise.resolve([]),
-    can("commissions") ? getCommissions() : Promise.resolve([]),
-  ]);
-  const parts: string[] = [];
-  if (jobs.length)
-    parts.push(
-      "ZAKÁZKY (Kniha zakázek, nejnověji změněné):\n" +
-        jobs
-          .map((j) => {
-            const bits = [
-              `${j.number} ${j.customer?.name ?? "bez zákazníka"}: ${j.title || "bez názvu"}`,
-              `stav ${STAGES[j.stage]?.label ?? j.stage}`,
-              j.customerOrderNumber ? `obj. zákazníka ${j.customerOrderNumber}` : null,
-              j.customerInquiryNumber ? `poptávka zákazníka ${j.customerInquiryNumber}` : null,
-              j.customerRequiredDate ? `požadovaný termín ${j.customerRequiredDate}` : null,
-              j.dueDate ? `potvrzený termín ${j.dueDate}` : null,
-              j.value !== null ? `hodnota ${czk(j.value)}` : null,
-              j.drawingNumbers.length ? `výkresy ${j.drawingNumbers.slice(0, 5).join(", ")}` : null,
-              j.owner ? `obchodník ${j.owner.name}` : null,
-            ];
-            return "- " + bits.filter(Boolean).join(", ");
-          })
-          .join("\n"),
-    );
-  if (customers.length)
-    parts.push(
-      "ZÁKAZNÍCI:\n" +
-        customers
-          .slice(0, 40)
-          .map((c) => `- ${c.customerNumber ?? ""} ${c.name} (IČO ${c.ico ?? "—"}, ${c.city ?? c.country}, ${c.totalJobs} zakázek, obrat ${czk(c.revenue)}${c.owner ? `, obchodník ${c.owner.name}` : ""})`.trim())
-          .join("\n"),
-    );
-  if (suppliers.length)
-    parts.push(
-      "DODAVATELÉ:\n" +
-        suppliers
-          .slice(0, 40)
-          .map((s) => `- ${s.name} (${s.country}; technologie ${s.technologies.join(", ") || "—"}; materiály ${s.materials.join(", ") || "—"}; lhůta ${s.leadDays ?? "?"} d; hodnocení ${s.rating ?? "—"}/5)`)
-          .join("\n"),
-    );
-  if (quotes.length)
-    parts.push(
-      "NABÍDKY:\n" +
-        quotes
-          .slice(0, 40)
-          .map((q) => {
-            const items = q.items.slice(0, 3).map((it) => `${it.drawingNumber ?? it.name ?? "položka"} ${it.quantity} ${it.unit}${it.unitPrice !== null ? ` á ${czk(it.unitPrice)}` : ""}`);
-            return `- ${q.number} ${q.customer?.name ?? ""}${q.job ? ` (zakázka ${q.job.number})` : ""}: ${quoteStatusLabel[q.status] ?? q.status}, ${czk(q.total)}${items.length ? `; ${items.join("; ")}` : ""}`;
-          })
-          .join("\n"),
-    );
-  if (drawings.length)
-    parts.push("VÝKRESY:\n" + drawings.slice(0, 40).map((d) => `- ${d.number} rev.${d.revision}, ${d.material}, ${d.dimensions}, ${d.qty} ks (${d.customer})`).join("\n"));
-  if (commissions.length)
-    parts.push("PROVIZE (tento měsíc):\n" + commissions.map((c) => `- ${c.owner}: obrat ${czk(c.revenue)}, provize ${czk(c.commission)}`).join("\n"));
-  return parts.join("\n\n");
+/** GET: seznam mých konverzací; ?conversation=<id> → její zprávy. */
+export async function GET(req: Request) {
+  const auth = await apiRequire("ai_assistant");
+  if (auth instanceof NextResponse) return auth;
+  const id = new URL(req.url).searchParams.get("conversation");
+  if (id) {
+    if (!UUID_RE.test(id)) return NextResponse.json({ error: "Konverzace nenalezena." }, { status: 404 });
+    return NextResponse.json({ messages: await getAssistantMessages(id) });
+  }
+  return NextResponse.json({ conversations: await listAssistantConversations(auth.user.id) });
 }
 
+/** DELETE ?conversation=<id>: smazat moji konverzaci. */
+export async function DELETE(req: Request) {
+  const auth = await apiRequire("ai_assistant");
+  if (auth instanceof NextResponse) return auth;
+  const id = new URL(req.url).searchParams.get("conversation");
+  if (!id || !UUID_RE.test(id)) return NextResponse.json({ error: "Konverzace nenalezena." }, { status: 404 });
+  const db = await createClient();
+  const { error } = await db.from("assistant_conversations").delete().eq("id", id).eq("user_id", auth.user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * POST { question, conversationId? }: dotaz v konverzaci (bez id = nová). Předchozí dotazy a odpovědi
+ * konverzace jdou s dotazem (navazující otázky), dotaz i odpověď se uloží.
+ */
 export async function POST(req: Request) {
   const auth = await apiRequire("ai_assistant");
   if (auth instanceof NextResponse) return auth;
-  let question: unknown;
+  let body: { question?: unknown; conversationId?: unknown } = {};
   try {
-    ({ question } = await req.json());
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Neplatný požadavek." }, { status: 400 });
   }
-  if (!question || typeof question !== "string" || !question.trim()) {
-    return NextResponse.json({ error: "Chybí dotaz." }, { status: 400 });
-  }
+  const question = typeof body.question === "string" ? body.question.trim().slice(0, MAX_QUESTION) : "";
+  if (!question) return NextResponse.json({ error: "Chybí dotaz." }, { status: 400 });
+  const db = await createClient();
+  let conversationId = typeof body.conversationId === "string" && UUID_RE.test(body.conversationId) ? body.conversationId : null;
   try {
-    const context = await buildContext();
-    const answer = await askAssistant({ question: question.trim().slice(0, MAX_QUESTION), context });
-    return NextResponse.json({ answer });
+    if (conversationId) {
+      const { data } = await db.from("assistant_conversations").select("id").eq("id", conversationId).eq("user_id", auth.user.id).maybeSingle();
+      if (!data) conversationId = null;
+    }
+    if (!conversationId) {
+      const title = question.replace(/\s+/g, " ").slice(0, 80);
+      const { data, error } = await db.from("assistant_conversations").insert({ user_id: auth.user.id, title } as never).select("id").single();
+      if (error || !data) throw new Error(error?.message ?? "Konverzaci se nepodařilo založit.");
+      conversationId = (data as { id: string }).id;
+    }
+    const history = (await getAssistantMessages(conversationId)).map((m) => ({ role: m.role, content: m.content }));
+    await db.from("assistant_messages").insert({ conversation_id: conversationId, role: "user", content: question } as never);
+    const { answer, tools } = await runAssistant({ history, question, today: today() });
+    await db.from("assistant_messages").insert({ conversation_id: conversationId, role: "assistant", content: answer } as never);
+    await db.from("assistant_conversations").update({ updated_at: new Date().toISOString() } as never).eq("id", conversationId);
+    return NextResponse.json({ conversationId, answer, tools });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Neznámá chyba";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, conversationId }, { status: 500 });
   }
 }
