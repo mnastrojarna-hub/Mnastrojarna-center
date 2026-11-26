@@ -928,7 +928,10 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   začátku operace = ℹ `clash.work` (pravidlo „proces střih 1“, jeden model s `kolize pravidlo pracovní`), nikdy ⚠ clash.real; nástroj,
   který obrobek nezasáhne = ⚠ `motion.process-miss`; neprostřiženo = ℹ `motion.process-partial`; strop 48 booleovských operací na
   operaci = ℹ `motion.process-approx`. `pohyb krok N` vypíše stav výrobku a hloubku zásahu; `stav` stav na konci. Dokument se NEMĚNÍ:
-  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava).
+  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
+  TÉMŽE obrobku se kombinuje: stav obrobku = obrobek − sjednocení odebraných objemů všech operací v kroku (druhý střih do téže díry
+  nic nepřidá: `proc=2 removed=314.159 scrap=1`, řádek `„Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení …; součet
+  operací 628,319 mm³)`), 3D ukáže obrobek po všech operacích; bez kombinace z jádra jen dolní mez `removed=…+` a ⚠.
   Zápis události `pohyb událost při vazba "ZDVIH" <= 1 odeber "Razník" z "Plech"` = totéž jako střih s podmínkou. `pohyb úroveň`
   (EN `motion level`) vypíše úroveň; úroveň se příkazem nevolí (geometrická aproximace = procesní operace).
 - **Motory při definici (bod 10):** po `pohyb motor …` řádek `pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
@@ -956,7 +959,7 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `pohyb krok N`, `pohyb export`, `pohyb přehrát` a `window.mncad.motion()` přepočítají (ℹ `motion.recomputed` řekne, co se
   změnilo) – starý výsledek se nikdy nevrací jako platný. Platný výsledek: `motion=ok` JEN když se kolize v krocích opravdu
   kontrolovaly bez průniku a k motorům není upozornění; `motion=mates-ok` = vazby splněny, kolize nekontrolovány; `warn` = ⚠ k motorům
-  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec); `conflict` / `clash` = nesplněné vazby / průnik. Dva výpočty
+  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec), ⚠ procesní vrstvy nebo sledovaná vůle pod limitem; `conflict` / `clash` = nesplněné vazby / průnik. Dva výpočty
   téhož stavu (panel + text, dvakrát API) se spojí v jeden. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"` a
   verdikt `data-motion-verdict`.
 - Natočení v souhrnu (` · natáčí se 30°`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se

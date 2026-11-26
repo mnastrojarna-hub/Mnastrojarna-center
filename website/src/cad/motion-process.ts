@@ -55,6 +55,11 @@ export type ProcOpResult = {
   scrapRule: NonNullable<ProcessOp["scrap"]>;
   approx?: { contact: number; computed: number };
   error?: string;
+  /**
+   * stav obrobku po VŠECH operacích na něm (jen poslední operace obrobku s víc operacemi): v kroku k index do `states`;
+   * společný objem operací (druhý střih do téže díry) jen jednou. `missing` = jádro kombinaci nevrátilo (stav jen jako dolní mez).
+   */
+  combined?: { steps: number[]; states: { removed: number; volume: number; scrap: { volume: number; center: Vec3 }[] }[]; error?: string } | { missing: true };
   ms: number;
 };
 export type ProcessResult = { ops: ProcOpResult[]; ms: number; /** jádro procesní operaci nemá (zkušební náhrada) / nelze spočítat */ unavailable?: string };
@@ -148,7 +153,19 @@ export function opPhase(kind: ProcessOp["kind"], s: ProcStep | undefined): OpPha
   return kind === "imprint" ? "imprinted" : "notched";
 }
 /** stav výrobku: složení stavů operací téhož obrobku */
-export type ProductState = { target: string; phase: "full" | "engaged" | "pierced" | "imprinted" | "notched" | "pierced+imprinted"; scrap: number; removed: number; depth: number };
+/**
+ * Stav výrobku v kroku. `exact: false` = víc operací na obrobku bez kombinovaného stavu z jádra: `removed` je jen dolní mez
+ * (největší z operací) – součet by společný objem počítal dvakrát (dřív druhý střih do téže díry = 628 mm³ místo 314 mm³).
+ */
+export type ProductState = { target: string; phase: "full" | "engaged" | "pierced" | "imprinted" | "notched" | "pierced+imprinted"; scrap: number; removed: number; depth: number; ops: number; exact?: false };
+/** kombinovaný stav obrobku `target` (operace, která ho nese) */
+const combinedFor = (ops: readonly ProcOpResult[]) => {
+  for (let i = ops.length - 1; i >= 0; i--) {
+    const c = ops[i].combined;
+    if (c && !("missing" in c)) return c;
+  }
+  return null;
+};
 export function productStates(proc: ProcessResult | null, k: number): ProductState[] {
   if (!proc) return [];
   const by = new Map<string, ProcOpResult[]>();
@@ -156,13 +173,22 @@ export function productStates(proc: ProcessResult | null, k: number): ProductSta
   const out: ProductState[] = [];
   for (const [target, ops] of by) {
     const ph = ops.map((o) => opPhase(o.kind, o.steps[k]));
-    const removed = ops.reduce((s, o) => s + (o.states[o.steps[k]?.state ?? 0]?.removed ?? 0), 0);
+    const stOf = (o: ProcOpResult) => o.states[o.steps[k]?.state ?? 0];
     const depth = Math.max(0, ...ops.map((o) => o.steps[k]?.depth ?? 0));
-    const scrap = ops.reduce((s, o, i) => s + (ph[i] === "cut" ? Math.max(1, o.states[o.steps[k]?.state ?? 0]?.scrap.length ?? 0) : 0), 0);
     const cut = ph.includes("cut");
     const imp = ph.includes("imprinted");
     const phase: ProductState["phase"] = ph.includes("engaged") ? "engaged" : cut && imp ? "pierced+imprinted" : cut ? "pierced" : imp ? "imprinted" : ph.includes("notched") ? "notched" : "full";
-    out.push({ target, phase, scrap, removed, depth });
+    const comb = ops.length > 1 ? combinedFor(ops) : null;
+    if (ops.length === 1) {
+      const o = ops[0];
+      out.push({ target, phase, scrap: ph[0] === "cut" ? Math.max(1, stOf(o)?.scrap.length ?? 0) : 0, removed: stOf(o)?.removed ?? 0, depth, ops: 1 });
+    } else if (comb) {
+      const st = comb.states[comb.steps[k] ?? 0] ?? comb.states[0];
+      out.push({ target, phase, scrap: cut ? Math.max(1, st.scrap.length) : 0, removed: st.removed, depth, ops: ops.length, ...(comb.error ? { exact: false as const } : {}) });
+    } else {
+      // bez kombinace z jádra: jen dolní mez (největší operace), odpad nejméně 1 – nikdy součet
+      out.push({ target, phase, scrap: cut ? 1 : 0, removed: Math.max(0, ...ops.map((o) => stOf(o)?.removed ?? 0)), depth, ops: ops.length, exact: false });
+    }
   }
   return out;
 }
@@ -251,6 +277,27 @@ export function processRequest(doc: CadDoc, res: Pick<MotionResult, "steps">, op
   };
 }
 
+/**
+ * Požadavek operace `op` s ostatními operacemi na TÉMŽE obrobku (jen poslední operace obrobku – její odpověď nese kombinovaný stav
+ * obrobku, `ProcRes.combined`); `startOf` = začátek operace. Stejný v CLI i v prohlížeči (sítě kombinovaného stavu).
+ */
+export function processRequestWith(doc: CadDoc, res: Pick<MotionResult, "steps">, op: ProcessOp, startOf: (op: ProcessOp) => ProcAt | null, mesh?: number[], meshCombined?: number[]): ProcReq {
+  const req = processRequest(doc, res, op, startOf(op), mesh);
+  const all = doc.motion?.process ?? [];
+  const same = all.filter((x) => x.target === op.target);
+  if (same.length < 2 || same[same.length - 1].id !== op.id) return req;
+  const others: NonNullable<ProcReq["others"]> = [];
+  for (const x of same.slice(0, -1)) {
+    try {
+      const q = processRequest(doc, res, x, startOf(x));
+      others.push({ tool: q.tool, kind: q.kind, ...(q.depth !== undefined ? { depth: q.depth } : {}), rels: q.rels });
+    } catch {
+      /* operace s chybou požadavku (podsestava…) – hlásí ji vlastní řádek; do kombinace nepatří */
+    }
+  }
+  return others.length ? { ...req, others, ...(meshCombined?.length ? { meshCombined } : {}) } : req;
+}
+
 export type ProcessEnv = { process?: (req: ProcReq) => Promise<ProcRes> };
 
 /**
@@ -265,8 +312,9 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
   const t0 = Date.now();
   const out: ProcOpResult[] = [];
   let unavailable: string | undefined;
+  const starts = new Map(ops.map((op) => [op.id, opStart(op, res, study)] as const));
   for (const op of ops) {
-    const start = opStart(op, res, study);
+    const start = starts.get(op.id) ?? null;
     const base = { id: op.id, kind: op.kind, tool: op.tool, target: op.target, start, scrapRule: op.scrap ?? "fall" } as const;
     const empty: ProcOpResult = { ...base, contact: null, through: null, steps: res.steps.map(() => ({ contact: false, depth: 0, through: false, state: 0 })), states: [{ removed: 0, volume: 0, scrap: [] }], toolAt: res.steps.map(() => null), dir: null, thickness: null, volume0: 0, depth: 0, removed: 0, scrap: [], ms: 0 };
     if (!env.process) {
@@ -276,7 +324,7 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
     }
     let req: ProcReq;
     try {
-      req = processRequest(doc, res, op, start);
+      req = processRequestWith(doc, res, op, (x) => starts.get(x.id) ?? null);
     } catch (e) {
       out.push({ ...empty, error: (e as Error).message });
       continue;
@@ -309,6 +357,8 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
       scrap: fin?.scrap ?? [],
       ...(k.approx ? { approx: k.approx } : {}),
       ...(k.error ? { error: k.error } : {}),
+      // víc operací na obrobku: kombinovaný stav z jádra (bez něj jen dolní mez – productStates)
+      ...(req.others?.length ? { combined: k.combined ? { steps: k.combined.steps, states: k.combined.states.map((x) => ({ removed: x.removed, volume: x.volume, scrap: x.scrap })), ...(k.combined.error ? { error: k.combined.error } : {}) } : { missing: true as const } } : {}),
       ms: k.ms,
     });
   }
@@ -419,6 +469,17 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
     if (o.through) parts.push(tr("odpad {0} ks, {1} mm³ ({2})", Math.max(1, o.scrap.length), nf(o.scrap.reduce((s, x) => s + x.volume, 0) || o.removed, 3), scrapWord(o.scrapRule)));
     out.push(` ${head}: ${parts.join(" · ")}`);
   }
+  // víc operací na témže obrobku: celkový odebraný objem = sjednocení (společný objem jednou), součet operací jen pro srovnání
+  const last = res.steps.length - 1;
+  for (const p of productStates(proc, last)) {
+    if (p.ops < 2) continue;
+    const sum = proc.ops.filter((o) => o.target === p.target).reduce((s, o) => s + o.removed, 0);
+    out.push(
+      p.exact === false
+        ? tr(" „{0}“: {1} operací, odebráno nejméně {2} mm³ – sjednocení operací nespočítáno (součet {3} mm³ by společný objem počítal dvakrát)", cname(doc, p.target), p.ops, nf(p.removed, 3), nf(sum, 3))
+        : tr(" „{0}“: {1} operací, celkem odebráno {2} mm³ (sjednocení – společný objem operací jen jednou; součet operací {3} mm³)", cname(doc, p.target), p.ops, nf(p.removed, 3), nf(sum, 3)),
+    );
+  }
   out.push(...productTimeline(proc, res, doc));
   return out;
 }
@@ -442,7 +503,7 @@ export function productLines(res: MotionResult, doc: CadDoc, k: number): string[
   const proc = processOf(res);
   if (!proc) return [];
   return productStates(proc, k).map((p) => {
-    const extra = [p.removed > 0 ? tr("odebráno {0} mm³", nf(p.removed, 3)) : "", p.depth > 0 ? tr("hloubka {0} mm", nf(p.depth, 3)) : "", p.scrap ? tr("odpad {0} oddělen", p.scrap) : ""].filter(Boolean);
+    const extra = [p.removed > 0 ? (p.exact === false ? tr("odebráno nejméně {0} mm³", nf(p.removed, 3)) : tr("odebráno {0} mm³", nf(p.removed, 3))) : "", p.depth > 0 ? tr("hloubka {0} mm", nf(p.depth, 3)) : "", p.scrap ? tr("odpad {0} oddělen", p.scrap) : ""].filter(Boolean);
     return tr(" stav výrobku „{0}“: {1}{2}", cname(doc, p.target), phaseWord(p.phase), extra.length ? ` · ${extra.join(" · ")}` : "");
   });
 }
@@ -461,6 +522,9 @@ export function processCodes(res: MotionResult, doc: CadDoc): ProcessCode[] {
     if (o.error && o.error !== proc.unavailable) out.push({ code: "motion.process-failed", args: [name, o.error], text: tr("procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu", name, o.error) });
     else if (!o.contact && !o.error) out.push({ code: "motion.process-miss", args: [name, P, T], text: tr("procesní operace {0}: nástroj „{1}“ obrobek „{2}“ v okně operace nezasáhl – obrobek beze změny", name, P, T) });
     else if (o.kind === "cut" && o.contact && !o.through) out.push({ code: "motion.process-partial", args: [name, T, nf(o.depth, 3)], text: tr("procesní operace {0}: obrobek „{1}“ neprostřižen – hloubka {2} mm", name, T, nf(o.depth, 3)) });
+    const cmb = o.combined;
+    if (cmb && "missing" in cmb) out.push({ code: "motion.process-failed", args: [name, tr("jádro nevrátilo stav obrobku po všech operacích")], text: tr("procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu", name, tr("jádro nevrátilo stav obrobku po všech operacích")) });
+    else if (cmb?.error) out.push({ code: "motion.process-failed", args: [name, cmb.error], text: tr("procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu", name, cmb.error) });
     if (o.approx) out.push({ code: "motion.process-approx", args: [name, String(o.approx.computed), String(o.approx.contact)], text: tr("procesní operace {0}: booleovsky spočítáno {1} z {2} kroků se záběrem (strop výkonu) – mezikroky převzaty", name, o.approx.computed, o.approx.contact) });
   }
   return out;
@@ -473,7 +537,7 @@ export function processStatusText(res: MotionResult, doc: CadDoc): string {
   const proc = processOf(res);
   if (!proc) return "";
   const last = res.steps.length - 1;
-  const parts = productStates(proc, last).map((p) => `„${cname(doc, p.target)}“ ${phaseWord(p.phase)}${p.removed > 0 ? tr(", odebráno {0} mm³", nf(p.removed, 3)) : ""}${p.scrap ? tr(", odpad {0}", p.scrap) : ""}`);
+  const parts = productStates(proc, last).map((p) => `„${cname(doc, p.target)}“ ${phaseWord(p.phase)}${p.removed > 0 ? (p.exact === false ? tr(", odebráno nejméně {0} mm³", nf(p.removed, 3)) : tr(", odebráno {0} mm³", nf(p.removed, 3))) : ""}${p.scrap ? tr(", odpad {0}", p.scrap) : ""}`);
   return tr("procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci {0}", parts.join("; "));
 }
 
@@ -482,10 +546,33 @@ export function processKv(res: MotionResult): string[] {
   const proc = processOf(res);
   if (!proc) return [];
   const n = (v: number) => String(Math.round(v * 1000) / 1000);
-  const removed = proc.ops.reduce((s, o) => s + o.removed, 0);
-  const scrap = proc.ops.reduce((s, o) => s + (o.through ? Math.max(1, o.scrap.length) : 0), 0);
+  // po obrobcích (víc operací na obrobku = sjednocení, ne součet – dřív druhý střih do téže díry removed=628.319 místo 314.159)
+  const fin = productStates(proc, Math.max(0, res.steps.length - 1));
+  const removed = fin.reduce((s, p) => s + p.removed, 0);
+  const scrap = fin.reduce((s, p) => s + p.scrap, 0);
+  const inexact = fin.some((p) => p.exact === false);
   const thr = proc.ops.find((o) => o.through)?.through;
-  return [`proc=${proc.ops.length}`, `removed=${n(removed)}`, `scrap=${scrap}`, ...(thr ? [`through=${thr.step}`] : [])];
+  return [`proc=${proc.ops.length}`, `removed=${n(removed)}${inexact ? "+" : ""}`, `scrap=${scrap}`, ...(thr ? [`through=${thr.step}`] : [])];
+}
+
+/**
+ * Sloupce CSV studie pro procesní vrstvu (na konci řádku, za vůlí): za každý obrobek stav výrobku a odebraný objem v kroku
+ * (víc operací na obrobku = sjednocení; dolní mez s „+“). Dřív CSV procesní vrstvu nemělo vůbec.
+ */
+export function processCsvHead(res: MotionResult, doc: CadDoc): string[] {
+  const proc = processOf(res);
+  if (!proc) return [];
+  return [...new Set(proc.ops.map((o) => o.target))].flatMap((t) => [tr("Stav výrobku {0}", cname(doc, t)), tr("Odebráno {0} [mm³]", cname(doc, t))]);
+}
+export function processCsvCells(res: MotionResult, k: number): string[] {
+  const proc = processOf(res);
+  if (!proc) return [];
+  const st = productStates(proc, k);
+  return [...new Set(proc.ops.map((o) => o.target))].flatMap((t) => {
+    const p = st.find((x) => x.target === t);
+    if (!p) return ["", ""];
+    return [p.phase, `${String(Math.round(p.removed * 1000) / 1000).replace(".", ",")}${p.exact === false ? "+" : ""}`];
+  });
 }
 
 /** API `window.mncad.motion().process` – operace a stav výrobku po krocích */
@@ -495,6 +582,6 @@ export function processApi(res: MotionResult, doc: CadDoc) {
   return {
     level: "geometric-approximation",
     ops: proc.ops.map((o) => ({ id: o.id, kind: o.kind, tool: cname(doc, o.tool), target: cname(doc, o.target), start: o.start, contact: o.contact, through: o.through, removed: o.removed, depth: o.depth, scrap: o.scrap.map((s) => s.volume), ...(o.error ? { error: o.error } : {}), ...(o.approx ? { approx: o.approx } : {}) })),
-    steps: res.steps.map((s, k) => ({ step: s.i, states: productStates(proc, k).map((p) => ({ target: cname(doc, p.target), state: p.phase, removed: p.removed, depth: p.depth, scrap: p.scrap })) })),
+    steps: res.steps.map((s, k) => ({ step: s.i, states: productStates(proc, k).map((p) => ({ target: cname(doc, p.target), state: p.phase, removed: p.removed, depth: p.depth, scrap: p.scrap, ...(p.exact === false ? { exact: false } : {}) })) })),
   };
 }

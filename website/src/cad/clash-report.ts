@@ -322,7 +322,7 @@ export function ruleText(doc: CadDoc, r: ClashRule): string {
  */
 export type ClashStep = { i: number; t: number; motors: readonly number[]; clashes?: readonly MaybeClassified[]; place?: Record<string, Placement>; between?: [number, number] };
 /** výsledek studie (MotionResult z cad/motion.ts); `sweep` / `between` = spojitost kontroly a kontakty mezi kroky (motion-clearance.ts) */
-export type ClashStudy = { steps: readonly ClashStep[]; collisionsChecked: boolean; sweep?: SweepInfo; between?: readonly BetweenHit[] };
+export type ClashStudy = { steps: readonly ClashStep[]; collisionsChecked: boolean; sweep?: SweepInfo; between?: readonly BetweenHit[]; /** sledovaná vůle (motion-clearance.ts) – bez ní souhrn říká „vůle nekontrolována“ */ clearance?: unknown };
 /** kontakty mezi kroky jako mezipolohy s kolizemi (seřazené podle polohy) */
 export const betweenSteps = (res: ClashStudy): ClashStep[] => (res.between ?? []).map((h) => ({ i: h.pos, t: h.t, motors: h.motors, clashes: h.clashes, between: [h.k0, h.k1] as [number, number] }));
 
@@ -441,7 +441,9 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
     ...(betweenFaults ? { between: betweenFaults, firstBetween: firstBetween ?? 0 } : {}),
   };
   // „žádný průnik v N polohách“ + jak se kontrolovalo (dřív „Kolize: žádné ve všech krocích“ i při průchodu mezi kroky)
-  if (!all.length && !threadPairs.size) return { lines: [sampled ? tr("Kolize: žádný průnik v kontrolovaných snímcích") : tr("Kolize: žádný průnik v {0} polohách", of), ...(sample ? [sample] : []), how], codes: [], stats };
+  // bez sledované vůle výslovně „vůle nekontrolována“ (vlna 22, bod 6 – nulový průnik není provozní vůle; jako statická `kolize`)
+  const clrNote = res.clearance ? "" : tr(" · vůle nekontrolována (pohyb vůle \"A\" \"B\" min 0,05 | pohyb vůle pohyblivé min 0,05)");
+  if (!all.length && !threadPairs.size) return { lines: [(sampled ? tr("Kolize: žádný průnik v kontrolovaných snímcích") : tr("Kolize: žádný průnik v {0} polohách", of)) + clrNote, ...(sample ? [sample] : []), how], codes: [], stats };
   const extra = [quiet.work.size ? tr(" · pracovní kontakt {0} dvojic", quiet.work.size) : "", quiet.touch.size ? tr(" · dotyk {0} dvojic", quiet.touch.size) : "", betweenFaults ? tr(" · mezi kroky (zjemněno) {0}×", betweenFaults) : ""].join("");
   const lines = [
     // „kroků s kolizí“ = kroky se SKUTEČNOU (nebo nevyhodnotitelnou) kolizí; šrouby v závitu jsou v textu zvlášť (vlna 22, bod 5)

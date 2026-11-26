@@ -81,7 +81,7 @@ Vazby: 2 (2 ok)
 Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize – pohyb stav
 Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 60 mm · objem Σ 115,76 cm³ · hmotnost Σ 0,909 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 48 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný, odebráno 314,159 mm³, odpad 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 48 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), vůle nekontrolována, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný, odebráno 314,159 mm³, odpad 1 (podrobně pohyb stav)
 ✓ procesní operace smazány: 1
 Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)

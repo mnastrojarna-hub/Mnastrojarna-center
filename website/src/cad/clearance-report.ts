@@ -233,6 +233,12 @@ export function clearanceApi(res: Res, doc: CadDoc) {
   };
 }
 
+/** počet sledovaných dvojic s vůlí pod limitem (verdikt `stav` motion=warn – motion-cache.ts `motionVerdict`) */
+export function clearanceBelowCount(res: Res): number {
+  const c = clearanceOf(res as never).clearance;
+  return c ? belowPairs(c.pairs, c.limit).length : 0;
+}
+
 /** věta do řádku „Pohyb:“ ve `stav` (prázdné bez sledované vůle) */
 export function clearanceStatusText(res: Res, doc: CadDoc): string {
   const c = clearanceOf(res as never).clearance;

@@ -4016,6 +4016,7 @@ export function CadApp() {
             data-doc-key={docKeyNow}
             data-motor-highlight={isAsm && motorHl ? motorHl.comps.length : undefined}
             data-process-view={isAsm && motionShow.proc ? asmViews.filter((v) => v.key.startsWith("proc:")).length : undefined}
+            data-process-combined={isAsm && motionShow.proc ? asmViews.filter((v) => /^proc:[^:]+:c\d+$/.test(v.key)).length : undefined}
             data-motor-axis={isAsm && motorHl?.label ? motorHl.label.text : undefined}
             data-compare-map={cmpShown?.colors ? docKeyNow : undefined}
             onPointerDownCapture={(e) => {

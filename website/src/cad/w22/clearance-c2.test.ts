@@ -59,7 +59,7 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     expect(con).not.toMatch(/Kolize: žádné ve všech krocích/);
     expect(con).toMatch(/^Kolize v pohybu: kroků s kolizí 0 z 37 .* skutečné: 1 dvojic dílů jen mezi kroky \(nalezeno zjemněním\) · mezi kroky \(zjemněno\) 1×\n kontrolováno spojitě i mezi polohami \(37 poloh \+ \d+ mezipoloh ze zjemnění; úseky: dráha posuvu \d+/m);
     // diskrétně: žádné tvrzení o úsecích mezi polohami, ℹ clash.discrete s posunem 5 mm
-    expect(con).toMatch(/Kolize: žádný průnik v 37 polohách\n {1,2}kontrolováno jen v 37 polohách \(diskrétně, posun mezi polohami až 5 mm\) – mezi polohami nekontrolováno \(spojitá kontrola vypnuta/);
+    expect(con).toMatch(/Kolize: žádný průnik v 37 polohách · vůle nekontrolována \(pohyb vůle [^\n]*\)\n {1,2}kontrolováno jen v 37 polohách \(diskrétně, posun mezi polohami až 5 mm\) – mezi polohami nekontrolováno \(spojitá kontrola vypnuta/);
     expect(short).toMatch(/clash\.discrete "Sestava 6": kontrolováno jen v 37 polohách \(diskrétně/);
     expect(short).toMatch(/^= L\d+ asm "Sestava 6" motion steps=36 .* clash\.mode=discrete clash\.poses=37 clash\.refined=0 clash\.maxstep=5mm m1=range:12>192:\+ level=kin groups=1:x\+180$/m);
     // spojitě znovu + 180 kroků: průnik v krocích 87–88, kontrola pořád spojitá

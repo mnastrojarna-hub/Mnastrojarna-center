@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 import { placementMatrix } from "@/cad/assembly";
 import type { MotionResult } from "@/cad/motion";
-import { processOf, processRequest, scrapOffset, scrapPlacement } from "@/cad/motion-process";
+import { processOf, processRequestWith, scrapOffset, scrapPlacement, type ProcAt } from "@/cad/motion-process";
 import { procKey, type ProcReq, type ProcRes } from "@/cad/process-types";
 import type { CadDoc, MeshData, Placement } from "@/cad/types";
 
@@ -59,7 +59,7 @@ function opKey(res: MotionResult, doc: CadDoc, id: string): string | null {
   let k = "";
   if (o && op) {
     try {
-      k = shortKey(processRequest(doc, res, op, o.start));
+      k = shortKey(processRequestWith(doc, res, op, startOf(res)));
     } catch {
       k = "";
     }
@@ -67,6 +67,12 @@ function opKey(res: MotionResult, doc: CadDoc, id: string): string | null {
   m.set(id, k);
   return k || null;
 }
+
+/** začátky operací z výsledku (stejné jako při výpočtu – požadavek i klíč se shodují s motion-process.ts `processRun`) */
+const startOf =
+  (res: MotionResult) =>
+  (op: { id: string }): ProcAt | null =>
+    processOf(res)?.ops.find((x) => x.id === op.id)?.start ?? null;
 
 /**
  * Načte sítě všech stavů všech operací výsledku (jednou na výsledek). `proc` = operace jádra (AsmEnv.process). Chyba jádra
@@ -82,12 +88,17 @@ export function ensureProcessMeshes(res: MotionResult, doc: CadDoc, proc: ((req:
       const op = doc.motion?.process?.find((x) => x.id === o.id);
       if (!op || o.states.length < 2) continue;
       try {
-        const req = processRequest(doc, res, op, o.start, o.states.map((_, i) => i).slice(1));
-        const key = shortKey(req);
-        if (store.has(`${key}#${o.states.length - 1}`)) continue;
+        const cmb = o.combined && !("missing" in o.combined) ? o.combined : null;
+        const req = processRequestWith(doc, res, op, startOf(res), o.states.map((_, i) => i).slice(1), cmb ? cmb.states.map((_, i) => i).slice(1) : undefined);
+        const key = shortKey({ ...req, meshCombined: undefined });
+        if (store.has(`${key}#${o.states.length - 1}`) && (!cmb || cmb.states.length < 2 || store.has(`${key}#c${cmb.states.length - 1}`))) continue;
         const r = await proc(req);
         r.states.forEach((s, i) => {
           if (i > 0) store.set(`${key}#${i}`, { body: s.mesh ?? null, scrap: s.scrapMesh ?? null });
+        });
+        // obrobek po všech operacích na něm (víc operací na témže obrobku)
+        r.combined?.states.forEach((s, i) => {
+          if (i > 0) store.set(`${key}#c${i}`, { body: s.mesh ?? null, scrap: null });
         });
         if (store.size > 600) for (const k of [...store.keys()].slice(0, store.size - 600)) store.delete(k);
       } catch {
@@ -111,6 +122,17 @@ export function processView(res: MotionResult | null, doc: CadDoc, k: number, pl
   const pr = processOf(res);
   if (!res || !pr) return null;
   const out: ProcessView = { replace: new Map(), scrap: [] };
+  // obrobky s kombinovaným stavem (víc operací): síť po všech operacích v kroku – dřív jen síť poslední operace se záběrem
+  const combinedTargets = new Set<string>();
+  for (const o of pr.ops) {
+    const cmb = o.combined && !("missing" in o.combined) ? o.combined : null;
+    if (!cmb) continue;
+    combinedTargets.add(o.target);
+    const cs = cmb.steps[k] ?? 0;
+    const key = opKey(res, doc, o.id);
+    const e = cs && key ? store.get(`${key}#c${cs}`) : null;
+    if (e?.body && key) out.replace.set(o.target, { key: `proc:${key}:c${cs}`, mesh: e.body });
+  }
   for (const o of pr.ops) {
     const st = o.steps[k]?.state ?? 0;
     if (!st) continue;
@@ -118,7 +140,7 @@ export function processView(res: MotionResult | null, doc: CadDoc, k: number, pl
     if (!key) continue;
     const e = store.get(`${key}#${st}`);
     if (!e) continue;
-    if (e.body) out.replace.set(o.target, { key: `proc:${key}:${st}`, mesh: e.body });
+    if (e.body && !combinedTargets.has(o.target)) out.replace.set(o.target, { key: `proc:${key}:${st}`, mesh: e.body });
     const off = scrapOffset(o, res.steps, k);
     const tp = place?.[o.target] ?? res.steps[k]?.place[o.target] ?? doc.components?.find((c) => c.id === o.target)?.placement;
     if (e.scrap && off && tp) out.scrap.push({ id: `${o.target}#scrap:${o.id}`, topId: o.target, key: `proc:${key}:${st}:scrap`, mesh: e.scrap, matrix: placementMatrix(scrapPlacement(tp, off)) });

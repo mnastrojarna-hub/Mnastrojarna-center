@@ -27,7 +27,8 @@
 //     (157 mm³), krok 21 = pierced, data-process-scrapped=1, data-process-removed≈314,159; 3D okno / softwarový náhled ukazuje plech
 //     po střihu a odpad (main[data-process-view] ≥ 2, síť „proc:…“); úroveň „kinematika + geometrická aproximace“; window.mncad
 //     .motion().process (stav po krocích, removed); pracovní záběr bez štítku „· kolize“; přidání operace otisk v GUI zapíše
-//     doc.motion.process; export PNG snímků obsahuje plech po operaci (snímek kroku 21 se liší od kroku 0)
+//     doc.motion.process; export PNG snímků obsahuje plech po operaci (snímek kroku 21 se liší od kroku 0); druhý střih do téže díry
+//     = celkem 314 mm³ jednou, odpad 1, main[data-process-combined]=1 (kombinovaný stav obrobku, ne síť poslední operace)
 // Spuštění: E2E_BASE=http://localhost:3535 node e2e/cad-w22-c.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -256,6 +257,21 @@ async function processFlow(p, tag, soft) {
   ok(ops.length === 2 && ops[1][0] === 'imprint' && Math.abs(ops[1][1] - 0.3) < 1e-9, `[${tag}] otisk přidaný v GUI je ve studii (${JSON.stringify(ops)})`);
   await p.locator('[data-process-remove="2"]').click();
   await p.waitForTimeout(400);
+  // fáze 2 kolo 3: druhý střih tímtéž razníkem do téže díry – obrobek po OBOU operacích (sjednocení): 314 mm³ jednou, odpad 1,
+  // 3D / náhled ukazuje kombinovaný stav (síť „proc:…:c…“); dřív removed=628 a jen síť poslední operace
+  const two = await run('pohyb proces střih "Razník" "Plech" název "střih znovu"');
+  ok(!/^✗/m.test(two) && /„Plech“: 2 operací, celkem odebráno 314,1\d* mm³/.test(two), `[${tag}] dva střihy do téže díry: celkem 314 mm³ jednou (sjednocení), ne součet\n   ${(two.match(/.*operací.*/g) || []).join(' | ')}`);
+  await idle();
+  ok(await motionDone(), `[${tag}] studie se 2 operacemi spočítána`);
+  await step(21);
+  const c21 = await p.evaluate(() => {
+    const el = document.querySelector('[data-process-state]');
+    const main = document.querySelector('main[data-process-combined]') || document.querySelector('[data-process-combined]');
+    return el ? { state: el.getAttribute('data-process-state'), removed: Number(el.getAttribute('data-process-removed')), scrap: Number(el.getAttribute('data-process-scrapped')), combined: main ? Number(main.getAttribute('data-process-combined')) : 0 } : null;
+  });
+  ok(c21 && c21.state === 'pierced' && Math.abs(c21.removed - 314.159) < 3.2 && c21.scrap === 1 && c21.combined === 1, `[${tag}] krok 21 se 2 operacemi: děrovaný, 314 mm³ jednou, odpad 1, ${soft ? 'náhled' : '3D okno'} ukazuje plech po obou operacích (${JSON.stringify(c21)})`);
+  await run('pohyb proces 2 smazat');
+  await idle();
   // export PNG po krocích: snímek kroku 21 se liší od kroku 0 (plech po střihu je v exportu)
   if (!soft) {
     const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);

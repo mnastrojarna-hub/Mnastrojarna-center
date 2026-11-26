@@ -1,0 +1,10 @@
+# Vlna 22, fáze 2 kolo 3, balík C: vůle pohyblivých dílů, „vůle nekontrolována“ v souhrnu pohybu, kombinace procesních operací
+ · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)	 · clearance not checked (motion clearance "A" "B" min 0.05 | motion clearance moving min 0.05)
+ „{0}“: {1} operací, odebráno nejméně {2} mm³ – sjednocení operací nespočítáno (součet {3} mm³ by společný objem počítal dvakrát)	 “{0}”: {1} operations, removed at least {2} mm³ – union of the operations not computed (the sum {3} mm³ would count the shared volume twice)
+ „{0}“: {1} operací, celkem odebráno {2} mm³ (sjednocení – společný objem operací jen jednou; součet operací {3} mm³)	 “{0}”: {1} operations, removed in total {2} mm³ (union – the shared volume of the operations counted once; sum of the operations {3} mm³)
+odebráno nejméně {0} mm³	removed at least {0} mm³
+, odebráno nejméně {0} mm³	, removed at least {0} mm³
+jádro nevrátilo stav obrobku po všech operacích	the kernel returned no workpiece state after all operations
+vůle nekontrolována	clearance not checked
+Stav výrobku {0}	Product state {0}
+Odebráno {0} [mm³]	Removed {0} [mm³]

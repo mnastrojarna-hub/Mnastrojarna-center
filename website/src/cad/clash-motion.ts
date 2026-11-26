@@ -68,8 +68,8 @@ export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<
   const steps = await ensureClassified(res, d, env);
   const every = (res as { dynamic?: { clashEvery?: number } }).dynamic?.clashEvery;
   // spojitost kontroly a kontakty nalezené mezi kroky (vlna 22, bod 6 – motion-clearance.ts)
-  const { sweep, between } = clearanceOf(res);
-  return motionClashSummary({ steps, collisionsChecked: res.collisionsChecked, ...(sweep ? { sweep } : {}), ...(between ? { between } : {}) }, d, every !== undefined ? { every } : {});
+  const { sweep, between, clearance } = clearanceOf(res);
+  return motionClashSummary({ steps, collisionsChecked: res.collisionsChecked, ...(sweep ? { sweep } : {}), ...(between ? { between } : {}), ...(clearance ? { clearance } : {}) }, d, every !== undefined ? { every } : {});
 }
 
 /** kolize kroku pro `pohyb krok N`: řádky (šroub v závitu, pracovní kontakt, dotyk) a ⚠ závady s instancí a místem */

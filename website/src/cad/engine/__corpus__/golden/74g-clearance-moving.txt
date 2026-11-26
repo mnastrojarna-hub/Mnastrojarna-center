@@ -1,0 +1,75 @@
+=== run 1 ===
+✓ nový díl „Vodítko“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Střižník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 16000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 788,5 mm³ (7 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 3141,6 mm³ · těleso platné
+
+Dokument: „Střižník“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 40 mm (X -5…5, Y -5…5, Z 0…40) · objem 3,14 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 3141,6 mm³ · těleso platné – Ø10 × 40 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Sestava 6c“ – nová záložka
+✓ komponenta „Vodítko“ vložena do sestavy (ukotvená)
+✓ komponenta „Střižník“ vložena do sestavy
+✓ vazba Souosost „Střižník“ F1 → „Vodítko“ F7: ok · poloha beze změny
+✓ motor 1: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+ pohání: „Střižník“ · směr −Z
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −20 mm
+ stojí: 1 („Vodítko“)
+Vazby splněny ve všech krocích
+Vůle: pohyblivé díly vůči ostatním · limit 0,05 mm · kontrola jen v polohách kroků (diskrétně) (kolize v pohybu vypnuté – pohyb kolize)
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −20 mm
+ stojí: 1 („Vodítko“)
+Vůle pohyblivých dílů: dvojic blíž než 1,1 mm: 1
+Vůle „Vodítko“ × „Střižník“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25,01; 20; 10] ↔ [25; 20; 10] · ⚠ pod limitem 0,05 mm v 11 z 11 poloh (kroky 0–10)
+Vazby splněny ve všech krocích
+⚠ řádek 6: vůle „Vodítko“ × „Střižník“ 0,01 mm < 0,05 mm v krocích 0–10 (nejmenší v kroku 0 (t = 0 s)) – místo [25,01; 20; 10] ↔ [25; 20; 10]
+Dokument: „Sestava 6c“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Vodítko [0; 0; 0] ⚓ · Střižník [20; 20; -10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 10 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 18,35 cm³ · hmotnost Σ 0,144 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, kolize nekontrolovány, vůle „Vodítko“ × „Střižník“ 0,01 mm < limit 0,05 mm (⚠ 1 dvojic) (podrobně pohyb stav)
+Vůle: pohyblivé díly vůči ostatním · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami (kolize v pohybu vypnuté – pohyb kolize)
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −20 mm
+ stojí: 1 („Vodítko“)
+Vůle pohyblivých dílů: dvojic blíž než 1,1 mm: 1
+Vůle „Vodítko“ × „Střižník“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25,01; 20; 10] ↔ [25; 20; 10] · ⚠ pod limitem 0,05 mm v 11 z 11 poloh (kroky 0–10)
+Vazby splněny ve všech krocích
+⚠ řádek 8: vůle „Vodítko“ × „Střižník“ 0,01 mm < 0,05 mm v krocích 0–10 (nejmenší v kroku 0 (t = 0 s)) – místo [25,01; 20; 10] ↔ [25; 20; 10]
+Vůle: nesleduje se · bez limitu · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami (kolize v pohybu vypnuté – pohyb kolize)
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −20 mm
+ stojí: 1 („Vodítko“)
+Vazby splněny ve všech krocích
+Pohybová studie: motorů 1 · kroků 10 · 2 s · kolize
+ 1. lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Pohybová studie: 10 kroků · 2 s · motory: lineární motor · Souosost „Střižník“ → „Vodítko“ · posuv od výchozí polohy 0 → 20 mm ↑ zdvih 20 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −20 mm
+ stojí: 1 („Vodítko“)
+Kolize: žádný průnik v 11 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
+ kontrolováno spojitě i mezi polohami (11 poloh + 10 mezipoloh ze zjemnění; úseky: dráha posuvu 10)
+Vazby splněny ve všech krocích
+
+Dokument: „Sestava 6c“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Vodítko [0; 0; 0] ⚓ · Střižník [20; 20; -10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 10 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 18,35 cm³ · hmotnost Σ 0,144 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 10 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle nekontrolována (podrobně pohyb stav)

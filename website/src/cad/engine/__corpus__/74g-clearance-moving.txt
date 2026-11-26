@@ -1,0 +1,21 @@
+# vlna 22, bod 6 (fáze 2, kolo 3 – falešná zelená): „pohyb vůle pohyblivé … bez zjemnění“ na střižníku ve vedení s vůlí 0,01 mm
+# hlásilo „žádná dvojice blíž než 1,1 mm v kontrolovaných polohách (11 poloh)“ a clear.pairs=0 (dvojice se zjišťovaly jen ve větvi
+# zjemnění); se zjemněním chyběl krok 0 („10 z 10 poloh (kroky 1–10)“); `stav` dával motion=ok při vůli pod limitem; souhrn kolizí
+# bez sledované vůle neříkal „vůle nekontrolována“. Očekáváno: obojí ⚠ 0,01 mm < 0,05 mm v 11 z 11 poloh (kroky 0–10),
+# clear.pairs=1 clear.below=11/11, motion=warn, „Kolize: žádný průnik v 11 polohách · vůle nekontrolována (…)“.
+nový díl Vodítko
+kvádr 40 40 10
+díra 10,02 skrz v 20 20
+nový díl Střižník
+válec 10 40
+#--- run
+nová sestava Sestava 6c
+vložit "Vodítko" ukotvit
+vložit "Střižník" v 20 20 -10
+sestava vazba souosost "Střižník" "Vodítko"
+pohyb motor lineární vazba 1 0..20 kroky 10
+pohyb vůle pohyblivé min 0,05 bez zjemnění
+stav
+pohyb vůle pohyblivé min 0,05 zjemnit
+pohyb vůle smazat
+pohyb kolize
