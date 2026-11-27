@@ -21,8 +21,8 @@ import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge"
 import type { BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, mouseButtons, queryBox, type BoxMode, type BoxResolve, type BoxSceneOf, type DragAction, type LeftDrag } from "./box-pick-3d";
-import { bodyOpacity, capStyles } from "@/cad/section-cap";
-import { capMesh, isCapObject } from "./section-cap-gl";
+import { bodyOpacity, capModule, capStyles } from "@/cad/section-cap";
+import { capMesh, capOutline, isCapObject, updateCapOutline } from "./section-cap-gl";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -464,6 +464,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     scene.add(sketchGroup);
     const asmGroup = new THREE.Group();
     scene.add(asmGroup);
+    // kolo 7: obrysy čel řezu se přepočítají před každým snímkem (i snímek / video studie), jen když se rovina vůči
+    // komponentě pohnula (section-cap-gl `updateCapOutline`, mezipaměť v section-contour)
+    const outlineSize = new THREE.Vector2();
+    scene.onBeforeRender = (r) => {
+      r.getSize(outlineSize);
+      for (const o of asmGroup.children) if (o.userData.capOutline) updateCapOutline(o, outlineSize);
+    };
 
     const axes = new THREE.Group();
     const ax = (dir: THREE.Vector3, color: number) => {
@@ -649,11 +656,11 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const capTargets = (): THREE.Mesh[] => {
       const s = S.current!;
       if (!isAsm() || !propsRef.current.section) return [];
-      return s.asmGroup.children.filter((o) => isCapObject(o) && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
+      return s.asmGroup.children.filter((o) => isCapObject(o) && !o.userData.capOutline && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
     };
     const edgeTargets = (): THREE.LineSegments[] => {
       const s = S.current!;
-      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.LineSegments).isLineSegments && o.visible) as THREE.LineSegments[];
+      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.LineSegments).isLineSegments && o.visible && !isCapObject(o)) as THREE.LineSegments[];
       return s.edges && !propsRef.current.bodyHidden ? [s.edges] : [];
     };
     /** nejbližší zásah tělesa NEBO čela řezu; u čela je vzdálenost = rovina řezu (čelo leží v ní, ne na zadní stěně) */
@@ -1547,6 +1554,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.asmGroup.remove(o);
       const mt = (o as THREE.Mesh).material as THREE.Material | undefined;
       mt?.dispose?.();
+      // obrys čela má vlastní geometrii (body jsou ze sdílené mezipaměti obrysů)
+      if (o.userData.capOutline) (o as THREE.Mesh).geometry.dispose();
     }
     const used = new Set(list.map((c) => c.key));
     for (const [k, g] of s.asmGeo)
@@ -1559,11 +1568,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const clipping = props.section ? [s.clip] : [];
     applyClip();
     // vlna 22 (zpráva 20. 11.): čelo řezu pro každou komponentu – barva komponenty, šrafy, stejná průhlednost jako tělo
-    const caps = props.section ? capStyles(list, display) : null;
+    // kolo 7: modul šraf ze sestavy (rozteč v mm, stejný jako softwarový náhled) a obrys čela
+    const caps = props.section ? capStyles(list, display, capModule(list)) : null;
     const pr = s.renderer.getPixelRatio();
     let capCount = 0;
     const capHex: string[] = [];
     const capHatch: string[] = [];
+    const capMm: string[] = [];
+    const capLine: string[] = [];
     for (const [ci, c] of list.entries()) {
       let g = s.asmGeo.get(c.key);
       if (!g || g.mesh !== c.mesh) {
@@ -1604,9 +1616,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       if (st) {
         // nese id komponenty (gizmo ho posune s tělem), ale `cap: true` ho vyřadí z výběru, najetí myší, okna a rozměru scény
         s.asmGroup.add(capMesh(g.geo, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, pr));
+        // obrys čela: průsečnice roviny se sítí, nepatrně před čelem (do odebrané strany), aby s ním nezápasil o hloubku
+        s.asmGroup.add(capOutline(c.mesh, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, -Math.max(1e-3, s.radius * 2e-4)));
         capCount++;
         capHex.push(st.hex);
         capHatch.push(st.hatch.hex);
+        capMm.push(String(st.hatch.stepMm));
+        capLine.push(st.outlineHex);
       }
     }
     // stav pro e2e a diagnostiku: počet čel a jejich barvy (stejné pořadí jako komponenty)
@@ -1616,10 +1632,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         hostEl.dataset.sectionCaps = String(capCount);
         hostEl.dataset.sectionCapColors = capHex.join(",");
         hostEl.dataset.sectionCapHatch = capHatch.join(",");
+        hostEl.dataset.sectionCapHatchMm = capMm.join(",");
+        hostEl.dataset.sectionCapOutline = capLine.join(",");
       } else {
         delete hostEl.dataset.sectionCaps;
         delete hostEl.dataset.sectionCapColors;
         delete hostEl.dataset.sectionCapHatch;
+        delete hostEl.dataset.sectionCapHatchMm;
+        delete hostEl.dataset.sectionCapOutline;
       }
     }
     if (list.length) {
@@ -1856,7 +1876,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
 
   return (
     <div className={softOn ? "invisible absolute inset-0" : "absolute inset-0"}>
-      <div ref={host} className="absolute inset-0" />
+      <div ref={host} data-gl-host className="absolute inset-0" />
       {/* popisky kót měření */}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden">
         {(props.measure?.labels ?? []).map((l, i) => (

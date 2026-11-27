@@ -2,7 +2,7 @@
 
 import { withDesignation } from "@/cad/material-designation";
 import { MaterialNoteLine } from "./material-note";
-import { softLimitsText, softStatusText } from "@/cad/soft-view";
+import { softLimitsText, softStatusText, viewStatusLine, type ViewEnv } from "@/cad/soft-view";
 import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
 import { geometryText, treeStatus } from "@/cad/feature-levels";
@@ -96,6 +96,7 @@ import { bomNotesOf, partDrawingsNote } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
+import { MotionDockSlot, useMotionDock } from "./motion-dock";
 import { processView, useProcessMeshVer } from "./process-meshes"; // procesní vrstva: obrobek po střihu / otisku a odpad v kroku (vlna 22, bod 4)
 import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
@@ -315,6 +316,7 @@ export function CadApp() {
   /** Skica › Import DXF…: vybraný soubor čeká v dialogu na volby (jednotky, posun, hladiny) */
   const [dxfImp, setDxfImp] = useState<{ name: string; text: string } | null>(null);
   const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
+  const motionDock = useMotionDock(); // ukotvení panelu studie (kolo 7, bod 14)
   const motionShow = useMotionView();
   const clearanceGapShow = useClearanceGap();
   // motor ve formuláři studie (vlna 22, bod 10): poháněné díly zvýrazněné, osa a šipka směru v překryvu (WebGL i bez WebGL)
@@ -843,6 +845,9 @@ export function CadApp() {
   runAgentRef.current = runAgentText;
   /** textový stav aktivního dokumentu (konzole, window.mncad.status) – tentýž výpočet jako příkaz `stav` (engine/asm-status.ts) */
   const agentStatus = () => presentStatusText(engineRef.current!.ws, cad, { onParts: () => setAsmVer((v) => v + 1) });
+  // kolo 7 (bod 21): window.mncad.status() uvádí i zobrazení modelu (view=webgl|soft, projekce) – stav prostředí, ne modelu
+  const viewEnvRef = useRef<{ env: ViewEnv; ortho: boolean }>({ env: "webgl", ortho: false });
+  viewEnvRef.current = { env: glError ? "soft" : "webgl", ortho: !!prefs.ortho };
   // automatizační API pro agenty (agent-api-host.ts): přístup ke stavu aplikace – obnovuje se při každém vykreslení
   const apiHostRef = useRef<ApiHost | null>(null);
   apiHostRef.current = {
@@ -1009,7 +1014,7 @@ export function CadApp() {
       undo: (n) => runAgentRef.current(`zpět ${Math.max(1, Math.floor(Number(n) || 1))}`),
       redo: (n) => runAgentRef.current(`znovu ${Math.max(1, Math.floor(Number(n) || 1))}`),
       history: () => ({ undo: histRef.current.past.length, redo: histRef.current.future.length }),
-      status: () => agentStatus(),
+      status: async () => `${await agentStatus()}\n${viewStatusLine(viewEnvRef.current.env, viewEnvRef.current)}`,
       drawingStatus: async (o) => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, op) => cad.drawing(doc, meta, op), { sheet: o?.sheet, extras: drawEnvRef.current })).text,
       exportDrawing: async (format, o) => (await import("@/cad/drawing-export")).exportDrawing(histRef.current.present, format, o ?? {}, (doc, meta, op) => cad.drawing(doc, meta, op), drawEnvRef.current),
       measure: (a, b) => measureApi(histRef.current.present, a, b),
@@ -4145,7 +4150,7 @@ export function CadApp() {
                 hidden={!!sketch}
                 failure={glError}
                 core={core}
-                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: weldFaceColors(doc, result?.bodies, doc.faceColors), display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
+                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: weldFaceColors(doc, result?.bodies, doc.faceColors), display: prefs.display, section, hidden: bodyHidden, dark: bg.dark, bodyOpacity }}
                 onRetry={() => {
                   setGlError(null);
                   setGlKey((k) => k + 1);
@@ -4241,7 +4246,7 @@ export function CadApp() {
 
             {/* Řez */}
             {section && !sketch && (
-              <FloatPanel title={tr("Řez modelem")} icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : motionOpen && isAsm ? "left-[376px] top-3 max-md:left-3 max-md:top-auto max-md:bottom-[76px]" : "left-3 top-3"} className="max-h-[calc(100%-96px)] overflow-y-auto">
+              <FloatPanel title={tr("Řez modelem")} icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : motionOpen && isAsm && motionDock !== "right" ? "left-[376px] top-3 max-md:left-3 max-md:top-auto max-md:bottom-[76px]" : "left-3 top-3"} className="max-h-[calc(100%-96px)] overflow-y-auto">
                 <SectionControls section={section} onChange={setSection} mesh={result?.mesh ?? null} assembly={isAsm ? asmViews : undefined} selection={selection} />
               </FloatPanel>
             )}
@@ -4407,6 +4412,8 @@ export function CadApp() {
               </div>
             )}
           </main>
+          {/* ukotvený panel pohybové studie (kolo 7, bod 14): sloupec vedle 3D okna – okno se zúží, model se nepřekrývá */}
+          {motionOpen && isAsm && <MotionDockSlot />}
 
           {/* Formulář prvku (jako „Options“ v ZW3D) */}
           {isAsm && asmSel && doc.components?.find((c) => c.id === asmSel) && (

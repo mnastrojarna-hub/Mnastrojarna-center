@@ -30,7 +30,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    dokument; \`await window.mncad.setDocument(docOrJson)\` ho otevře v nové záložce (\`{ inPlace: true }\` = nahradí otevřený
    dokument jako jeden krok historie); \`await window.mncad.undo(n)\` / \`redo(n)\` / \`history()\` = historie Zpět / Znovu;
    \`await window.mncad.status()\` vrátí stav
-   jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
+   jako text (poslední řádek „Zobrazení: … · view=webgl|soft projection=persp|ortho“ = zobrazení okna aplikace, ne model;
+   v CLI \`stav\` ho nemá); \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
    3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
    \`await window.mncad.save("název")\` stáhne projekt .mncad bez dialogu (jako příkaz \`uložit\`) a vrátí
@@ -951,7 +952,8 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   kořene skupiny – znaky mezera , : = " % zapsané jako v URL, \`%20\` = mezera; kolo 7).
 - \`pohyb\` / \`pohyb stav\` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); \`pohyb krok 12\` – polohy
   v kroku; \`pohyb export csv\` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
-  \`pohyb přehrát [smyčka]\`, \`pohyb zastavit\`, \`pohyb export png|webm\` (snímky ZIP / video z 3D okna, jen v aplikaci);
+  \`pohyb přehrát [smyčka]\`, \`pohyb zastavit\`, \`pohyb export png|webm\` (snímky ZIP / video z 3D okna, jen v aplikaci; prohlížeč bez kodéru WebM = animované PNG se
+  stejným časováním a ⚠);
   \`pohyb kroky 48 čas 2 kolize vyp\`, \`pohyb motor smazat 1\`, \`pohyb smazat\`.
 - API: \`await window.mncad.motion('motor rotační "Klika" 0..360 krok 5')\` (text = volitelný příkaz \`pohyb …\` předem) vrátí
   \`{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }\`;
@@ -2035,7 +2037,8 @@ vynutí 3D okno). Volby: \`view\` iso | front | top | right | back | bottom | le
 shaded | wireframe | hiddenLine | xray, \`fit\`, \`hints\` (popisky F1 / E2 / V3 do obrázku), \`section: { axis: "X", offset:
 25, flip: true }\` (\`null\` = bez řezu), \`explode\` (sestava 0–3), \`background\` white | current. Dočasný pohled, styl
 i řez se po snímku vrátí. Funguje i bez WebGL (zjednodušený náhled). V sestavě má v řezu každá komponenta s objemem
-čelo řezu (barva komponenty + šrafy, sousední díly se liší; i bez WebGL, ve snímku a ve videu studie; čelo se nevybírá),
+čelo řezu (barva komponenty + šrafy vázané na model – rozteč v mm, jedou s komponentou – a tmavý obrys; sousední díly
+se liší; i bez WebGL včetně průhlednosti, ve snímku a ve videu studie; čelo se nevybírá),
 odpověď \`řez\` to uvádí. Trvale textem:
 
 \`\`\`
@@ -2140,7 +2143,7 @@ pixely v 3D okně:
    jádra a přepočtu (\`[data-core-status]\`: \`loading|ready|busy|stale|error\`) – omezení prostředí není chyba modelu.
    Náhled nekreslí: perspektivu (je pravoúhlý), gizmo přesunu, skici a pomocné roviny v modelu, mřížku, analýzy ploch
    (zebra, úkosy, tloušťka, křivost), barevnou mapu odchylek, duchy porovnání, grafiku měření a stopu bodu pohybové studie,
-   hřebeny křivosti / řídicí body ploch třídy A a průhlednost – čísla dávají text a panely (\`analýza …\`, \`měřit\`,
+   hřebeny křivosti / řídicí body ploch třídy A – čísla dávají text a panely (\`analýza …\`, \`měřit\`,
    \`porovnat\`, \`pohyb stav\`); seznam je pod „Proč nevidím 3D?“ (\`[data-soft-limit]\`, cad/soft-view.ts).
    Výběr v něm funguje stejně jako ve 3D okně: **klik** vybere plochu (nejbližší ke kameře), hranu (do ~6 px, jen
    viditelnou) nebo vrchol (do ~7 px), **Ctrl / Shift + klik** přidá či odebere, platí filtr výběru (stavový řádek),

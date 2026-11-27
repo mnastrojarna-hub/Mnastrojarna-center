@@ -10,9 +10,19 @@
  *  - průhledná čela (tlumená / průhledná komponenta) nezapisují hloubku.
  * Čelo se nevybírá: `userData.cap = true` → 3D okno ho vynechá z cílů výběru, najetí myší, výběru oknem i měření; čelo jen
  * zakrývá to, co je za ním.
+ *
+ * Kolo 7: šrafy vázané na MODEL – hodnota šraf v bodě čela = g·p + g0 (svět, `hatchWorld` z `@/cad/section-cap`, tentýž
+ * vzorec jako softwarový náhled), před vykreslením převedená do pohledových souřadnic (uniforma `capHatch`); čára, když
+ * zlomková část < tloušťka × |∇| (`dFdx`/`dFdy` – tloušťka v pixelech v každém přiblížení). Obrys čela = `LineSegments`
+ * průsečnice roviny řezu se sítí (`@/cad/section-contour`) v místních souřadnicích komponenty, přepočtený před snímkem,
+ * když se rovina vůči komponentě pohne (`updateCapOutline`).
  */
 import * as THREE from "three";
-import type { CapStyle } from "@/cad/section-cap";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { hatchWorld, type CapStyle } from "@/cad/section-cap";
+import { cachedContour, localPlane } from "@/cad/section-contour";
 
 /** místa ve shaderu MeshBasicMaterial (three r186), za která se vkládá kód čela – kontroluje test */
 export const CAP_SHADER_ANCHORS = { main: "void main() {", clip: "#include <clipping_planes_fragment>", color: "#include <color_fragment>" } as const;
@@ -20,12 +30,14 @@ export const CAP_SHADER_ANCHORS = { main: "void main() {", clip: "#include <clip
 const CAP_UNIFORMS = /* glsl */ `
 uniform mat4 capProj;
 uniform vec4 capHatch;
+uniform float capHatchWidth;
 uniform vec3 capHatchColor;
 `;
 
 /** hloubka čela = rovina řezu (pohledové souřadnice: paprsek z kamery, u pravoúhlého pohledu rovnoběžně s osou −z) */
 const CAP_DEPTH = /* glsl */ `
 #if NUM_CLIPPING_PLANES > 0
+	vec3 capPt = - vClipPosition;
 	{
 		vec3 capP = - vClipPosition;
 		vec4 capPl = clippingPlanes[ 0 ];
@@ -34,6 +46,7 @@ const CAP_DEPTH = /* glsl */ `
 			if ( abs( capPl.z ) > 1e-6 ) {
 				vec3 capX = vec3( capP.xy, - ( capPl.w + dot( capPl.xy, capP.xy ) ) / capPl.z );
 				if ( capX.z >= capP.z ) {
+					capPt = capX;
 					vec4 capC = capProj * vec4( capX, 1.0 );
 					capDepth = clamp( ( capC.z / capC.w ) * 0.5 + 0.5, 0.0, 1.0 );
 				}
@@ -43,7 +56,8 @@ const CAP_DEPTH = /* glsl */ `
 			if ( abs( capDen ) > 1e-12 ) {
 				float capT = - capPl.w / capDen;
 				if ( capT > 0.0 && capT <= 1.0 ) {
-					vec4 capC = capProj * vec4( capP * capT, 1.0 );
+					capPt = capP * capT;
+					vec4 capC = capProj * vec4( capPt, 1.0 );
 					capDepth = clamp( ( capC.z / capC.w ) * 0.5 + 0.5, 0.0, 1.0 );
 				}
 			}
@@ -53,15 +67,21 @@ const CAP_DEPTH = /* glsl */ `
 #endif
 `;
 
-/** šrafy v pixelech obrazovky: čára, kde (x·nx + y·ny) mod rozteč < tloušťka (shodně s `onHatch` a softwarovým náhledem) */
+/**
+ * šrafy vázané na model: v = capHatch.xyz · bod čela (pohledové souřadnice, bod v rovině řezu) + capHatch.w; čára, když
+ * fract(v) < tloušťka × |∇v| (pixely) – shodně se softwarovým náhledem (`soft-render.ts`, `onModelHatch`)
+ */
 const CAP_HATCH = /* glsl */ `
-	if ( capHatch.z > 0.0 ) {
-		float capH = dot( gl_FragCoord.xy, capHatch.xy );
-		if ( mod( capH, capHatch.z ) < capHatch.w ) diffuseColor.rgb = capHatchColor;
+#if NUM_CLIPPING_PLANES > 0
+	if ( capHatchWidth > 0.0 ) {
+		float capV = dot( capPt, capHatch.xyz ) + capHatch.w;
+		float capFw = length( vec2( dFdx( capV ), dFdy( capV ) ) );
+		if ( fract( capV ) < capHatchWidth * capFw ) diffuseColor.rgb = capHatchColor;
 	}
+#endif
 `;
 
-type CapUniforms = { capProj: { value: THREE.Matrix4 }; capHatch: { value: THREE.Vector4 }; capHatchColor: { value: THREE.Color } };
+type CapUniforms = { capProj: { value: THREE.Matrix4 }; capHatch: { value: THREE.Vector4 }; capHatchWidth: { value: number }; capHatchColor: { value: THREE.Color } };
 
 /** vloží kód čela do shaderu MeshBasicMaterial; vrací false, když některé místo ve shaderu chybí (jiná verze three) */
 export function patchCapShader(shader: { fragmentShader: string; uniforms: Record<string, { value: unknown }> }, u: CapUniforms): boolean {
@@ -69,6 +89,7 @@ export function patchCapShader(shader: { fragmentShader: string; uniforms: Recor
   if (!f.includes(CAP_SHADER_ANCHORS.main) || !f.includes(CAP_SHADER_ANCHORS.clip) || !f.includes(CAP_SHADER_ANCHORS.color)) return false;
   shader.uniforms.capProj = u.capProj;
   shader.uniforms.capHatch = u.capHatch;
+  shader.uniforms.capHatchWidth = u.capHatchWidth;
   shader.uniforms.capHatchColor = u.capHatchColor;
   shader.fragmentShader = f
     .replace(CAP_SHADER_ANCHORS.main, CAP_UNIFORMS + CAP_SHADER_ANCHORS.main)
@@ -79,7 +100,7 @@ export function patchCapShader(shader: { fragmentShader: string; uniforms: Recor
 
 /**
  * Materiál čela řezu: odvrácené stěny sítě komponenty oříznuté rovinou `plane` (tentýž objekt jako u těla – posun řezu
- * se projeví bez nové stavby). `pixelRatio` = pixely plátna na CSS px (rozteč šraf).
+ * se projeví bez nové stavby). `pixelRatio` = pixely plátna na CSS px (tloušťka čáry šraf).
  */
 export function capMaterial(st: CapStyle, plane: THREE.Plane, pixelRatio = 1): THREE.MeshBasicMaterial {
   const pr = pixelRatio > 0 && Number.isFinite(pixelRatio) ? pixelRatio : 1;
@@ -96,22 +117,42 @@ export function capMaterial(st: CapStyle, plane: THREE.Plane, pixelRatio = 1): T
   const h = st.hatch;
   const u: CapUniforms = {
     capProj: { value: new THREE.Matrix4() },
-    capHatch: { value: new THREE.Vector4(h.nx, h.ny, h.step * pr, h.width * pr) },
+    // šrafy v pohledových souřadnicích – nastaví `syncCapCamera` před každým vykreslením (kamera, matice komponenty, rovina)
+    capHatch: { value: new THREE.Vector4(0, 0, 0, 0) },
+    capHatchWidth: { value: h.stepMm > 0 ? h.width * pr : 0 },
     capHatchColor: { value: new THREE.Color(h.hex) },
   };
-  m.userData = { cap: true, capUniforms: u, capHex: st.hex, capHatchHex: h.hex, capPattern: st.pattern };
+  m.userData = { cap: true, capUniforms: u, capHex: st.hex, capHatchHex: h.hex, capPattern: st.pattern, capHatchAngle: h.angle, capHatchMm: h.stepMm, capPlane: plane };
   m.onBeforeCompile = (shader) => {
     patchCapShader(shader, u);
   };
-  // jeden program pro všechna čela (uniformy má každý materiál vlastní)
-  m.customProgramCacheKey = () => "mncad-section-cap-v1";
+  // jeden program pro všechna čela (uniformy má každý materiál vlastní); v2 = šrafy vázané na model
+  m.customProgramCacheKey = () => "mncad-section-cap-v2";
   return m;
 }
 
-/** projekční matice kamery do uniformy čela před vykreslením (perspektiva i pravoúhlý pohled, i snímek videa) */
+const M3 = new THREE.Matrix3();
+/**
+ * Šrafy čela v pohledových souřadnicích kamery: hodnota ve světě v = g·p + g0 (`hatchWorld`, matice komponenty `world`,
+ * světová rovina řezu); p = Rc·q + tc (q pohledové souřadnice, kamera.matrixWorld = [Rc | tc]) → v = (Rcᵀ·g)·q + (g·tc + g0).
+ */
+export function capHatchView(world: THREE.Matrix4, plane: THREE.Plane, angle: number, stepMm: number, camera: THREE.Camera, out = new THREE.Vector4()): THREE.Vector4 {
+  const { g, g0 } = hatchWorld(world.elements, [plane.normal.x, plane.normal.y, plane.normal.z], angle, stepMm);
+  const cw = camera.matrixWorld.elements;
+  // Rcᵀ·g: sloupce Rc jsou osy kamery ve světě → složky = průměty g do os kamery
+  M3.setFromMatrix4(camera.matrixWorld);
+  const e = M3.elements;
+  return out.set(e[0] * g[0] + e[1] * g[1] + e[2] * g[2], e[3] * g[0] + e[4] * g[1] + e[5] * g[2], e[6] * g[0] + e[7] * g[1] + e[8] * g[2], g[0] * cw[12] + g[1] * cw[13] + g[2] * cw[14] + g0);
+}
+
+/** projekční matice kamery a šrafy vázané na model do uniforem čela před vykreslením (perspektiva i pravoúhlý pohled, i snímek videa) */
 export function syncCapCamera(cap: THREE.Object3D, camera: THREE.Camera) {
-  const u = ((cap as THREE.Mesh).material as THREE.Material | undefined)?.userData?.capUniforms as CapUniforms | undefined;
-  if (u) u.capProj.value.copy(camera.projectionMatrix);
+  const ud = ((cap as THREE.Mesh).material as THREE.Material | undefined)?.userData;
+  const u = ud?.capUniforms as CapUniforms | undefined;
+  if (!u) return;
+  u.capProj.value.copy(camera.projectionMatrix);
+  const plane = ud!.capPlane as THREE.Plane | undefined;
+  if (plane && ud!.capHatchMm > 0) capHatchView(cap.matrixWorld, plane, ud!.capHatchAngle, ud!.capHatchMm, camera, u.capHatch.value);
 }
 
 /**
@@ -129,3 +170,49 @@ export function capMesh(geo: THREE.BufferGeometry, st: CapStyle, plane: THREE.Pl
 
 /** objekt je čelo řezu (ne těleso komponenty) – nevybírá se, nepočítá se do rozměru scény */
 export const isCapObject = (o: THREE.Object3D | null | undefined): boolean => !!o?.userData?.cap;
+
+/** tloušťka obrysu čela v CSS px (čára širší než hrany – hranice řezu je hlavní čára jako na výkrese) */
+export const CAP_OUTLINE_PX = 2;
+
+/**
+ * Obrys čela řezu (kolo 7): široké úsečky (`LineSegments2`, tloušťka v CSS px) v místních souřadnicích komponenty (matice
+ * komponenty – hýbe se s ní); body se přepočítají v `updateCapOutline` před snímkem z místní roviny řezu. Posun `offset`
+ * (mm, záporný = do odebrané strany, odkud je čelo vidět) drží obrys před čelem v hloubce. Nese `cap: true` (nevybírá se,
+ * nezakrývá výběr) a `capOutline: true`.
+ */
+export function capOutline(mesh: { vertices: ArrayLike<number>; triangles: ArrayLike<number> & object }, st: CapStyle, plane: THREE.Plane, matrix: THREE.Matrix4, ids: { id: string; topId: string; key: string }, offset: number): LineSegments2 {
+  const g = new LineSegmentsGeometry();
+  const transparent = st.opacity < 1;
+  const m = new LineMaterial({ color: new THREE.Color(st.outlineHex).getHex(), linewidth: CAP_OUTLINE_PX, worldUnits: false, transparent, opacity: transparent ? Math.max(st.opacity, 0.35) : 1, toneMapped: false });
+  m.userData = { capOutlineHex: st.outlineHex };
+  const l = new LineSegments2(g, m);
+  l.matrixAutoUpdate = false;
+  l.matrix.copy(matrix);
+  l.frustumCulled = false;
+  l.visible = false; // až s prvními úsečkami (prázdná geometrie by v kreslení nic neudělala)
+  l.userData = { ...ids, cap: true, capOutline: true, outlineMesh: mesh, outlinePlane: plane, outlineOffset: offset, outlineSeg: null };
+  return l;
+}
+
+/**
+ * Přepočítá obrys čela, když se rovina řezu vůči komponentě změnila (posun řezu, přehrávání studie, gizmo), a nastaví
+ * rozlišení plátna (tloušťka čáry v px); vrací počet úseček. `size` = velikost plátna v CSS px.
+ */
+export function updateCapOutline(l: THREE.Object3D, size?: { x: number; y: number }): number {
+  const ud = l.userData as { outlineMesh?: { vertices: ArrayLike<number>; triangles: ArrayLike<number> & object }; outlinePlane?: THREE.Plane; outlineOffset?: number; outlineSeg?: Float32Array | null };
+  if (!ud.outlineMesh || !ud.outlinePlane) return 0;
+  const p = ud.outlinePlane;
+  const pl = localPlane(l.matrixWorld.elements, [p.normal.x, p.normal.y, p.normal.z], p.constant);
+  const seg = cachedContour(ud.outlineMesh.vertices, ud.outlineMesh.triangles, pl, ud.outlineOffset ?? 0);
+  const ls = l as LineSegments2;
+  if (ud.outlineSeg !== seg) {
+    ud.outlineSeg = seg;
+    if (seg.length >= 6) ls.geometry.setPositions(seg);
+    l.visible = seg.length >= 6;
+  }
+  if (size && size.x > 0 && size.y > 0) (ls.material as LineMaterial).resolution.set(size.x, size.y);
+  return seg.length / 6;
+}
+
+/** úsečky obrysu (pro testy a diagnostiku): body naposledy nastavené `updateCapOutline` */
+export const capOutlineSegments = (l: THREE.Object3D): Float32Array | null => (l.userData.outlineSeg as Float32Array | null) ?? null;

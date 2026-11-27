@@ -43,6 +43,7 @@ import { findView } from "@/cad/motion-views";
 import { studySpan } from "@/cad/motion-video";
 import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
 import { MotionPlayer, type PlayerHost } from "./motion-player";
+import { MotionDockButton, useMotionDockTarget } from "./motion-dock"; // ukotvení plného panelu (kolo 7, bod 14)
 import { appRuns } from "./run-host";
 import { motionRunOf, trackedMotion } from "./motion-runs";
 import { modelRev } from "@/cad/engine/result-key";
@@ -202,6 +203,7 @@ export function MotionPanel({
   const cancel = useRef(false);
   const [speed, setSpeed] = useState(1);
   const [compact, setCompactState] = useState(readCompact);
+  const dockTarget = useMotionDockTarget();
   const setCompact = (on: boolean) => {
     setCompactState(on);
     try {
@@ -610,7 +612,7 @@ export function MotionPanel({
     <>
     {/* kompaktní režim (vlna 22, bod 14): jen lišta přehrávání dole ve 3D okně, plný panel skrytý */}
     {!compact && (
-    <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
+    <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose} dock={dockTarget} extra={<MotionDockButton />}>
       <div data-motion-panel data-motion-state={state} data-motion-verdict={verdict} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
         <MotionModeSwitch study={study} onStudy={setStudy} doc={doc} />
