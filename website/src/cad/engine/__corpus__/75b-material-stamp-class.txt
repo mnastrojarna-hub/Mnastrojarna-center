@@ -1,0 +1,17 @@
+# vlna 22, bod 22g (kolo 7): materiál zadaný razítkem textem = totéž pravidlo jako pole razítka v GUI a příkaz materiál
+# (ČSN 11 523 na hliníkovém dílu → třída ocel + ℹ material.class); třída zadaná PO označení jiné třídy → „→“ + ⚠
+# material.class-conflict, nikdy ✓; neznámé označení + třída = ✓ s poznámkou, že označení zůstává
+nový díl "Deska A"
+kvádr 100 60 20
+materiál hliník
+výkres A4
+výkres razítko materiál="ČSN 11 523"
+stav
+#--- run
+nový díl "Přidržovač"
+kvádr 40 30 10
+materiál ČSN 11 423
+materiál nerez
+materiál Hardox 400
+materiál ocel
+stav

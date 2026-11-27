@@ -11,7 +11,6 @@
 exportováno z modelu {0} ({1}), model je teď {2}	aus Modell {0} exportiert ({1}), das Modell ist jetzt {2}
 Exporty ({0}, zastaralých {1}) · model je teď {2}:	Exporte ({0}, veraltet {1}) · das Modell ist jetzt {2}:
 Exporty ({0})	Exporte ({0})
-exporty [vymazat] · výstupy [zastaralé] · přepočítat vše	exporte [löschen] · ausgaben [veraltet] · alles neu berechnen
 Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exporte: {0} – alle aus der aktuellen Modellrevision (Liste: exporte)
 Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exporte: {0} von {1} aus einer älteren Modellrevision – {2} (Liste: exporte)
 exporty: neznámé „{0}“ – {1}	exporte: unbekannt „{0}“ – {1}

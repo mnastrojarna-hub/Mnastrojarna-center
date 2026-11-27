@@ -74,8 +74,9 @@ describe("greens b: GUI pole označení = pravidlo textového příkazu", () => 
     }
     expect(designationNote("ČSN 11 423", withDesignation(part("hlinik"), "ČSN 11 423").material)?.code).toBe("material.class");
     expect(designationNote("Hardox 400", "ocel")?.code).toBe("material.density-assumed");
-    // třída změněná po označení (ČSN 11 423 = ocel, ale vybraný hliník) – hustota je předpoklad, ne ℹ „zařazen jako“
-    expect(designationNote("ČSN 11 423", "hlinik")?.code).toBe("material.density-assumed");
+    // třída změněná po označení (ČSN 11 423 = ocel, ale vybraný hliník) – ⚠, ne ℹ „zařazen jako“; od kola 7 (bod 22g) přesnější
+    // ⚠ material.class-conflict (označení patří jiné rozpoznané třídě), dřív obecné ⚠ material.density-assumed
+    expect(designationNote("ČSN 11 423", "hlinik")?.code).toBe("material.class-conflict");
     expect(designationNote(undefined, "ocel")).toBeNull();
     // prázdné pole nebo popisek současné třídy = bez označení
     expect(withDesignation(part("ocel", "X"), "").materialName).toBeUndefined();

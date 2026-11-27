@@ -44,6 +44,7 @@ const REQUIRED: Record<string, "error" | "warn" | "note"> = {
   "share.fallback-link": "warn", // 35
   "host.fonts": "error", // 36
   "material.density-assumed": "warn", // 37
+  "material.class-conflict": "warn", // 37 (vlna 22 kolo 7: označení jiné třídy, než podle které se počítá hustota)
   "material.class": "note", // 37
   "hole.tap-diameter": "warn", // 38
   "host.app-only": "error", // 39

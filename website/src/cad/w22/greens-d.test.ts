@@ -37,6 +37,15 @@
  * 24. kusovník u zastaralé kopie: nikdy rada „materiál … v dílu“ / „bez výkresu“, když díl v záložce údaj má – rada obnovit
  *     (24b: totéž u `výkres export pdf vše`, v souhrnu `bom.docs` a v panelu Kusovník – asm-supply.test.ts)
  * 25. „uložena do Nastavení“ – jen kde Nastavení přežije běh (v CLI „jen pro tento běh“)
+ *  Fáze 2, kolo 7 (zbylé mezery bodů 19, 20, 22g):
+ * 26. `✓ kontrola kolizí znovu (kolize)` v `přepočítat vše` – nikdy, když kontrola kolizi našla (⚠ „nalezeno kolizí: N“);
+ *     strojová část `warned=N`
+ * 27. „Zbývá: nic – … odpovídají modelu“ – nikdy, když obnova kopie ztratila referenci vazby (vazba v „Zbývá udělat ručně“);
+ *     `✓ kopie dílů … obnoveny` jen bez ⚠/✗ podpříkazu
+ * 28. `✓ materiál = Nerez` – nikdy, když označení v razítku patří jiné třídě (⚠ material.class-conflict); razítko textem
+ *     `materiál="ČSN 11 523"` na hliníkovém dílu nikdy bez ℹ/⚠ a nikdy s hustotou hliníku
+ * 30. „křížení odkazů 0“ – jen když se žádné dva odkazy pozic nekříží (bod 17: A1, 100 dílů – dřív 2 křížení, přesun kolo 7)
+ * 29. `výkresy dílů`: „list vyhodnocen bez nálezů“ jen u listu, který vznikl; díl mimo záložku nikdy tiše (⚠ bom.make-incomplete)
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
@@ -415,4 +424,110 @@ describe("greens D4 – čitelný výkres sestavy a šablony hlavičky (body 17,
     await expect(applyDrawingCmd(doc, cmd('výkres hlavička použít "Nikde"'), no)).rejects.toThrow(/neexistuje/);
     await expect(applyDrawingCmd(doc, cmd('výkres razítko logo="nikde.png"'), no, { input: async () => null })).rejects.toThrow(/není připojený/);
   });
+});
+
+// ───────────────────────── kolo 7 (body 19, 20, 22g): skutečné jádro ─────────────────────────
+describe("greens kolo 7 – přepočítat vše, materiál razítka, výkresy dílů", async () => {
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
+  const { inProcessTransport } = await import("../kernel-inprocess");
+  const { formatShort } = await import("../engine/protocol");
+  const real = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await real.init();
+  const run = (ws: MemoryWorkspace, t: string) => runScript(ws, t, { kernel: real as unknown as KernelApi, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+  const docOf = (ws: MemoryWorkspace, name: string): CadDoc => ws.docOf!(ws.tabs().find((x) => x.title === name)!.id)!;
+  // repro S/w22/p2/fixr7d/p20/a.txt = korpus 78 (zvětšená deska prorazí přidržovač)
+  const ASM = 'nový díl "Deska A"\nkvádr 100 60 20\nnový díl "Přidržovač"\nkvádr 40 30 10\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 10 10 20\nkolize';
+
+  it("26 (kolo 7, bod 20): přepočítat vše s nalezenou kolizí – žádné „✓ kontrola kolizí znovu“, ⚠ s počtem, warned=1", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, ASM);
+    const r = await run(ws, 'záložka "Deska A"\nupravit "Kvádr 1" size=100;60;25\nzáložka "Nástroj"\npřepočítat vše');
+    const t = txt(r);
+    expect(t).not.toMatch(/✓ kontrola kolizí znovu/);
+    expect(t).toMatch(/⚠ kontrola kolizí znovu \(kolize\) – nalezeno kolizí: 1 – viz ⚠ výše/);
+    expect(formatShort(r)).toMatch(/recomputed=\d+ left=\d+ .* warned=1/);
+    // protipříklad: obnova, po které kolize není (deska tenčí) → ✓ a warned=0
+    const ws2 = new MemoryWorkspace();
+    await run(ws2, ASM);
+    const ok = await run(ws2, 'záložka "Deska A"\nupravit "Kvádr 1" size=100;60;15\nzáložka "Nástroj"\npřepočítat vše');
+    expect(txt(ok)).toMatch(/✓ kontrola kolizí znovu \(kolize\)\n/);
+    expect(formatShort(ok)).toMatch(/warned=0/);
+  }, 240_000);
+
+  it("27 (kolo 7, bod 20): obnova kopie ztratí referenci vazby – „Zbývá“ ji vypíše, žádné „Zbývá: nic“ ani ✓ obnovy", async () => {
+    // repro S/w22/p2/fixr7d/p20/b.txt
+    const ws = new MemoryWorkspace();
+    await run(ws, 'nový díl "Deska A"\nkvádr 60 40 10\nkvádr 20 40 5 v 0 0 5 odebrat\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 40 10 30\nsestava vazba kontakt "Přidržovač" spodní "Deska A" F3');
+    const r = await run(ws, 'záložka "Deska A"\nsmazat "Kvádr 2"\nzáložka "Sestava A"\npřepočítat vše');
+    const t = txt(r);
+    expect(t).not.toMatch(/Zbývá: nic/);
+    expect(t).not.toMatch(/✓ kopie dílů v sestavě obnoveny/);
+    expect(t).toMatch(/⚠ kopie dílů v sestavě obnoveny z dílů \(sestava obnovit vše\) – s varováním: mate\.lost/);
+    expect(t).toMatch(/Zbývá udělat ručně \(1\)[\s\S]*⚠ vazba 1 Kontakt – ztracená reference po úpravě dílu → sestava vazba 1 plocha … \/ sestava vazba 1 smazat/);
+  }, 240_000);
+
+  it("28 (kolo 7, 22g): třída po označení jiné třídy = ⚠ material.class-conflict (ne ✓); razítko textem pozná třídu", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, 'nový díl "Přidržovač"\nkvádr 40 30 10\nmateriál ČSN 11 423\nmateriál nerez');
+    expect(txt(r)).not.toMatch(/✓ materiál = Nerez/);
+    expect(has(r, "material.class-conflict")).toBe(true);
+    expect(r.entries.find((e) => e.code === "material.class-conflict")!.text).toMatch(/„ČSN 11 423“ je třídy Ocel, hustota se ale počítá podle třídy Nerez/);
+    // protipříklad: třída shodná s označením / neznámé označení – bez ⚠ konfliktu
+    const ok = await run(new MemoryWorkspace(), 'nový díl "Přidržovač"\nkvádr 40 30 10\nmateriál ČSN 11 423\nmateriál ocel\nmateriál Hardox 400\nmateriál ocel');
+    expect(has(ok, "material.class-conflict")).toBe(false);
+    expect(txt(ok)).toMatch(/✓ materiál = Ocel \(7\.85 g\/cm³\) · označení „Hardox 400“ v razítku zůstává/);
+    // razítko textem: ČSN 11 523 na hliníkovém dílu → třída ocel + ℹ material.class (dřív hustota hliníku bez slova)
+    const ws3 = new MemoryWorkspace();
+    const st = await run(ws3, 'nový díl "Deska A"\nkvádr 100 60 20\nmateriál hliník\nvýkres A4\nvýkres razítko materiál="ČSN 11 523"');
+    expect(docOf(ws3, "Deska A")).toMatchObject({ material: "ocel", materialName: "ČSN 11 523" });
+    expect(st.entries.some((e) => e.code === "material.class" && e.line === 5)).toBe(true);
+    // neznámé označení v razítku = ⚠ density-assumed (jako příkaz materiál)
+    const st2 = await run(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 100 60 20\nvýkres A4\nvýkres razítko materiál="Hardox 400"');
+    expect(st2.entries.some((e) => e.code === "material.density-assumed" && e.line === 4)).toBe(true);
+  }, 240_000);
+
+  it("29 (kolo 7, bod 19): výkresy dílů – list jen vyráběnému dílu bez výkresu; díl mimo záložku ⚠, nikdy tiše", async () => {
+    // repro S/w22/p2/fixr7d/p19/a.txt
+    const ws = new MemoryWorkspace();
+    const SETUP = 'nový díl "Deska A"\nkvádr 100 60 20\nnový díl "Přidržovač"\nkvádr 40 30 10\nvýkres A3\nnový díl "Pouzdro"\nválec 10 20\ndruh nakupovaný katalog "K-1"\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 10 10 20\nvložit "Pouzdro" v 60 10 20\nnormálie M8x20';
+    await run(ws, SETUP);
+    const r = await run(ws, "výkresy dílů");
+    const t = txt(r);
+    expect(t).toMatch(/Výkresy dílů sestavy „Nástroj“ – vyráběných dílů 2 \(normálie 1 a nakupované 1 výkres nedostanou\)/);
+    expect(t).toMatch(/→ Deska A – list „List 1“ vyhodnocen bez nálezů/);
+    expect(t).toMatch(/· Přidržovač \(1 listů\)/);
+    expect(formatShort(r)).toMatch(/make=2 created=1 existing=1 missing=0/);
+    expect(docOf(ws, "Deska A").drawings?.length).toBe(1);
+    expect(docOf(ws, "Pouzdro").drawings?.length ?? 0).toBe(0);
+    expect(docOf(ws, "Přidržovač").drawings?.length).toBe(1);
+    expect(ws.present().name).toBe("Nástroj"); // zpět v sestavě
+    expect(has(r, "bom.make-incomplete")).toBe(false);
+    // opakování: nic nového („Výkres už mají (2)“), žádné „Založeno“
+    const again = await run(ws, 'záložka "Nástroj"\nvýkresy dílů');
+    expect(txt(again)).not.toMatch(/Založeno/);
+    expect(formatShort(again)).toMatch(/created=0 existing=2/);
+    // díl zavřený (jen kopie v sestavě) → ⚠ bom.make-incomplete, „Nezaloženo“
+    const ws2 = new MemoryWorkspace();
+    await run(ws2, 'nový díl "Deska A"\nkvádr 100 60 20\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit');
+    await run(ws2, 'zavřít záložku "Deska A"');
+    const miss = await run(ws2, 'záložka "Nástroj"\nvýkresy dílů');
+    expect(txt(miss)).not.toMatch(/vyhodnocen bez nálezů/);
+    expect(txt(miss)).toMatch(/Nezaloženo – díl není otevřený v záložce \(1\)/);
+    expect(has(miss, "bom.make-incomplete")).toBe(true);
+    // v dílu = ✗ s radou (žádné tiché nic)
+    const part = await run(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 10 10 10\nvýkresy dílů');
+    expect(part.entries.some((e) => e.level === "error" && /jen v sestavě/.test(e.text ?? ""))).toBe(true);
+  }, 240_000);
+
+  it("30 (kolo 7, bod 17): A1 se 100 díly – křížení odkazů 0, překryvy 0; počet odpovídá skutečným průsečíkům čar", async () => {
+    const { countCrossings } = await import("../drawing-balloons");
+    const src = fs.readFileSync(path.resolve(__dirname, "../engine/__corpus__/79f-balloons-100-a1.txt"), "utf8");
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, src.split("\n").filter((l) => !l.startsWith("#")).join("\n"));
+    const t = txt(r);
+    expect(t).toMatch(/Pozice: 100 \(.*\) · .* · nevešlo se 0 · křížení odkazů 0/);
+    expect(t).toMatch(/Překryvy na listu: 0 \(zkontrolováno/);
+    // „0“ musí být skutečný stav čar: bez kontroly by test prošel i s křížícím se rozmístěním
+    expect(countCrossings([{ x: 0, y: 0, a: [10, 10] }, { x: 10, y: 0, a: [0, 10] }])).toBe(1);
+  }, 240_000);
 });

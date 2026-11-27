@@ -41,6 +41,16 @@ export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
     }
   } else if (op.patch.material !== undefined) {
     const cls = MATERIALS.find((x) => x.id === op.patch.material);
-    say(ctx, tr("✓ materiál = {0}", cls ? `${cls.label} (${cls.density} g/cm³)` : op.patch.material));
+    const label = cls ? `${cls.label} (${cls.density} g/cm³)` : op.patch.material;
+    // označení do razítka zůstává (jako nabídka Materiál v GUI); patří-li jiné třídě (`materiál nerez` po ČSN 11 423), hustota
+    // označení odporuje → „→“ + ⚠ material.class-conflict, ne ✓ (bod 22g, kolo 7 – dřív ✓ a v razítku ocel s hustotou nerezu)
+    const note = d.materialName ? designationNote(d.materialName, d.material) : null;
+    if (note?.code === "material.class-conflict") {
+      say(ctx, tr("→ materiál = {0} · označení „{1}“ v razítku zůstává", label, d.materialName!));
+      coded(ctx, note.code, { args: note.args });
+    } else if (note?.code === "material.density-assumed") {
+      // neznámé označení (Hardox 400) + zadaná třída: hustota podle výslovně zadané třídy, označení zůstává
+      say(ctx, tr("✓ materiál = {0} · označení „{1}“ v razítku zůstává", label, d.materialName!));
+    } else say(ctx, tr("✓ materiál = {0}", label));
   } else say(ctx, `✓ ${Object.entries(op.patch).map(([k, v]) => `${k === "name" ? tr("název") : tr("barva")} = ${v}`).join(", ")}`);
 };

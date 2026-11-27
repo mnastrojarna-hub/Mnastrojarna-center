@@ -176,6 +176,8 @@ export const CODES = [
   { code: "compare.inexact", level: "note", key: "rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek" },
   { code: "material.density-assumed", level: "warn", key: "materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})" },
   { code: "material.class", level: "note", key: "materiál „{0}“ zařazen jako {1}" },
+  /** označení materiálu patří jiné třídě, než podle které se počítá hustota (vlna 22, bod 22g – kolo 7) */
+  { code: "material.class-conflict", level: "warn", key: "materiál „{0}“ je třídy {1}, hustota se ale počítá podle třídy {2} ({3} g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu {1}" },
   // ── výkresy a předloha (5.2 č. 32, 33; kap. 8) ──
   { code: "drawing.warning", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.section-miss", level: "warn", key: "rovina řezu neprotíná těleso: {0}" },

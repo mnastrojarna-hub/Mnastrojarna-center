@@ -1,0 +1,33 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ materiál = Hliník (2.7 g/cm³)
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+→ razítko: materiál „ČSN 11 523“ – výsledek po vyhodnocení listu níže
+ℹ řádek 8: materiál „ČSN 11 523“ zařazen jako Ocel (7.85 g/cm³)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+
+Dokument: „Deska A“ · díl · materiál ČSN 11 523 (hustota podle: Ocel) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 120 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 120000 mm³ · těleso platné – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ materiál „ČSN 11 423“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 3: materiál „ČSN 11 423“ zařazen jako Ocel (7.85 g/cm³)
+→ materiál = Nerez (7.95 g/cm³) · označení „ČSN 11 423“ v razítku zůstává
+⚠ řádek 4: materiál „ČSN 11 423“ je třídy Ocel, hustota se ale počítá podle třídy Nerez (7.95 g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu Ocel
+→ materiál „Hardox 400“ uložen jako označení do razítka – třída se z něj nepoznala, hustota zůstává podle třídy „Nerez“ (7.95 g/cm³); pro jinou hustotu zadejte: materiál ocel|nerez|hlinik|mosaz|med|titan|pom|1.2311|1.2343|1.2738|1.1730|1.7131|1.2516
+⚠ řádek 5: materiál „Hardox 400“ zadán jen označením – hustota 7.95 g/cm³ (Nerez)
+✓ materiál = Ocel (7.85 g/cm³) · označení „Hardox 400“ v razítku zůstává
+✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Hardox 400 (hustota podle: Ocel) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 10 mm (X 0…40, Y 0…30, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 40 × 30 × 10 mm, new, roh [0; 0; 0]

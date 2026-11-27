@@ -941,7 +941,7 @@ export function AsmProps({
  * Kusovník – tabulka + CSV. Při více druzích položek oddíly Vyráběné díly / Normálie / Nakupované díly (bom-model.ts);
  * upozornění (`notes`): kopie dílu starší než díl v záložce (s tlačítkem Obnovit z dílu) a co chybí vyráběným dílům.
  */
-export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void }) {
+export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh, onPartDrawings }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void; /** `výkresy dílů` (bod 19, kolo 7) */ onPartDrawings?: () => void }) {
   const total = rows.reduce((s, r) => s + (r.massKg ?? 0) * r.qty, 0);
   const sections = kindsIn(rows).length > 1 && !rows.some((r) => (r.level ?? 0) > 0);
   let cur: string | undefined;
@@ -1018,6 +1018,11 @@ export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { ro
         <button type="button" onClick={onCsv} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12px] hover:bg-[#f3f6f9]">
           {tr("Export CSV (Excel)")}
         </button>
+        {onPartDrawings && rows.some((r) => !r.assembly && (r.kind ?? "make") === "make") && (
+          <button type="button" data-part-drawings onClick={onPartDrawings} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12px] hover:bg-[#f3f6f9]" title={tr("Založí list výkresu každému vyráběnému dílu otevřenému v záložce, který výkres nemá (text: výkresy dílů)")}>
+            {tr("Výrobní dokumentace")}
+          </button>
+        )}
         {onDrawing && (
           <button type="button" onClick={onDrawing} className="rounded bg-brand px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-brand-600">
             {tr("Výkres sestavy s kusovníkem")}

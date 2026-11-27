@@ -28,6 +28,25 @@ export function bomNotesOf(doc: CadDoc, rows: BomRow[], partOf: PartLookup): { t
   return [...staleCopies(doc, partOf).map((s) => ({ text: staleCopyText(s), stale: true })), ...bomWarnings(rows, staleHints(doc, partOf)).map((text) => ({ text }))];
 }
 
+/**
+ * Výpis příkazu `výkresy dílů` z protokolu běhu (tlačítko „Výrobní dokumentace“ v okně Kusovník – bod 19, kolo 7): od nadpisu
+ * „Výkresy dílů sestavy …“ po konec výpisu; ⚠ řádky protokolu (díl bez výkresu, varování listu) se připojí – nic se nezamlčí.
+ */
+export function partDrawingsNote(out: string): string {
+  const lines = out.split("\n");
+  const head = tr("Výkresy dílů sestavy „{0}“ – vyráběných dílů {1} (normálie {2} a nakupované {3} výkres nedostanou):", "", "", "", "").split("„")[0];
+  const i = lines.findIndex((l) => l.trimStart().startsWith(head));
+  if (i < 0) return out.trim();
+  // výpis = nadpis, oddíly (Založeno / Výkres už mají / Nezaloženo …) a jejich odsazené řádky; končí prázdným řádkem nebo
+  // dalším záznamem protokolu (✓ ℹ ⚠ ✗ → =) či stavem dokumentu
+  const body: string[] = [lines[i].trim()];
+  for (const l of lines.slice(i + 1)) {
+    if (!l.trim() || /^(✓|ℹ|⚠|✗|→|=|Dokument:|Document:|Dokument „)/.test(l)) break;
+    body.push(l.trim());
+  }
+  return [...body, ...lines.filter((l) => l.startsWith("⚠") || l.startsWith("✗"))].join("\n");
+}
+
 /** jedno textové pole údaje druhu (uloží se při opuštění pole / Enter) */
 function SupplyText({ id, title, value, placeholder, onCommit }: { id: string; title: string; value: string; placeholder?: string; onCommit: (v: string) => void }) {
   return (

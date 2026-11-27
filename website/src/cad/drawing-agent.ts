@@ -28,6 +28,7 @@ import { applyGeneralTol, applyTitleFields, titleRevisionCheck, titleStatusLines
 import { inheritTitle } from "./title-block";
 import { loadSettings } from "./settings";
 import { MATERIALS } from "../lib/mesh-metrics";
+import { withDesignation } from "./material-designation";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
 import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
 import type { DrawingExportResult } from "./drawing-export";
@@ -891,7 +892,14 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       if (f.number !== undefined || f.author !== undefined || f.revision !== undefined) {
         doc.props = { ...(doc.props ?? {}), ...(f.number !== undefined ? { number: f.number } : {}), ...(f.author !== undefined ? { author: f.author } : {}), ...(f.revision !== undefined ? { revision: f.revision } : {}) };
       }
-      if (f.material !== undefined) doc.materialName = f.material.trim() || undefined;
+      if (f.material !== undefined) {
+        // pole materiálu razítka = totéž pravidlo jako pole razítka v GUI a příkaz `materiál …` (material-designation.ts,
+        // vlna 22 kolo 7, bod 22g): ČSN 11 523 → třída ocel; dřív jen text razítka a hustota zůstala podle dosavadní třídy bez ⚠
+        const nd = withDesignation({ material: doc.material, ...(doc.materialName !== undefined ? { materialName: doc.materialName } : {}) }, f.material);
+        doc.material = nd.material;
+        if (nd.materialName) doc.materialName = nd.materialName;
+        else delete doc.materialName;
+      }
       // dosavadní pole se v protokolu jmenují jako dřív (TITLE_KEY), nová podle cad/agent-title.ts
       const off = named ? 1 : 0;
       log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (i >= off && keys[i - off] in TITLE_KEY && !["tolerance", "logo", "template"].includes(keys[i - off]) ? `${tr(TITLE_KEY[keys[i - off] as TitleField])} „${f[keys[i - off]]}“` : p)).join(", ")));
