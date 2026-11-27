@@ -819,6 +819,8 @@ export interface FlowFacts {
   holdReason?: string | null;
   /** Vyrábí se bez objednávky zákazníka (zákazník napsal „vyrábějte"). */
   awaitingCustomerPo?: boolean;
+  /** Výjimka „Fakturovat před dodáním" (27. 11.): fakturu jde vystavit ještě před potvrzeným DL. */
+  invoiceBeforeDelivery?: boolean;
   awaitingPoSince?: string | null;
   awaitingPoNote?: string | null;
   /** Objednávka zákazníka dorazila dodatečně (zakázka se vyráběla bez ní) — teď ji potvrdit. */
@@ -974,10 +976,26 @@ export function invoiceDeliveryOf(
   return deliveredPartial(facts) ? "partial" : "none";
 }
 
-/** Fakturu z aplikace jde vystavit: dodáno vše, zakázka ještě fakturu nemá, Ve výrobě…Vyfakturováno. */
+/**
+ * Dodání potvrdil zákazník (majitel 27. 11.: „až nahraju potvrzený dodací list, bude Dodáno zákazníkovi a bude se
+ * moct fakturovat"): potvrzený DL po poslední dodávce, nebo zakázka už je Dodáno zákazníkovi a dál.
+ */
+export function deliveryConfirmed(f: Pick<FlowFacts, "stage" | "deliveryNoteConfirmedAt" | "lastDeliveryAt">): boolean {
+  if (flowRank(f.stage) >= 9) return true;
+  const dn = f.deliveryNoteConfirmedAt ? pragueDay(f.deliveryNoteConfirmedAt) : null;
+  const last = pragueDay(f.lastDeliveryAt);
+  return Boolean(dn) && (!last || (dn as string) >= last);
+}
+
+/**
+ * Fakturu z aplikace jde vystavit: zakázka ještě fakturu nemá a buď je dodáno vše a dodání potvrzené (potvrzený
+ * DL / Dodáno zákazníkovi), nebo platí výjimka „Fakturovat před dodáním" (od objednávky dál).
+ */
 export function canIssueInvoice(f: FlowFacts): boolean {
   const rank = flowRank(f.stage);
-  return !(f.invoiceNumber ?? "").trim() && rank >= 5 && rank <= 10 && invoiceDeliveryOf(f) === "complete";
+  if ((f.invoiceNumber ?? "").trim() || rank > 10) return false;
+  if (f.invoiceBeforeDelivery && rank >= 3) return true;
+  return rank >= 5 && invoiceDeliveryOf(f) === "complete" && deliveryConfirmed(f);
 }
 
 export function deliveryKey(f: FlowFacts): DeliveryState | null {
@@ -1669,7 +1687,7 @@ export type FlowActionKey =
   // výjimky v toku (31. 10.) — „Co se stalo?"
   | "job.notOrdered" | "job.decline" | "job.reopenLost" | "job.pause" | "job.resume" | "production.failed"
   | "claim.open" | "claim.resolve" | "claim.close" | "order.startWithoutPo" | "order.poArrived" | "order.correct"
-  | "drawing.update"
+  | "drawing.update" | "invoice.beforeDelivery"
   // poptávky dodavatelům (31. 10.) — poptávkové kolo (dialog „Poptat dodavatele")
   | "rfq.create";
 
@@ -1750,6 +1768,7 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   // jediná cesta k faktuře: PDF s QR (řada FV) + evidence faktur + dialog odeslání jako u nabídky
   "payment.invoice": act({ key: "payment.invoice", label: "Vystavit fakturu", icon: ReceiptText, intent: "primary", feature: "margins", kind: "dialog" }),
   // faktura z jiného systému / ručně psaná: číslo, datum, splatnost (řádek v evidenci faktur bez PDF)
+  "invoice.beforeDelivery": act({ key: "invoice.beforeDelivery", label: "Fakturovat před dodáním…", icon: ReceiptText, intent: "secondary", feature: "margins", kind: "dialog" }),
   "payment.invoiceExternal": act({ key: "payment.invoiceExternal", label: "Faktura vystavená mimo systém…", icon: FileSignature, intent: "secondary", feature: "margins", kind: "dialog" }),
   "payment.record": act({ key: "payment.record", label: "Zadat platbu", icon: Banknote, intent: "primary", feature: "margins", kind: "dialog" }),
   "payment.settle": act({ key: "payment.settle", label: "Zaplaceno", icon: CircleCheckBig, intent: "secondary", feature: "margins", kind: "dialog" }),
@@ -1775,7 +1794,7 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
 /** Výjimky v toku — v menu „⋯" jako první skupina „Co se stalo?". */
 export const FLOW_EXCEPTION_KEYS: readonly FlowActionKey[] = [
   "drawing.update", "order.correct", "order.startWithoutPo", "order.poArrived", "production.failed", "claim.open",
-  "claim.resolve", "claim.close", "job.pause", "job.resume", "job.reopenLost", "job.notOrdered", "job.decline",
+  "claim.resolve", "claim.close", "invoice.beforeDelivery", "job.pause", "job.resume", "job.reopenLost", "job.notOrdered", "job.decline",
 ];
 
 export interface ActionCtx {
@@ -2097,6 +2116,11 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     return quoteNext(s, ctx) ?? null;
   }
   if (rank >= 3 && rank <= 8) {
+    // výjimka „Fakturovat před dodáním": faktura je hlavní krok, dokud není vystavená
+    if (f.invoiceBeforeDelivery && canIssueInvoice(f)) {
+      const inv = allowed(ctx, "payment.invoice");
+      if (inv) return inv;
+    }
     if (s.order === "aktualizovana") return allowed(ctx, "order.decideChange");
     if (s.order === "rozpor") return allowed(ctx, "order.resolveMismatch");
     // vyrábí se bez objednávky zákazníka: potvrzovat zatím není co — rovnou předat do výroby
@@ -2106,6 +2130,8 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     if (rank >= 5) {
       if (s.delivery === "castecne") return allowed(ctx, "delivery.record", "Dodat zbytek");
       if (s.delivery === "k_expedici") return allowed(ctx, "delivery.record", "Zapsat dodání a dodací list");
+      // DL vystaven, zboží na cestě — „Dodáno zákazníkovi" a faktura až po potvrzeném DL (27. 11.)
+      if (s.delivery === "dodano") return allowed(ctx, "delivery.confirmNote", "Nahrát potvrzený DL");
       if (f.stage === "ve_vyrobe") return productionNext(f, ctx);
       return null;
     }
@@ -2189,6 +2215,7 @@ export function exceptionActions(f: FlowFacts, ctx: Pick<ActionCtx, "can">): Flo
   if (rank >= 0 && rank <= 2) keys.add("order.startWithoutPo");
   if (f.awaitingCustomerPo && !closed) keys.add("order.poArrived");
   if (rank >= 5 && rank <= 8) keys.add("production.failed");
+  if (rank >= 3 && rank <= 8 && !f.invoiceBeforeDelivery && !(f.invoiceNumber ?? "").trim()) keys.add("invoice.beforeDelivery");
   if (f.stage !== "reklamace" && !claimOpen(f) && deliveredToCustomer(f)) keys.add("claim.open");
   if (f.stage === "reklamace") keys.add("claim.resolve");
   if (claimOpen(f) && f.claimResolution === "oprava" && f.stage !== "reklamace") keys.add("claim.close");
@@ -2283,7 +2310,7 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
   // (vystavenou fakturu Doklady ▾ otevřou / pošlou znovu), dílčí faktura na část dodávky zatím není
   if (canIssueInvoice(f)) add("payment.invoice");
   // faktura vystavená jinde (účetní program, ručně) — číslo, datum, splatnost do evidence; jen po dodání
-  if (rank >= 5 && rank <= 10 && !(f.invoiceNumber ?? "").trim() && invoiceDeliveryOf(f) !== "none") add("payment.invoiceExternal");
+  if (rank >= 3 && rank <= 10 && !(f.invoiceNumber ?? "").trim() && (f.invoiceBeforeDelivery || (rank >= 5 && invoiceDeliveryOf(f) !== "none"))) add("payment.invoiceExternal");
   if (s.payment && s.payment !== "zaplaceno") { add("payment.record"); add("payment.settle"); }
   // záloha / dílčí platba ještě před fakturou (od potvrzené objednávky po dodání) — tentýž dialog
   if (!s.payment && rank >= 4 && rank <= 9) add("payment.record");
@@ -2303,6 +2330,7 @@ export const FLOW_EXCEPTION_COLUMNS_LIST = [
   "side_from_stage", "hold_reason", "awaiting_customer_po", "awaiting_po_since", "awaiting_po_note", "customer_po_received_at",
   "customer_order_number", "claim_opened_at", "claim_reason", "claim_qty", "claim_item_id", "claim_note", "claim_from_stage",
   "claim_resolution", "claim_resolution_note", "claim_resolved_at", "corrected_at", "corrected_note", "drawing_changes_open",
+  "invoice_before_delivery",
 ];
 export const FLOW_EXCEPTION_COLUMNS = FLOW_EXCEPTION_COLUMNS_LIST.join(", ");
 
@@ -2397,6 +2425,7 @@ function exceptionFactsOf(r: Record<string, unknown>): Partial<FlowFacts> {
   if ("side_from_stage" in r) out.sideFromStage = stageOrNull(r.side_from_stage);
   if ("hold_reason" in r) out.holdReason = textOrNull(r.hold_reason);
   if ("awaiting_customer_po" in r) out.awaitingCustomerPo = r.awaiting_customer_po === true;
+  if ("invoice_before_delivery" in r) out.invoiceBeforeDelivery = r.invoice_before_delivery === true;
   if ("awaiting_po_since" in r) out.awaitingPoSince = textOrNull(r.awaiting_po_since);
   if ("awaiting_po_note" in r) out.awaitingPoNote = textOrNull(r.awaiting_po_note);
   if ("customer_po_received_at" in r) out.customerPoReceivedAt = textOrNull(r.customer_po_received_at);

@@ -44,7 +44,7 @@ export async function confirmDeliveryNoteCore(
   if (!date) return { ok: false, error: "Neplatné datum (čekám RRRR-MM-DD)." };
   const fileId = opts?.fileId || null;
   if (fileId !== null && !isUuid(fileId)) return { ok: false, error: "Dokument nenalezen." };
-  const job = await loadJob(db, jobId, "id, status, delivery_note_confirmed_at");
+  const job = await loadJob(db, jobId, "id, status, delivery_note_confirmed_at, invoice_number, items_count, items_delivered, items_partial");
   if (!job) return { ok: false, error: NOT_FOUND };
   const from = isJobStage(job.status) ? job.status : null;
 
@@ -60,7 +60,15 @@ export async function confirmDeliveryNoteCore(
     if (fErr) return { ok: false, error: fErr.message };
   }
 
-  const toStage: JobStage | null = opts.stage !== false && from && isForward(from, "dodano_zakaznikovi") ? "dodano_zakaznikovi" : null;
+  // majitel 27. 11.: „Dodáno zákazníkovi" až potvrzený DL — jen když je dodáno vše (částečná dodávka stav nemění);
+  // faktura vystavená předem (výjimka) → rovnou Vyfakturováno
+  const count = Number(job.items_count) || 0;
+  const done = Number(job.items_delivered) || 0;
+  // dodáno vše, nebo dodání po kusech nezapsané vůbec (starší zakázky) — rozpracovaná částečná dodávka ne
+  const allDelivered = count === 0 || done >= count || (done === 0 && !(Number(job.items_partial) > 0));
+  const invoiced = typeof job.invoice_number === "string" && job.invoice_number.trim() !== "";
+  const target: JobStage = invoiced ? "fakturovano" : "dodano_zakaznikovi";
+  const toStage: JobStage | null = opts.stage !== false && allDelivered && from && isForward(from, target) ? target : null;
   const update: Row = { delivery_note_confirmed_at: date };
   if (toStage) update.status = toStage;
   const { error } = await db.from("orders").update(update as never).eq("id", jobId);

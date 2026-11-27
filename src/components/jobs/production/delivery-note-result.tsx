@@ -12,7 +12,7 @@ export interface IssuedNote {
   fileId: string;
   filename: string;
   label?: string | null;
-  /** Dodávka dodala vše (zakázka se posune na Dodáno zákazníkovi). */
+  /** Dodávka dodala vše (stav se posune až potvrzeným DL). */
   final?: boolean;
 }
 
@@ -57,7 +57,7 @@ export function DeliveryNoteResult({
           <p className="text-green-800/90 dark:text-green-200/80">
             {note.final === false
               ? "Dodání je zapsané — zbytek dodáš dalším dodacím listem."
-              : "Dodání je zapsané — vše dodáno."}{" "}
+              : "Dodání je zapsané — vše dodáno. Stav zůstává, dokud nenahraješ potvrzený dodací list (pak Dodáno zákazníkovi a faktura)."}{" "}
             PDF bez cen je uložené v Dokumentech zakázky.
           </p>
           {sentTo && <p className="font-medium">Odesláno na {sentTo}.</p>}
