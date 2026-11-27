@@ -173,6 +173,14 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   r = await cli(['run', '-', '--out', path.join(WORK, 'o1'), '--formats', 'none', '--json'], { input: 'nový díl Deska\nkvádr 80 60 10\ndíra 10,5 skrz v 40 30\nnový díl Čep\nválec 10 30\nnová sestava S\nvložit "Deska" ukotvit\nvložit "Čep" v 100 0 0\nsestava vazba souosost "Čep" Ø10 "Deska" Ø10,5\nkolize\n' });
   j0 = json(r);
   ok(r.code === 0 && /^D "S" asm comp=2 parts=2 mates=1\/1 V\.sum=49\.49cm3 /m.test(j0?.protocol || ''), `sestava v CLI: D ${(j0?.protocol || '').split('\n').find((l) => l.startsWith('D "S"')) || '(chybí)'}`);
+  // vlna 22, bod 9 (kolo 7): zkrácená studie – strojový řádek pohybu končí skutečným dojezdem motoru (korpus 61a; protokol konzole
+  // v prohlížeči strojový řádek nemá, proto ho kontroluje až CLI). Dřív řádek dojezd neuváděl.
+  r = await cli(['run', path.join(WEB, 'src/cad/engine/__corpus__/61a-motor-short-end.txt'), '--out', path.join(WORK, 'o1'), '--formats', 'none']);
+  {
+    const mk = r.out.split('\n').filter((l) => /^= L\d+ asm "Mechanika" motion /.test(l));
+    // 3 řádky: definice motoru (studie 2 s – motor dojede, bez pole), `pohyb čas 1` a `pohyb` (zkrácená – s polem)
+    ok(r.code === 0 && mk.length === 3 && / t=2 /.test(mk[0]) && !/m1\.end=/.test(mk[0]) && mk.slice(1).every((l) => / t=1 .* m1=ranged:57\.5>27\.15:- .* m1\.end=42\.325$/.test(l)), `zkrácená studie: m1.end=42.325 na konci strojového řádku jen po zkrácení (${mk.length} řádky): ${mk[1] || '(chybí)'}`);
+  }
   r = await cli(['run', path.join(IN, 'empty.txt'), '--out', path.join(WORK, 'o1')]);
   ok(r.code === 1 && /parse\.error/.test(r.out), 'prázdný skript → ✗ parse.error, 1');
   // tvrdý rozpočet: 300 různých ✗ → stručný protokol ≤ 2048 B, přebytek do <out>/protocol-full.txt a jeden řádek značky

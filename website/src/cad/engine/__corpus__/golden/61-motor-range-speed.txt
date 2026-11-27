@@ -68,7 +68,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 4 ===
 ✗ řádek 2: motor: rozsah 30,35 mm rychlostí 15,175 mm/s trvá 2 s, zadaný čas 1 s nestačí – vynechte čas (délka studie bude 2 s), nebo rychlost (motor projede rozsah za 1 s) (skript ze starší verze: dřívější význam – jet od začátku rychlostí bez konce – zapíšete „od A rychlost V“)
 
@@ -78,7 +78,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 5 ===
 ✗ řádek 1: motor: rychlost -15,175 je záporná, ale rozsah 27,15 → 57,5 mm roste – zadejte kladnou rychlost (směr určuje rozsah), nebo rozsah otočte
 
@@ -88,7 +88,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 6 ===
 Pohybová studie: motorů 1 · kroků 4
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
@@ -115,4 +115,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

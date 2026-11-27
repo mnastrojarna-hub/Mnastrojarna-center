@@ -1,0 +1,40 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Mechanika“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ vazba ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+ pohání: „Deska A“ · směr −Z
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Deska A“: ΔZ −30,35 mm
+ stojí: 1 („Rám“)
+Vazby splněny ve všech krocích
+Pohybová studie: motorů 1 · kroků 4
+ 1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Deska A“: ΔZ −15,175 mm
+ stojí: 1 („Rám“)
+Vazby splněny ve všech krocích
+⚠ řádek 15: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
+Pohybová studie: motorů 1 · kroků 4 · 1 s · r·?
+ 1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Deska A“: ΔZ −15,175 mm
+ stojí: 1 („Rám“)
+Vazby splněny ve všech krocích
+⚠ řádek 16: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 1 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)

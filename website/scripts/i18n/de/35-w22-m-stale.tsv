@@ -9,11 +9,11 @@ stav sestavy	Zustand der Baugruppe
 výpočet pohybové studie nahradil novější výpočet (sestava nebo studie se mezitím změnila)	die Berechnung der Bewegungsstudie wurde durch eine neuere ersetzt (Baugruppe oder Studie haben sich inzwischen geändert)
 Pohyb: nespočítáno – „pohyb spustit“ nebo Vypočítat pohyb v panelu studie	Bewegung: nicht berechnet – „bewegung starten“ oder Bewegung berechnen im Studienfenster
 Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: {0}; přepočítá „pohyb spustit“	Bewegung: das Ergebnis GILT NICHT – seit der Berechnung geändert: {0}; „bewegung starten“ berechnet neu
-Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)	Bewegung: das Ergebnis gilt für diesen Zustand der Baugruppe – {0} Schritte, {1}, {2} (Einzelheiten: bewegung status)
+Pohyb: výsledek platí pro tento stav sestavy – {0}, {1}, {2} (podrobně pohyb stav)	Bewegung: das Ergebnis gilt für diesen Zustand der Baugruppe – {0}, {1}, {2} (Einzelheiten: bewegung status)
 nesplněné vazby v {0} krocích	nicht erfüllte Verknüpfungen in {0} Schritten
 vazby splněny	Verknüpfungen erfüllt
 kolize nekontrolovány	Kollisionen nicht geprüft
-průnik těles v {0} krocích	Körperdurchdringung in {0} Schritten
+průnik těles {0}	Körperdurchdringung {0}
 bez průniku těles v kontrolovaných krocích	keine Körperdurchdringung in den geprüften Schritten
 # panel Pohybová studie – stav výsledku
 Nezkontrolováno – pro sestavu „{0}“ v tomto stavu se pohyb ještě nepočítal.	Nicht geprüft – für die Baugruppe „{0}“ in diesem Zustand wurde die Bewegung noch nicht berechnet.

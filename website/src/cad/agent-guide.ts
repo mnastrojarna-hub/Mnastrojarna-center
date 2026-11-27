@@ -837,7 +837,14 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   znovu zadat \`pohyb motor … A..B rychlost V\` (v panelu tlačítko „Převést na rozsah × rychlost“), převod do skriptu to uvede v poznámce.
 - **Motory na strojovém řádku** (i ve stručném protokolu): na konci \`= … motion …\` jedno pole na motor
   \`m<i>=<průběh>:<začátek>><konec>:<směr>\` – průběh \`range\` | \`back\` (\`55>25>55\`) | \`ranged\` | \`open\` (konec = hodnota na konci
-  studie), směr \`+\` roste / \`-\` klesá / \`+-\` \`-+\` tam a zpět; např. \`m1=ranged:57.5>27.15:-\`.
+  studie), směr \`+\` roste / \`-\` klesá / \`+-\` \`-+\` tam a zpět; např. \`m1=ranged:57.5>27.15:-\`. Pole nese ZADANÝ rozsah; motor,
+  který ve zkrácené studii na konec nedojede (⚠ \`motion.motor-short\`), má navíc na konci řádku \`m<i>.end=<hodnota na konci studie>\`
+  (např. \`m1.end=42.325\`) – skutečný dojezd, stejně jako \`travel=\`.
+- **Vazba pro motor – hlavní zdvih × vedení:** Vzdálenost a Drážka s polohou = motor řídí HODNOTU vazby (řádek motoru „hodnota
+  vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm“); Souosost, Drážka bez polohy, Dráha, Šroub = vedení, motor posouvá / natáčí od výchozí
+  polohy („posuv od výchozí polohy“). Formulář motoru v panelu nabízí vazby v těchto dvou skupinách (předvybraná první vazba
+  s hodnotou) a u vazby, kterou už motor pohání, dopíše „– pohání motor N“; druhý motor na témže stupni volnosti = ⚠
+  \`motion.motor-conflict\`.
 - **Režim studie a úroveň simulace (vlna 22, bod 2):** \`pohyb kinematika\` = polohy jen z vazeb a motorů (pružiny se měří, netlačí);
   díl, kterého polohu vazby neurčují (volný v mezi – stírací deska, přidržovač), zůstává, kde byl, a posune ho jen doraz meze → ⚠
   \`motion.undetermined\` a souhrn místo „Vazby splněny ve všech krocích“ napíše „⚠ vazby splněny …, ale polohu „X“ neurčují“.
@@ -871,7 +878,13 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   „Nesplněné vazby: N“ a \`motion.conflict\` počítají jen skutečně porušené vazby a pohony; vazba, která motor zastavila a je splněná
   (pevná vzdálenost, mez na dorazu), je v \`pohyb krok N\` „brání: …“. V **dynamice** platí \`na mezi stop\` (výchozí) i \`chyba\` také:
   mez porušená předepsaným pohybem motoru zastaví motory na poslední platné hodnotě (⚠ \`motion.motor-limit\`), resp. snímky za mezí
-  jsou neplatné (⚠ \`motion.invalid\`, zobrazena poslední platná poloha).
+  jsou neplatné (⚠ \`motion.invalid\`, zobrazena poslední platná poloha) – všechny snímky, dokud motor žádá jinou hodnotu než
+  v posledním platném snímku, i když za mezí už stojí (dojel). Stav integrátoru za mezí je nefyzikální: blok Dynamika bere zdvih, v max,
+  a max, dotyky dorazů, síly pružin a energii jen z platných kroků (⚠ „neplatné kroky 4–12 … jen z platných kroků“, energie „v posledním
+  platném kroku (t = …)“), neplatný snímek nemá \`dyn\` (CSV prázdné buňky, graf mezera). Zastavený motor je v dynamice stejně jako v kinematice nesplněný pohon:
+  \`conflicts=N\`, „nesplněné vazby v N krocích“ a \`motion.conflict\` vazby motoru, nikdy „Vazby splněny ve všech krocích“.
+  \`motion.motor-limit\` u profilu, který za mezí dojel a couvl, dopíše nejzazší žádanou hodnotu („žádáno 37,226 → 37,348 mm
+  (nejdál 27,15 mm)“).
 - **Preferovaná strana meze:** \`sestava vazba "Mez" preferovat max\` (EN \`prefer\`, DE \`bevorzugen\`; \`ne\` = zrušit; JSON
   \`prefer: "min" | "max"\`) u Meze vzdálenosti / úhlu a Drážky bez polohy: kinematika i přepočet vazeb drží díl u této meze, když ho
   ostatní vazby neurčují; pevnou vazbu, ukotvení, kontakt ani motor nepřebije. Výpis vazby končí „· preferuje max“.

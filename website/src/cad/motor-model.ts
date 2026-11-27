@@ -201,6 +201,21 @@ export const motorIsAbsolute = (mo: Pick<MotionMotor, "kind">, m: Pick<Mate, "ty
   !!m && mo.kind === "linear" && (m.type === "distance" || (m.type === "slot" && m.value !== undefined));
 
 /**
+ * Vazby pro motor rozdělené podle role (vlna 22, bod 10 – kolo 7: „nabídka obsahovala hlavní ZDVIH i vodicí vazby“ bez rozlišení):
+ * `value` = vazby s hodnotou (Vzdálenost, Drážka s polohou) – motor řídí hodnotu vazby, zadává se začátek a konec jako hodnoty
+ * vazby (hlavní zdvih); `guide` = vodicí vazby (Souosost, Drážka bez polohy, Dráha, Šroub, Závěs) – motor posouvá / natáčí podél
+ * vedení od výchozí polohy. Pořadí v obou skupinách jako v sestavě; `driven` = čísla motorů (od 1), které vazbu už pohánějí.
+ * Rotační motor má jen vodicí vazby (osa). Formulář motoru je ukáže ve dvou skupinách a předvybere první vazbu s hodnotou.
+ */
+export function motorMateGroups<M extends Pick<Mate, "id" | "type" | "value">>(mates: readonly M[], kind: MotionMotor["kind"], motors: readonly Pick<MotionMotor, "mate">[] = []): { value: M[]; guide: M[]; driven: Map<string, number[]> } {
+  const driven = new Map<string, number[]>();
+  motors.forEach((mo, i) => driven.set(mo.mate, [...(driven.get(mo.mate) ?? []), i + 1]));
+  const value = mates.filter((m) => motorIsAbsolute({ kind }, m));
+  const guide = mates.filter((m) => !motorIsAbsolute({ kind }, m));
+  return { value, guide, driven };
+}
+
+/**
  * Výchozí začátek motoru bez výpočtu: u absolutní vazby její hodnota v dokumentu (splněná vazba = aktuální mezera), jinak 0
  * (posuv / natočení od výchozí polohy). Skutečně naměřenou hodnotu ve výchozí poloze dává výsledek studie (`MotionResult.motorInfo`).
  */

@@ -82,7 +82,7 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const a = await runLines(press(), { ...env, motion: slot("A") }, MATE, "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
     const kvOf = (d: CadDoc, key: string) => statusKv(d, null, { components: 2, parts: 2, motion: motionStatusOf(slot(key).store, key, d) });
     const okLine = motionStatusOf(slot("A").store, "A", a.doc)!;
-    expect(okLine.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)");
+    expect(okLine.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)");
     // kolize se v této studii nekontrolovaly: vazby splněny, ale `motion=ok` to není (oprava po kontrole – dřív `motion=ok`)
     expect(kvOf(a.doc, "A")).toMatch(/ motion=mates-ok$/);
     expect(kvOf(a.doc, "A")).not.toMatch(/ motion=ok\b/);
@@ -158,6 +158,19 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     expect(a.log.join("\n")).not.toContain(GREEN_MATES);
     expect(a.codes.map((c) => c.code)).toContain("motion.motor-limit");
     expect(a.kv).toMatch(/ stopped=\d+ level=kin groups=\S+$/); // M3: tuhé skupiny na konci řádku
+  });
+  it("„Vazby splněny…“ ne ani v DYNAMICE, když motor stojí na mezi – zastavený pohon = nesplněná vazba motoru jako v kinematice (kolo 7)", async () => {
+    // dřív: dynamika vedle ⚠ motion.motor-limit (stopped=N) psala „Vazby splněny ve všech krocích“ a conflicts=0, kinematika téhož
+    // dokumentu „nesplněné vazby v N krocích“ + motion.conflict ZDVIH (oponent kola 6)
+    const env = fakeEnv();
+    const base = [MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40'];
+    const dyn = await runLines(press({ holder: true }), env, ...base, "pohyb dynamika čas 2 krok 0.002 snímky 10", "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
+    expect(dyn.last.log.join("\n")).not.toContain(GREEN_MATES);
+    expect(dyn.kv).toMatch(/ mode=dyn /);
+    expect(dyn.kv).toMatch(/ stopped=[1-9]/);
+    const n = Number(dyn.kv!.match(/ conflicts=(\d+)/)![1]);
+    expect(n).toBeGreaterThan(0);
+    expect(dyn.last.log.join("\n")).toMatch(/⚠ nesplněné vazby v \d+ krocích/);
   });
   it("„Vazby splněny…“ jen s polohou, která neujela: preference meze, kterou pevná vazba nedovolí splnit, neposune díly v X/Y (fáze 2)", async () => {
     // dřív: preference min|max proti pevné vazbě → penalizační optimum ujelo o ~5,6–7,9 m v X/Y s natočením kolem Z a souhrn hlásil

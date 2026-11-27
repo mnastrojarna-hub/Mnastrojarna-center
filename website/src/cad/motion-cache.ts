@@ -19,7 +19,7 @@ import { flattenAssembly, MAX_DEPTH } from "./assembly";
 import { stepHasFault } from "./clash-report";
 import { betweenFaultCount, clearanceBelowCount, clearanceStatusText } from "./clearance-report";
 import { tr } from "./i18n";
-import { motionMotorNotes, type MotionResult } from "./motion";
+import { inStepsWord, motionMotorNotes, stepsWord, type MotionResult } from "./motion";
 import { clearanceOf } from "./motion-clearance";
 import { massMaterialId } from "./motion-mass";
 import { processStatusText, processWarnCount } from "./motion-process";
@@ -308,16 +308,17 @@ export function motionStatusOf(store: MotionStore, key: string, d: CadDoc): Moti
   if (st.state === "stale") return { state: "stale", line: tr("Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: {0}; přepočítá „pohyb spustit“", st.changed.join("; ")) };
   const r = st.entry.res;
   const v = motionVerdict(r, d);
+  // tvar čísla podle počtu („4 kroky“, „12 kroků“, „1 krok“ – motion.ts stepsWord; dřív vždy „{0} kroků“, kolo 6)
   const steps = Math.max(0, r.steps.length - 1);
   // jen kroky se SKUTEČNOU kolizí (vlna 22, bod 5 – clash-report.ts, motionVerdict); šroub v závitu / dotyk / pracovní kontakt kolizí nejsou
   // kolize nalezené zjemněním MEZI kroky (vlna 22, bod 6) – jinak by `stav` hlásil „bez průniku“ při průchodu mezi kroky
   const mid = betweenFaultCount(r, d);
   const other = !v.hit && !mid && r.steps.some((x) => x.clashes?.length);
-  const mates = r.conflictSteps ? tr("nesplněné vazby v {0} krocích", r.conflictSteps) : tr("vazby splněny");
-  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : v.hit ? tr("průnik těles v {0} krocích", v.hit) : mid ? tr("průnik těles mezi kroky ({0}×, nalezeno zjemněním)", mid) : other ? tr("bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)") : tr("bez průniku těles v kontrolovaných krocích");
+  const mates = r.conflictSteps ? tr("nesplněné vazby {0}", inStepsWord(r.conflictSteps)) : tr("vazby splněny");
+  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : v.hit ? tr("průnik těles {0}", inStepsWord(v.hit)) : mid ? tr("průnik těles mezi kroky ({0}×, nalezeno zjemněním)", mid) : other ? tr("bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)") : tr("bez průniku těles v kontrolovaných krocích");
   // vůle (bod 6; bez sledované vůle u „bez průniku“ výslovně „vůle nekontrolována“ – nulový průnik není provozní vůle), stav výrobku (bod 4)
   const clrText = clearanceStatusText(r, d) || (r.collisionsChecked && !v.hit && !mid && !clearanceOf(r).clearance ? tr("vůle nekontrolována") : "");
   const clr = [clrText, processStatusText(r, d)].filter(Boolean).join(", ");
   const warn = v.notes ? tr(", ⚠ upozornění k motorům: {0}", v.notes) : "";
-  return { state: v.state, line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, (clr ? `${clash}, ${clr}` : clash) + warn) };
+  return { state: v.state, line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0}, {1}, {2} (podrobně pohyb stav)", stepsWord(steps), mates, (clr ? `${clash}, ${clr}` : clash) + warn) };
 }

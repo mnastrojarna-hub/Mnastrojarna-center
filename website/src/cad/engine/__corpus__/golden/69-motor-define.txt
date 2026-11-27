@@ -50,7 +50,7 @@ Vazby: 5 (5 ok)
 Pohybová studie: motorů 2 · kroků 4 · 2 s – pohyb stav
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 163,04 cm³ · hmotnost Σ 1,280 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, nesplněné vazby v 4 krocích, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, nesplněné vazby v 4 krocích, kolize nekontrolovány (podrobně pohyb stav)
 === run 2 ===
 ✓ motor 2 odebrán
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 37,15 mm ↓ zdvih 20,35 mm
@@ -81,4 +81,4 @@ Vazby: 5 (5 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 120 mm · objem Σ 163,04 cm³ · hmotnost Σ 1,280 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

@@ -131,7 +131,7 @@ Vazby: 7 (6 ok, 1 potlačeno)
 Pohybová studie: motorů 1 · kroků 60 · 2 s · kolize – pohyb stav
 Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 100 × 100 × 91 mm · objem Σ 224,08 cm³ · hmotnost Σ 1,759 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 krocích, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 kroku, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
 === run 2 ===
 ✓ dokument „Cyklus“ (0 prvků) – otevře se v nové záložce
 ℹ řádek 1: záložka „Cyklus“ už je otevřená, ale nezaložil ji stejný druh příkazu běhu (otevřený soubor, JSON, ruční práce) – dokument je v nové záložce (u nový díl / nová sestava ji převezme volba „znovu“)
@@ -192,4 +192,4 @@ Vazby: 7 (6 ok, 1 potlačeno)
 Pohybová studie: motorů 1 · kroků 60 · 2 s · kolize – pohyb stav
 Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 100 × 100 × 91 mm · objem Σ 224,08 cm³ · hmotnost Σ 1,759 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 krocích, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 kroku, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)

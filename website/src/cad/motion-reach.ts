@@ -12,6 +12,7 @@
  *   samy. Hlásí se už při definici (⚠ `motion.motor-conflict`), ne až ve výpočtu.
  */
 import { rotMatrix } from "./assembly";
+import { leafLabel } from "./clash-report";
 import { tr } from "./i18n";
 import { MATE_LABEL, type GeoProvider } from "./mates";
 import { motorCurrent, motorStartTime } from "./motor-model";
@@ -198,7 +199,10 @@ export async function motorConflicts(doc: CadDoc, geo: GeoProvider, study: Pick<
 
 /** Popis dosahu motoru slovy: „pohání: „Přidržovač“ + 1 díl (zámek: „Šroub M12“) · osa −Z“ */
 export function reachText(r: MotorReach, doc: CadDoc): string {
-  const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  // instance stejnou funkcí jako kolize a strom (clash-report.ts leafLabel → compLabel): přezdívka „Kostka [K7]“, jinak „Kostka #7“
+  // u opakovaného dílu – dřív u sestavy se 100 komponentami „„Kostka“, „Kostka“, „Kostka“ a další“ (kolo 7, měření bodu 10);
+  // dřív (kolo 7, první commit) vlastní kopie téže logiky – oponent: dvě kopie se rozejdou
+  const nm = (id: string) => leafLabel(doc, [id]);
   if (r.blocked || !r.comps.length) return tr("nepohne se (stupeň volnosti drží vazby)");
   const others = r.comps.length - 1;
   const lockedTxt = r.locked.length ? tr(" – spolu s ním kvůli pevné vazbě (zámku): {0}{1}", r.locked.slice(0, 3).map((id) => `„${nm(id)}“`).join(", "), r.locked.length > 3 ? tr(" a další") : "") : "";
