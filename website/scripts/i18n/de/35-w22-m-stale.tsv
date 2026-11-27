@@ -22,7 +22,6 @@ Počítám pohyb sestavy „{0}“…	Bewegung der Baugruppe „{0}“ wird bere
 Probíhá běh textových příkazů – panel počká na jeho dokončení a pak počítá s dokumentem, který běh zapíše.	Ein Lauf von Textbefehlen ist im Gang – das Fenster wartet auf sein Ende und rechnet dann mit dem Dokument, das der Lauf schreibt.
 Vypočítat pohyb znovu	Bewegung neu berechnen
 Výsledek neplatí – od výpočtu se změnilo: {0}. Nezkontrolováno; spusťte Vypočítat pohyb znovu.	Das Ergebnis gilt nicht – seit der Berechnung geändert: {0}. Nicht geprüft; Bewegung neu berechnen ausführen.
-Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} kroků · spočítáno {3}	Das Ergebnis gilt für „{0}“ im jetzigen Zustand · {1} Komponenten · {2} Schritte · berechnet {3}
 #!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
 výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“	das Ergebnis der Bewegungsstudie gilt für den jetzigen Zustand der Baugruppe nicht – seit der Berechnung geändert: {0}; „bewegung starten“ berechnet es neu
 pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}	Bewegungsstudie neu berechnet – das gespeicherte Ergebnis galt nicht, seit der Berechnung geändert: {0}

@@ -13,6 +13,7 @@ import { springGeom, springPosRound, springRound, springShapeLen, springWorldAxi
 import { getLang, tr } from "./i18n";
 import { worldGeo, type GeoProvider } from "./mates";
 import type { AsmComponent, CadDoc, Mate, Vec3 } from "./types";
+import { lostSpringComps, springLostNote, springLostSides } from "./spring-lost";
 
 export type SpringLevel = "ok" | "warn" | "error";
 /** Stav jedné pružiny: `seat` = vzdálenost dosedacích ploch, `length` = délka tvaru (≤ L0), `offset` = posun začátku na plochu A. */
@@ -231,7 +232,8 @@ export function springStatusLine(doc: CadDoc, check?: SpringCheck): string | nul
   const base = springStatusLine0(doc);
   if (!base || !check) return base;
   if (check.stale.length) return `${base} – ⚠ ${check.stale.map(springDriftText).join("; ")}`;
-  if (!check.checked) return `${base.replace(/ ✓/g, "")} – ${tr("uložená délka, s dosedacími plochami nezkontrolováno")}`;
+  // ztracená dosedací plocha má vlastní text v řádku (spring-lost.ts); dovětek o uložené délce jen když jsou i jiné pružiny
+  if (!check.checked) return lostSpringComps(doc).length === springComps(doc).length ? base.replace(/ ✓/g, "") : `${base.replace(/ ✓/g, "")} – ${tr("uložená délka, s dosedacími plochami nezkontrolováno")}`;
   return `${base} – ${tr("délka odvozená z dosedacích ploch (řídí polohy komponent)")}`;
 }
 
@@ -243,6 +245,8 @@ function springStatusLine0(doc: CadDoc): string | null {
     c,
     text: (ref: string) => {
       const s = c.spring!;
+      // ztracená dosedací plocha: uložená délka neplatí – žádná délka, síla ani ✓ (vlna 22, bod 20 – kolo 4)
+      if (springLostSides(s).length) return springLostNote(doc, c, ref);
       if (s.length === undefined) return tr("„{0}“{1} – délka zatím nespočtena (sestava pružina / přepočet vazeb)", c.name, ref);
       const solid = solidOf(c);
       const v = springVerdict(s.seat ?? s.length, s.free, solid);
@@ -263,7 +267,8 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
   for (const c of springComps(doc)) {
     const rows = steps.map((s) => ({ i: s.i, st: s.springs?.[c.id] })).filter((r): r is { i: number; st: SpringStep } => !!r.st);
     if (!rows.length) {
-      items.push({ c, text: (ref) => tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref) });
+      if (springLostSides(c.spring).length) items.push({ c, text: (ref) => tr("⚠ pružina {0}", springLostNote(doc, c, ref)) });
+      else items.push({ c, text: (ref) => tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref) });
       continue;
     }
     const L = rows.map((r) => r.st.length);
@@ -272,7 +277,8 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
     const loose = rows.filter((r) => r.st.level === "warn");
     const solid = solidOf(c);
     const fr = rows.filter((r) => r.st.force !== undefined).map((r) => r.st.force!);
-    const range = (a: number[], d = 3) => (Math.abs(a[0] - a[a.length - 1]) < 1e-9 ? fmt(a[0], d) : `${fmt(a[0], d)} → ${fmt(a[a.length - 1], d)}`);
+    // stejná zobrazená hodnota = jedna hodnota („35 mm“, ne „35 → 35 mm“ ze šumu řešiče ~1e-9 – kolo 6)
+    const range = (a: number[], d = 3) => (fmt(a[0], d) === fmt(a[a.length - 1], d) ? fmt(a[0], d) : `${fmt(a[0], d)} → ${fmt(a[a.length - 1], d)}`);
     const span = (list: typeof rows) => (!list.length ? "" : list[0].i === list[list.length - 1].i ? `${list[0].i}` : `${list[0].i}–${list[list.length - 1].i}`);
     let body = `: ${tr("délka {0} mm", range(L))} (min ${fmt(Math.min(...L), 3)} · L0 ${fmt(c.spring!.free, 3)}${solid !== undefined ? ` · Ln ${fmt(solid, 3)}` : ""})`;
     if (fr.length) body += ` · ${tr("síla {0} N (max {1} N)", range(fr, 1), fmt(Math.max(...fr), 1))}`;
@@ -282,6 +288,9 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
     const more = chk.length ? `; ${chk.join("; ")}` : "";
     if (bad.length) items.push({ c, text: (ref) => `✗ ${head(ref)}${body} – ${tr("pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)", span(bad), fmt(Math.min(...seat), 3))}${more}` });
     else if (loose.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("nedosedá v krocích {0} (mezera max {1} mm)", span(loose), fmt(Math.max(...seat) - c.spring!.free, 3))}${more}` });
+    // na dorazu Ln ve VŠECH krocích: pružina se nepohnula z bloku – ne „✓“ (kinematika pružinou netlačí; polohu drží jen vazby /
+    // preference) – vlna 22, bod 2, kolo 6
+    else if (solid !== undefined && rows.length > 1 && L.every((v) => v <= solid + 1e-6)) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("po celou studii stlačená na doraz Ln (blok) – síla {0} N je jen odvozená z polohy; zkontrolujte polohu dílů (kinematika pružinou netlačí: pohyb kvazistatika)", fmt(fr.length ? Math.max(...fr) : 0, 1))}${more}` });
     else if (chk.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${chk.join("; ")}` });
     else items.push({ c, text: (ref) => `✓ ${head(ref)}${body}` });
   }

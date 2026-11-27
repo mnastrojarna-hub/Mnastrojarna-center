@@ -81,6 +81,11 @@ export interface OpCtx {
   kind?: OpKind;
   /** přísný režim běhu (volba běhu + řádky `přísně`, engine/strict.ts) */
   strict?: StrictState;
+  /**
+   * bloky příkazů výkresu běhu (engine/drawing-track.ts): export listu, který běh měnil, ohlásí jeho nálezy (řez mimo těleso)
+   * na řádky příkazů výkresu, ne podruhé na řádku exportu (22i kolo 6)
+   */
+  draw?: { reportNow(sheetId: string, codes: readonly string[]): Promise<boolean> };
 }
 
 export type OpHandler<K extends OpKind> = (op: OpOf<K>, ctx: OpCtx) => Promise<void>;

@@ -21,7 +21,7 @@ import { findSnap, orthoPoint, polarPoint, type SnapHit } from "@/cad/draft/snap
 import { spatialIndex } from "@/cad/draft/spatial";
 import { extents } from "@/cad/draft/status";
 import { perfMark } from "@/cad/perf-log";
-import { boxMode, CLICK_PX, clickMode, HOLD_MS, HOLD_SLOP_PX, holdPhase, isCrossing, isDrag, rectFrom, type BoxMods, type ClickMode } from "@/cad/box-select-2d";
+import { boxMode, CLICK_PX, clickMode, HOLD_MS, HOLD_SLOP_PX, holdPhase, isCrossing, isDoubleClick, isDrag, rectFrom, type BoxMods, type ClickMode } from "@/cad/box-select-2d";
 import { boxLabel, drawBoxSelect } from "../box-select-2d-ui";
 
 export type DraftPrefs = {
@@ -98,9 +98,10 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     snap: null as SnapHit | null,
     hover: null as string | null,
     /** okno výběru: rohy (px), tažené / dvěma kliky, modifikátory (stisk, puštění, poslední pohyb), vynucené o / k, dotykem */
-    win: null as { a: Vec2; b: Vec2; drag: boolean; mods: BoxMods[]; cur?: BoxMods; force?: "window" | "crossing"; touch?: boolean } | null,
+    /** `t` = čas PRVNÍHO STISKU okna dvěma kliky – poklepání se měří od stisku k stisku (isDoubleClick, jako ui-layout) */
+    win: null as { a: Vec2; b: Vec2; drag: boolean; mods: BoxMods[]; cur?: BoxMods; force?: "window" | "crossing"; touch?: boolean; t?: number } | null,
     /** stisk levého tlačítka ve výběru: klik (entita pod kurzorem), nebo po posunu ≥ 5 px okno */
-    press: null as { a: Vec2; hit: string | null; mods: BoxMods } | null,
+    press: null as { a: Vec2; hit: string | null; mods: BoxMods; t?: number } | null,
     /** čeká se na první roh okna zadaného volbou o / k */
     force: null as "window" | "crossing" | null,
     /** po Esc během okna: puštění tlačítka už nic nevybere */
@@ -481,6 +482,18 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     }
     if (e.button !== 0) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // poklepání do prázdna není druhý roh okna zadaného dvěma kliky: okno otevřené prvním klikem se zruší a stisk
+    // dostane rozšíření (poklepání do výřezu rozvržení = modelový prostor); jinak se stisk spolkne (žádné nové okno)
+    const win0 = s.win;
+    if (e.pointerType !== "touch" && win0 && !win0.drag && !win0.force && win0.t !== undefined && isDoubleClick(win0.a, win0.t, scr, Date.now())) {
+      s.win = null;
+      s.live = null;
+      s.press = null;
+      host.current?.removeAttribute("data-boxsel-live");
+      schedule("over");
+      if (!pr.current.prompt && hook("down", scr, e)) hooked.current = true;
+      return;
+    }
     if (e.pointerType !== "touch" && !pr.current.prompt && !s.win && !s.force && hook("down", scr, e)) {
       hooked.current = true;
       return;
@@ -560,7 +573,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
       return;
     }
     const filt = pmt?.k === "select" ? pmt.filter : undefined;
-    s.press = { a: scr, hit: pickEntity(p.model, idx(), toWorld(v, scr), PICK / v.scale, filt)?.id ?? null, mods };
+    s.press = { a: scr, hit: pickEntity(p.model, idx(), toWorld(v, scr), PICK / v.scale, filt)?.id ?? null, mods, t: Date.now() };
   };
 
   /** puštění bez tažení: klik na entitu vybere ji (podle modifikátorů), klik do prázdna začne okno dvěma kliky */
@@ -574,7 +587,9 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
       schedule("over");
       return;
     }
-    s.win = { a: pr0.a, b: scr, drag: false, mods: [pr0.mods] };
+    // poklepání = druhý STISK do 350 ms od prvního STISKU (jedno pravidlo s rozšířením rozvržení ui-layout `pointerHook`,
+    // vlna 22 kolo 6) – dřív se měřilo od puštění: pomalý první klik pak okno zrušil, ale rozšíření poklepání nevidělo
+    s.win = { a: pr0.a, b: scr, drag: false, mods: [pr0.mods], t: pr0.t ?? Date.now() };
     schedule("over");
   };
 
@@ -589,7 +604,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     if (s.force) return press(scr, {});
     const filt = pmt?.k === "select" ? pmt.filter : undefined;
     const hit = pickEntity(p.model, idx(), toWorld(v, scr), (3 * PICK) / v.scale, filt);
-    s.press = { a: scr, hit: hit?.id ?? null, mods: {} };
+    s.press = { a: scr, hit: hit?.id ?? null, mods: {}, t: Date.now() };
     release(scr, {});
   };
 

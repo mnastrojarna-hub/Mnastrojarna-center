@@ -46,6 +46,9 @@ function setup(ops: ProcessOp[] = [{ id: "p1", kind: "cut", tool: "R", target: "
 /** zkušební jádro: záběr od z < 11 (z = 10: celá tloušťka, ale hrot ještě v rovině spodní plochy), prostřiženo od z = 9 */
 function fakeKernel(calls: ProcReq[] = []) {
   return async (req: ProcReq): Promise<ProcRes> => {
+    // kolo 6: processRun se napřed ptá na plán mezipoloh (`plan`, bez booleovských operací) – zkušební jádro mezipolohy nechce
+    // a plán do zaznamenaných výpočtů nepatří (testy níže kontrolují požadavky výpočtu)
+    if (req.plan) return { steps: [], states: [{ removed: 0, volume: 6400, scrap: [] }], dir: null, thickness: null, volume0: 6400, ms: 0 };
     calls.push(req);
     const states: ProcRes["states"] = [{ removed: 0, volume: 6400, scrap: [] }];
     let st = 0;

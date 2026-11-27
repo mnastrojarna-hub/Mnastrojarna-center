@@ -13,7 +13,7 @@ import { matesCount } from "./engine/kv";
 import { docKv } from "./engine/protocol";
 import { setLang } from "./i18n";
 import type { PartFace } from "./mates";
-import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource, type Vec3 } from "./types";
+import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource, type MeshData, type Vec3 } from "./types";
 
 setLang("cs");
 const P = (o: Vec3, n: Vec3): PartFace => ({ kind: "plane", origin: o, normal: n });
@@ -24,6 +24,33 @@ const FACES: Record<string, PartFace[]> = {
   split: [P([0, 20, 2.5], [-1, 0, 0]), P([34, 0, 4.5], [0, -1, 0]), P([10, 10, 5], [0, 0, 1]), P([34, 40, 4.5], [0, 1, 0]), P([30, 20, 0], [0, 0, -1]), P([60, 20, 5], [1, 0, 0]), P([40, 20, 10], [0, 0, 1]), P([10, 30, 5], [0, 0, 1])],
   holder: [P([0, 5, 5], [-1, 0, 0]), P([10, 5, 5], [1, 0, 0]), P([5, 0, 5], [0, -1, 0]), P([5, 10, 5], [0, 1, 0]), P([5, 5, 0], [0, 0, -1]), P([5, 5, 10], [0, 0, 1])],
 };
+/**
+ * obálky ploch podle varianty (min, max) – síť náhradního jádra (vlna 22 kolo 6: „táž plocha, změnila velikost“ smí být jen
+ * s překryvem s původní plochou, který se počítá z obálek ploch sítě stavby; dřív mock síť neměl a stačila táž rovina)
+ */
+type B = [Vec3, Vec3];
+const BOXES: Record<string, B[]> = {
+  stepped: [[[0, 0, 0], [0, 40, 5]], [[0, 0, 0], [60, 0, 10]], [[0, 0, 5], [20, 40, 5]], [[0, 40, 0], [60, 40, 10]], [[0, 0, 0], [60, 40, 0]], [[60, 0, 0], [60, 40, 10]], [[20, 0, 10], [60, 40, 10]], [[20, 0, 5], [20, 40, 10]]],
+  flat: [[[0, 0, 0], [0, 40, 10]], [[60, 0, 0], [60, 40, 10]], [[0, 0, 0], [60, 0, 10]], [[0, 40, 0], [60, 40, 10]], [[0, 0, 0], [60, 40, 0]], [[0, 0, 10], [60, 40, 10]]],
+  split: [[[0, 0, 0], [0, 40, 5]], [[0, 0, 0], [60, 0, 10]], [[0, 0, 5], [20, 18, 5]], [[0, 40, 0], [60, 40, 10]], [[0, 0, 0], [60, 40, 0]], [[60, 0, 0], [60, 40, 10]], [[20, 0, 10], [60, 40, 10]], [[0, 22, 5], [20, 40, 5]]],
+  holder: [[[0, 0, 0], [0, 10, 10]], [[10, 0, 0], [10, 10, 10]], [[0, 0, 0], [10, 0, 10]], [[0, 10, 0], [10, 10, 10]], [[0, 0, 0], [10, 10, 0]], [[0, 0, 10], [10, 10, 10]]],
+};
+/** síť z obdélníků v obálkách ploch (dva trojúhelníky na plochu) – plocha i obálka jako u skutečné stavby */
+function boxMesh(boxes: B[]): MeshData {
+  const v: number[] = [];
+  const t: number[] = [];
+  const g: number[] = [];
+  boxes.forEach(([a, b], face) => {
+    const flat = [0, 1, 2].find((d) => a[d] === b[d]) ?? 2;
+    const [u, w] = [0, 1, 2].filter((d) => d !== flat);
+    const corner = (cu: number, cw: number): number[] => { const p = [...a]; p[u] = cu; p[w] = cw; return p; };
+    const base = v.length / 3;
+    v.push(...corner(a[u], a[w]), ...corner(b[u], a[w]), ...corner(b[u], b[w]), ...corner(a[u], b[w]));
+    g.push(t.length, 6, face);
+    t.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  });
+  return { vertices: new Float32Array(v), normals: new Float32Array(v.length), triangles: new Uint32Array(t), faceGroups: new Int32Array(g), lines: new Float32Array(0), edgeGroups: new Int32Array(0) };
+}
 const variantOf = (s: ComponentSource | undefined): string => {
   if (!s || s.kind === "file") return "";
   const d = s.kind === "part" ? s.doc : s.doc;
@@ -37,8 +64,9 @@ function mockEnv(): AsmEnv {
     parts: async (list) =>
       list.map((p) => {
         src.set(p.key, p.source);
-        const faces = FACES[variantOf(p.source)]?.length ?? 0;
-        const result: BuildResult = { status: [], mesh: null, metrics: { volume: 1000, area: 0, bbox: [[0, 0, 0], [1, 1, 1]], faces, edges: 0 }, ms: 0 };
+        const v = variantOf(p.source);
+        const faces = FACES[v]?.length ?? 0;
+        const result: BuildResult = { status: [], mesh: BOXES[v] ? boxMesh(BOXES[v]) : null, metrics: { volume: 1000, area: 0, bbox: [[0, 0, 0], [1, 1, 1]], faces, edges: 0 }, ms: 0 };
         return { key: p.key, result };
       }),
     mateFace: async (key, i) => FACES[variantOf(src.get(key))]?.[i] ?? null,
@@ -82,7 +110,8 @@ describe("sestava hotovo: ztracená plocha vazby se hlásí, nikdy tiše nepřip
     expect(pos(r.doc)).toEqual(before); // dřív: poloha [40; 0; 5] · natočení [90; 0; 0] (F3 = boční plocha −Y)
     expect(r.log[0]).toMatch(/^→ „Deska A“ vrácen do sestavy „Sestava A“ .* · vazby 0\/1 ok · ztracené reference: 1 – stav vazeb níže$/);
     expect(r.log.join("\n")).not.toMatch(/✓|vazby 1\/1 ok|vazby pohnuly/);
-    expect(r.codes).toEqual([{ code: "mate.lost", args: [expect.stringMatching(/^1 Kontakt „Přidržovač“ F5 → „Deska A“ F3$/), expect.stringMatching(/^B F3 dílu „Deska A“ \(rovinná \+Z · střed \[10; 20; 5\]\) po úpravě dílu neexistuje$/), "vyberte plochu znovu (sestava vazba 1 plocha b …), nebo vazbu smažte (sestava vazba 1 smazat)"] }]);
+    // (kolo 6: náhradní jádro má síť → otisk nese i plochu mm², jako skutečná stavba v greens-a 9)
+    expect(r.codes).toEqual([{ code: "mate.lost", args: [expect.stringMatching(/^1 Kontakt „Přidržovač“ F5 → „Deska A“ F3$/), expect.stringMatching(/^B F3 dílu „Deska A“ \(rovinná \+Z · střed \[10; 20; 5\] · 800 mm²\) po úpravě dílu neexistuje$/), "vyberte plochu znovu (sestava vazba 1 plocha b …), nebo vazbu smažte (sestava vazba 1 smazat)"] }]);
     // geometrie ztraceného odkazu se nenačte – ani stará plocha se stejným číslem
     expect(geoProvider(r.doc, env)(r.doc.mates![0].b)).toBeNull();
   });
@@ -167,7 +196,9 @@ describe("sestava hotovo: ztracená plocha vazby se hlásí, nikdy tiše nepřip
 
 describe("sameFace (obal nad matchFace): dvě koplanární plochy už nejsou „nejbližší“, ale nejednoznačné", () => {
   it("jediná plocha v téže rovině → její číslo; dvě → null", () => {
-    expect(sameFace(P([10, 20, 5], [0, 0, 1]), [{ face: 3, info: P([12, 20, 5], [0, 0, 1]) }])).toBe(3);
+    // vlna 22 kolo 6 (vědomá změna): s plochou (mm²), aby šel ověřit překryv s původní plochou; bez ní null
+    expect(sameFace(P([10, 20, 5], [0, 0, 1]), [{ face: 3, info: P([12, 20, 5], [0, 0, 1]), area: 800 }], 1e-4, -1, 800)).toBe(3);
+    expect(sameFace(P([10, 20, 5], [0, 0, 1]), [{ face: 3, info: P([12, 20, 5], [0, 0, 1]) }])).toBeNull();
     expect(sameFace(P([10, 20, 5], [0, 0, 1]), [{ face: 3, info: P([12, 20, 5], [0, 0, 1]) }, { face: 4, info: P([40, 20, 5], [0, 0, 1]) }])).toBeNull();
   });
 });

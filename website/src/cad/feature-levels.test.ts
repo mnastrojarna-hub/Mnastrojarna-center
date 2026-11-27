@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
-import { bodyText, effectOf, effectText, expectsSolid, featureCounts, featureState, geometryText, levelsData, levelsText, resultTypeError, settleBodyChecks, type BodyCheck } from "./feature-levels";
+import { bodyText, effectOf, effectText, expectsSolid, featureCounts, featureState, geometryText, levelsData, levelsText, resultTypeError, settleBodyChecks, treeStatus, type BodyCheck } from "./feature-levels";
 import type { FeatureStatus } from "./types";
 
 afterEach(() => setLang("cs"));
@@ -128,5 +128,23 @@ describe("úroveň „konečné těleso“ – neprovedená kontrola nikdy není
     expect(geometryText({ valid: undefined, solids: 1, faces: 90_000, approx: true })).toBe("nezkontrolováno (velké těleso, 90000 ploch – měřeno ze sítě, platnost se nekontroluje) · 1 těleso");
     expect(geometryText({ valid: false, solids: 1, faces: 6 })).toMatch(/^NEPLATNÁ/);
     expect(geometryText({ valid: true, solids: 0, faces: 6 })).toMatch(/^ŽÁDNÉ objemové těleso/);
+  });
+});
+
+describe("strom historie při úpravě prvku se stavbou po něj (rollback) – úrovně aktivního prvku jen z platné celé stavby", () => {
+  const st = (id: string, ok = true) => ({ id, ok });
+  const view = [st("a"), st("b")]; // stavba po upravovaný prvek „c“
+  const full = { geo: "G1", status: [st("a"), st("b"), st("c"), st("d", false)] };
+  it("doplní upravovaný a další prvky z celé stavby téže geometrie", () => {
+    expect(treeStatus(view, full, "G1", true)?.map((s) => s.id)).toEqual(["a", "b", "c", "d"]);
+    expect(treeStatus(view, full, "G1", true)?.find((s) => s.id === "d")?.ok).toBe(false);
+  });
+  it("po změně geometrie (parametr upravovaného prvku) celá stavba neplatí – nic se nedoplní", () => {
+    expect(treeStatus(view, full, "G2", true)?.map((s) => s.id)).toEqual(["a", "b"]);
+  });
+  it("bez rollbacku / bez celé stavby / bez výsledku beze změny", () => {
+    expect(treeStatus(view, full, "G1", false)?.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(treeStatus(view, null, "G1", true)?.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(treeStatus(undefined, full, "G1", true)).toBeUndefined();
   });
 });

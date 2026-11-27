@@ -123,6 +123,52 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     }
   }, 300_000);
 
+  it("kolo 6 · jádro: dráha posuvu kolíku napříč pohybu v OBOU pořadích dvojice 0,03 mm (dřív „Nůž“ × „Kolík“ 1,03 mm) a poloha minima", async () => {
+    const ws = new MemoryWorkspace();
+    const setup = corpus("74h-clearance-pin-side").split("\n").filter((l) => !/^(#|pohyb|stav)/.test(l)).join("\n");
+    await runReport(ws, setup, host());
+    const d = ws.present();
+    const id = (n: string) => d.components!.find((c) => c.name === n)!.id;
+    const nuz = d.components!.find((c) => c.name === "Nůž")!;
+    const at = (x: number) => ({ ...nuz.placement, position: [x, 0, 10] as [number, number, number] });
+    const doc17 = { ...d, components: d.components!.map((c) => (c.id === nuz.id ? { ...c, placement: at(97) } : c)) };
+    const r = await kernel.clearance({
+      doc: doc17,
+      poses: [{ [nuz.id]: at(102) }],
+      sweep: [
+        { a: id("Nůž"), b: id("Kolík"), from: 0, to: 1, locate: true },
+        { a: id("Kolík"), b: id("Nůž"), from: 0, to: 1, locate: true },
+      ],
+    });
+    for (const sw of r.sweep!) {
+      expect(sw.ok).toBe(true);
+      expect(sw.d).toBeCloseTo(0.03, 4);
+      // poloha minima: nůž pod osou kolíku (x 99..100 v úseku 97 → 102), body nože a kolíku v té poloze (ne na hranolu dráhy)
+      expect(sw.s!).toBeGreaterThan(0.39);
+      expect(sw.s!).toBeLessThan(0.61);
+    }
+    const [nk, kn] = r.sweep!;
+    expect(nk.p2![1]).toBeCloseTo(40.03, 3); // bod na kolíku
+    expect(Math.abs(nk.p2![0] - 100)).toBeLessThan(0.05);
+    expect(kn.p1![1]).toBeCloseTo(40.03, 3);
+  }, 120_000);
+
+  it("kolo 6 · 74h: vůle 0,03 mm mezi kroky 17 a 18 v obou pořadích – zvlášť od poloh kroků, s polohou v úseku; bez „dodržen“", async () => {
+    const { short, con } = await run("74h", corpus("74h-clearance-pin-side"));
+    const kv = lines(short, /^= L\d+ asm "Sestava 6V" motion steps=36 .* clear\.min=/);
+    expect(kv.length).toBe(3); // „Nůž“ × „Kolík“, „Kolík“ × „Nůž“, pohyb stav
+    // dřív clear.min=1.03 clear.below=0/37 (a „Kolík“ × „Nůž“ 0,03 se „v 1 z 37 poloh (kroky 18)“)
+    for (const l of kv) expect(l).toMatch(/ clear\.min=0\.03 clear\.limit=0\.05 clear\.below=0\/37 clear\.below\.between=1 clear\.at=17-18 clear\.pairs=1 /);
+    expect(con).not.toMatch(/limit 0,05 mm dodržen v celém pohybu/);
+    expect(con).not.toMatch(/z 37 poloh \(kroky 18\)/);
+    expect(con).toMatch(/Vůle „Nůž“ × „Kolík“: nejmenší 0,03 mm mezi kroky 17 a 18 \(po přímé dráze: poloha 17,\d+, t = 0,9\d* s, motory 9\d,\d+\) – místo \[(99|100)[,\d]*; 40; 10\] ↔ \[(99|100)[,\d]*; 40,03; 10\] · ⚠ pod limitem 0,05 mm mezi kroky 17 a 18 \(v polohách kroků nad limitem\)/);
+    expect(con).toMatch(/Vůle „Kolík“ × „Nůž“: nejmenší 0,03 mm mezi kroky 17 a 18 \(po přímé dráze: poloha 17,/);
+    expect(short).toMatch(/clash\.clearance "Sestava 6V": vůle „Nůž“ × „Kolík“ 0,03 mm < 0,05 mm mezi kroky 17 a 18 \(nejmenší/);
+    expect(short).toMatch(/^= L\d+ status "Sestava 6V" .* motion=warn$/m);
+    // krok 18 sám: 1,25 mm bez ⚠ (dřív započten jako krok pod limitem)
+    expect(con).toMatch(/^ vůle „Kolík“ × „Nůž“: 1,25 mm – /m);
+  }, 300_000);
+
   it("74c: střižník ve vedení – vůle 0,01 mm pod limitem 0,05 (⚠ s místem a kroky), `kolize` bez ✓", async () => {
     const { r, short, con } = await run("74c", corpus("74c-clearance-guide"));
     // statická kontrola: žádné ✓ a výslovně „vůle nekontrolována“

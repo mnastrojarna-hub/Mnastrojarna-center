@@ -344,6 +344,137 @@ function leafSweep(a: Leaf, b: Leaf, m: number[], v: Vec3, touching: boolean): L
   }
 }
 
+/**
+ * Smí se dráha listu při posuvu ve směru `dir` (souřadnice listu) počítat hranoly jeho ploch? Hranice dráhy tvoří plocha, její posunutá
+ * kopie, dráhy hran a dráhy SILUET – bodů plochy, kde je normála kolmá na směr posuvu. Rovina (normála stálá) a válec / kužel /
+ * vytažená plocha s osou ve směru posuvu siluetu uvnitř plochy nemají (hranoly ploch dráhu vystihnou přesně); válec napříč
+ * pohybu (kolík, kterým projíždí nůž) siluetu uvnitř plochy má – hranoly ploch by ji vynechaly a vůle vyšla větší (kolo 6: 1,03 mm
+ * místo 0,03 mm). Výsledek se pamatuje podle listu a směru.
+ */
+const safeCache = new Map<string, boolean>();
+function sweepSafe(leaf: Leaf, dir: Vec3): boolean {
+  const l = Math.hypot(dir[0], dir[1], dir[2]);
+  if (!(l > 1e-12)) return true;
+  const u: Vec3 = [dir[0] / l, dir[1] / l, dir[2] / l];
+  const key = `${leaf.key}|${u.map((x) => Math.round(x * 1e6)).join(",")}`;
+  const hit = safeCache.get(key);
+  if (hit !== undefined) return hit;
+  const oc = r.getOC() as Oc;
+  const T = oc.GeomAbs_SurfaceType;
+  const along = (d: { X(): number; Y(): number; Z(): number }) => {
+    const c = [d.Y() * u[2] - d.Z() * u[1], d.Z() * u[0] - d.X() * u[2], d.X() * u[1] - d.Y() * u[0]];
+    return Math.hypot(c[0], c[1], c[2]) < 1e-7;
+  };
+  let safe = true;
+  const exp = new oc.TopExp_Explorer(leaf.body.wrapped, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+  try {
+    for (; exp.More() && safe; exp.Next()) {
+      let ad: any = null;
+      try {
+        ad = new oc.BRepAdaptor_Surface(oc.TopoDS.Face(exp.Current()), true);
+        const t = ad.GetType();
+        if (t === T.GeomAbs_Plane) continue;
+        if (t === T.GeomAbs_Cylinder || t === T.GeomAbs_Cone) {
+          const g = t === T.GeomAbs_Cylinder ? ad.Cylinder() : ad.Cone();
+          const ax = g.Axis();
+          const d = ax.Direction();
+          safe = along(d);
+          d.delete();
+          ax.delete();
+          g.delete();
+          continue;
+        }
+        if (t === T.GeomAbs_SurfaceOfExtrusion) {
+          const d = ad.Direction();
+          safe = along(d);
+          d.delete();
+          continue;
+        }
+        safe = false; // koule, anuloid, B-spline …: silueta uvnitř plochy možná
+      } catch {
+        safe = false;
+      } finally {
+        ad?.delete();
+      }
+    }
+  } finally {
+    exp.delete();
+  }
+  if (safeCache.size >= 4000) safeCache.delete(safeCache.keys().next().value!);
+  safeCache.set(key, safe);
+  return safe;
+}
+
+/** matice 12 čísel [R po řádcích, t] → body: R·p + t */
+const ap12 = (m: number[], p: Vec3): Vec3 => [m[0] * p[0] + m[1] * p[1] + m[2] * p[2] + m[9], m[3] * p[0] + m[4] * p[1] + m[5] * p[2] + m[10], m[6] * p[0] + m[7] * p[1] + m[8] * p[2] + m[11]];
+/** inverze matice 12 čísel (tuhý pohyb) */
+const inv12 = (m: number[]): number[] => {
+  const Rt = [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
+  const t = [m[9], m[10], m[11]];
+  return [...Rt, -(Rt[0] * t[0] + Rt[1] * t[1] + Rt[2] * t[2]), -(Rt[3] * t[0] + Rt[4] * t[1] + Rt[5] * t[2]), -(Rt[6] * t[0] + Rt[7] * t[1] + Rt[8] * t[2])];
+};
+
+/**
+ * Dráha posuvu dvojice listů v tom pořadí, ve kterém ji hranoly ploch vystihnou (kolo 6): dráha B vůči A, není-li B bezpečné
+ * (`sweepSafe`) dráha A posunutého o −v vůči B (výsledek zpět do souřadnic A), jinak – obě nebezpečné – null (rozhodne půlení
+ * u volajícího; žádné „spojitě“ z neúplné dráhy). Dřív jen dráha B: nůž × kolík 1,03 mm, kolík × nůž 0,03 mm.
+ */
+function leafSweepAny(a: Leaf, b: Leaf, m: number[], v: Vec3, touching: boolean): LocalDist | null {
+  if (sweepSafe(b, apRT(m.slice(0, 9), v))) return leafSweep(a, b, m, v, touching);
+  if (!sweepSafe(a, v)) return null;
+  const mi = inv12(m); // A v souřadnicích B
+  const vB = apR(mi.slice(0, 9), [-v[0], -v[1], -v[2]]); // posuv A vůči B v souřadnicích B
+  const h = leafSweep(b, a, mi, vB, touching);
+  if (!h) return null;
+  // body zpět do souřadnic A a do pořadí dvojice (p1 na A, p2 na B)
+  return { d: h.d, inside: h.inside, ...(h.pen !== undefined ? { pen: h.pen } : {}), ...(h.p2 ? { p1: ap12(m, h.p2) } : {}), ...(h.p1 ? { p2: ap12(m, h.p1) } : {}) };
+}
+
+/**
+ * Poloha minima vzdálenosti na přímé dráze (kolo 6, `locate`): f(s) = vzdálenost A a B posunutého o s·v, s ∈ ⟨0, 1⟩ – vzorky po
+ * 1/16 a zlatý řez kolem nejmenšího. Vrací zlomek `s` a body A a B v té poloze (souřadnice A).
+ */
+function locateMin(a: Leaf, b: Leaf, m: number[], v: Vec3): { s: number; d: number; p1?: Vec3; p2?: Vec3 } | null {
+  const at = (s: number) => {
+    const ms = [...m];
+    ms[9] += s * v[0];
+    ms[10] += s * v[1];
+    ms[11] += s * v[2];
+    return leafDist(a, b, ms);
+  };
+  const N = 16;
+  let best: { s: number; h: LocalDist } | null = null;
+  for (let j = 0; j <= N; j++) {
+    const h = at(j / N);
+    if (h && (!best || h.d < best.h.d)) best = { s: j / N, h };
+  }
+  if (!best) return null;
+  let lo = Math.max(0, best.s - 1 / N);
+  let hi = Math.min(1, best.s + 1 / N);
+  const g = (Math.sqrt(5) - 1) / 2;
+  let x1 = hi - g * (hi - lo);
+  let x2 = lo + g * (hi - lo);
+  let f1 = at(x1);
+  let f2 = at(x2);
+  for (let it = 0; it < 24 && hi - lo > 1e-6; it++) {
+    if ((f1?.d ?? Infinity) <= (f2?.d ?? Infinity)) {
+      hi = x2;
+      x2 = x1;
+      f2 = f1;
+      x1 = hi - g * (hi - lo);
+      f1 = at(x1);
+    } else {
+      lo = x1;
+      x1 = x2;
+      f1 = f2;
+      x2 = lo + g * (hi - lo);
+      f2 = at(x2);
+    }
+    for (const [x, f] of [[x1, f1], [x2, f2]] as const) if (f && f.d < best.h.d) best = { s: x, h: f };
+  }
+  return { s: best.s, d: best.h.d, ...(best.h.p1 ? { p1: best.h.p1 } : {}), ...(best.h.p2 ? { p2: best.h.p2 } : {}) };
+}
+
 /* ───────── operace ───────── */
 
 const ROT_EPS = 1e-9;
@@ -433,6 +564,7 @@ export async function clearance(req: ClrReq): Promise<ClrRes> {
         const vW = apR(aw.R, vA); // posuv B vůči A ve světě (A v poloze `from`)
         const cutoff = q.cutoff ?? Infinity;
         let best: ClrSweep | null = null;
+        let bestLeaf: { la: Leaf; lb: Leaf; m: number[]; v: Vec3; ma: Rt } | null = null;
         const cand: { la: Leaf; lb: Leaf; ma: Rt; mb: Rt; g: number }[] = [];
         for (const la of A.leaves)
           for (const lb of B.leaves) {
@@ -451,14 +583,33 @@ export async function clearance(req: ClrReq): Promise<ClrRes> {
           const key = `${c.la.key}|${c.lb.key}|${rel.key}|${vL.map((x) => Math.round(x * 1e7)).join(",")}|${q.touch ? 1 : 0}`;
           let hit = sweepCache.get(key);
           if (hit === undefined) {
-            const h = leafSweep(c.la, c.lb, rel.m, vL, !!q.touch);
+            // pořadí, ve kterém hranoly ploch dráhu vystihnou (kolo 6: válec napříč pohybu – silueta uvnitř plochy)
+            const h = leafSweepAny(c.la, c.lb, rel.m, vL, !!q.touch);
             if (!h) return { d: NaN, exact: false, ok: false, v: vW }; // dráhu nešlo spočítat – rozhodne půlení
             hit = h;
             remember(sweepCache, key, hit);
           }
-          if (!best || hit.d < best.d || (hit.d <= 1e-9 && (hit.pen ?? 0) > (best.pen ?? 0)))
+          if (!best || hit.d < best.d || (hit.d <= 1e-9 && (hit.pen ?? 0) > (best.pen ?? 0))) {
             best = { d: hit.d, exact: true, ok: true, v: vW, ...(hit.inside ? { inside: true } : {}), ...(hit.pen !== undefined ? { pen: hit.pen } : {}), ...(hit.p1 ? { p1: toWorld(c.ma, hit.p1) } : {}), ...(hit.p2 ? { p2: toWorld(c.ma, hit.p2) } : {}), aPath: c.la.path, bPath: c.lb.path };
+            bestLeaf = { la: c.la, lb: c.lb, m: rel.m, v: vL, ma: c.ma };
+          }
           if (best.d <= 0 && (best.pen ?? Infinity) > 1e-3) break; // průchod tělesem – víc není třeba
+        }
+        // poloha minima na dráze a body A a B v ní (vůle mezi kroky: „mezi kroky 17 a 18 (poloha 17,52; t = …)“ – kolo 6)
+        if (q.locate && best && bestLeaf && best.d > 1e-9 && Number.isFinite(best.d)) {
+          const L = locateMin(bestLeaf.la, bestLeaf.lb, bestLeaf.m, bestLeaf.v);
+          // body ve světě v dohledané poloze: A se v úseku posune o s·ΔA (bez natočení); s natočením A jen poloha, body z dráhy
+          const a0 = topAt(A, q.from);
+          const a1 = topAt(A, q.to);
+          const turn = a0.R.some((x, i) => Math.abs(x - a1.R[i]) > ROT_EPS);
+          if (L) {
+            const sh: Vec3 = [(a1.t[0] - a0.t[0]) * L.s, (a1.t[1] - a0.t[1]) * L.s, (a1.t[2] - a0.t[2]) * L.s];
+            const w = (p: Vec3): Vec3 => {
+              const q2 = toWorld(bestLeaf!.ma, p);
+              return [q2[0] + sh[0], q2[1] + sh[1], q2[2] + sh[2]];
+            };
+            best = { ...best, s: L.s, ...(!turn && L.p1 ? { p1: w(L.p1) } : {}), ...(!turn && L.p2 ? { p2: w(L.p2) } : {}) };
+          }
         }
         return best ?? { d: cand[0]?.g ?? Infinity, exact: false, ok: true, v: vW };
       });
@@ -473,5 +624,6 @@ export async function clearance(req: ClrReq): Promise<ClrRes> {
 export function clearClearanceCache(): void {
   distCache.clear();
   sweepCache.clear();
+  safeCache.clear();
   localBoxes.clear();
 }

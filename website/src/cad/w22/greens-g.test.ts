@@ -20,11 +20,14 @@
  *                              plochami vedle tělesa, ne když se soubor nenačetl, ne bez kontroly („bez kontroly“, STL) (G3, 22c);
  *                              ne, když soubor po zpětném načtení neprojde přesnou kontrolou platnosti (⚠ out.reload-invalid),
  *                              ne bez přesné kontroly souboru (ploch nad mez – jen „odpovídá modelu; … jen rychlou kontrolou“) (22a f. 2)
+ *   „→ geometrie souboru odpovídá“ (příčina ⚠ out.reload-invalid)
+ *                              kontrola exportu – jen s tolerancí po přepočtu do meze (číslo v řádku), ne bez změřené tolerance,
+ *                              ne s tolerancí nad mezí, ne když soubor neprojde ani po přepočtu (22a f. 2, kolo 4)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { docStatusText } from "../agent";
 import { setLang } from "../i18n";
-import type { EngineHost } from "../engine/host";
+import type { EngineHost, MemoryFiles } from "../engine/host";
 import type { KernelApi } from "../engine/kernel";
 import { statusKv } from "../engine/kv";
 import { MemoryWorkspace } from "../engine/memory-workspace";
@@ -267,11 +270,112 @@ describe("„věrná kopie modelu“ – jen po přesné kontrole platnosti soub
     expect(r.protocol).not.toMatch(/check=ok/);
     expect(r.entries.some((e) => e.code === "out.reload-invalid" && e.level === "warn")).toBe(true);
   });
+  it("kolo 4: soubor projde přesnou kontrolou až po přepočtu tolerancí hran – pořád ⚠ out.reload-invalid (výchozí čtečka ho odmítne), nikdy „věrná kopie“ ani ✓", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [20, 20, 30]];
+    const c = exportCheck({ solids: 1, volume: 8860, bbox: box, valid: true, validExact: true }, { solids: 1, volume: 8860, bbox: box, valid: true, validExact: false, badFaces: 3, faces: 7, retolValid: true }, "STEP");
+    expect(c.ok).toBe(false);
+    expect(c.level).toBe("warn");
+    expect(c.code).toBe("out.reload-invalid");
+    expect(c.line.startsWith("⚠")).toBe(true);
+    expect(c.line).not.toMatch(/věrná kopie|^✓/);
+  });
+  it("kolo 4 (oponent): „geometrie souboru odpovídá“ jen s tolerancí po přepočtu do meze – ne s tolerancí 0,2 mm, ne bez změřené tolerance, ne když soubor neprojde ani po přepočtu", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [20, 20, 30]];
+    const m = { solids: 1, volume: 8860, bbox: box, valid: true, validExact: true, maxTol: 6.3e-5 };
+    const f = { solids: 1, volume: 8860, bbox: box, valid: true, validExact: false, badFaces: 3, faces: 7 };
+    const ok = exportCheck(m, { ...f, retolValid: true, retolMaxTol: 6e-7 }, "STEP");
+    expect(ok.line).toMatch(/s tolerancí nejvýše 6,0e-7 mm \(mez 6,3e-5 mm = největší tolerance modelu\) → geometrie souboru odpovídá/);
+    for (const g of [{ retolValid: true, retolMaxTol: 0.2 }, { retolValid: true }, { retolValid: false, retolBadFaces: 1 }, { retolValid: false, retolBadFaces: 1, devMax: 6e-5, devOver: 0 }]) {
+      const c = exportCheck({ ...m, devMax: 6e-5 }, { ...f, ...g }, "STEP");
+      expect(c.code, JSON.stringify(g)).toBe("out.reload-invalid");
+      expect(c.line, JSON.stringify(g)).not.toMatch(/geometrie souboru odpovídá|zápis odchylku nezvětšil|věrná kopie/);
+    }
+  });
   it("kontrola neproběhla nad souborem (ploch nad mez): „věrná kopie“ se nevypíše, řádek řekne „jen rychlou kontrolou“", async () => {
     const { exportCheck } = await import("../agent-out");
     const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [10, 10, 10]];
     const c = exportCheck({ solids: 1, volume: 1000, bbox: box, valid: true }, { solids: 1, volume: 1000, bbox: box, valid: true, validExact: null, faces: 401 }, "STEP");
     expect(c.line).not.toMatch(/věrná kopie/);
     expect(c.line).toMatch(/jen rychlou kontrolou – přesná neproběhla \(401 ploch > 400\)/);
+  });
+});
+
+describe("kolo 6: „✓ export STEP“ a pak ⚠ / ✗ – zápis souboru není ✓, rozhoduje kontrola (22i, 22a, 22c)", () => {
+  const SHELL = 'nový díl "Deska A"\nskica XY: obdélník 40 30\nprvek surf.extrude sketchId="Skica 1" distance=20\nskica XY: obdélník 40 30\nprvek surf.planar sketchId="Skica 2"\nskica XY odsazení 20: obdélník 40 30\nprvek surf.planar sketchId="Skica 3"\nprvek surf.sew tolerance=0.01';
+  const run = async (t: string, strict = false) => {
+    const h = host();
+    const phases: string[] = [];
+    h.phase = (op, p) => void phases.push(`${op}:${p}`);
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), t, h, { lang: "cs", strict }), { full: true });
+    return { r, files: (h.files as MemoryFiles).files, phases };
+  };
+  const exportOk = (full: string | undefined) => (full ?? "").split("\n").filter((l) => /^✓ L\d+ export (STEP|BREP)/.test(l));
+  it("závit šroubovicí (⚠ out.reload-invalid): řádek zápisu ℹ „zapsáno, kontrola níže“, žádné „✓ … export STEP“ nad ⚠", { timeout: 300_000 }, async () => {
+    const { r } = await run('nový díl "Šroub B"\nválec 18 30\nzávit M18×1,5 délka 20 v 0 0 10 šroubovice\nexport step');
+    expect(r.entries.some((e) => e.code === "out.reload-invalid")).toBe(true);
+    expect(exportOk(r.full)).toEqual([]);
+    expect(r.full).toMatch(/^ℹ L4 msg\.note "Šroub B": export STEP: .* – zapsáno, kontrola níže$/m);
+  });
+  it("těleso s volnou plochou (známé před zápisem): zápis ℹ, ne ✓; ⚠ out.free-surfaces", { timeout: 180_000 }, async () => {
+    const { r } = await run('nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano\nexport step\nexport stl');
+    expect(r.entries.filter((e) => e.code === "out.free-surfaces")).toHaveLength(2);
+    expect((r.full ?? "").split("\n").filter((l) => /^✓ L\d+ export (STEP|STL)/.test(l))).toEqual([]);
+  });
+  it("volné plochy vedle tělesa (var/c1, repro 22c L25): ani „✓ těleso: přesná kontrola platnosti“ nestojí nad ⚠ out.free-surfaces – jen ℹ", { timeout: 180_000 }, async () => {
+    // oponentura kola 6: zápis už byl ℹ, ale ✓ přesné kontroly tělesa zůstal přímo nad ⚠ téhož exportu
+    const { r } = await run('nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano\nexport step');
+    expect(r.entries.some((e) => e.code === "out.free-surfaces")).toBe(true);
+    const lines = (r.full ?? "").split("\n");
+    expect(lines.filter((l) => /^✓ L5 /.test(l))).toEqual([]);
+    expect(lines.some((l) => /^ℹ L5 msg\.note "Deska B": těleso: přesná kontrola platnosti .* – platné/.test(l)), r.full).toBe(true);
+  });
+  it("platné těleso: zápis ℹ, ✓ jen z kontroly („věrná kopie modelu“)", { timeout: 180_000 }, async () => {
+    const { r } = await run("nový díl Kostka\nkvádr 10 10 10\nexport step");
+    expect(exportOk(r.full)).toEqual([]);
+    expect(r.full).toMatch(/^✓ L3 kontrola STEP: .* → věrná kopie modelu$/m);
+  });
+  it("přísný režim: export, který zastaví běh, soubor NEZAPÍŠE (model bez tělesa, ⚠ out.reload-invalid); bez přísného režimu ano", { timeout: 300_000 }, async () => {
+    const a = await run(`${SHELL}\nexport step`, true);
+    expect(a.r.protocol).toMatch(/^MNCAD\/1 STOP /);
+    expect(a.r.entries.find((e) => e.code === "out.no-solid")?.text).toMatch(/^soubor nezapsán \(přísný režim zastaví běh\) – /);
+    expect(a.files.size).toBe(0);
+    expect(a.r.protocol).not.toMatch(/^F /m);
+    const b = await run('nový díl "Šroub B"\nválec 18 30\nzávit M18×1,5 délka 20 v 0 0 10 šroubovice\nexport step', true);
+    expect(b.r.entries.find((e) => e.code === "out.reload-invalid")?.text).toMatch(/^soubor nezapsán/);
+    expect(b.files.size).toBe(0);
+    // fáze průběhu (CLI --progress / hostitel): kontrola ano, zápis NE – soubor nevznikl (dřív hlášena fáze „write“)
+    expect(b.phases.filter((p) => p.startsWith("export:step:"))).toEqual(["export:step:model", "export:step:convert", "export:step:verify"]);
+    const c = await run(`${SHELL}\nexport step`);
+    expect(c.files.size).toBe(1); // bez přísného režimu se soubor zapíše (✗ out.no-solid, F check=fail)
+    const ok = await run("nový díl Kostka\nkvádr 10 10 10\nexport step", true);
+    expect(ok.files.size).toBe(1); // čistá kontrola: zapíše se i v přísném režimu
+    expect(ok.phases.filter((p) => p.startsWith("export:step:"))).toEqual(["export:step:model", "export:step:convert", "export:step:verify", "export:step:write"]);
+    expect(ok.r.protocol).not.toMatch(/^MNCAD\/1 STOP/);
+  });
+});
+
+describe("kolo 6: řez výkresu mimo těleso se při výstupu PDF ohlásí jednou (22i)", () => {
+  const TEXT = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres řez XZ odsazení 500';
+  it("výkres export pdf: jeden ✗ drawing.section-miss na řádku příkazu řezu, žádný ⚠ s odznakem, žádné „bez nálezů“", { timeout: 180_000 }, async () => {
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), `${TEXT}\nvýkres export pdf`, host(), { lang: "cs" }), { full: true });
+    const miss = r.entries.filter((e) => e.code === "drawing.section-miss");
+    expect(miss.map((e) => e.line)).toEqual([4]);
+    expect(r.entries.some((e) => /Rovina řezu neprotíná/.test(e.text))).toBe(false);
+    expect(r.full).not.toMatch(/bez nálezů/);
+  });
+  it("CLI --formats pdf (finishRun): nález z řádku příkazu se v závěru nezopakuje (dřív druhý ✗ L-, err=2)", { timeout: 180_000 }, async () => {
+    const { engineRun, finishRun } = await import("../cli/job");
+    const { ReportBuilder } = await import("../engine/protocol");
+    const ws = new MemoryWorkspace();
+    const h = host();
+    const rb = new ReportBuilder({ lang: "cs", lines: 4, strict: false });
+    const hooks = { opStart: () => undefined, opEnd: () => undefined };
+    await engineRun(ws, TEXT, h, rb, { strict: false, open: [] }, hooks);
+    await finishRun(ws, h, rb, { formats: ["pdf"], allDocs: false, noOutputOnError: false, share: false }, hooks);
+    expect(rb.entries.filter((e) => e.code === "drawing.section-miss").map((e) => e.line)).toEqual([4]);
+    expect(rb.count("error")).toBe(1);
+    expect((h.files as MemoryFiles).files.size).toBe(1);
   });
 });

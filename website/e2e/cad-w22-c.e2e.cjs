@@ -29,6 +29,10 @@
 //     .motion().process (stav po krocích, removed); pracovní záběr bez štítku „· kolize“; přidání operace otisk v GUI zapíše
 //     doc.motion.process; export PNG snímků obsahuje plech po operaci (snímek kroku 21 se liší od kroku 0); druhý střih do téže díry
 //     = celkem 314 mm³ jednou, odpad 1, main[data-process-combined]=1 (kombinovaný stav obrobku, ne síť poslední operace)
+// 13) kolo 6 (body 4 a 6): korpus 74i – střižník projde plechem během JEDNOHO kroku → panel v kroku 1 data-process-state=pierced,
+//     314 mm³, plech po střihu ve 3D / náhledu (síť z požadavku s mezipolohami – stejný klíč jako výpočet); korpus 74j – otisk + střih:
+//     krok 6 „děrovaný + v záběru“ (data-process-engaged=1); korpus 74h – vůle 0,03 mm mezi kroky 17 a 18: řádek s polohou v úseku,
+//     ⚠ pod limitem (data-clearance-below=1), nikdy „dodržen v celém pohybu“; „Na minimum“ skočí na nejbližší krok úseku
 // Spuštění: E2E_BASE=http://localhost:3535 node e2e/cad-w22-c.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -282,6 +286,57 @@ async function processFlow(p, tag, soft) {
   }
 }
 
+/** 13 (kolo 6): záběr mezi kroky, děrovaný + v záběru, vůle mezi kroky zvlášť – s WebGL i bez něj */
+async function round6Flow(p, tag, soft) {
+  const { run, idle } = helpers(p);
+  const mp = p.locator('[data-motion-panel]');
+  const openMotion = async () => {
+    if (await mp.count()) return;
+    await p.locator('button', { hasText: /^Pohybová studie$/ }).first().click().catch(() => {});
+    await mp.waitFor({ timeout: 30000 }).catch(() => {});
+  };
+  const motionDone = () => p.waitForFunction(() => document.querySelector('[data-motion-panel]')?.getAttribute('data-motion-state') === 'ok', null, { timeout: 240000 }).then(() => true, () => false);
+  const state = () => p.evaluate(() => {
+    const el = document.querySelector('[data-process-state]');
+    const main = document.querySelector('main[data-process-view]') || document.querySelector('[data-process-view]');
+    return el ? { state: el.getAttribute('data-process-state'), engaged: el.getAttribute('data-process-engaged'), text: el.textContent, removed: Number(el.getAttribute('data-process-removed')), scrap: Number(el.getAttribute('data-process-scrapped')), view: main ? Number(main.getAttribute('data-process-view')) : 0 } : null;
+  });
+  const step = async (n) => {
+    await run(`pohyb krok ${n}`);
+    await p.waitForTimeout(1200);
+  };
+  // 74i: jeden krok, nástroj projde plechem mezi kroky (dřív „bez záběru – nezasáhl“, stav plný)
+  const jump = await run(corpus('74i-process-between'));
+  ok(!/^✗/m.test(jump) && /záběr od mezipolohy mezi kroky 0 a 1/.test(jump) && !/nezasáhl/.test(jump), `[${tag}] 74i: střih spočítaný v mezipolohách, ne „nezasáhl“`);
+  await idle();
+  await openMotion();
+  ok(await motionDone(), `[${tag}] 74i: studie spočítána`);
+  await step(1);
+  const j1 = await state();
+  ok(j1 && j1.state === 'pierced' && Math.abs(j1.removed - 314.159) < 3.2 && j1.scrap === 1 && j1.view >= 1, `[${tag}] 74i krok 1: děrovaný, 314 mm³, plech po střihu ve ${soft ? 'softwarovém náhledu' : '3D okně'} (${JSON.stringify(j1)})`);
+  await p.screenshot({ path: `${S}w22c-${tag}-13-jump.png` });
+  // 74j: otisk + prostřižený střih → „děrovaný + v záběru“ (dřív „v záběru“)
+  const imp = await run(corpus('74j-process-imprint-depth'));
+  ok(!/^✗/m.test(imp) && /otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm/.test(imp), `[${tag}] 74j: ℹ otisk 0,1 z 0,3 mm`);
+  await idle();
+  ok(await motionDone(), `[${tag}] 74j: studie Lis B spočítána`);
+  await step(6);
+  const k6 = await state();
+  ok(k6 && k6.state === 'pierced' && k6.engaged === '1' && /děrovaný \+ v záběru/.test(k6.text || ''), `[${tag}] 74j krok 6: děrovaný + v záběru (${JSON.stringify(k6)})`);
+  // 74h: vůle mezi kroky 17 a 18 – zvlášť, s polohou v úseku; nikdy „dodržen v celém pohybu“
+  const clr = await run(corpus('74h-clearance-pin-side').split('\n').filter((l) => !/^(pohyb vůle smazat|pohyb vůle "Kolík"|pohyb stav|pohyb krok)/.test(l)).join('\n'));
+  ok(!/^✗/m.test(clr), `[${tag}] 74h: sestava a vůle bez chyby`);
+  await idle();
+  ok(await motionDone(), `[${tag}] 74h: studie spočítána`);
+  const box = await p.evaluate(() => {
+    const el = document.querySelector('[data-clearance-min]');
+    return el ? { min: el.getAttribute('data-clearance-min'), below: el.getAttribute('data-clearance-below'), text: el.textContent, jump: document.querySelector('[data-clearance-jump]')?.textContent || '' } : null;
+  });
+  ok(box && box.below === '1' && /mezi kroky 17 a 18 \(po přímé dráze: poloha 17,/.test(box.text) && /pod limitem 0,05 mm mezi kroky 17 a 18/.test(box.text) && !/dodržen/.test(box.text), `[${tag}] 74h panel: 0,03 mm mezi kroky 17 a 18 s polohou, ⚠ pod limitem, bez „dodržen“ (${box && box.min} · ${box && box.text.slice(0, 200)})`);
+  ok(box && /krok 1[78]\)/.test(box.jump), `[${tag}] 74h: „Na minimum“ míří do úseku 17–18 (${box && box.jump})`);
+  await p.screenshot({ path: `${S}w22c-${tag}-13-clearance.png` });
+}
+
 (async () => {
   const browsers = [];
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -377,6 +432,8 @@ async function processFlow(p, tag, soft) {
     ok(errs.length === 0, 'C2: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
     await processFlow(pc, 'webgl', false); // C3: procesní vrstva (bod 4)
     ok(errs.length === 0, 'C3: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
+    await round6Flow(pc, 'webgl', false); // kolo 6: záběr mezi kroky, děrovaný + v záběru, vůle mezi kroky
+    ok(errs.length === 0, 'kolo 6: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
     await cx.close();
   }
 
@@ -409,6 +466,7 @@ async function processFlow(p, tag, soft) {
   await classesFlow(p2, 'nowebgl');
   await clearanceFlow(p2, 'nowebgl', true); // C2: úsečka vůle v softwarovém náhledu (majitel testoval bez WebGL)
   await processFlow(p2, 'nowebgl', true); // C3: plech po střihu a odpad v softwarovém náhledu
+  await round6Flow(p2, 'nowebgl', true); // kolo 6 bez WebGL
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

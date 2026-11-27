@@ -1,0 +1,12 @@
+# Vlna 22 kolo 6 (balík g): odebrání celého tělesa (22b), popisky kontroly kót v jazyce běhu (22d), výstupy po STOP a ℹ zápisu (22c/22i)
+Nástroj ubral celé těleso – po odebrání nezůstal žádný materiál (nástroj překrývá celé těleso). Zmenšete nebo posuňte nástroj, nebo změňte režim.	Das Werkzeug hat den ganzen Körper abgetragen – nach dem Abtragen bleibt kein Material (das Werkzeug überdeckt den ganzen Körper). Verkleinern oder verschieben Sie das Werkzeug oder ändern Sie den Modus.
+Průnik s nástrojem je prázdný – nástroj se s tělesem nepřekrývá, nezůstal žádný materiál. Posuňte nebo zvětšete nástroj, nebo změňte režim.	Die Schnittmenge mit dem Werkzeug ist leer – das Werkzeug überlappt den Körper nicht, es bleibt kein Material. Verschieben oder vergrößern Sie das Werkzeug oder ändern Sie den Modus.
+Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry prvku (rozměry, polohu, režim).	Die Operation hat keinen Volumenkörper geliefert ({0}) – der Kern ist fehlgeschlagen; ändern Sie die Parameter des Features (Maße, Lage, Modus).
+{0} délka {1}	{0} Länge {1}
+{0} ({1} dl.)	{0} (Länge {1})
+{0} hl. {1}	{0} Tiefe {1}
+{0} skrz	{0} durchgehend
+zapsáno, kontrola níže	geschrieben, Prüfung unten
+kontrola níže	Prüfung unten
+soubor nezapsán (přísný režim zastaví běh) – {0}	Datei nicht geschrieben (der strenge Modus hält den Lauf an) – {0}
+R{0} (rohy)	R{0} (Ecken)

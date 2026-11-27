@@ -17,6 +17,8 @@
 //    (data-overlap-count), pohled pozice výběrem (data-balloon-view-select → data-balloon-view), zámek (data-balloon-lock →
 //    data-balloon-mode="locked"), tažení balónku myší (posunutá pozice v textu), přesun přes geometrii → značky překryvů
 //    (data-overlap-marker), umístění kusovníku (data-bom-place → data-bom-layout); text `výkres pozice` dává totéž.
+//  - kolo 4 / 6 (bod 20): ztracená ruční kóta (hrana po změně modelu zmizela) – „⚠ Vybrat znovu“ (data-dim-repick) →
+//    klik na novou hranu v pohledu a umístění → kóta nahrazena se stejným id a textem, ⚠ zmizí, `výkres stav` bez ⚠.
 //  - D4 (bod 22j): panel Razítko – „Uložit jako šablonu“ (data-title-tpl-name, data-title-tpl-save) → `výkres hlavička`
 //    vypíše šablonu; nový díl: výběr šablony (data-title-tpl-select) → razítko s firmou a nástrojářskou šablonou.
 // Spuštění (fáze 2): bin/e2e-run <worktree>/website 3534 <out> cad-w22-d   (E2E_BASE nastaví e2e-run)
@@ -88,6 +90,10 @@ async function scenario(args, label) {
   await p.locator('button', { hasText: /^Kusovník/ }).first().click().catch(() => {});
   await p.waitForTimeout(1200);
   ok((await p.locator('[data-bom-note="stale"]').count()) >= 1, `${label}: okno Kusovník – upozornění na zastaralou kopii`);
+  // kolo 6 (22g, recenze): text upozornění v okně = text příkazu `kusovník` – u Desky A rada obnovit, ne „materiál … v dílu“
+  const bomNotes = (await p.locator('[data-bom-note]').allInnerTexts().catch(() => [])).join('\n');
+  ok(/Deska A: v kusovníku chybí číslo DA-001, materiál 1\.2379 – díl v záložce je má, kopie v sestavě je starší: sestava obnovit #1/.test(bomNotes) && !/Deska A[^\n]*– materiál 1\.2379 v dílu/.test(bomNotes) && !/bez čísla výkresu: Deska A/.test(bomNotes), `${label}: okno Kusovník – u starší kopie rada „sestava obnovit #1“ (ne „materiál 1.2379 v dílu“) – ` + bomNotes.replace(/\n/g, ' ¦ ').slice(0, 400));
+  ok(/vyráběné díly bez označení materiálu \(jen třída\): Přidržovač – materiál 1\.2379 v dílu/.test(bomNotes), `${label}: okno Kusovník – Přidržovač (bez materiálu v dílu) dál s radou doplnit v dílu`);
   await closeModal();
   await p.locator('[data-refresh-btn="all"]').first().click();
   await p.waitForTimeout(2500);
@@ -360,6 +366,44 @@ async function scenario(args, label) {
   await openConsole();
   log = await run('záložka "Deska R"\nvýkres stav');
   ok(!/drawing\.dim-detached|neodpovídají geometrii/.test(log) && /přední: 30 \*/.test(log), `${label}: kolo 3 – po potvrzení v GUI text bez ⚠, kóta 30 *`);
+  // ── kolo 4 / 6: ztracená ruční kóta (hrana zmizela) – „⚠ Vybrat znovu“ (data-dim-repick), klik na novou hranu a umístění
+  //    → kóta zůstane s týmž id, ⚠ zmizí, text bez drawing.dim-detached
+  log = await run('nový díl "Deska L"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres kóta svisle pohled přední 60 0 60 10 odsazení 10 text \"(10)\"');
+  log = await run('záložka "Deska L"\nupravit "Kvádr 1" size=30;40;10\nvýkres stav');
+  ok(/drawing\.dim-detached|neodpovídají geometrii/.test(log) && /geometrie, ke které se kóta váže, v pohledu není/.test(log), `${label}: kolo 6 – ztracená kóta ⚠ v textu – ` + line(log, /v pohledu není/));
+  await run('výkres');
+  for (let k = 0; k < 3 && (await input.isVisible().catch(() => false)); k++) {
+    await consoleBox.getByRole('button', { name: 'Zavřít', exact: true }).first().click().catch(() => {});
+    await input.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  }
+  const rp = p.locator('[data-dim-repick]');
+  await rp.first().waitFor({ timeout: 60000 }).catch(() => {});
+  const rpId = await rp.first().getAttribute('data-dim-repick').catch(() => null);
+  ok((await rp.count()) === 1 && !!rpId, `${label}: kolo 6 – u ztracené kóty tlačítko „Vybrat znovu“ (data-dim-repick)`);
+  const rowsBefore = await p.locator('[data-ann-row]').count();
+  await rp.first().click().catch(() => {});
+  ok((await p.locator('[data-dim-repicking="1"]').count()) === 1, `${label}: kolo 6 – po kliknutí výběr nové geometrie (data-dim-repicking)`);
+  // přední pohled: model (x, z) → obrazovka podle data-views (z nahoru = −y pohledu)
+  const fm = await p.evaluate(() => { const s = document.querySelector('[data-sheet] > div svg'); const r = s.getBoundingClientRect(); return { l: r.left, t: r.top, k: r.width / Number(s.getAttribute('viewBox').split(' ')[2]), views: JSON.parse(document.querySelector('[data-sheet]').getAttribute('data-views')) }; }).catch(() => null);
+  const fv = fm && fm.views.find((x) => x.key === 'front');
+  const F = (x, z) => [fm.l + (fv.px + (x - fv.x0) * fv.s) * fm.k, fm.t + (fv.py + (-z - fv.y0) * fv.s) * fm.k];
+  if (fv) {
+    // pravá svislá hrana (x = 30) a umístění vpravo od ní
+    for (const [x, z] of [[30, 5], [30 + 12 / fv.s, 5]]) {
+      const [cx, cy] = F(x, z);
+      await p.mouse.move(cx, cy);
+      await p.waitForTimeout(200);
+      await p.mouse.click(cx, cy);
+      await p.waitForTimeout(500);
+    }
+  }
+  // (bez Esc – nástroj se po novém výběru vypne sám a Esc bez nástroje by zavřel výkres)
+  await p.waitForFunction(() => !document.querySelector('[data-dim-repick]'), null, { timeout: 30000 }).catch(() => {});
+  ok(!!fv && (await p.locator('[data-dim-repick]').count()) === 0 && (await p.locator(`[data-ann-row="${rpId}"]`).count()) === 1 && (await p.locator('[data-ann-row]').count()) === rowsBefore, `${label}: kolo 6 – kóta znovu přichycena: ⚠ zmizel, id ${rpId} zůstalo, počet kót ${rowsBefore}`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska L"\nvýkres stav');
+  ok(!/drawing\.dim-detached|neodpovídají geometrii/.test(log) && /přední: \(10\) \*/.test(log), `${label}: kolo 6 – po novém výběru text bez ⚠, kóta „(10)“ s textem uživatele – ` + line(log, /přední:/));
   log = await run('nový díl "Deska S"\nkvádr 50 30 10\nnová sestava "Nástroj S"\nvložit "Deska S" ukotvit\nzáložka "Deska S"\nmateriál 1.2379\nzáložka "Nástroj S"\nvýkres A3');
   ok(/starší než díl/.test(log) && !/✓ výkres: list „List 1“ vyhodnocen bez nálezů/.test(log), `${label}: kolo 3 – list sestavy se zastaralou kopií bez „bez nálezů“`);
   await run('výkres');

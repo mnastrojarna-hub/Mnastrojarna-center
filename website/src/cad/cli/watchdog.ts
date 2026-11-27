@@ -20,6 +20,9 @@ import { ReportBuilder } from "../engine/protocol";
 import type { Entry, OutFile, RunReport } from "../engine/protocol-types";
 import type { StrictOpt } from "./args";
 import { stopEntry } from "../engine/strict";
+import { codeText } from "../engine/codes";
+import { tr } from "../i18n";
+import { EXPORT_PHASES, exportPhaseText } from "../engine/export-phases";
 import type { DoneFile, FromJob, JobInit, JobRequest, Mem, SelftestResult, ToJob } from "./job";
 import type { RunStamp } from "../engine/run-queue";
 
@@ -121,7 +124,7 @@ export type RunCall = {
   lang: CadLang;
 };
 
-type Current = {
+export type Current = {
   id: number;
   req: JobRequest;
   call: RunCall;
@@ -129,6 +132,12 @@ type Current = {
   files: OutFile[];
   ops: { line: number; op: string; ms: number }[];
   inFlight: { line: number | null; op: string; at: number } | null;
+  /**
+   * poslední hlášená fáze a průběh rozpracované operace (vlna 22 kolo 6, bod 22h): `phase` = model | convert | verify | write
+   * (průběh stavby bez pojmenované fáze = model), `progress` = „build 2/2 Tažení po šroubovici“ – do ✗ run.timeout / memory / cancelled
+   */
+  phase?: { op: string; phase: string };
+  progress?: { op: string; index?: number; total?: number; name?: string; mesh?: boolean };
   peak: number;
   t0: number;
   /** identita běhu z vlákna (id + revize vstupu) – i do protokolu přerušeného běhu */
@@ -138,6 +147,33 @@ type Current = {
 };
 
 let seq = 0;
+
+/** průběh z vlákna: fáze exportu (model / convert / verify / write) nahradí předchozí a vynuluje průběh; průběh stavby
+ * (build i/n, síť) bez pojmenované fáze = přestavba modelu */
+export function trackProgress(c: Pick<Current, "phase" | "progress">, m: { op: string; index?: number; total?: number; name?: string; phase?: string }): void {
+  if (m.phase && (EXPORT_PHASES as readonly string[]).includes(m.phase)) {
+    c.phase = { op: m.op, phase: m.phase };
+    c.progress = undefined;
+    return;
+  }
+  if (!c.phase) c.phase = { op: m.op, phase: "model" };
+  c.progress = { op: m.op, index: m.index, total: m.total, name: m.name, ...(m.phase === "mesh" ? { mesh: true } : {}) };
+}
+
+/**
+ * Fáze a průběh rozpracované operace pro ✗ zásahu hlídače: `phase` (model | convert | verify | write), `progress`
+ * („build 2/2 Tažení po šroubovici“, „build: mesh“) a text „ (ve fázi: přestavba modelu, 2/2)“. Bez hlášené fáze null.
+ */
+export function phaseInfo(c: Pick<Current, "phase" | "progress">): { phase: string; progress?: string; text: string } | null {
+  if (!c.phase) return null;
+  const fmt = /^(?:out|export):(\w+)$/.exec(c.phase.op)?.[1] ?? "";
+  const p = c.progress;
+  const count = p?.total ? `${Math.min((p.index ?? 0) + 1, p.total)}/${p.total}` : "";
+  const progress = p ? (p.mesh ? `${p.op}: mesh` : count ? `${p.op} ${count}${p.name ? ` ${p.name}` : ""}` : "") : "";
+  const step = p?.mesh ? tr("síť modelu") : count;
+  const what = exportPhaseText(c.phase.phase, fmt);
+  return { phase: c.phase.phase, ...(progress ? { progress } : {}), text: tr(" (ve fázi: {0})", step ? `${what}, ${step}` : what) };
+}
 
 /**
  * Jedno vlákno běhu. `mncad run`: jedno vlákno, jeden běh, pak `close()`. `mncad serve`: vlákno připnuté k relaci, víc
@@ -238,6 +274,8 @@ export class JobThread {
     switch (m.t) {
       case "op-start":
         c.inFlight = { line: m.line, op: m.op, at: Date.now() };
+        c.phase = undefined;
+        c.progress = undefined;
         this.o.onEvent?.({ t: "op-start", line: m.line, op: m.op, at: c.inFlight.at });
         break;
       case "op-end":
@@ -251,6 +289,7 @@ export class JobThread {
         this.checkMem(m.mem);
         break;
       case "progress":
+        trackProgress(c, m);
         this.o.onEvent?.({ t: "progress", op: m.op, index: m.index, total: m.total, name: m.name, ...(m.phase ? { phase: m.phase } : {}) });
         break;
       case "run":
@@ -291,7 +330,15 @@ export class JobThread {
     for (const op of c.ops) rb.op(op.line, op.op, op.ms);
     const line = c.inFlight?.line ?? null;
     const args = kind === "timeout" ? [c.call.timeoutSec] : kind === "memory" ? [this.o.maxMemMB] : kind === "crash" ? [detail] : [];
-    rb.code(INTERRUPTION_CODE[kind], { line, args, data: { op: c.inFlight?.op ?? null, detail } });
+    // poslední fáze a průběh rozpracované operace: „časový limit 10 s vypršel (ve fázi: přestavba modelu, 2/2)“ + data.phase /
+    // data.progress (vlna 22 kolo 6, bod 22h – dřív jen op a detail, nebylo vidět, co běželo)
+    const where = phaseInfo(c);
+    rb.code(INTERRUPTION_CODE[kind], {
+      line,
+      args,
+      ...(where ? { text: `${codeText(INTERRUPTION_CODE[kind], ...args)}${where.text}` } : {}),
+      data: { op: c.inFlight?.op ?? null, detail, ...(where ? { phase: where.phase, ...(where.progress ? { progress: where.progress } : {}) } : {}) },
+    });
     rb.memory(c.peak);
     // identita běhu: zrušený / přerušený běh = „zrušeno“, limit / pád = „chyba“ (vlna 22, bod 12)
     const runId = c.run?.id ?? c.req.runId;

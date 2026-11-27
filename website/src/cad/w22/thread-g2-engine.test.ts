@@ -15,6 +15,7 @@ import { finalizeReport } from "../engine/protocol";
 import { runScript } from "../engine/run";
 import { runReport } from "../engine/run-protocol";
 import { exactBeforeExport } from "../engine/validity-store";
+import { retolLimit } from "../agent-out";
 import { emptyDoc, type CadDoc } from "../types";
 import type { ValidityResult } from "../validity";
 import { greenThenRed, realHost } from "./real-host";
@@ -75,8 +76,10 @@ describe("export STEP: přesná kontrola před exportem, export = model (bez Sam
       const h = host();
       const r = finalizeReport(await runReport(ws, `nový díl "${name}"\n${body}\n${thr}\nexport step`, h), { full: true });
       const lines = (r.full ?? "").split("\n");
-      const at = lines.findIndex((l) => /^✓ L4 export STEP/.test(l));
+      // kolo 6 (22i): zápis STEP s kontrolou není ✓ – ℹ „zapsáno, kontrola níže“; ✓ nad ⚠ out.reload-invalid byl falešně zelený
+      const at = lines.findIndex((l) => /^ℹ L4 msg\.note ".*": export STEP: .* – zapsáno, kontrola níže$/.test(l));
       expect(at, name).toBeGreaterThanOrEqual(0);
+      expect(lines.some((l) => /^✓ L4 export STEP/.test(l)), name).toBe(false);
       expect(lines[at + 1], name).toMatch(/^✓ L4 těleso: přesná kontrola platnosti \(BRepCheck přesnou metodou\) – platné, ploch \d+ · [\d,]+ s$/);
       expect(lines[at + 2], name).toMatch(/^⚠ L4 out\.reload-invalid .*kontrola STEP: soubor znovu načten jádrem – těles: 1, .*rozdíl 0,0000 %.* – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti \(BRepCheck přesnou metodou\): vadných ploch \d+ z \d+ \(rychlá kontrola: platné; model přesně platný\)/);
       expect(r.full ?? "", name).not.toMatch(/věrná kopie/);
@@ -92,10 +95,47 @@ describe("export STEP: přesná kontrola před exportem, export = model (bez Sam
       expect(file, name).toMatchObject({ valid: true, validExact: false });
       expect(file.badFaces, name).toBeGreaterThan(0);
       expect(model.validExact, name).toBe(true);
+      // kolo 4 (rozbor příčiny, oponent): u závitu z prvku Závit nepomůže ani přepočet tolerancí po načtení – přepočet BRepLib
+      // vzorkuje a tolerance pár hran podhodnotí. Naměřená odchylka křivek hran od ploch je v souboru STEJNÁ jako v modelu (zápis
+      // geometrii nezhoršil – není to vada exportu) a na vadných plochách přesahuje toleranci hran i po přepočtu.
+      expect(file.retolValid, name).toBe(false);
+      expect(file.retolMaxTol, name).toBeGreaterThan(0);
+      expect(model.maxTol, name).toBeGreaterThan(0);
+      expect(file.devSamples, name).toBeGreaterThanOrEqual(50);
+      expect(model.devSamples, name).toBe(file.devSamples);
+      expect(file.devMax!, name).toBeGreaterThan(0);
+      expect(file.devMax!, name).toBeLessThanOrEqual(model.devMax! * 1.01 + 1e-9);
+      expect(file.devMax!, name).toBeLessThan(1e-3);
+      expect(file.devOver!, name).toBeGreaterThan(0);
+      expect(lines[at + 2], name).toMatch(/ani po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou neprojde \(vadných ploch \d+\): odchylka křivek hran od ploch v souboru nejvýše [\d,]+e-\d mm, v modelu [\d,]+e-\d mm \(vzorkováno \d+ bodů na hranu\); na vadných plochách přesahuje odchylka toleranci hrany i po přepočtu \(hran: \d+; přepočet vzorkuje\) – zápis odchylku nezvětšil, čtečka STEP a přepočet tolerance hran podhodnotí/);
+      expect(lines[at + 2], name).not.toMatch(/geometrie souboru odpovídá|příčina není jen|příčina nezjištěna/);
       const after = await h.kernel.validity(d);
       expect(after).toMatchObject({ method: "exact", valid: true });
       expect(r.docs[0], name).toMatchObject({ valid: true, validCheck: "exact" });
     }
+  });
+  // kolo 4 (rozbor cad-w22-a3 22h): model z e2e A3 (válec Ø20 + helixSweep radius 9 = skrytý kanál) je přesnou kontrolou
+  // platný; soubor STEP po zpětném načtení výchozí čtečkou ne – zapisovač to nespraví (STEP tolerance hran nenese; nastavení
+  // zapisovače výsledek čtení nemění), po přepočtu tolerancí načteného souboru projde. Pravda = ⚠ out.reload-invalid
+  // s doloženou příčinou, nikdy ✓ „věrná kopie“ – totéž čeká e2e cad-w22-a3 (exportFile i export z menu)
+  it("model z e2e A3 (helixSweep r 9 ve válci Ø20): model přesně platný, soubor po načtení ne, po přepočtu tolerancí ano → ⚠ out.reload-invalid s doloženou příčinou, ne ✓", { timeout: 300_000 }, async () => {
+    const ws = new MemoryWorkspace();
+    const h = host();
+    const r = finalizeReport(await runReport(ws, 'nový díl "Export A"\nválec 20 30\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 mode=cut\nexport step', h), { full: true });
+    const full = r.full ?? "";
+    expect(full).toMatch(/^✓ L4 těleso: přesná kontrola platnosti \(BRepCheck přesnou metodou\) – platné, ploch \d+ · [\d,]+ s$/m);
+    expect(full).toMatch(/^⚠ L4 out\.reload-invalid "Export A": kontrola STEP: .* – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti \(BRepCheck přesnou metodou\): vadných ploch \d+ z \d+ \(rychlá kontrola: platné; model přesně platný\); čtečka STEP nastaví tolerance hran menší než odchylka křivek od ploch – po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde s tolerancí nejvýše [\d,]+e-\d mm \(mez [\d,]+e-\d mm = největší tolerance modelu\) → geometrie souboru odpovídá/m);
+    expect(full).not.toMatch(/věrná kopie/);
+    expect(r.protocol).toMatch(/check=fail/);
+    const d: CadDoc = ws.present();
+    const { model, file } = await h.kernel.exportStats(d, new Uint8Array(await h.kernel.exportFile(d, "step")), "step");
+    expect(model.validExact).toBe(true);
+    expect(file).toMatchObject({ valid: true, validExact: false, retolValid: true });
+    // „geometrie souboru odpovídá“ jen s tolerancí po přepočtu do meze (oponent kolo 4: změřeno 6e-7 mm, model 6,3e-5 mm)
+    expect(file.retolMaxTol!).toBeLessThanOrEqual(retolLimit(model.maxTol));
+    expect(file.retolMaxTol!).toBeLessThan(1e-5);
+    // rozbor mění jen tolerance načteného souboru, ne model (mezipaměť stavby): model je po exportu stále přesně platný
+    expect(await h.kernel.validity(d)).toMatchObject({ method: "exact", valid: true });
   });
   it("kontrolní těleso bez závitu (válec s průchozí dírou): soubor projde i přesnou kontrolou → ✓ „věrná kopie modelu“", { timeout: 180_000 }, async () => {
     const ws = new MemoryWorkspace();

@@ -14,6 +14,7 @@ import { attachedFiles, readFileAsDataUrl } from "@/cad/attached-files";
 import { DEFAULT_DECIMALS, generalTolFields, generalTolOf, templateLabel, titleBlockSize, TITLE_TEMPLATES, titleTemplateOf, type GeneralTol, type TitleTemplate } from "@/cad/title-block";
 import { encodePng, prepareLogo, rasterInBrowser, toDataUrl } from "@/cad/title-logo";
 import { cn } from "@/lib/cn";
+import { MaterialNoteLine } from "./material-note";
 
 type Props = {
   meta: DrawingMeta;
@@ -21,6 +22,8 @@ type Props = {
   /** číslo, kreslil a revize i do vlastností dokumentu (po opuštění pole) */
   persistProps: () => void;
   onMaterialChange?: (name: string) => void;
+  /** díl, jehož označení materiálu pole mění – pod polem ℹ material.class / ⚠ material.density-assumed (vlna 22 kolo 6) */
+  materialDoc?: { material: string; materialName?: string };
   /** sestava: nepředepsané tolerance se nevyžadují */
   assembly?: boolean;
   flash: (m: string) => void;
@@ -59,7 +62,7 @@ const modeOf = (g: GeneralTol | null): TolMode => (g ? g.kind : "none");
 export const panelTolMode = (g: GeneralTol | null, textOn: string | null, sheetKey: string): TolMode => (g ? modeOf(g) : textOn !== null && textOn === sheetKey ? "text" : "none");
 
 /** Sekce „Razítko“ výkresového prostředí. */
-export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, assembly, flash, sheetKey = "", docTemplates, onDocTemplates }: Props) {
+export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, materialDoc, assembly, flash, sheetKey = "", docTemplates, onDocTemplates }: Props) {
   const tpl = titleTemplateOf(meta);
   const g = generalTolOf(meta);
   // režim se odvozuje z údajů listu; jediný stav bez hodnoty je „Vlastní text“ s prázdným polem – zapamatuje se
@@ -146,6 +149,7 @@ export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, 
       </div>
       <Row label={tr("Materiál")}>
         <input className={inputCls} data-title-field="material" aria-label={tr("Materiál")} value={meta.material} onChange={(e) => setM({ material: e.target.value })} onBlur={() => onMaterialChange?.(meta.material)} placeholder={tr("označení do razítka, např. ČSN 11 423")} />
+        {materialDoc && <MaterialNoteLine doc={materialDoc} />}
       </Row>
       <div className="grid grid-cols-2 gap-2">
         <Field name="stock" label={tr("Polotovar")} value={meta.stock} onChange={(v) => setM({ stock: v })} placeholder={tr("např. plech 40×160×185")} />

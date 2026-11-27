@@ -9,7 +9,8 @@
  * z dosedacích ploch“ / ⚠ rozpor / „nezkontrolováno“).
  */
 import { springComps, springDriftArgs, springDriftText, type SpringCheck } from "../asm-spring";
-import { springCheckOf } from "../asm-spring-agent";
+import { markMissingSeats, springCheckOf } from "../asm-spring-agent";
+import { lostSpringComps, springFixCmd, springLostShort } from "../spring-lost";
 import { isCancelled } from "../kernel-client";
 import type { CadDoc } from "../types";
 import { makeAsmEnv, type AsmEnvOptions } from "./asm-env";
@@ -25,11 +26,24 @@ import type { Workspace } from "./workspace";
  */
 export async function freshenRunDoc(ctx: OpCtx, line: number | null): Promise<void> {
   const r = runOf(ctx);
-  const doc = r.doc;
+  let doc = r.doc;
   if (doc.kind !== "assembly" || !springComps(doc).length) return;
+  const env = makeAsmEnv(ctx.ws, ctx.host.kernel, { docKey: docKeyOf(ctx), ...asmHooks(ctx) });
+  // dosedací plocha, kterou díl nemá (vnější úprava – plocha 99): ztracená, ne „uložená délka … nezkontrolováno“ (kolo 6)
+  try {
+    const m = await markMissingSeats(doc, env);
+    if (m.marked.length) {
+      doc = r.doc = m.doc;
+      r.changed = true;
+    }
+  } catch (e) {
+    if (isCancelled(e)) throw e;
+  }
+  // každá pružina se ztracenou dosedací plochou (nově zjištěná i uložená v souboru) = ⚠ na řádku načtení
+  reportLostSprings(ctx, doc, line);
   let res: Awaited<ReturnType<typeof springCheckOf>> = null;
   try {
-    res = await springCheckOf(doc, makeAsmEnv(ctx.ws, ctx.host.kernel, { docKey: docKeyOf(ctx), ...asmHooks(ctx) }));
+    res = await springCheckOf(doc, env);
   } catch (e) {
     if (isCancelled(e)) throw e;
     return; // geometrie ploch nejde načíst – `stav` řekne „nezkontrolováno“
@@ -43,6 +57,18 @@ export async function freshenRunDoc(ctx: OpCtx, line: number | null): Promise<vo
     const o = { doc: doc.name, args: springDriftArgs(d), text: springDriftText(d) };
     if (ctx.log) ctx.log.coded(line, "spring.stale", o);
     else ctx.report.code("spring.stale", { line, ...o });
+  }
+}
+
+/**
+ * ⚠ `spring.lost` za každou pružinu se ztracenou dosedací plochou (načtení dokumentu, `stav`): délka a síla nezkontrolovány, příkaz
+ * opravy. Varování, ne poznámka – přísný režim (`--strict`) na něm zastaví, stejně jako na ⚠ rozporu délky (vlna 22, bod 7 / 20).
+ */
+export function reportLostSprings(ctx: OpCtx, doc: CadDoc, line: number | null): void {
+  for (const c of lostSpringComps(doc)) {
+    const o = { doc: doc.name, args: [c.name, springLostShort(doc, c), springFixCmd(doc, c)] };
+    if (ctx.log) ctx.log.coded(line, "spring.lost", o);
+    else ctx.report.code("spring.lost", { line, ...o });
   }
 }
 

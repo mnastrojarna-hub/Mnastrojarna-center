@@ -3,7 +3,8 @@
 //      konzole ukazuje stav a id běhu, předchozí protokol jen jako „Předchozí běh“; uložit / export / sdílet počkají na
 //      dokončený stav a soubor nese revizi modelu
 //  22e) rozepsaná hodnota pole (helixSweep hloubka 0,8 → 0,82) a hned název – obojí v dokumentu; EN tečka / DE čárka;
-//      Esc vrátí hodnotu; opuštění pole bez změny = žádný krok Zpět; přepnutí záložky < 450 ms – hodnota ve SVÉM dokumentu
+//      Esc vrátí hodnotu; opuštění pole bez změny = žádný krok Zpět; přepnutí záložky < 450 ms – hodnota ve SVÉM dokumentu;
+//      (kolo 6) Ctrl+S / Cmd+S skutečnými klávesami s kurzorem v poli → zápis souboru s rozepsanou hodnotou, znovuotevření
 //  22f) formát A2 → A3 a přepnutí na jiný dokument do 500 ms – A3 v Desce A, druhý dokument bez cizího výkresu; Ctrl+Z
 //      vrátí jen změnu listu; zaškrtnutí pohledu se uloží
 //  22h) export jako úloha: fáze, seznam Exporty (data-*), kontrola zpětným načtením i z menu, zrušení bez prázdného souboru
@@ -95,9 +96,19 @@ async function runs(p, tag) {
 
 /* ───────────────────────── 22h: export jako úloha ───────────────────────── */
 async function exports(p, tag) {
+  // fáze 2, kolo 4 (vědomá úprava, balík g – 22a): model závitu šroubovicí je přesně platný, ale soubor STEP po zpětném načtení
+  // výchozí čtečkou přesnou kontrolou NEPROJDE (čtečka spočte tolerance hran menší, než je skutečná odchylka; po přepočtu
+  // tolerancí projde s tolerancí do meze = největší tolerance modelu, číslo v řádku – oponent kolo 4: bez meze by „geometrie
+  // souboru odpovídá“ prošlo i se souborem, jehož křivky jsou 0,1 mm od ploch). Pravdivý výsledek kontroly je proto
+  // ⚠ out.reload-invalid, ne ✓ – stejně jako cad-w22-g 7c a
+  // w22/thread-g2-engine.test.ts. Dřív test čekal ✓ (napsán před přesnou kontrolou souboru z balíku g). Cesta ✓ „věrná kopie“
+  // se ověřuje níže na modelu, jehož soubor přesnou kontrolou projde (válec s průchozí dírou).
+  await p.evaluate((t) => window.mncad.run(t), 'nový díl "Export K"\nválec 30 20\ndíra 8 skrz v 0 0 20');
+  const rk = await p.evaluate(() => window.mncad.exportFile('step'));
+  ok(rk.job && rk.job.state === 'done' && rk.check?.ok === true && /→ věrná kopie modelu$/.test(rk.check.text) && !rk.warning, `${tag}22h: exportFile modelu bez aproximovaných hran – kontrola ✓ věrná kopie (${(rk.check?.text || '').slice(0, 160)})`);
   await p.evaluate((t) => window.mncad.run(t), THREAD('Export A', 12));
   const r = await p.evaluate(() => window.mncad.exportFile('step'));
-  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === true && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile = úloha s fázemi, kontrola ✓, revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')})`);
+  ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(r.check.text) && /model přesně platný/.test(r.check.text) && /po přepočtu tolerancí hran a vrcholů soubor přesnou kontrolou projde s tolerancí nejvýše [\d,]+e-\d mm \(mez [\d,]+e-\d mm = největší tolerance modelu\) → geometrie souboru odpovídá/.test(r.check.text) && !/věrná kopie/.test(r.check.text) && /out\.reload-invalid|NEPROJDE/.test(r.warning || '') && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile závitu šroubovicí = úloha s fázemi, kontrola ⚠ (soubor po načtení přesně neplatný, model platný – ne ✓), revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')}; ${(r.check?.text || '').slice(0, 220)})`);
   // zrušení exportu přes API: model se nejdřív změní (30 závitů – export pak trvá sekundy), úloha exportu se počká ve frontě
   // a zruší se, až v seznamu Exporty skutečně je (fáze 2: dřív pevných 200 ms a „upravit“ na neexistující název prvku –
   // export nezměněného modelu doběhl dřív, než přišlo zrušení)
@@ -210,6 +221,77 @@ async function fields(p, tag, lang) {
   ok(Math.abs(docs.a.features.find((x) => x.id === feat.id).data.depth - 0.9) < 1e-9 && docs.b.features.length === 1 && !docs.b.features.some((x) => x.type === 'ext'), `${tag}22e: rozepsaná hodnota zapsána do Formulář A, Formulář B beze změny (${bBefore.length > 0})`);
 }
 
+/* ───────────── 22e (kolo 6): Ctrl+S / Cmd+S s kurzorem v poli – skutečné klávesy, zápis do souboru, znovuotevření ───────────── */
+const fsInit = () => {
+  // automatizace (navigator.webdriver) stahuje rovnou bez dialogu – tady zkoušíme cestu člověka: dialog „Uložit jako“ a zápis
+  Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  window.__fs = { picked: [], writes: [] };
+  window.showSaveFilePicker = async (o) => {
+    const name = (o && o.suggestedName) || 'x';
+    window.__fs.picked.push(name);
+    return { name, kind: 'file', createWritable: async () => ({ write: async (blob) => { const t = typeof blob === 'string' ? blob : await new Response(blob).text(); window.__fs.writes.push([name, t]); }, close: async () => undefined }), remove: async () => undefined };
+  };
+};
+const lastWrite = async (p, n0, ms = 20000) => {
+  try { await p.waitForFunction((n) => window.__fs.writes.length > n, n0, { timeout: ms }); } catch { return null; }
+  const w = await p.evaluate(() => window.__fs.writes.slice(-1)[0]);
+  try { return JSON.parse(w[1]); } catch { return { raw: String(w[1]).slice(0, 200) }; }
+};
+const findDoc = (j, name) => {
+  if (!j || typeof j !== 'object') return null;
+  if (j.name === name && j.features) return j;
+  for (const k of ['doc', 'document', 'project']) if (j[k]) { const r = findDoc(j[k], name); if (r) return r; }
+  if (Array.isArray(j.docs)) for (const d of j.docs) { const r = findDoc(d, name); if (r) return r; }
+  return j.features ? j : null;
+};
+async function ctrlSave(b, tag, url, lang) {
+  const L = { cs: { depth: 'Hloubka závitu', d1: '0,82', d2: '0,84' }, en: { depth: 'Thread depth', d1: '0.82', d2: '0.84' }, de: { depth: 'Gewindetiefe', d1: '0,82', d2: '0,84' } }[lang];
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
+  await ctx.addInitScript(fsInit);
+  const p = await ctx.newPage();
+  try {
+    await start(p, url);
+    const docName = 'Uložit ' + lang;
+    await p.evaluate((t) => window.mncad.run(t), THREAD(docName, 6));
+    await p.evaluate(() => window.mncad.idle && window.mncad.idle());
+    const feat = await p.evaluate(() => window.mncad.getDocument().features.find((f) => f.type === 'ext'));
+    await p.locator(`[data-feature-row="${feat.id}"]`).click(); await p.waitForTimeout(700);
+    // skutečné klávesy: hloubka, hned název, hned Ctrl+S s kurzorem v poli názvu (bez Tab, bez OK)
+    const depth = p.getByLabel(L.depth).first();
+    await depth.click(); await p.keyboard.press('Control+a'); await p.keyboard.type(L.d1);
+    const idx = await p.locator('input').evaluateAll((els) => els.findIndex((i) => /^Tažení po šroubovici|^Helical sweep|^Austragung entlang Helix|^Helix/.test(i.value)));
+    ok(idx >= 0, `${tag}22e kolo 6: pole názvu prvku nalezeno`);
+    if (idx < 0) return;
+    const nameEl = p.locator('input').nth(idx);
+    await nameEl.click(); await p.keyboard.press('Control+a'); await p.keyboard.type('Závit S');
+    const n0 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved = await lastWrite(p, n0, 20000);
+    const sd = findDoc(saved, docName);
+    const sf = sd && sd.features ? sd.features.find((x) => x.id === feat.id) : null;
+    ok(!!sf && Math.abs(sf.data.depth - 0.82) < 1e-9 && sf.name === 'Závit S', `${tag}22e kolo 6: Ctrl+S v poli názvu zapsal soubor s hloubkou ${L.d1} a názvem (depth=${sf && sf.data.depth}, název=${sf && sf.name}, zápisů ${saved ? 1 : 0})`);
+    ok(await p.evaluate(() => !!document.activeElement && document.activeElement.tagName === 'INPUT'), `${tag}22e kolo 6: po Ctrl+S zůstal kurzor v poli (zkratka nepřebrala fokus)`);
+    // Cmd+S (Meta) s kurzorem v poli hloubky – druhý zápis do téhož souboru
+    await depth.click(); await p.keyboard.press('Control+a'); await p.keyboard.type(L.d2);
+    const n1 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Meta+s');
+    const saved2 = await lastWrite(p, n1, 20000);
+    const sf2 = findDoc(saved2, docName)?.features?.find((x) => x.id === feat.id);
+    ok(!!sf2 && Math.abs(sf2.data.depth - 0.84) < 1e-9, `${tag}22e kolo 6: Cmd+S v poli hloubky zapsal ${L.d2} (depth=${sf2 && sf2.data.depth})`);
+    // znovuotevření prvního souboru: hloubka a název ze souboru
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    if (saved && sd) {
+      await p.locator('input[type=file]:not([data-insert-input])').first().setInputFiles({ name: 'ulozit.mncad', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
+      await p.waitForTimeout(2500);
+      const d = await p.evaluate(() => window.mncad.getDocument());
+      const g = (d.features || []).find((x) => x.type === 'ext');
+      ok(!!g && Math.abs(g.data.depth - 0.82) < 1e-9 && g.name === 'Závit S', `${tag}22e kolo 6: znovu otevřený soubor má depth=${g && g.data.depth} a název „${g && g.name}“`);
+    }
+  } finally {
+    await ctx.close();
+  }
+}
+
 /* ───────────────────────── 22f: výkres – formát, přepnutí záložky, Ctrl+Z, pohled ───────────────────────── */
 async function drawing(p, tag, lang) {
   const fmt = { cs: 'Formát listu', en: 'Sheet size', de: 'Blattformat' }[lang];
@@ -273,7 +355,10 @@ async function menuExport(b, tag) {
   await p.getByRole('button', { name: /STEP/ }).first().click();
   await p.waitForSelector('[data-export-job][data-export-state="done"]', { timeout: 300000 });
   const done = p.locator('[data-export-job][data-export-state="done"]').last();
-  ok((await done.getAttribute('data-export-check')) === 'ok' && /^r·[0-9a-f]{6}$/.test(await done.getAttribute('data-export-rev')), `${tag}22h: export z menu – kontrola zpětným načtením ok, revize modelu v záznamu`);
+  // kolo 4 (vědomá úprava, viz exports()): soubor závitu šroubovicí přesnou kontrolou po načtení neprojde → záznam úlohy „fail“
+  // a v dokumentu ⚠ text kontroly s doloženou příčinou; nikdy „věrná kopie“ (dřív test čekal „ok“)
+  const menuRec = await p.evaluate(() => ((window.mncad.getDocument().outputs || []).slice(-1)[0] || {}).job || null);
+  ok((await done.getAttribute('data-export-check')) === 'fail' && !!menuRec && menuRec.check && menuRec.check.ok === false && /NEPROJDE přesnou kontrolou platnosti/.test(menuRec.check.text) && !/věrná kopie/.test(menuRec.check.text) && /^r·[0-9a-f]{6}$/.test(await done.getAttribute('data-export-rev')), `${tag}22h: export z menu – kontrola zpětným načtením provedena: ⚠ soubor po načtení přesně neplatný (ne ✓), revize modelu v záznamu (${((menuRec && menuRec.check && menuRec.check.text) || '').slice(0, 160)})`);
   await p.waitForTimeout(10000);
   ok(await done.isVisible(), `${tag}22h: záznam exportu zůstal i 10 s po konci`);
   // kolo 3 (falešná zelená): model změněný BĚHEM exportu z menu (Ctrl+Z, když převod běží) – záznam v dokumentu nese revizi
@@ -306,7 +391,41 @@ async function menuExport(b, tag) {
   ok(!!chg.rec && chg.rec.job && chg.rec.job.state === 'done' && typeof chg.rec.job.ms === 'number' && /ZASTARALÝ/.test(recLine) && !/odpovídá modelu/.test(recLine), `${tag}22h: model změněn během exportu → záznam zastaralý, ne „odpovídá modelu“ (${recLine}; undo ${JSON.stringify(undone)})`);
   ok(!chg.bar && /model se během exportu změnil/.test(chg.text), `${tag}22h: bez lišty ✓ kontroly nad změněným modelem, hláška o změně během exportu`);
   await p.screenshot({ path: S + 'a3-exports.png' });
+  await undoAfterExport(p, tag);
   await ctx.close();
+}
+
+/**
+ * Kolo 4 (fáze 2): Ctrl+Z HNED PO dokončeném exportu z menu nesmí smazat záznam exportu – soubor na disku existuje. Dřív se záznam
+ * zapsal jen do současného stavu historie a Zpět vrátil stav bez něj: seznam Exporty / čip „Zastaralé výstupy“ zmizel (falešně
+ * čisto). Teď: záznam zůstane, k vrácenému modelu je ZASTARALÝ (čip ⚠ 1); Ctrl+Y = zase „odpovídá modelu“ (cad/history-outputs.ts).
+ */
+async function undoAfterExport(p, tag) {
+  await p.evaluate(() => window.mncad.run('nový díl "Deska U"\nkvádr 60 40 10'));
+  await p.evaluate(() => window.mncad.run('upravit "Kvádr 1" size=50;40;10'));
+  await p.evaluate(() => window.mncad.idle());
+  const nDone = await p.locator('[data-export-job][data-export-state="done"]').count();
+  await p.getByRole('button', { name: 'Soubor', exact: true }).click();
+  await p.getByRole('button', { name: /STEP/ }).first().click();
+  await p.waitForFunction((n) => document.querySelectorAll('[data-export-job][data-export-state="done"]').length > n, nDone, { timeout: 300000 });
+  await p.waitForFunction(() => (window.mncad.getDocument().outputs || []).some((r) => /Deska.U/.test(r.file)), null, { timeout: 30000 });
+  const rec = await p.evaluate(() => (window.mncad.getDocument().outputs || []).filter((r) => /Deska.U/.test(r.file)).slice(-1)[0]);
+  const size0 = await p.evaluate(() => JSON.stringify(window.mncad.getDocument().features[0].size));
+  await p.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+  await p.keyboard.press('Control+z');
+  await p.waitForFunction((s) => JSON.stringify(window.mncad.getDocument().features[0]?.size) !== s, size0, { timeout: 30000 }).catch(() => {});
+  await p.waitForTimeout(600);
+  const u = await p.evaluate((id) => ({ size: JSON.stringify(window.mncad.getDocument().features[0]?.size), has: (window.mncad.getDocument().outputs || []).some((r) => r.id === id), chip: document.querySelector('[data-outputs-chip]')?.getAttribute('data-outputs-chip') ?? null }), rec.id);
+  const list = await p.evaluate(() => window.mncad.run('exporty'));
+  const line = (list.split('\n').find((l) => l.includes(rec.file)) || '').trim();
+  ok(u.size !== size0 && u.has && /ZASTARALÝ/.test(line) && !/odpovídá modelu/.test(line), `${tag}kolo 4: Ctrl+Z hned po exportu – model vrácen (${size0} → ${u.size}), záznam „${rec.file}“ zůstal a je ZASTARALÝ (${line})`);
+  ok(u.chip !== null && Number(u.chip) >= 1, `${tag}kolo 4: čip Zastaralé výstupy po Ctrl+Z ukazuje soubor (data-outputs-chip=${u.chip}), ne „čisto“`);
+  await p.keyboard.press('Control+y');
+  await p.waitForFunction((s) => JSON.stringify(window.mncad.getDocument().features[0]?.size) === s, size0, { timeout: 30000 }).catch(() => {});
+  await p.waitForTimeout(600);
+  const list2 = await p.evaluate(() => window.mncad.run('exporty'));
+  const line2 = (list2.split('\n').find((l) => l.includes(rec.file)) || '').trim();
+  ok(/odpovídá modelu/.test(line2), `${tag}kolo 4: Ctrl+Y vrátí model exportu – záznam zase „odpovídá modelu“ (${line2})`);
 }
 
 const browsers = [];
@@ -329,6 +448,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
     await ctx.close();
   }
   await menuExport(b, '');
+  for (const [tag, url, lang] of [['', `${BASE}/cad`, 'cs'], ['[en] ', `${BASE}/en/cad`, 'en'], ['[de] ', `${BASE}/de/cad`, 'de']]) await ctrlSave(b, tag, url, lang);
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
   const nogl = await launch({ args: ['--disable-gpu', '--disable-webgl', '--disable-3d-apis'] });
@@ -339,6 +459,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   await round3(p, '[bez WebGL] ');
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
+  await ctrlSave(nogl, '[bez WebGL] ', `${BASE}/cad`, 'cs');
   await nogl.close();
 })()
   .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })

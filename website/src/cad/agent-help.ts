@@ -72,7 +72,7 @@ export function findHelpTarget(word: string, ctx: HelpCtx): { type: FeatureType 
   const w = fold(word);
   const t = ctx.types.find((x) => fold(x) === w) ?? ctx.types.find((x) => fold(x) === fold(ctx.canon(word))) ?? Object.entries(ctx.labels).find(([, l]) => fold(l) === w || fold(tr(l)) === w)?.[0] ?? ALIAS[w];
   if (t) return { type: t as FeatureType };
-  const ext = allExt().find((d) => fold(d.ext) === w || fold(d.label) === w);
+  const ext = allExt().find((d) => fold(d.ext) === w || fold(d.label) === w || fold(d.labelSrc ?? "") === w);
   return ext ? { ext } : null;
 }
 

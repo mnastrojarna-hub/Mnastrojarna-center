@@ -512,7 +512,14 @@ export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMet
     consider(run({ dimRoom: opts.dimRoom, dimRoomMin: 0 }));
     return done();
   }
-  for (const room of [10, 24]) if (!consider(run({ dimRoom: room, dimRoomMin: 0 })).smart.report.noRoom) return done();
+  for (const room of [10, 24]) {
+    const x = consider(run({ dimRoom: room, dimRoomMin: 0 }));
+    if (x.smart.report.noRoom) continue;
+    // kóty se vešly, ale měřítko zmenšil pás razítka (nástrojářská šablona 180×64): ještě s místem jen tam, kde kóty jsou –
+    // pohledy se pak často vejdou nad / vedle razítka v původním měřítku (vlna 22, bod 19, kolo 6: dřív 1:2 místo 1:1)
+    if (x.d.tbLimited && x.pads) consider(run({ dimRoom: 0, dimRoomMin: -6, dimPads: x.pads }));
+    return done();
+  }
   const wide = consider(run({ dimRoom: 24, dimRoomMin: undefined }));
   // místo jen tam, kde kóty v předchozím pokusu skutečně jsou (okraj bez kót se smí zmenšit) – často se vejdou na menší formát
   if (wide.pads) consider(run({ dimRoom: 0, dimRoomMin: -6, dimPads: wide.pads }));

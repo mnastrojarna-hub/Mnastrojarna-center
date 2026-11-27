@@ -1,0 +1,15 @@
+# vlna 22, bod 20 – kolo 4 (balík M): ztracená dosedací plocha pružiny ve výpisu vazeb, sestava pružiny, stav, pohyb, GUI; sestava obnovit = remapAsmRefs
+ · pružiny se ztracenou dosedací plochou: {0}	 · Federn mit verlorener Auflagefläche: {0}
+„{0}“{1} – ztracená dosedací plocha {2}: délka a síla nezkontrolovány – {3}	„{0}“{1} – verlorene Auflagefläche {2}: Länge und Kraft nicht geprüft – {3}
+{0}; délka pružiny se z ní nepočítá	{0}; die Federlänge wird daraus nicht berechnet
+{0}: dosedací plocha {1} dílu „{2}“ – {3}	{0}: Auflagefläche {1} des Teils „{2}“ – {3}
+⚠ pružina {0}	⚠ Feder {0}
+Odebrat pružinu	Feder entfernen
+pružina „{0}“ „{1}“ {2} → „{3}“ {4} – {5}: {6} – {7}	Feder „{0}“ „{1}“ {2} → „{3}“ {4} – {5}: {6} – {7}
+Pružiny se ztracenou dosedací plochou: {0} – jejich délka a síla se nekontrolují.	Federn mit verlorener Auflagefläche: {0} – ihre Länge und Kraft werden nicht geprüft.
+sestava pružina {0} mezi {1} {2} | sestava pružina {0} odebrat	baugruppe feder {0} zwischen {1} {2} | baugruppe feder {0} entfernen
+Vyberte komponenty A a B a klikněte na Upravit pružinu (dosedací plocha = nejbližší kolmá rovinná plocha), nebo textem: {0}	Wählen Sie die Komponenten A und B und klicken Sie auf Feder ändern (Auflagefläche = nächste senkrechte ebene Fläche), oder als Text: {0}
+Zadat dosedací plochy znovu	Auflageflächen neu festlegen
+Ztracená dosedací plocha – délka a síla pružiny se nekontrolují:	Verlorene Auflagefläche – Länge und Kraft der Feder werden nicht geprüft:
+ztracená dosedací plocha pružiny – délka a síla se nekontrolují	verlorene Auflagefläche der Feder – Länge und Kraft werden nicht geprüft
+<plocha>	<Fläche>

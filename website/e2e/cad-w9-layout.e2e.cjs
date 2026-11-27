@@ -103,6 +103,27 @@ const BASE = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, ''
   await p.mouse.dblclick(box.x + 12, box.y + box.height - 12);
   await p.waitForTimeout(500);
   ok(await p.locator('[data-pspace-badge]').isVisible(), 'poklepání mimo výřez → zpět na papír');
+  // vlna 22 kolo 6: poklepání se měří od STISKU k STISKU v plátně i v rozšíření rozvržení (jedno pravidlo isDoubleClick).
+  // Pomalý první klik (držený 420 ms) a rychlý druhý: od puštění < 350 ms, od stisku > 350 ms = NE poklepání → druhý roh
+  // okna dvěma kliky (data-boxsel), papír zůstane. Dřív plátno měřilo od puštění: okno zrušilo, rozšíření poklepání nevidělo.
+  {
+    // prázdné místo papíru uvnitř výřezu (ne na jeho okraji, ne na středicí značce listu) – klik tam nic nevybere
+    const pp = await scr(vp0.c[0] - vp0.w * 0.3, vp0.c[1] - vp0.h * 0.3);
+    await p.evaluate(() => document.querySelector('[data-draft-canvas]').removeAttribute('data-boxsel'));
+    await p.mouse.move(pp[0] - 2, pp[1] + 2);
+    await p.mouse.move(pp[0], pp[1]);
+    await p.mouse.down();
+    await p.waitForTimeout(420); // od stisku k druhému stisku > 350 ms (i bez zátěže), od puštění jen pár ms
+    await p.mouse.up();
+    await p.mouse.move(pp[0] + 3, pp[1] + 3); // otevřené okno dvěma kliky ukáže živý počet (data-boxsel-live)
+    const live = await p.getAttribute('[data-draft-canvas]', 'data-boxsel-live');
+    await p.mouse.down();
+    await p.mouse.up();
+    await p.waitForTimeout(400);
+    const bs = await p.getAttribute('[data-draft-canvas]', 'data-boxsel');
+    ok(bs !== null && (await p.locator('[data-pspace-badge]').isVisible()), `pomalý první klik + druhý klik = druhý roh okna, ne poklepání (okno po 1. kliku: data-boxsel-live ${live}; data-boxsel ${bs})`);
+    await p.keyboard.press('Escape');
+  }
 
   // ── panel Vzhled stránky: měřítko výřezu 1:10, zmrazení hladiny OSY ve výřezu ──
   await p.locator('[data-draft-workspace] [data-ribbon] button').filter({ hasText: 'Vzhled stránky' }).first().click();

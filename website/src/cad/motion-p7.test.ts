@@ -23,7 +23,7 @@ import { emptyAssembly, partComponent } from "./assembly";
 import { clearInterferenceCache, interference } from "./asm-kernel";
 import { makeFromText } from "./library";
 import type { PartFace } from "./mates";
-import { motionIssues, motionSummary, poseDoc, type MotionResult } from "./motion";
+import { motionFindings, motionIssues, motionSummary, poseDoc, type MotionResult } from "./motion";
 import { emptyDoc, type AsmComponent, type BuildResult, type CadDoc, type Feature } from "./types";
 
 const FULL = !!process.env.P7_FULL;
@@ -272,12 +272,10 @@ describe("P7 – střižný nástroj 57 komponent, pohyb 40 kroků s kolizemi", 
     expect(res.timing).toMatchObject({ vars: 36, groups: 2 });
     expect(res.conflictSteps).toBe(14);
     const issues = motionIssues(res, asmDoc());
-    expect(issues.map((x) => x.steps)).toEqual([[27, 40], [27, 40], [27, 40]]);
-    expect(motionSummary(res, asmDoc()).filter((l) => l.includes("motion.conflict"))).toEqual([
-      " ⚠ motion.conflict pohyb porušuje vazbu „Vzdálenost Horní deska → Spodní deska“ v kroku 27–40 (t = 1.35–2 s)",
-      " ⚠ motion.conflict pohyb porušuje vazbu „Mez vzdálenosti Stírací deska → Kotevní deska“ v kroku 27–40 (t = 1.35–2 s)",
-      " ⚠ motion.conflict pohyb porušuje vazbu „Mez vzdálenosti Stírací deska → Matrice“ v kroku 27–40 (t = 1.35–2 s)",
-    ]);
+    // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit
+    expect(issues.map((x) => x.steps)).toEqual([[27, 40]]);
+    expect(motionSummary(res, asmDoc()).filter((l) => l.includes("motion.conflict"))).toEqual([" ⚠ motion.conflict pohyb porušuje vazbu „Vzdálenost Horní deska → Spodní deska“ v kroku 27–40 (t = 1.35–2 s)"]);
+    expect(motionFindings(res, asmDoc()).find((x) => x.code === "motion.motor-limit")!.text).toMatch(/brání: „Mez vzdálenosti Stírací deska → Kotevní deska“ .*; „Mez vzdálenosti Stírací deska → Matrice“ /);
   }, 120_000);
 
   let col: MotionResult;

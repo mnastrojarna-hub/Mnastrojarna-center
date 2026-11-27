@@ -12,6 +12,7 @@ import { outputsKv } from "../doc-outputs";
 import { clashCountsKv } from "../clash-report";
 import { sourceKey } from "../assembly";
 import { mateLost } from "../mates";
+import { lostSpringComps } from "../spring-lost";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import { featureCounts } from "../feature-levels";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
@@ -149,6 +150,15 @@ export function matesCount(doc: CadDoc, st: AsmStatus["mates"]): DocSummary["mat
 }
 
 /**
+ * Pružiny sestavy se ztracenou dosedací plochou (vlna 22, bod 20 – pružinová část): strojově `springs.lost=N` v řádku D, `= … status`,
+ * Σ i `kontrola sestava` – stejná úroveň jako `mates=…(lost=N)` u vazeb. Bez ztracené plochy `undefined` (dřívější řádky beze změny).
+ */
+export function springsCount(doc: CadDoc): DocSummary["springs"] {
+  const lost = lostSpringComps(doc).length;
+  return lost ? { total: (doc.components ?? []).filter((c) => !!c.spring).length, lost } : undefined;
+}
+
+/**
  * Souhrn dokumentu (`DocSummary`, řádek D) z výsledku stavby a stavu sestavy – společné pro `= status` a řádky D v CLI.
  * Díl: prvky ✓/⚠/✗, objem, obálka, hmotnost podle hustoty třídy materiálu. Sestava: komponenty, různé díly, vazby,
  * objem Σ, hmotnost Σ, obálka.
@@ -164,6 +174,8 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
     if (asm?.bbox) s.bbox = asm.bbox;
     const m = matesCount(doc, asm?.mates);
     if (m) s.mates = m;
+    const sp = springsCount(doc);
+    if (sp) s.springs = sp;
     return s;
   }
   if (s.kind === "draft") return s;

@@ -36,8 +36,9 @@ import { getLang, tr } from "./i18n";
 import { kinCluster, kinCtx, MATE_LABEL, mateLost, memoGeo, solveMates, type GeoProvider } from "./mates";
 import { DEG, L, add, cross, dot, expRot, kinResidual, len, pivotOf, placementOf, poseOf, resNorm, rigidGroups, scale, solvePoses, sub, syncGroups, unit, wrap, worldOf, dofValue, type Pose } from "./mates-kin";
 import type { CompInertia, M3, MassSource } from "./motion-mass";
-import { motorProblem, poseDoc, type MotionClashes, type MotionResult, type MotionStep, type MotionTiming } from "./motion";
-import { motorAt as modelMotorAt, motorIsAbsolute } from "./motor-model";
+import { motorProblem, poseDoc, rotationAngleDeg, runMotion, START0_EPS, type MotionClashes, type MotionResult, type MotionStep, type MotionTiming } from "./motion";
+import type { MateDev } from "./motion-quasi";
+import { JUMP_EPS, motorAt as modelMotorAt, motorIsAbsolute } from "./motor-model";
 import type { AsmComponent, CadDoc, Mate, MateRef, MotionDynamic, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** gravitační zrychlení [mm/s²] */
@@ -188,6 +189,46 @@ export async function runDynamic(
   for (const ld of D.loads ?? []) if (!mates.some((m) => m.id === ld.mate)) throw new Error(tr("síla na vazbě: vazba v sestavě není (smazaná nebo potlačená)"));
   const g = memoGeo(geo);
   const poses = new Map<string, Pose>(s0.components.map((c) => [c.id, poseOf(c.placement)] as const));
+  // start integrátoru z KVAZISTATICKÉ rovnováhy v okamžiku začátku motorů (vlna 22, bod 2 – kolo 6): motor, jehož začátek není
+  // hodnota vazby v dokumentu (deska „přeskočí“), by jinak začal s pružinou mimo rovnováhu (přidržovač na Ln) – ráz a „největší
+  // síla pružiny“, které jsou jen artefaktem startu. Krok 0 dynamiky = krok 0 kvazistatiky. Bez motoru nebo bez pružin beze změny
+  // (volný kmit z polohy dokumentu zůstává zkouškou dynamiky).
+  // JEN když začátek motoru skáče (oponent kola 6: dřív vždy, s motorem a pružinou – zmizel skutečný přechodový děj z polohy
+  // dokumentu, např. puštění přidržovače na doraz meze, a to bez ⚠). Bez skoku startuje integrátor z polohy dokumentu; když ho
+  // start z rovnováhy přesune, výsledek to řekne (`start0`, ⚠ motion.start-jump s příčinou „skok motoru“).
+  const start0: NonNullable<MotionResult["start0"]> = [];
+  // hodnoty vazeb motorů v poloze DOKUMENTU (výchozí stav motorů – u přírůstkového motoru základ přírůstku; start z rovnováhy ho nemění)
+  const c0 = kinCtx(poses, g, (_k, d) => wrap(d));
+  const docV = study.motors.map((mo) => {
+    const m = mates.find((x) => x.id === mo.mate);
+    return m ? dofValue(m, mo.kind, c0) : null;
+  });
+  const motorJumps = study.motors.some((mo, i) => {
+    const m = mates.find((x) => x.id === mo.mate);
+    if (!m) return false;
+    const want = motorAt(mo, 0, duration);
+    if (!motorIsAbsolute(mo, m)) return Math.abs(want) > JUMP_EPS;
+    const v = docV[i];
+    return v !== null && Math.abs(v - want) > JUMP_EPS;
+  });
+  if (motorJumps && springComps(doc).length) {
+    try {
+      const q = await runMotion(doc, geo, { motors: study.motors, duration, steps: 1, mode: "quasistatic" });
+      const p0 = q.steps[0]?.status ? null : q.steps[0]?.place;
+      if (p0)
+        for (const [id, pl] of Object.entries(p0)) {
+          const P = poses.get(id);
+          if (!P) continue;
+          const was = placementOf(P);
+          const d = Math.hypot(pl.position[0] - was.position[0], pl.position[1] - was.position[1], pl.position[2] - was.position[2]);
+          const deg = rotationAngleDeg(was.rotation, pl.rotation);
+          if (d > START0_EPS || deg > START0_EPS) start0.push({ comp: id, d, deg, cause: "motor" });
+          poses.set(id, poseOf(pl));
+        }
+    } catch {
+      // rovnováhu nejde spočítat (motor mimo vazby …) – start z polohy dokumentu jako dřív; výpočet níže řekne své
+    }
+  }
   let state = new Map<string, number>();
   let rec: Map<string, number> | null = null;
   const ctx = kinCtx(poses, g, (k, d) => {
@@ -201,11 +242,55 @@ export async function runDynamic(
   const motors = study.motors.map((mo) => {
     const m = mates.find((x) => x.id === mo.mate)!;
     const abs = motorIsAbsolute(mo, m);
-    const v0 = dofValue(m, mo.kind, ctx);
+    const v0 = docV[study.motors.indexOf(mo)] ?? dofValue(m, mo.kind, ctx);
     if (v0 === null) throw new Error(tr("motor {0}: chybí geometrie vazby „{1}“", study.motors.indexOf(mo) + 1, m.name ?? tr(MATE_LABEL[m.type])));
     return { mo, m, abs, v0, target: 0 };
   });
-  const setTime = (t: number) => motors.forEach((x) => (x.target = motorAt(x.mo, t, duration)));
+  // motor na mezi v dynamice (vlna 22, bod 8 – kolo 6): mez vazby, kterou předepsaný pohyb motoru porušuje (doraz v rozporu
+  // s motorem), = „stop“ (výchozí): motory od toho okamžiku drží hodnotu posledního platného snímku; „chyba“: snímky za mezí jsou
+  // neplatné (zobrazí poslední platnou polohu). Dřív se volba přijala a v dynamice neměla účinek.
+  // Volba platí PRO KAŽDÝ MOTOR zvlášť (kolo 6, oponent: dřív jedna volba pro celou studii). Zastavení je směrové: motor stojí jen,
+  // dokud profil žádá dál ZA mez (týž směr jako při zastavení); jakmile profil couvne zpět na dosažitelnou stranu (zpětný zdvih),
+  // motor ho zase sleduje – dřív zůstal zmrazený do konce studie a hlásil „brání: Mez“ i při návratu nahoru.
+  const frozen: (number | null)[] = study.motors.map(() => null);
+  const frozenDir: number[] = study.motors.map(() => 0);
+  const limitMode = (i: number): "stop" | "error" => (study.motors[i]?.atLimit === "error" ? "error" : "stop");
+  const anyFrozen = () => frozen.some((f) => f !== null);
+  const setTime = (t: number) =>
+    motors.forEach((x, i) => {
+      const w = motorAt(x.mo, t, duration);
+      const f = frozen[i];
+      if (f !== null && Math.sign(w - f) !== frozenDir[i]) frozen[i] = null; // profil couvl na dosažitelnou stranu meze
+      x.target = frozen[i] ?? w;
+    });
+  /**
+   * motory, kterých se porušená mez týká: pohánějí díl (tuhé těleso) některé z porušených mezí; když žádný (mez porušená přes řetěz
+   * dalších dílů), všechny – volba „na mezi“ jednoho motoru tak neplatí pro motor, který s mezí nesouvisí
+   */
+  const involved = (ids: string[]): Set<number> => {
+    const bs = new Set<number>();
+    for (const id of ids) {
+      const m = live.find((x) => x.id === id);
+      for (const c of m ? [m.a.compId, m.b.compId] : []) if (bodyOf.has(c)) bs.add(bodyOf.get(c)!);
+    }
+    const out = new Set<number>();
+    motors.forEach((x, i) => [x.m.a.compId, x.m.b.compId].some((c) => bs.has(bodyOf.get(c) ?? -1)) && out.add(i));
+    return out.size ? out : new Set(motors.map((_, i) => i));
+  };
+  /** motory „stop“ dotčené mezemi `ids`, které v tomto kroku jely (cíl se změnil), zastaví na hodnotě `prev` ve směru, kterým jely */
+  const freezeMoving = (prev: number[], ids: string[]): boolean => {
+    let any = false;
+    const inv = involved(ids);
+    motors.forEach((x, i) => {
+      if (!inv.has(i) || limitMode(i) !== "stop" || frozen[i] !== null) return;
+      const d = x.target - prev[i];
+      if (Math.abs(d) <= 1e-12) return;
+      frozen[i] = prev[i];
+      frozenDir[i] = Math.sign(d);
+      any = true;
+    });
+    return any;
+  };
   const absMate = new Map(motors.filter((x) => x.abs).map((x) => [x.m.id, x]));
   const seeds = new Set(mates.flatMap((m) => [m.a, m.b, m.c, m.d].flatMap((r) => (r ? [r.compId] : []))));
   const cl = kinCluster(mates, seeds, isFixed);
@@ -723,15 +808,27 @@ export async function runDynamic(
   let lastA = new Float64Array(nv);
   const peaks: Record<string, DynPeak> = Object.fromEntries(bodies.map((b, i) => [b.id, { v: Math.hypot(V[i * 6], V[i * 6 + 1], V[i * 6 + 2]), tv: 0, a: 0, ta: 0 }]));
   let frame = 0;
+  const limitBroken = (l: Limit) => {
+    const v = l.value();
+    return v !== null && ((l.min !== undefined && v < l.min - 1e-3) || (l.max !== undefined && v > l.max + 1e-3));
+  };
+  let lastValid: DynMotionStep | null = null;
+  let frozenBy: Limit[] = [];
+  let lastTargets: number[] | null = null;
   const record = async (k: number, t: number, Vn: Float64Array, Aac: Float64Array, stepMs: number) => {
     const conflicts = live.filter((m) => resNorm(eqOf(m)) > 1e-3).map((m) => m.id);
     driveRes().forEach((r, i) => {
       if (Math.abs(r) > 1e-3) conflicts.push(`motor:${motors.filter((x) => !x.abs)[i]?.mo.id}`);
     });
+    const broken: MateDev[] = [];
     for (const l of limits) {
       const v = l.value();
       // mez vazby porušená (doraz v rozporu s motorem); pružinu pod Ln hlásí souhrn pružin (✗ pod délkou na doraz)
-      if (!l.id.startsWith("spring:") && v !== null && ((l.min !== undefined && v < l.min - 1e-3) || (l.max !== undefined && v > l.max + 1e-3))) conflicts.push(l.id);
+      if (!l.id.startsWith("spring:") && v !== null && ((l.min !== undefined && v < l.min - 1e-3) || (l.max !== undefined && v > l.max + 1e-3))) {
+        conflicts.push(l.id);
+        const bound = l.min !== undefined && v < l.min ? l.min : l.max!;
+        broken.push({ id: l.id, label: l.label, kind: "limit", value: v, ...(l.min !== undefined ? { min: l.min } : {}), ...(l.max !== undefined ? { max: l.max } : {}), dev: v - bound, unit: l.unit });
+      }
     }
     if (conflicts.length) conflictSteps++;
     const place: Record<string, Placement> = {};
@@ -739,11 +836,44 @@ export async function runDynamic(
       const P = poses.get(c.id);
       if (P) place[c.id] = placementOf(P);
     }
+    // motor na mezi (kolo 6): porušená mez při předepsaném pohybu motoru
+    const wanted = hasMotors ? motors.map((x) => motorAt(x.mo, t, duration)) : [];
+    // motor „chyba“, který v tomto snímku jede (profil se mění), a porušená mez = neplatný snímek; motory „stop“ zastaví
+    const movingNow = (i: number) => Math.abs(motorAt(motors[i].mo, t, duration) - motorAt(motors[i].mo, Math.max(0, t - dt), duration)) > 1e-12;
+    let status: MotionStep["status"];
+    if (hasMotors && (broken.length || anyFrozen())) {
+      const inv = involved(broken.map((b) => b.id));
+      if (broken.length && motors.some((_, i) => inv.has(i) && limitMode(i) === "error" && movingNow(i))) status = "invalid";
+      else {
+        if (broken.length && freezeMoving(lastTargets ?? motors.map((x) => x.target), broken.map((b) => b.id))) frozenBy = limits.filter((l) => broken.some((b) => b.id === l.id));
+        if (frozen.some((f, i) => f !== null && Math.abs(wanted[i] - f) > 1e-3)) status = "stopped";
+      }
+    }
+    if (!anyFrozen()) frozenBy = [];
+    if (status === "invalid" && lastValid) for (const id of Object.keys(place)) place[id] = lastValid.place[id] ?? place[id];
     const dyn: Record<string, DynStepBody> = {};
     bodies.forEach((b, i) => {
       dyn[b.id] = { p: com(i), v: [Vn[i * 6], Vn[i * 6 + 1], Vn[i * 6 + 2]], a: [Aac[i * 6], Aac[i * 6 + 1], Aac[i * 6 + 2]] };
     });
-    const row: DynMotionStep = { i: frame++, t, motors: motors.map((x) => x.target), place, conflicts, dyn };
+    const row: DynMotionStep = { i: frame++, t, motors: hasMotors && (anyFrozen() || status) ? wanted : motors.map((x) => x.target), place, conflicts, dyn };
+    if (status) {
+      row.status = status;
+      row.cause = "motor";
+      if (broken.length) row.devs = broken;
+      else if (status === "stopped" && frozenBy.length)
+        // mez, která motor zastavila (v poloze snímku na mezi = splněná) – „brání“ v motion.motor-limit
+        row.devs = frozenBy.flatMap((l) => {
+          const v = l.value();
+          if (v === null) return [];
+          const bound = l.min !== undefined && (l.max === undefined || Math.abs(v - l.min) <= Math.abs(v - l.max)) ? l.min : l.max!;
+          return [{ id: l.id, label: l.label, kind: "limit" as const, value: v, ...(l.min !== undefined ? { min: l.min } : {}), ...(l.max !== undefined ? { max: l.max } : {}), dev: Math.abs(v - bound) <= 1e-3 ? 0 : v - bound, unit: l.unit }];
+        });
+      if (status === "stopped") row.reached = motors.map((x, i) => frozen[i] ?? x.target);
+      if (status === "invalid") row.shows = lastValid?.i ?? 0;
+    } else {
+      lastValid = row;
+      lastTargets = motors.map((x) => x.target);
+    }
     if (hasSprings) {
       row.springs = springSteps(poseDoc(doc, place), g);
       // síla v kroku = pružina + tlumič (stejně jako v integraci)
@@ -787,6 +917,7 @@ export async function runDynamic(
     for (let a = 0; a < nv; a++) Vh[a] = V[a] + 0.5 * dt * A0[a];
     Vh = project(Vh, rowsEq);
     drift(Vh, dt);
+    const tPrevTargets = motors.map((x) => x.target);
     setTime(t1);
     // oprava polohy na vazby a motory v čase t1: SHAKE (směr reakce vazby M⁻¹·Jᵀ) a stejná oprava do rychlosti v½ (RATTLE)
     const pred = snapshot();
@@ -884,6 +1015,9 @@ export async function runDynamic(
     if (!jolt) for (let a = 0; a < nv; a++) Aac[a] = (Vn[a] - V[a]) / dt;
     lastA = Aac;
     V = Vn;
+    // motor na mezi „stop“ (výchozí): mez vazby porušená předepsaným pohybem → motory drží hodnotu předchozího kroku (kolo 6)
+    const brokenNow = hasMotors ? limits.filter((l) => !l.id.startsWith("spring:") && limitBroken(l)) : [];
+    if (brokenNow.length && freezeMoving(tPrevTargets, brokenNow.map((l) => l.id))) frozenBy = brokenNow;
     eApplied += pw.loadP * dt * 1e-6;
     eDamp += pw.dampP * dt * 1e-6;
     const eAfter = energy(V);
@@ -939,6 +1073,7 @@ export async function runDynamic(
     ...(s0.mates ? { mates: s0.mates } : {}),
     timing,
     motorInfo: motors.map((x) => ({ abs: x.abs, current: x.abs ? x.v0 : 0 })),
+    ...(start0.length ? { start0 } : {}),
     dynamic: info,
   };
 }

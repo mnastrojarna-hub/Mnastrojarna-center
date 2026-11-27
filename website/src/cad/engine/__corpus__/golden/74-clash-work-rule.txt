@@ -32,7 +32,7 @@ kolize: 1 – šroub v závitu 0, skutečné 1
 kolize po pravidlech: skutečné 1
 ✓ motor 1: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
  pohání: „Razník“ · směr −Z
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Razník“: ΔZ −4 mm
  stojí: 3 („Rám“, „Matrice“, „Plech“)
@@ -47,9 +47,8 @@ kolize po pravidlech: skutečné 1
 kolize po pravidlech: pracovní kontakt 1
 Kolize (zkontrolováno ?): pracovní kontakt 1 · zobrazeno 1 skupin (vše)
  · pracovní kontakt: pracovní kontakt „Plech“ × „Razník“ (78,5 mm³) – pravidlo r1 pracovní kontakt „Razník“ × „Plech“ při hodnotě vazby „ZDVIH“ 26–24 (střih) – místo [30; 30; 11,5] · obálka 10 × 10 × 1 mm
-Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize
+Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize · r·?
  1. lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Razník“: ΔZ −4 mm
  stojí: 3 („Rám“, „Matrice“, „Plech“)

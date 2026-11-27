@@ -1,9 +1,11 @@
 "use client";
 
+import { withDesignation } from "@/cad/material-designation";
+import { MaterialNoteLine } from "./material-note";
 import { softLimitsText, softStatusText } from "@/cad/soft-view";
 import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
-import { geometryText } from "@/cad/feature-levels";
+import { geometryText, treeStatus } from "@/cad/feature-levels";
 import { ValidityChip } from "./validity-chip";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -43,6 +45,7 @@ import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type DrawingDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, parseAgentText } from "@/cad/agent";
 import { histStep } from "@/cad/agent-edit";
+import { carryOutputs, recordOutsideHistory, undoKeepOutputs } from "@/cad/history-outputs";
 import { resolveTab, type TabInfo } from "@/cad/agent-asm";
 import type { AsmEnv, PartFaces } from "@/cad/asm-agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
@@ -115,6 +118,7 @@ import { ComputeChip, progressLabel } from "./compute-chip";
 import { discardPending, flushPending, historyRule, pendingCount, setDocKeyGetter } from "./flush-barrier";
 import { appRuns, guardApi, motionSignalHold, outputGate, runsSnapshot, textRun } from "./run-host";
 import { computeBegin, computesSnapshot, tracked, type ComputeKind, type ComputeRun } from "./compute-runs";
+import { trackedMotion } from "./motion-runs"; // výpočty pohybové studie v témže modelu výpočtů (vlna 22, bod 12)
 import { ComputeStatus } from "./compute-status";
 import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
@@ -194,6 +198,8 @@ const PICK_TYPES = new Set<FeatureType>(["fillet", "chamfer", "shell", "hole", "
 const NO_MATES: Record<string, MateStatus> = {};
 
 /** klíč geometrie dokumentu (prvky, proměnné, stavy) – stejný klíč = stejné těleso */
+/** listy výkresů beze změny (zápis bez kroku Zpět) */
+const sameDrawings = (a?: DrawingDoc[], b?: DrawingDoc[]) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const geoKey = (d: CadDoc) => JSON.stringify([d.features, d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null]);
 
 export function CadApp() {
@@ -211,6 +217,8 @@ export function CadApp() {
   const [planePick, setPlanePick] = useState(false);
   const [tab, setTab] = useState<Tab>("create");
   const [result, setResult] = useState<BuildResult | null>(null);
+  /** stav prvků z poslední stavby CELÉHO dokumentu (dokument + otisk geometrie) – strom při úpravě se stavbou po prvek (feature-levels.ts treeStatus) */
+  const [fullStatus, setFullStatus] = useState<{ key: string; geo: string; status: BuildResult["status"] } | null>(null);
   const [core, setCore] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -402,10 +410,13 @@ export function CadApp() {
     lastStep.current = { key: merge ?? null, at: now };
   }, []);
   const liveWith = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => ({ ...h, present: fn(h.present) })), []);
+  /** záznam exportu po doběhnutí úlohy (mimo krok historie): do současného stavu i do stavů Znovu (cad/history-outputs.ts) */
+  const recordOutput = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => recordOutsideHistory(h, fn)), []);
   const undo = () => {
     flushPending("undo"); // rozepsané pole / list výkresu nejdřív jako vlastní krok – Zpět pak vrátí právě je
     lastStep.current = { key: null, at: 0 };
-    setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
+    // záznamy exportů vzniklé po cílovém stavu zůstanou – soubor na disku krok Zpět nesmaže (cad/history-outputs.ts)
+    setHist((h) => undoKeepOutputs(h));
   };
   const redo = () => {
     flushPending("redo");
@@ -553,14 +564,15 @@ export function CadApp() {
    * jen změnu listu) a neuložená změna (dotaz při zavření karty); `record: false` = založení prvního listu bez kroku.
    */
   const writeDrawings = (d: DrawingDoc[], o: { key?: string; record?: boolean } = {}) => {
-    const fn = (cur: CadDoc): CadDoc => ({ ...cur, drawings: d });
+    // beze změny listů žádný krok Zpět (uložení nezměněného listu před „+ Výkres“ / přepnutím výkresu dřív přidalo prázdný krok)
+    const fn = (cur: CadDoc): CadDoc => (sameDrawings(cur.drawings, d) ? cur : { ...cur, drawings: d });
     if (!o.key || o.key === docId.current) {
       if (o.record === false) liveWith(fn);
       else commitWith(fn);
       return;
     }
     dirty.current = true;
-    setDocTabs((list) => list.map((t) => (t.docId === o.key && t.kind !== "drawing" ? { ...t, hist: o.record === false ? { ...t.hist, present: fn(t.hist.present) } : { past: [...t.hist.past.slice(-80), t.hist.present], present: fn(t.hist.present), future: [] } } : t)));
+    setDocTabs((list) => list.map((t) => (t.docId === o.key && t.kind !== "drawing" && fn(t.hist.present) !== t.hist.present ? { ...t, hist: o.record === false ? { ...t.hist, present: fn(t.hist.present) } : { past: [...t.hist.past.slice(-80), t.hist.present], present: fn(t.hist.present), future: [] } } : t)));
   };
   /** výkres jako vlastní záložka (sdílí dokument se zdrojovou záložkou) */
   const openDrawingTab = () => {
@@ -695,7 +707,7 @@ export function CadApp() {
       let moved = 0;
       flushSync(() =>
         setHist((h) => {
-          const step = histStep(h, dir, n);
+          const step = histStep(h, dir, n, carryOutputs);
           moved = step.moved;
           return step.hist;
         }),
@@ -1008,7 +1020,9 @@ export function CadApp() {
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
         const k = await import("@/cad/asm-agent-kin");
         const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
-        const res = await k.motionRun(d, asmEnvRef.current());
+        // záznam výpočtu ve sdíleném modelu výpočtů (id v…, revize vstupu, stav – vlna 22, bod 12; panel Pohyb totéž)
+        const env = asmEnvRef.current();
+        const { res, run } = await trackedMotion(d, () => k.motionRun(d, env));
         // časový plán videa s uloženými volbami studie (vlna 22, bod 13 – cad/motion-video.ts)
         const video = await import("@/cad/motion-video").then((m) => m.videoApi(res, d.motion)).catch(() => null);
         // první SKUTEČNÁ kolize (šroub v závitu, dotyk ani pracovní kontakt ne) s popisem instance a místem; kroky s třídami dvojic
@@ -1019,7 +1033,7 @@ export function CadApp() {
         const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
         // procesní vrstva: operace, stav výrobku po krocích, úroveň „geometrická aproximace“ (vlna 22, bod 4)
         const proc = (await import("@/cad/motion-process")).processApi(res, d);
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
+        return { ...(run ? { run } : {}), steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1214,6 +1228,7 @@ export function CadApp() {
       if (owner === docId.current && !queued.current) {
         resultFor.current = { key: owner, geo: geoKey(d) };
         setResult(res);
+        if (resultFor.current.geo === geoKey(docRef.current)) setFullStatus({ key: owner, geo: resultFor.current.geo, status: res.status }); // stavba celého dokumentu (ne pohledu „po prvek“)
         run.end("done");
       } else run.end("superseded");
       setStale(false);
@@ -1251,6 +1266,11 @@ export function CadApp() {
       }
     }
   }, []);
+  /** stav prvků pro strom: při úpravě se stavbou po prvek doplněný z platné celé stavby téže geometrie (feature-levels.ts treeStatus) */
+  const treeSt = useMemo(() => {
+    if (!(rollback || sketchId)) return result?.status;
+    return treeStatus(result?.status, fullStatus && fullStatus.key === docId.current ? fullStatus : null, geoKey(doc), true);
+  }, [result, fullStatus, doc, rollback, sketchId]);
   restoreKernelRef.current = () => {
     if (buildDocView.kind !== "assembly") void runBuild(buildDocView);
   };
@@ -1340,7 +1360,7 @@ export function CadApp() {
   // Sestava › Pružina mezi díly: výběr dosedacích ploch a tabulka (components/cad/springs/spring-between.tsx)
   const springPick = useSpringBetween({ doc, isAsm, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
   // ztracená reference vazby (vlna 22, bod 20): nový výběr plochy klikem v modelu nebo ze seznamu ploch (mate-repick.tsx)
-  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
+  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, entRows: async (leaf, ent) => (await import("@/cad/asm-agent")).compEnts(histRef.current.present, leaf, ent, asmEnvRef.current()), entInfo: (k, i, e) => cad.mateEnt(k, i, e), geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
   const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
@@ -2030,7 +2050,9 @@ export function CadApp() {
       return;
     }
     if (repick.active) {
+      // ztracená plocha: klik na plochu; ztracená hrana / vrchol: klik na hranu / vrchol téhož dílu (mate-repick.tsx)
       if (it?.kind === "face" && it.compId) void repick.choose(it.compId, it.index);
+      else if ((it?.kind === "edge" || it?.kind === "vertex") && it.compId) void repick.chooseEnt(it.compId, it.index, it.kind);
       return;
     }
     if (mate) {
@@ -2581,9 +2603,11 @@ export function CadApp() {
   const pickMode: PickMode = refPick
     ? "select"
     : isAsm
-    ? mate || boltPick || springPick.active || repick.active
-      ? "asmFace"
-      : "select"
+    ? repick.active && repick.want !== "face"
+      ? "select" // ztracená hrana / vrchol vazby: výběr s filtrem hrana / vrchol (selFilter níže)
+      : mate || boltPick || springPick.active || repick.active
+        ? "asmFace"
+        : "select"
     : planePick
       ? "face-plane"
       : measure
@@ -2696,7 +2720,7 @@ export function CadApp() {
       // změnil-li uživatel model během převodu, soubor je ze starší revize – žádná lišta ✓ nad jiným modelem, hláška to řekne
       const rec = { format, file: target.name, job: r, id: h.id, ms: appRuns.get(h.id)?.ms };
       const changed = recordExportJob(histRef.current.present, rec).changed;
-      liveWith((cur) => recordExportJob(cur, rec).doc);
+      recordOutput((cur) => recordExportJob(cur, rec).doc);
       setExportChk(changed ? null : chk);
       flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check + (changed ? " · " + tr("⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu", r.modelRev) : ""));
       track("cad_export", { format });
@@ -2749,6 +2773,7 @@ export function CadApp() {
     flash(`${savedText(t.name)} · ${tr("model")} ${p.modelRev}`);
   };
   const saveProject = async () => {
+    flushPending("save"); // rozepsané pole / list výkresu patří do ukládaného souboru (i Ctrl+S, tlačítko Uložit)
     const t = projectTarget.current;
     if (t?.handle) {
       if (!(await waitOutputs(tr("uložení")))) return flash(tr("Uložení zrušeno."));
@@ -2938,12 +2963,19 @@ export function CadApp() {
     const onKey = (e: KeyboardEvent) => {
       if (askBusy() || gearWizardBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
-      if (field) {
-        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
-        return;
-      }
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (field) {
+        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
+        // Ctrl/Cmd+S i s fokusem v poli (vlna 22 kolo 6, bod 22e): rozepsaná hodnota se zapíše (flush) a projekt se uloží –
+        // dřív zkratka v poli skončila tady a prohlížeč nabídl „Uložit stránku“, soubor zůstal bez změny
+        if (mod && !e.shiftKey && !e.altKey && k === "s") {
+          e.preventDefault();
+          flushPending("save");
+          void saveProject();
+        }
+        return;
+      }
       if (mod && e.shiftKey && k === "k") {
         e.preventDefault();
         setAgentOpen(true);
@@ -2967,7 +2999,8 @@ export function CadApp() {
       }
       if (mod && k === "s") {
         e.preventDefault();
-        saveProject();
+        flushPending("save");
+        void saveProject();
         return;
       }
       if (mod && k === "o") {
@@ -4004,10 +4037,10 @@ export function CadApp() {
             {isAsm ? (
               <>
               {repick.panel}
-              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} />
+              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))} />
               </>
             ) : (
-              <Manager doc={doc} status={result?.status} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
+              <Manager doc={doc} status={treeSt} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
             )}
           </aside>
 
@@ -4048,7 +4081,7 @@ export function CadApp() {
                   selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
                   onPickEdge={onPickEdge}
                   onPickFace={onPickFace}
-                  selFilter={refPick ? refFilter(refPick.want) : selFilter}
+                  selFilter={refPick ? refFilter(refPick.want) : isAsm && repick.want && repick.want !== "face" ? repick.want : selFilter}
                   snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
                   selection={measure ? measureSel : mate ? mateSelection(mate, mateHover) : featSel ? [...new Set(Object.values(featSel).flat())].map((index): SelItem => ({ kind: "face", index })) : selection}
                   onPick={onPick}
@@ -4484,7 +4517,8 @@ export function CadApp() {
           )}
           {selection.length > 0 && <span className="rounded bg-brand/10 px-1.5 font-mono text-[10.5px] text-brand-600">{tr("vybráno")}{" "}{selection.length}</span>}
           {cursor && !sketch && <span className="hidden font-mono text-[10.5px] text-[#5b6776] md:inline">X {fmtNum(cursor[0], 2)} {tr("· Y")}{" "}{fmtNum(cursor[1], 2)} {tr("· Z")}{" "}{fmtNum(cursor[2], 2)}</span>}
-          <span className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{prefs.ortho ? tr("pravoúhlá") : tr("perspektiva")}</span>
+          {/* skutečná projekce: softwarový náhled (bez WebGL) kreslí VŽDY pravoúhle – nastavená perspektiva platí jen ve WebGL (vlna 22 kolo 6, bod 21) */}
+          <span data-projection={glError || prefs.ortho ? "ortho" : "persp"} className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{glError && !prefs.ortho ? tr("pravoúhlá (perspektiva jen ve WebGL)") : prefs.ortho || glError ? tr("pravoúhlá") : tr("perspektiva")}</span>
           <span className="hidden text-[10.5px] text-[#5b6776] lg:inline" data-mouse-hint title={boxHelpText()}>{mouseHint(prefs.mouse, prefs.leftDrag)}</span>
         </footer>
 
@@ -4524,15 +4558,16 @@ export function CadApp() {
                 defaultValue={doc.materialName ?? ""}
                 key={`mn-${doc.materialName ?? ""}`}
                 placeholder={mat.label}
-                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše")}
+                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – pozná-li se z něj třída (ocel, nerez, hliník…), nastaví i hustotu; jinak hustota zůstává podle třídy výše (⚠)")}
                 onBlur={(e) => {
-                  const t = e.target.value.trim();
-                  const next = t && t !== mat.label ? t : undefined;
-                  if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+                  // jedno pravidlo s textovým příkazem `materiál …` (material-designation.ts, vlna 22 kolo 6)
+                  const next = withDesignation(doc, e.target.value);
+                  if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
               />
+              <MaterialNoteLine doc={doc} />
             </label>
             <Row k={tr("Hmotnost")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
             <Row k={tr("Objem")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
@@ -4710,9 +4745,9 @@ export function CadApp() {
             doc={doc}
             onShare={() => openShare()}
             onMaterialChange={(v) => {
-              const t = v.trim();
-              const next = t && t !== mat.label ? t : undefined;
-              if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+              // pole Materiál v razítku výkresu: totéž pravidlo jako příkaz `materiál …` (material-designation.ts)
+              const next = withDesignation(doc, v);
+              if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
             }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? tr("dle kusovníku") : doc.materialName?.trim() || mat.label}
@@ -4722,7 +4757,7 @@ export function CadApp() {
             docKey={docId.current}
             onDrawingsChange={(d, o) => writeDrawings(d, o)}
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
-            onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
+            onExported={(e) => recordOutput((cur) => recordExport(cur, e).doc)}
             onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
             staleCopies={copiesNow}
             onPropsChange={(p) => commit({ ...doc, props: p })}

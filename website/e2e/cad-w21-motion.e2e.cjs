@@ -199,7 +199,9 @@ const num = (s) => Number(String(s).replace(',', '.'));
   log = await run('motion kinematics');
   ok(/kinematika/.test(log) && !/^Dynamika:/m.test(log), 'motion kinematics → zpět na kinematiku: ' + line(log, /kinematika/));
   log = await run('pohyb stav');
-  ok(/Pohybová studie: 20 kroků/.test(log), 'pohyb stav po kinematice: ' + line(log, /^Pohybová studie: 20/));
+  // vlna 22, bod 15 (kolo 6, vědomá změna): `pohyb stav` má jen jednu hlavičku studie (definice + revize modelu), druhý řádek
+  // „Pohybová studie: 20 kroků · …“ ze souhrnu výsledku se už nevypisuje
+  ok(/Pohybová studie: motorů \d+ · kroků 20 · .*r·[0-9a-f]{6}/.test(log) && !/^Pohybová studie: \d+ krok/m.test(log), 'pohyb stav po kinematice: ' + line(log, /Pohybová studie:/));
 
   // ── text: jedna pružina do kapsy a pak „do děr vzoru“ (stírač na 6 pružinách) ──
   log = await run('nový díl Deska 6 kapes\nkvádr 200 120 30' + [30, 100, 170].flatMap((x) => [30, 90].map((y) => `\nválec 21 10 v ${x} ${y} 0 odebrat`)).join(''));

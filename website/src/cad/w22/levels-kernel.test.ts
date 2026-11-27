@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { docStatusText } from "../agent";
-import { buildDoc, buildShape, clearBuildCache } from "../build";
+import { buildDoc, buildShape, clearBuildCache, noSolidError } from "../build";
 import { statusKv } from "../engine/kv";
 import { registerExt } from "../ext/registry";
 import { featureState, levelsText } from "../feature-levels";
@@ -77,6 +77,57 @@ describe("účinek booleovské operace (22b)", () => {
     expect(e.level).toBe("partial"); // skutečný, i když proti nástroji nepatrný úběr – ne „žádný“
     expect(levelsText(of(r2, sliver))).toMatch(/^úběr 0,04 mm³ \(<1 % nástroje\)/);
     expect(of(r2, sliver).warning).toBeUndefined();
+  });
+});
+
+describe("odebrání celého tělesa (22b, kolo 6)", () => {
+  it("kvádr 10 10 10 a pak kvádr 10 10 10 odebrat: ✗ „nástroj ubral celé těleso“, ne věta o dráze a profilu tažení", { timeout: 60_000 }, async () => {
+    const b = box([10, 10, 10]);
+    const all = box([10, 10, 10], [0, 0, 0], "cut");
+    clearBuildCache();
+    const res = await buildDoc(doc(b, all));
+    expect(of(res, all).ok).toBe(false);
+    expect(of(res, all).error).toMatch(/^Nástroj ubral celé těleso – po odebrání nezůstal žádný materiál/);
+    expect(of(res, all).error).not.toMatch(/dráha|profil|jádro selhalo/);
+    expect(res.metrics?.solids).toBe(1); // těleso před prvkem zůstane
+  });
+  it("věta o dráze a profilu jen u tažení; průnik bez překryvu = prázdný průnik; jiný prvek = obecná věta", () => {
+    const empty = { solids: 0, shells: 0, faces: 0, valid: false } as never;
+    const shellOnly = { solids: 0, shells: 1, faces: 3, valid: false } as never;
+    expect(noSolidError(ext("surf.sweep", { mode: "cut" }), shellOnly)).toMatch(/dráha se nesmí protínat/);
+    expect(noSolidError({ ...box([1, 1, 1]), mode: "intersect" } as Feature, empty, "disjoint")).toMatch(/^Průnik s nástrojem je prázdný/);
+    expect(noSolidError(hole(0, 0), empty, "covered")).toMatch(/^Nástroj ubral celé těleso/);
+    // oponentura kola 6: prázdný výsledek bez ověřené příčiny (jádro mohlo vrátit prázdný tvar i při selhání) = obecná věta
+    // „jádro selhalo“, ne jistá rada „Nástroj ubral celé těleso“ / „průnik je prázdný“
+    expect(noSolidError(hole(0, 0), empty)).toMatch(/^Operace nevrátila objemové těleso \(.*\) – jádro selhalo; změňte parametry prvku/);
+    expect(noSolidError({ ...box([1, 1, 1]), mode: "intersect" } as Feature, empty)).toMatch(/jádro selhalo/);
+    const other = noSolidError(box([1, 1, 1], [0, 0, 0], "add"), shellOnly);
+    expect(other).toMatch(/^Operace nevrátila objemové těleso \(žádné objemové těleso – jen 1 plášť \(3 ploch\)\)/);
+    expect(other).not.toMatch(/dráha|profil/);
+  });
+});
+
+describe("příčina prázdného výsledku je ověřená proti tělesu před operací (22b, kolo 6 – oponentura)", () => {
+  it("emptyResultCause: nástroj pokrývá těleso = covered; menší nástroj / dutý nástroj kolem tělesa = null; jiný výsledek = null", { timeout: 60_000 }, async () => {
+    // dřív: „Nástroj ubral celé těleso“ stálo jen na prázdném výsledku a režimu odebrání – bez ověření, že nástroj těleso pokrývá
+    const { beginFeatureOps, emptyResultCause } = await import("../shape-health");
+    const { cutAll } = await import("../fastbool");
+    const body = r.makeBaseBox(10, 10, 10) as never as r.Shape3D;
+    beginFeatureOps();
+    const gone = cutAll(body, [r.makeBaseBox(10, 10, 10) as never]);
+    expect(emptyResultCause(gone)).toBe("covered");
+    beginFeatureOps();
+    const bigger = cutAll(body, [r.makeBaseBox(30, 30, 30).translate([-10, -10, -10]) as never]);
+    expect(emptyResultCause(bigger)).toBe("covered");
+    beginFeatureOps();
+    const part = cutAll(body, [r.makeBaseBox(4, 4, 20).translate([0, 0, -5]) as never]);
+    expect(emptyResultCause(part)).toBeNull(); // obálka nástroje těleso nepokrývá
+    // dutý nástroj (trubka kolem tělesa): obálka tělesa je uvnitř obálky nástroje, vrcholy tělesa ale v nástroji neleží
+    const tube = r.makeCylinder(30, 30, [5, 5, -10]).cut(r.makeCylinder(20, 30, [5, 5, -10]) as never) as never as r.Shape3D;
+    beginFeatureOps();
+    const around = cutAll(body, [tube]);
+    expect(emptyResultCause(around)).toBeNull();
+    expect(emptyResultCause(r.makeBaseBox(1, 1, 1) as never)).toBeNull(); // výsledek, který není z deníku operací
   });
 });
 

@@ -296,6 +296,11 @@ export type DrawingResult = {
   tables?: { kind: "title" | "bom" | "holes" | "springs" | "revisions"; x: number; y: number; w: number; h: number }[];
   /** vnitřní obdélník rámu listu */
   frameRect?: { x: number; y: number; w: number; h: number };
+  /**
+   * měřítko listu je menší, než by dovolil list bez pásu razítka a tabulek (vysoké razítko – nástrojářská šablona): Chytré
+   * kóty pak zkusí ještě rozvržení s místem pro kóty jen tam, kde kóty jsou (vlna 22, bod 19, kolo 6)
+   */
+  tbLimited?: boolean;
   /** rozvržení kusovníku: režim, počet sloupců, řádků celkem a nevykreslených (nevešly se) */
   bomLayout?: { mode: "above" | "columns" | "sheet" | "only"; cols: number; rows: number; hidden: number };
   /** vygenerované objekty listu, které jdou vybrat a upravit (`genEdit`): kóty celkových rozměrů a pozice – čáry a texty (mm listu) */
@@ -1676,7 +1681,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     extras.push({ v: x.v, pad: { l: dims ? 15 : 5, t: dims ? 15 : 5, r: 5, b: 12 }, scale: x.m.scale, name: x.m.name });
   }
   for (const x of xt.list) extras.push({ v: x.view, pad: { l: 6, t: 14, r: 6, b: 6 }, scale: "auto", name: x.label, xv: x });
-  type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[]; room: number };
+  type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[]; room: number; /** mřížka leží mimo pás nad razítkem (vedle razítka) */ beside: boolean };
   const arrange = (n: SheetName, s: number, force = false, bp: BomPlan = bomPlanFor(n), tbhOverride?: number): Arrangement | null => {
     const tbh = tbhOverride ?? TB.h + bp.h0 + tablesH;
     const [W, H] = sheetDims(n);
@@ -1697,12 +1702,37 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       const feet = rects.map((q, i) => inflate(q, atLeast(list[i].pad, DIM_ROOM + room)));
       const ext = boundsOf(feet);
       let fits = ext.w <= area.w + 1e-6 && ext.h <= area.h + 1e-6;
-      if (!fits && loose && ext.w <= frame.w + 1e-6 && ext.h <= frame.h + 1e-6) {
-        const dx = area.x - ext.x;
-        const dy = area.y - ext.y;
-        fits = !feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)));
+      let off: Vec2 = [area.x - ext.x, area.y - ext.y];
+      let beside = false;
+      if (!fits && ext.w <= frame.w + 1e-6 && ext.h <= frame.h + 1e-6) {
+        // Pás nad razítkem nestačí (vysoké razítko – nástrojářská šablona 180×64, tabulky): než se zmenší měřítko, mřížka se
+        // posune kamkoli do rámu, kde žádný její okraj pro kóty nezasáhne razítko ani tabulky – vedle razítka, nad ním (vlna 22,
+        // bod 19, kolo 6: dřív jen vlevo nahoře a jen u Chytrých kót → ISO 7200 1:1, nástrojářská šablona 1:2). Polohy přisazené
+        // k rámu a k hranám razítka / tabulek; přednost má poloha nejvýš vlevo.
+        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w]);
+        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h]);
+        for (const q of fixed)
+          for (const f of feet) {
+            sxs.add(q.x - f.x - f.w);
+            sxs.add(q.x + q.w - f.x);
+            sys.add(q.y - f.y - f.h);
+            sys.add(q.y + q.h - f.y);
+          }
+        let best: { o: Vec2; sc: number } | null = null;
+        for (const dx of sxs)
+          for (const dy of sys) {
+            if (!inside({ x: ext.x + dx, y: ext.y + dy, w: ext.w, h: ext.h }, frame)) continue;
+            if (feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)))) continue;
+            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y);
+            if (!best || sc < best.sc - 1e-9) best = { o: [dx, dy], sc };
+          }
+        if (best) {
+          fits = true;
+          off = best.o;
+          beside = true;
+        }
       }
-      return { list, rects, ext, fits };
+      return { list, rects, ext, fits, off, beside };
     };
     // řez nejdřív v řadě s hlavním pohledem (promítací čáry); když se tam nevejde, hledá se pro něj volné místo na listu
     const pick = (room: number) => {
@@ -1723,8 +1753,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const { grid, secFree } = pk;
     if (!grid.fits && !force) return null;
     let ok = grid.fits;
-    const ox = area.x - grid.ext.x;
-    const oy = area.y - grid.ext.y;
+    const [ox, oy] = grid.off;
     const items: Item[] = grid.list.map((c, i) => ({ v: c.v, pad: c.pad, s, grid: true, rect: { ...grid.rects[i], x: grid.rects[i].x + ox, y: grid.rects[i].y + oy } }));
     const occupied = () => [...items.map((it) => inflate(it.rect, it.grid ? atLeast(it.pad, 12) : it.pad)), ...fixed];
     const main = items.find((it) => it.v.key === "front");
@@ -1778,7 +1807,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       if (!force) return null;
       lost(e, scales[scales.length - 1]);
     }
-    return { ok, items, W, H, area, bounds, fixed, room: pk.room };
+    return { ok, items, W, H, area, bounds, fixed, room: pk.room, beside: grid.beside };
   };
   const fits = (n: SheetName, s: number) => !!arrange(n, s);
   const bestScale = (n: SheetName) => STANDARD_SCALES.find((s) => fits(n, s)) ?? null;
@@ -1858,6 +1887,10 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   bomPlan = bomPlanFor(sheet);
   TBH = tbhFor(sheet);
+  // měřítko zmenšené VYŠŠÍM razítkem, než je ISO 7200 (nástrojářská šablona 180×64): s razítkem výšky ISO 7200 by se vešlo
+  // větší – Chytré kóty zkusí těsnější místo pro kóty (bod 19, kolo 6). U ISO 7200 / kompaktní se nic nemění.
+  const TB_ISO = 38;
+  const tbLimited = opts.scale === "auto" && TB.h > TB_ISO + 1e-6 && (STANDARD_SCALES.find((x) => !!arrange(sheet, x, false, bomPlan, TB_ISO + bomPlan.h0 + tablesH)) ?? 0) > scale + 1e-12;
   // tabulky (kusovník, díry, pružiny) zmenšily pohledy pod 1:20: ⚠ s měřítkem bez nich
   if (opts.scale === "auto" && (bomRows.length || tablesH)) {
     const free = STANDARD_SCALES.find((x) => !!arrange(sheet, x, false, NO_BOM, TB.h)) ?? null;
@@ -1884,7 +1917,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const moved = arr.items.map((it) => ({ ...it, rect: { ...it.rect, x: it.rect.x + dx, y: it.rect.y + dy } }));
     // pohledy mimo mřížku nesmí po posunu vyjet z rámu ani do razítka
     // (volné rozvržení: ani pohledy mřížky, které sahají vedle razítka)
-    if (moved.every((it) => (it.grid && !loose) || it.lost || (inside(foot(it), it.grid ? { x: M_LEFT, y: M, w: arr.W - M_LEFT - M, h: arr.H - 2 * M } : arr.bounds) && !arr.fixed.some((f) => overlaps(foot(it), f))))) arr.items = moved;
+    if (moved.every((it) => (it.grid && !loose && !arr.beside) || it.lost || (inside(foot(it), it.grid ? { x: M_LEFT, y: M, w: arr.W - M_LEFT - M, h: arr.H - 2 * M } : arr.bounds) && !arr.fixed.some((f) => overlaps(foot(it), f))))) arr.items = moved;
   }
 
   const placed = new Map<string, Placed>();
@@ -1992,6 +2025,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const th = p.brk ? decompress1(p.y0 + p.h, p.brk, 1) - decompress1(p.y0, p.brk, 1) : p.h;
     if (o.side === "t") linearDim(polys, texts, [b.x, b.y], [b.x + b.w, b.y], [0, -1], off, tw);
     else linearDim(polys, texts, [b.x, b.y + b.h], [b.x, b.y], [-1, 0], off, th);
+    // text kóty u rámu nesmí ležet na centrovací značce (ISO 5457) – posune se podél kótovací čáry (vlna 22, bod 19, kolo 6)
+    for (const t of texts.slice(nt)) clearCentringMarks(t, SW, SH, o.side === "t" ? [b.x, b.x + b.w] : [b.y, b.y + b.h]);
     genCapture(generated, id, "dim", polys, texts, np, nt);
   }
   const stackOut: NonNullable<DrawingResult["stacks"]> = [];
@@ -2132,6 +2167,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     ...(balloonInfo ? { balloonInfo } : {}),
     tables,
     frameRect: { x: M_LEFT, y: M, w: SW - M_LEFT - M, h: SH - 2 * M },
+    ...(tbLimited ? { tbLimited } : {}),
     ...(bomRows.length ? { bomLayout: { mode: bomPlan.mode === "none" ? "above" : bomPlan.mode, cols: bomPlan.cols.filter((c) => c.length).length, rows: bomRows.length, hidden: bomPlan.hidden } } : {}),
     generated: generated.length ? generated : undefined,
     models: modelOut.length ? modelOut : undefined,
@@ -2871,6 +2907,45 @@ function frame(W: number, H: number, polys: Poly[]): Poly[] {
   return marks;
 }
 
+/** části centrovacích značek (ISO 5457) uvnitř rámu listu W × H – jako `frame` (úsečky [a, b], mm listu, y dolů) */
+export function centringMarksInside(W: number, H: number): [Vec2, Vec2][] {
+  const cxm = (M_LEFT + W - M) / 2;
+  const cym = H / 2;
+  return [
+    [[cxm, M], [cxm, M + 5]],
+    [[cxm, H - M - 5], [cxm, H - M]],
+    [[M_LEFT, cym], [M_LEFT + 5, cym]],
+    [[W - M - 5, cym], [W - M, cym]],
+  ];
+}
+
+/**
+ * Text vygenerované kóty, který leží na centrovací značce rámu: posune se podél kótovací čáry (vodorovný text vodorovně, svislý
+ * svisle) na bližší stranu značky, ale jen v rozsahu kótovací čáry `span` (jinak zůstane – kontrola překryvů listu ho ohlásí).
+ */
+export function clearCentringMarks(t: DText, W: number, H: number, span: [number, number]): void {
+  const along = Math.abs(t.rotate ?? 0) < 45 ? 0 : 1;
+  for (const [a, b] of centringMarksInside(W, H)) {
+    const [x0, y0, x1, y1] = textBox(t);
+    const hitMark = Math.max(x0, Math.min(a[0], b[0])) <= Math.min(x1, Math.max(a[0], b[0])) + 0.3 && Math.max(y0, Math.min(a[1], b[1])) <= Math.min(y1, Math.max(a[1], b[1])) + 0.3;
+    if (!hitMark) continue;
+    // značka napříč směrem textu (svislá značka × vodorovný text): posun o polovinu textu + 1,5 mm
+    const m = along === 0 ? a[0] : a[1];
+    const lo = along === 0 ? x0 : y0;
+    const hi = along === 0 ? x1 : y1;
+    if ((along === 0 ? Math.abs(a[0] - b[0]) : Math.abs(a[1] - b[1])) > 1e-6) continue; // značka podél textu – posun nepomůže
+    const c = along === 0 ? t.x : t.y;
+    const toHi = m + 1.5 - lo; // posun dopředu: levý (horní) okraj textu za značku
+    const toLo = m - 1.5 - hi; // posun dozadu: pravý (spodní) okraj textu před značku
+    const [s0, s1] = [Math.min(...span), Math.max(...span)];
+    const ok = (d: number) => lo + d >= s0 + 1 && hi + d <= s1 - 1;
+    const d = [toHi, toLo].filter(ok).sort((p, q) => Math.abs(p) - Math.abs(q))[0];
+    if (d === undefined) continue;
+    if (along === 0) t.x = c + d;
+    else t.y = c + d;
+  }
+}
+
 /**
  * Centrovací značka nesmí vést přes tabulku (razítko, kusovník ve sloupcích u spodního rámu, tabulka revizí – vlna 22, bod 17:
  * značka uprostřed spodního rámu A3 protínala záhlaví druhého sloupce kusovníku). Část za čárou rámu se u tabulky nekreslí –
@@ -3402,9 +3477,15 @@ function drawBalloons(items: BalloonItem[], ortho: Placed[], isoP: Placed | null
     const [x0, y0, x1, y1] = textBox(t);
     obstacles.push({ x: x0 - 0.5, y: y0 - 0.5, w: x1 - x0 + 1, h: y1 - y0 + 1 });
   }
-  for (const pl of polys) if (pl.layer === "dim" && pl.pts.length > 1 && !pl.fill) obstacles.push(rectOfPts(pl.pts, 0.5));
+  // čáry kót (kótovací, pomocné, odkazy popisů) – překážky pro balónky a čáry, které odkaz pozice nemá křížit (kolo 6)
+  const dimLines: [Vec2, Vec2][] = [];
+  for (const pl of polys)
+    if (pl.layer === "dim" && pl.pts.length > 1 && !pl.fill) {
+      obstacles.push(rectOfPts(pl.pts, 0.5));
+      for (let i = 0; i + 1 < pl.pts.length; i++) dimLines.push([pl.pts[i], pl.pts[i + 1]]);
+    }
   for (const p of ortho) if (!byKey.has(p.key) || byKey.get(p.key) !== p) obstacles.push({ x: p.px - 1, y: p.py - 1, w: p.w * p.s + 2, h: p.h * p.s + 2 });
-  const lay = layoutBalloons({ items: items.map((it) => ({ pos: it.pos, name: it.name, boxes: it.boxes?.length ? it.boxes : [it.bbox] })), views, assign: opts.balloonViews, edit: gen.edit, obstacles, bounds, R });
+  const lay = layoutBalloons({ items: items.map((it) => ({ pos: it.pos, name: it.name, boxes: it.boxes?.length ? it.boxes : [it.bbox] })), views, assign: opts.balloonViews, edit: gen.edit, obstacles, bounds, R, lines: dimLines });
   for (const b of lay.placed) {
     const [np, nt] = [polys.length, texts.length];
     polys.push({ layer: "dim", pts: circlePts([b.x, b.y], R, 32) });

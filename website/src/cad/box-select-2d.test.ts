@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
-import { boxMode, clickMode, holdPhase, isCrossing, isDrag, mergeSelection, pickShape, polyInside, polyTouches, rectFrom, segTouchesRect, selectShapes, shapeHit, sketchBoxIds, type BoxShape, type P2 } from "./box-select-2d";
+import { boxMode, clickMode, holdPhase, isCrossing, isDoubleClick, isDrag, mergeSelection, pickShape, polyInside, polyTouches, rectFrom, segTouchesRect, selectShapes, shapeHit, sketchBoxIds, type BoxShape, type P2 } from "./box-select-2d";
 import { annotationShapes, annotationsInBox, deleteAnnotations, moveAnnotation, moveAnnotations } from "./drawing-boxsel";
 import { annotationGeometry, type PlacedView } from "./drawing";
 import type { DrawingAnnotation } from "./types";
@@ -48,6 +48,16 @@ describe("výběr oknem 2D – pravidla", () => {
     expect(holdPhase([0, 0], 0, [2, 2], 200)).toBe("wait");
     expect(holdPhase([0, 0], 0, [3, 3], 600)).toBe("hold");
     expect(holdPhase([0, 0], 0, [20, 0], 100)).toBe("moved");
+  });
+
+  it("poklepání (vlna 22, oprava regrese W20): druhý stisk do 350 ms a 6 px není druhý roh okna", () => {
+    // plátno 2D výkresu: klik do prázdna otevře okno dvěma kliky; druhý stisk na stejném místě hned potom je poklepání
+    // (výřez rozvržení → modelový prostor), ne nulové okno, které by poklepání spolklo
+    expect(isDoubleClick([100, 100], 1000, [101, 102], 1200)).toBe(true);
+    expect(isDoubleClick([100, 100], 1000, [100, 100], 1349)).toBe(true);
+    expect(isDoubleClick([100, 100], 1000, [100, 100], 1350)).toBe(false); // pomalé druhé kliknutí = druhý roh okna
+    expect(isDoubleClick([100, 100], 1000, [106, 100], 1100)).toBe(false); // jiné místo = druhý roh okna
+    expect(isDoubleClick([100, 100], 1000, [140, 160], 1100)).toBe(false);
   });
 });
 

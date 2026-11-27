@@ -8,7 +8,7 @@
 ✓ základna A = F1 (rovina, normála -1; 0; 0, bod 0; 20; 5) – polohy funkčních prvků se kontrolují od ní
 → list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
-✓ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 24 000 mm³ (rozdíl 0,0000 %), obálka 60,00 × 40,00 × 10,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 ✓ výkres PDF: Deska_A_vykres.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
@@ -51,7 +51,7 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
 ⚠ řádek 3: vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) – vydejte novou revizi: výkres vydat B
 Exporty (2, zastaralých 1) · model je teď r·?:
   1. ⚠ PDF „Deska_A_vykres.pdf“ · list List 1 · rev. A · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky), exportujte znovu: výkres export pdf
-  2. STEP „Deska_A.step“ · z modelu r·? (?.?.????) – odpovídá modelu
+  2. STEP „Deska_A.step“ · z modelu r·? (?.?.????) · úloha: dokončeno ⏱ ? s · kontrola ✓ – odpovídá modelu
 Zastaralé výstupy (2) · model je teď r·?:
   1. ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) → výkres vydat B
   2. ⚠ PDF „Deska_A_vykres.pdf“ – exportováno z modelu r·? (?.?.????), model je teď r·? se změněnými údaji dílu (název, číslo, materiál, druh položky) → výkres export pdf

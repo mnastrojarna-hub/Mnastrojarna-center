@@ -12,14 +12,14 @@ import { tr } from "@/cad/i18n";
 import { inputRevOf, isFinal, RunTracker, type RunEntry, type RunSnapshot } from "@/cad/engine/run-queue";
 import type { CadDoc } from "@/cad/types";
 
-export type ComputeKind = "build" | "mates" | "clash" | "measure";
+export type ComputeKind = "build" | "mates" | "clash" | "measure" | "motion";
 
 /** výpočty aplikace (id `v1`, `v2`… – odlišná řada od běhů `r…`) */
 export const computeRuns = new RunTracker({ prefix: "v", keep: 40 });
 
 /** název druhu výpočtu pro člověka */
 export const computeLabel = (k: ComputeKind | string): string =>
-  k === "build" ? tr("stavba modelu") : k === "mates" ? tr("přepočet vazeb") : k === "clash" ? tr("kontrola kolizí") : k === "measure" ? tr("měření") : String(k);
+  k === "build" ? tr("stavba modelu") : k === "mates" ? tr("přepočet vazeb") : k === "clash" ? tr("kontrola kolizí") : k === "measure" ? tr("měření") : k === "motion" ? tr("pohybová studie") : String(k);
 
 export type ComputeEnd = "done" | "superseded" | "cancelled" | "error";
 

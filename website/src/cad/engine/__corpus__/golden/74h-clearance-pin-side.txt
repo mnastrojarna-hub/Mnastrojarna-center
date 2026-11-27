@@ -1,0 +1,87 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Doraz“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Kolík“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Nůž“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Sestava 6V“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Doraz“ vložena do sestavy (ukotvená)
+✓ komponenta „Kolík“ vložena do sestavy (ukotvená)
+✓ komponenta „Nůž“ vložena do sestavy
+✓ vazba POSUV „Nůž“ F1 → „Doraz“ F2 · 12 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ pohání: „Nůž“ · směr +X
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Nůž“: ΔX +180 mm
+ stojí: 3 („Rám“, „Doraz“, „Kolík“)
+Kolize: žádný průnik v 37 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vazby splněny ve všech krocích
+Vůle: „Nůž“ × „Kolík“ · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Nůž“: ΔX +180 mm
+ stojí: 3 („Rám“, „Doraz“, „Kolík“)
+Kolize: žádný průnik v 37 polohách
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vůle „Nůž“ × „Kolík“: nejmenší 0,03 mm mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188) – místo [100; 40; 10] ↔ [100; 40,03; 10] · ⚠ pod limitem 0,05 mm mezi kroky 17 a 18 (v polohách kroků nad limitem)
+Vazby splněny ve všech krocích
+⚠ řádek 20: vůle „Nůž“ × „Kolík“ 0,03 mm < 0,05 mm mezi kroky 17 a 18 (nejmenší mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188)) – místo [100; 40; 10] ↔ [100; 40,03; 10]
+Dokument: „Sestava 6V“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Doraz [-10; 0; 10] ⚓ · Kolík [100; 41,03; 10] ⚓ · Nůž [12; 0; 10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 210 × 42 × 30 mm · objem Σ 84,46 cm³ · hmotnost Σ 0,663 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 36 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle „Nůž“ × „Kolík“ 0,03 mm < limit 0,05 mm (⚠ 1 dvojic) (podrobně pohyb stav)
+Vůle: nesleduje se · bez limitu · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Nůž“: ΔX +180 mm
+ stojí: 3 („Rám“, „Doraz“, „Kolík“)
+Kolize: žádný průnik v 37 polohách · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vazby splněny ve všech krocích
+Vůle: „Kolík“ × „Nůž“ · limit 0,05 mm · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Nůž“: ΔX +180 mm
+ stojí: 3 („Rám“, „Doraz“, „Kolík“)
+Kolize: žádný průnik v 37 polohách
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vůle „Kolík“ × „Nůž“: nejmenší 0,03 mm mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188) – místo [100; 40,03; 10] ↔ [100; 40; 10] · ⚠ pod limitem 0,05 mm mezi kroky 17 a 18 (v polohách kroků nad limitem)
+Vazby splněny ve všech krocích
+⚠ řádek 23: vůle „Kolík“ × „Nůž“ 0,03 mm < 0,05 mm mezi kroky 17 a 18 (nejmenší mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188)) – místo [100; 40,03; 10] ↔ [100; 40; 10]
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize · r·?
+ 1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Nůž“: ΔX +180 mm
+ stojí: 3 („Rám“, „Doraz“, „Kolík“)
+Kolize: žádný průnik v 37 polohách
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vůle „Kolík“ × „Nůž“: nejmenší 0,03 mm mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188) – místo [100; 40,03; 10] ↔ [100; 40; 10] · ⚠ pod limitem 0,05 mm mezi kroky 17 a 18 (v polohách kroků nad limitem)
+Vazby splněny ve všech krocích
+⚠ řádek 24: vůle „Kolík“ × „Nůž“ 0,03 mm < 0,05 mm mezi kroky 17 a 18 (nejmenší mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188)) – místo [100; 40,03; 10] ↔ [100; 40; 10]
+Krok 18 (t = 1 s, motory 102):
+ Rám [0; 0; 0]
+ Doraz [-10; 0; 10]
+ Kolík [100; 41,03; 10]
+ Nůž [102; 0; 10]
+ vůle „Kolík“ × „Nůž“: 1,25 mm – [100,89; 40,57; 10] ↔ [102; 40; 10]
+✓ Kvádr 1 (box) · přidáno 80000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 4000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 62,83 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 400 mm³ · těleso platné
+
+Dokument: „Sestava 6V“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Doraz [-10; 0; 10] ⚓ · Kolík [100; 41,03; 10] ⚓ · Nůž [12; 0; 10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 210 × 42 × 30 mm · objem Σ 84,46 cm³ · hmotnost Σ 0,663 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 36 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, vůle „Kolík“ × „Nůž“ 0,03 mm < limit 0,05 mm (⚠ 1 dvojic) (podrobně pohyb stav)

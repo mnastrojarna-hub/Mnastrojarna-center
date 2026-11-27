@@ -51,7 +51,46 @@ export type BalloonInput = {
   bounds: BRect;
   /** poloměr kroužku [mm] */
   R?: number;
+  /** čáry kót listu (kótovací a pomocné čáry) – odkaz je nemá křížit (kolo 6) */
+  lines?: [Vec2, Vec2][];
 };
+
+/** odkaz nesmí vést blíž než toto ke kotvě jiné pozice (kontrola listu hlásí pod 1 mm – drawing-overlaps.ts) [mm] */
+const ANCHOR_GAP = 1.5;
+/** vzdálenost bodu c od úsečky ab */
+function segDist(a: Vec2, b: Vec2, c: Vec2): number {
+  const ab = sub(b, a);
+  const L2 = ab[0] * ab[0] + ab[1] * ab[1];
+  const t = L2 > 1e-12 ? Math.max(0, Math.min(1, ((c[0] - a[0]) * ab[0] + (c[1] - a[1]) * ab[1]) / L2)) : 0;
+  return dist([a[0] + ab[0] * t, a[1] + ab[1] * t], c);
+}
+/** mřížka úseček (čáry kót) pro dotaz „kříží odkaz nějakou čáru“ (buňka 10 mm) */
+class LineIndex {
+  private cells = new Map<string, number[]>();
+  private readonly C = 10;
+  constructor(private readonly segs: [Vec2, Vec2][]) {
+    segs.forEach(([a, b], i) => {
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / this.C); gx <= Math.floor(Math.max(a[0], b[0]) / this.C); gx++)
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / this.C); gy <= Math.floor(Math.max(a[1], b[1]) / this.C); gy++) {
+          const k = `${gx},${gy}`;
+          const l = this.cells.get(k);
+          if (l) l.push(i);
+          else this.cells.set(k, [i]);
+        }
+    });
+  }
+  crosses(p: Vec2, q: Vec2): boolean {
+    const seen = new Set<number>();
+    for (let gx = Math.floor(Math.min(p[0], q[0]) / this.C); gx <= Math.floor(Math.max(p[0], q[0]) / this.C); gx++)
+      for (let gy = Math.floor(Math.min(p[1], q[1]) / this.C); gy <= Math.floor(Math.max(p[1], q[1]) / this.C); gy++)
+        for (const i of this.cells.get(`${gx},${gy}`) ?? []) {
+          if (seen.has(i)) continue;
+          seen.add(i);
+          if (segmentsCross(p, q, this.segs[i][0], this.segs[i][1])) return true;
+        }
+    return false;
+  }
+}
 
 const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 const dist = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -186,9 +225,16 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
   const placed: PlacedBalloon[] = [];
   const box = (p: Vec2): BRect => ({ x: p[0] - R - 0.6, y: p[1] - R - 0.6, w: 2 * R + 1.2, h: 2 * R + 1.2 });
   const free = (p: Vec2) => inRect(box(p), inp.bounds) && !occ.hit(box(p)) && placed.every((b) => dist([b.x, b.y], p) >= 2 * R + 1);
-  /** odkaz z `p` ke kotvě `a` nevede přes jiný balónek a balónek v `p` neleží na cizím odkazu */
-  const leaderClear = (p: Vec2, a: Vec2, self?: { x: number; y: number }) =>
-    placed.every((b) => b === self || (!segmentHitsCircle(p, a, [b.x, b.y], R + 0.3) && !segmentHitsCircle([b.x, b.y], b.a, p, R + 0.3)));
+  const lines = new LineIndex(inp.lines ?? []);
+  /**
+   * odkaz z `p` ke kotvě `a` nevede přes jiný balónek, balónek v `p` neleží na cizím odkazu; odkaz nevede přes kotvu jiné
+   * pozice ani cizí odkaz přes kotvu `a` (nešlo by poznat, kam vede – kolo 6), nekříží čáry kót ani odkaz zamčené pozice
+   * (ten výměny proti křížení nepřesunou)
+   */
+  const leaderClear = (p: Vec2, a: Vec2, self?: { x: number; y: number }, anchors = true) =>
+    placed.every((b) => b === self || (!segmentHitsCircle(p, a, [b.x, b.y], R + 0.3) && !segmentHitsCircle([b.x, b.y], b.a, p, R + 0.3) && (!anchors || (segDist(p, a, b.a) >= ANCHOR_GAP && segDist([b.x, b.y], b.a, a) >= ANCHOR_GAP)) && (b.mode !== "locked" || !segmentsCross(p, a, [b.x, b.y], b.a)))) && !lines.crosses(p, a);
+  /** nejdelší rozumný odkaz pohledu: dál od kotvy je pozice nečitelná (kolo 6 – na A3 byl odkaz 243 mm) */
+  const maxLead = (v: BView) => Math.max(40, 0.3 * (v.rect.w + v.rect.h));
   const missingView: number[] = [];
   // klíče úprav (opakovaná pozice → pos:<n>#k jako vlna E)
   const seen = new Map<number, number>();
@@ -287,20 +333,38 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
     return Math.atan2(a[1] - (v.rect.y + v.rect.h / 2), a[0] - (v.rect.x + v.rect.w / 2));
   };
   let pending = [...rest].sort((p, q) => views.indexOf(p.prefs[0]) - views.indexOf(q.prefs[0]) || angleIn(p) - angleIn(q));
+  /**
+   * kotvy k vyzkoušení: zvolená (střed prvního výskytu, nebo bod nejdál od použitých) a body uvnitř průmětu prvního výskytu,
+   * které nesplývají s kotvou jiné pozice a neleží na cizím odkazu – kotva se volí spolu s místem balónku tak, aby odkaz
+   * nevedl přes kotvu jiné pozice (kolo 6)
+   */
+  const anchorCands = (it: BItem, v: BView): Vec2[] => {
+    const first = anchorPick(it, v);
+    const used = usedAnchors.get(v.key) ?? [];
+    const okA = (c: Vec2) => used.every((u) => dist(u, c) >= ANCHOR_GAP) && placed.every((b) => b.view !== v.key || segDist([b.x, b.y], b.a, c) >= ANCHOR_GAP);
+    const out = [first, ...anchorsOf(it, v).slice(0, 9)].filter((c, i, all) => all.findIndex((d) => dist(c, d) < 1e-6) === i && okA(c));
+    return out.length ? out : [first];
+  };
   const tryPlace = (x: Rest, lim: number, strict: boolean): boolean => {
     for (const v of x.prefs) {
-      const a = anchorPick(x.it, v);
-      let best: { p: Vec2; cost: number } | null = null;
-      for (const sl of slotsAll.get(v.key)!) {
-        if (sl.ring >= lim || !free(sl.p)) continue;
-        const cost = dist(sl.p, a) + sl.ring * 6;
-        if (best && cost >= best.cost) continue;
-        if (strict && !leaderClear(sl.p, a)) continue;
-        best = { p: sl.p, cost };
-      }
+      const cands = strict ? anchorCands(x.it, v) : [anchorPick(x.it, v)];
+      const Lmax = maxLead(v);
+      let best: { p: Vec2; a: Vec2; cost: number } | null = null;
+      const slots = slotsAll.get(v.key)!.filter((sl) => sl.ring < lim && free(sl.p));
+      cands.forEach((a, ai) => {
+        for (const sl of slots) {
+          const L = dist(sl.p, a);
+          if (strict && L > Lmax) continue;
+          const cost = L + sl.ring * 6 + ai * 1.5;
+          if (best && cost >= best.cost) continue;
+          if (strict && !leaderClear(sl.p, a)) continue;
+          best = { p: sl.p, a, cost };
+        }
+      });
       if (best) {
+        const { a, p } = best as { p: Vec2; a: Vec2; cost: number };
         anchorUse(v, a);
-        const b: PlacedBalloon = { id: x.id, pos: x.it.pos, view: v.key, x: best.p[0], y: best.p[1], a, mode: "auto", assigned: x.assigned };
+        const b: PlacedBalloon = { id: x.id, pos: x.it.pos, view: v.key, x: p[0], y: p[1], a, mode: "auto", assigned: x.assigned };
         placed.push(b);
         results.push(b);
         return true;
@@ -320,6 +384,22 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
     placed.push({ id: x.id, pos: x.it.pos, view: v.key, x: p[0], y: p[1], a, mode: "auto", assigned: x.assigned, lost: true });
   }
 
+  /** jiná kotva pozice `b` uvnitř průmětu její komponenty, se kterou odkaz nevede přes cizí kotvu ani balónek (false = není) */
+  const itemOf = new Map(rest.map((x) => [x.id, x.it]));
+  const reAnchor = (b: PlacedBalloon): boolean => {
+    const it = itemOf.get(b.id);
+    const v = vmap.get(b.view);
+    if (!it || !v) return false;
+    const others = placed.filter((o) => o !== b && o.view === b.view);
+    for (const c of anchorsOf(it, v).slice(0, 9)) {
+      if (others.some((o) => dist(o.a, c) < ANCHOR_GAP)) continue;
+      if (leaderClear([b.x, b.y], c, b)) {
+        b.a = c;
+        return true;
+      }
+    }
+    return false;
+  };
   // 3) výměny proti křížení odkazových čar (jen automaticky umístěné ve stejném pohledu)
   const lead = (b: { x: number; y: number; a: Vec2 }): [Vec2, Vec2] => [[b.x, b.y], b.a];
   for (let pass = 0; pass < 6; pass++) {
@@ -332,12 +412,19 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
         const [p1, p2] = lead(p);
         const [q1, q2] = lead(q);
         if (!segmentsCross(p1, p2, q1, q2)) continue;
+        const before = Math.max(dist([p.x, p.y], p.a), dist([q.x, q.y], q.a));
+        const [pa, qa] = [p.a, q.a];
         [p.x, q.x] = [q.x, p.x];
         [p.y, q.y] = [q.y, p.y];
-        // výměna, po které by odkaz vedl přes jiný balónek, se vrátí
-        if (!leaderClear([p.x, p.y], p.a, p) || !leaderClear([q.x, q.y], q.a, q)) {
+        // výměna, po které by odkaz vedl přes jiný balónek, kotvu nebo kótu, nebo by se odkaz nad míru prodloužil, se vrátí;
+        // odkaz přes cizí kotvu zkusí nejdřív jinou kotvu uvnitř průmětu téže komponenty (kolo 6)
+        const v = vmap.get(p.view);
+        const ok = (b: PlacedBalloon) => leaderClear([b.x, b.y], b.a, b) || reAnchor(b);
+        const after = () => Math.max(dist([p.x, p.y], p.a), dist([q.x, q.y], q.a));
+        if (!ok(p) || !ok(q) || (v && after() > before + 1e-6 && after() > 2 * maxLead(v))) {
           [p.x, q.x] = [q.x, p.x];
           [p.y, q.y] = [q.y, p.y];
+          [p.a, q.a] = [pa, qa];
           continue;
         }
         swapped = true;

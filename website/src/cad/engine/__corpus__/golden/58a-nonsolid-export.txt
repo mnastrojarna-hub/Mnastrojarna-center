@@ -11,7 +11,7 @@ Prvky:
     entity: e1 čára 3 b. [0; 0]→[50; 0]→[50; 30] otevřená
     profil: žádný uzavřený obrys – otevřená křivka e1 (konce [0; 0] a [50; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
  2. Plošné vysunutí [ext, id #] ✓ žádné objemové těleso – 
-ℹ export STEP: c1-plocha.step · 7,0 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: c1-plocha.step · 7,0 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✗ kontrola STEP: soubor neobsahuje objemové těleso (těles 0, volných skořepin 1, volných ploch 0) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě
 ✓ nový díl „Deska A“ – nová záložka
 → Skica 2 (sketch) přidán – výsledek po výpočtu níže
@@ -41,7 +41,7 @@ Prvky:
     profil: 1 uzavřený obrys (e1) ✓
  6. Rovinná plocha [ext, id #] ✓ žádné objemové těleso – 
  7. Sešít plochy [ext, id #] ✓ žádné objemové těleso – 
-ℹ export STEP: c2-skorepina.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: c2-skorepina.step · 15 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✗ kontrola STEP: soubor neobsahuje objemové těleso (těles 0, volných skořepin 1 (uzavřených 1), volných ploch 0) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě
 ℹ export STL: c2-skorepina.stl · 684 B · STL (síť) – staženo (bez dialogu)
   ✗ STL: model nemá objemové těleso (těles 0, ploch mimo tělesa 6) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)
@@ -62,8 +62,8 @@ Prvky:
     entity: e1 čára 2 b. [-10; 5]→[50; 5] otevřená
     profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-10; 5] a [50; 5]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
  3. Plošné vysunutí [ext, id #] ✓ těleso platné + 1 volná plocha – 
-✓ export STEP: c3-teleso-plocha.step · 21 kB · STEP AP214 – staženo (bez dialogu)
-  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 7
+ℹ export STEP: c3-teleso-plocha.step · 21 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
+  ℹ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 7
   ⚠ kontrola STEP: soubor obsahuje vedle těles (1) i plochy mimo tělesa (volných skořepin 1, volných ploch 0) – nejsou objemem, objem a hmotnost jsou jen z těles
 ✓ nový díl „Deska C“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
@@ -79,7 +79,7 @@ Prvky:
     entity: e1 spline 4 b. [-60; 45]→[-20; 30]→[20; 45]→[60; 30]
     profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-60; 45] a [60; 30]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
  3. Tažení 1 [sweep, id #] ✓ úběr 3643,6 mm³ (>99 % nástroje) · těleso platné – 
-✓ export STEP: c4-forma.step · 133 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: c4-forma.step · 133 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 9
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 476 356 mm³ (rozdíl 0,0000 %), obálka 120,00 × 100,00 × 40,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 ✓ Skica 1 (sketch)

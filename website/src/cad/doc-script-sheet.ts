@@ -27,7 +27,7 @@ import type { DrawingOptions, DetailView, ModelView, RevisionItem, GenEdit, Draw
 import type { AuxViewOpt, CutSectionOpt, ViewBreakOpt } from "./drawing-views";
 import { tr } from "./i18n";
 import { rangesText } from "./drawing-balloons";
-import { applyTemplate, sameName, TEMPLATE_FIELDS } from "./title-templates";
+import { applyTemplate, defaultTemplateName, sameName, TEMPLATE_FIELDS } from "./title-templates";
 import type { CadDoc, DrawingDoc, Vec2 } from "./types";
 
 /** výstup převodníku, do kterého se zapisuje (doc-script.ts Ctx) */
@@ -102,6 +102,7 @@ const WD = {
   tpl: L("hlavička", "title-template", "kopfvorlage"),
   tplSave: L("uložit", "save", "speichern"),
   tplUse: L("použít", "use", "verwenden"),
+  tplDefault: L("výchozí", "default", "standard"),
 };
 type WK = keyof typeof WD;
 const VIEW_W: Record<string, W3> = {
@@ -764,8 +765,10 @@ export function emitTitleTemplates(o: SheetOut, doc: CadDoc): void {
         fields.logo = logo;
       } else o.note(tr("logo šablony hlavičky „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres hlavička uložit \"{0}\" logo=\"soubor.svg\"", rec.name, Math.round(LOGO_MAX / 1024)));
     }
-    const l = `${head(o)} ${w(o, "tpl")} ${w(o, "tplSave")} ${q}${parts.length ? " " + parts.join(" ") : ""}`;
-    if (sameCmd(l, { k: "views", cmd: { op: "tpl", act: "save", name: rec.name, setDefault: false, fields } })) o.line(l);
+    // výchozí šablona nových listů (Nastavení) – příznak „výchozí“, aby ji přečtený skript zase nastavil (bod 22j, kolo 6)
+    const def = !!defaultTemplateName() && sameName(defaultTemplateName()!, rec.name);
+    const l = `${head(o)} ${w(o, "tpl")} ${w(o, "tplSave")} ${q}${def ? ` ${w(o, "tplDefault")}` : ""}${parts.length ? " " + parts.join(" ") : ""}`;
+    if (sameCmd(l, { k: "views", cmd: { op: "tpl", act: "save", name: rec.name, setDefault: def, fields } })) o.line(l);
     else o.note(tr("šablonu hlavičky „{0}“ nejde zapsat", rec.name));
   }
 }

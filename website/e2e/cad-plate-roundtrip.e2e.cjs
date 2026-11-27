@@ -41,13 +41,42 @@ stav`;
   const log = await p.evaluate((t) => window.mncad.run(t), PART);
   const bad = log.split('\n').filter((l) => l.startsWith('✗'));
   ok(bad.length === 0, 'díl vytvořen bez chyb' + (bad.length ? '\n' + bad.join('\n') : ''));
-  ok(/materiál „ČSN 11 423“ = označení do razítka; hustota zůstává podle třídy „Ocel“/.test(log), 'materiál: označení do razítka s jasným upozorněním na hustotu');
+  // ČSN 11 423 je ocel třídy 11: označení se pozná (materialClass, ℹ material.class) a hustota se nastaví podle třídy
+  // Ocel – protokol to napíše výslovně, nesmí přitom tvrdit „hustota zůstává“ (⚠ material.density-assumed patří jen
+  // k označení, ze kterého se třída nepozná). Dřívější text testu („hustota zůstává podle třídy Ocel“) platil před
+  // rozpoznáváním tříd z označení (5.2 č. 37) – výsledná hustota je stejná, hláška teď říká pravdu o tom, proč.
+  ok(/materiál „ČSN 11 423“ = označení do razítka, třída „Ocel“ \(7[.,]85 g\/cm³\)/.test(log) && !/materiál „ČSN 11 423“ = označení do razítka; hustota zůstává/.test(log), 'materiál: označení do razítka, třída Ocel rozpoznána z označení, hustota 7,85 g/cm³ výslovně');
   ok(/materiál ČSN 11 423 \(hustota podle: Ocel\)/.test(log), 'stav: označení i třída hustoty');
   const vol0 = volumeOf(log);
   ok(vol0 > 100 && /Rozměry: 240 × 160 × 30 mm/.test(log), `stav: rozměry 240 × 160 × 30 mm, objem ${vol0} cm³`);
   ok(/M6 hl\. 8/.test(log), 'stav: závitové díry M6 hl. 8');
   // panel Materiál: označení je vidět i pro člověka
   ok((await p.getByLabel('Označení materiálu do razítka').inputValue()) === 'ČSN 11 423', 'panel Materiál: pole „Označení materiálu (razítko)“ = ČSN 11 423');
+  // vlna 22 kolo 6: pole označení v GUI = totéž pravidlo jako příkaz `materiál …` (material-designation.ts) – třída se pozná
+  // z označení (ℹ material.class pod polem), nepoznaná třída = ⚠ material.density-assumed (hustota je předpoklad, ne ✓)
+  {
+    const inp = p.getByLabel('Označení materiálu do razítka');
+    const sel = inp.locator('xpath=ancestor::label/preceding-sibling::label//select').first();
+    const note = () => p.locator('[data-material-note]').first().getAttribute('data-material-note').catch(() => null);
+    ok((await note()) === 'material.class', `pod polem ℹ material.class pro ČSN 11 423 (${await note()})`);
+    await sel.selectOption('hlinik');
+    await p.waitForTimeout(300);
+    await inp.fill('ČSN 11 423');
+    await inp.press('Enter');
+    await p.waitForTimeout(400);
+    let st = await p.evaluate(() => window.mncad.status());
+    ok((await sel.inputValue()) === 'ocel' && /materiál ČSN 11 423 \(hustota podle: Ocel\)/.test(st) && (await note()) === 'material.class', `GUI: ČSN 11 423 po třídě Hliník → třída Ocel z označení, ℹ pod polem (třída ${await sel.inputValue()}, ${await note()})`);
+    await inp.fill('Hardox 400');
+    await inp.press('Enter');
+    await p.waitForTimeout(400);
+    st = await p.evaluate(() => window.mncad.status());
+    const warnText = await p.locator('[data-material-note]').first().textContent().catch(() => '');
+    ok((await note()) === 'material.density-assumed' && /^⚠/.test(warnText || '') && /materiál Hardox 400 \(hustota podle: Ocel\)/.test(st), `GUI: Hardox 400 → ⚠ hustota předpokládaná (${warnText})`);
+    await inp.fill('ČSN 11 423');
+    await inp.press('Enter');
+    await p.waitForTimeout(400);
+    ok((await inp.inputValue()) === 'ČSN 11 423' && (await note()) === 'material.class', 'GUI: označení vráceno na ČSN 11 423');
+  }
 
   // ── 2. výkres ──
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();
