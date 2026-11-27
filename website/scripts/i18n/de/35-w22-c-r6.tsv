@@ -1,0 +1,14 @@
+# Vlna 22, kolo 6, balík C (body 4, 5, 6): mezipolohy procesní vrstvy, otisk mělčí než hloubka, děrovaný + v záběru, vůle mezi kroky zvlášť
+{0} a {1}	{0} und {1}
+{0} + v záběru	{0} + im Eingriff
+nezjištěn (záběr jen mezi kroky)	nicht ermittelt (Eingriff nur zwischen den Schritten)
+mezipolohy mezi kroky {0} a {1} (t = {2} s)	der Zwischenstellung zwischen Schritt {0} und {1} (t = {2} s)
+mezipoloze mezi kroky {0} a {1} (t = {2} s)	der Zwischenstellung zwischen Schritt {0} und {1} (t = {2} s)
+záběr jen mezi kroky – výsledek procesu nezjištěn (mezipolohy od kroku {0} nešly spočítat)	Eingriff nur zwischen den Schritten – Prozessergebnis nicht ermittelt (Zwischenstellungen ab Schritt {0} nicht berechenbar)
+procesní operace {0}: otisk do „{1}“ {2} mm z požadovaných {3} mm	Prozessoperation {0}: Prägung in „{1}“ {2} mm von geforderten {3} mm
+procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – mezipolohy nešly spočítat, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)	Prozessoperation {0}: das Werkzeug „{1}“ konnte das Werkstück „{2}“ nur zwischen den Schritten erreichen – Zwischenstellungen nicht berechenbar, Prozessergebnis nicht ermittelt (feinere Schritte: bewegung schritte N)
+pracovní kontakt „{0}“ × „{1}“ mezi kroky {2} a {3} (pravidlo {4}), největší průnik {5} mm³	Arbeitskontakt „{0}“ × „{1}“ zwischen Schritt {2} und {3} (Regel {4}), größte Durchdringung {5} mm³
+mezi kroky {0} a {1} (po přímé dráze: poloha {2}, t = {3} s, motory {4})	zwischen Schritt {0} und {1} (entlang der geraden Bahn: Stellung {2}, t = {3} s, Antriebe {4})
+; mezi kroky {0}	; zwischen Schritt {0}
+ · ⚠ pod limitem {0} mm mezi kroky {1} (v polohách kroků nad limitem)	 · ⚠ unter dem Grenzwert {0} mm zwischen Schritt {1} (in den Schrittstellungen über dem Grenzwert)
+vůle „{0}“ × „{1}“ {2} mm < {3} mm mezi kroky {4} (nejmenší {5})	Spiel „{0}“ × „{1}“ {2} mm < {3} mm zwischen Schritt {4} (kleinstes {5})

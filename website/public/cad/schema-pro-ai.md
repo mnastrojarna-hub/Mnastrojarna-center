@@ -931,8 +931,11 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   1 ks`, `Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)`; úroveň `kinematika + geometrická
   aproximace`, strojově `level=kin+geo … proc=1 removed=314.159 scrap=1 through=21` na konci řádku. Pracovní záběr nástroje do obrobku od
   začátku operace = ℹ `clash.work` (pravidlo „proces střih 1“, jeden model s `kolize pravidlo pracovní`), nikdy ⚠ clash.real; nástroj,
-  který obrobek nezasáhne = ⚠ `motion.process-miss`; neprostřiženo = ℹ `motion.process-partial`; strop 48 booleovských operací na
-  operaci = ℹ `motion.process-approx`. `pohyb krok N` vypíše stav výrobku a hloubku zásahu; `stav` stav na konci. Dokument se NEMĚNÍ:
+  který obrobek nezasáhne = ⚠ `motion.process-miss`; neprostřiženo = ℹ `motion.process-partial` (i otisk mělčí než zadaná hloubka:
+  `otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm`); strop 48 booleovských operací na operaci = ℹ `motion.process-approx`. Krok delší
+  než polovina nástroje ve směru pohybu (razník projde plechem mezi dvěma kroky): procesní vrstva doplní mezipolohy z řešiče
+  (`záběr od mezipolohy mezi kroky 0 a 1 (t = 0,667 s)`); nejdou-li spočítat (dynamika, řešič bez řešení) = ⚠ `motion.process-between`
+  „výsledek procesu nezjištěn“ a stav výrobku `nezjištěn`, nikdy „plný“. Víc operací: hotový výsledek má přednost – `děrovaný + v záběru`. `pohyb krok N` vypíše stav výrobku a hloubku zásahu; `stav` stav na konci. Dokument se NEMĚNÍ:
   krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
   TÉMŽE obrobku se kombinuje: stav obrobku = obrobek − sjednocení odebraných objemů všech operací v kroku (druhý střih do téže díry
   nic nepřidá: `proc=2 removed=314.159 scrap=1`, řádek `„Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení …; součet

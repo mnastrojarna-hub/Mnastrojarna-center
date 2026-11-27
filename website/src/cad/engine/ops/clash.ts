@@ -28,17 +28,24 @@ import { asmHooks, coded, say, sayKv, type OpCtx, type OpHandler } from "./util"
 export type ClashOut = { coded: (code: Code, o: CodeEntryInit) => void; quiet: (code: Code, o: CodeEntryInit) => void };
 export const ctxOut = (ctx: OpCtx): ClashOut => ({ coded: (c, o) => coded(ctx, c, o), quiet: (c, o) => void ctx.report.code(c, { line: ctx.line, ...o }) });
 
+/**
+ * Důvody zařazení, u kterých se dvojice posuzovala jako šroub v díře – jen ty nesou v JSON díru a pásmo závitu (kolo 6: dotyk
+ * „Deska A“ × „Deska B“ nesl `hole` M12 z jiné díry desky; dotyk, pracovní kontakt ani skutečná kolize bez šroubu díru nemají).
+ */
+const SCREW_WHY = new Set<ClashDetail["why"]>(["thread", "underhead", "off-axis", "outside-band", "rest-deep", "rest-large", "unknown-designation", "no-thread-feature", "thread-rule"]);
+const screwData = (x: Pick<ClashDetail, "why" | "cls">) => x.cls !== "touch" && x.cls !== "work" && SCREW_WHY.has(x.why);
+
 /** data záznamu skupiny (JSON `entries[].data`): třída, důvod, počet, instance, cesty, objem a místo každé položky */
 const groupData = (g: ReturnType<typeof groupClashes>[number]) => ({
-  // dřívější tvar `data` šroubu v závitu (díra, pásmo) z první položky – JSON zůstává zpětně čitelný
-  ...(g.items[0].holeIn ? { holeIn: g.items[0].holeIn } : {}),
-  ...(g.items[0].hole ? { hole: g.items[0].hole } : {}),
-  ...(g.items[0].band !== undefined ? { band: g.items[0].band, rest: g.items[0].rest, restDepth: g.items[0].restDepth } : {}),
+  // dřívější tvar `data` šroubu v závitu (díra, pásmo) z první položky – JSON zůstává zpětně čitelný; jen u dvojice šroub × díra
+  ...(screwData(g.items[0]) && g.items[0].holeIn ? { holeIn: g.items[0].holeIn } : {}),
+  ...(screwData(g.items[0]) && g.items[0].hole ? { hole: g.items[0].hole } : {}),
+  ...(screwData(g.items[0]) && g.items[0].band !== undefined ? { band: g.items[0].band, rest: g.items[0].rest, restDepth: g.items[0].restDepth } : {}),
   cls: g.cls,
   why: g.why,
   n: g.items.length,
   pair: [g.a, g.b],
-  items: g.items.map((i) => ({ a: i.la, b: i.lb, aPath: pathA(i), bPath: pathB(i), volume: Math.round(i.volume * 1000) / 1000, ...(i.at ? { at: i.at } : {}), ...(i.box ? { box: i.box } : {}), ...(i.depth !== undefined ? { depth: Math.round(i.depth * 1e4) / 1e4 } : {}), ...(i.rule ? { rule: i.rule } : {}), ...(i.hole ? { hole: i.hole } : {}), ...(i.band !== undefined ? { band: i.band, rest: i.rest } : {}) })),
+  items: g.items.map((i) => ({ a: i.la, b: i.lb, aPath: pathA(i), bPath: pathB(i), volume: Math.round(i.volume * 1000) / 1000, ...(i.at ? { at: i.at } : {}), ...(i.box ? { box: i.box } : {}), ...(i.depth !== undefined ? { depth: Math.round(i.depth * 1e4) / 1e4 } : {}), ...(i.rule ? { rule: i.rule } : {}), ...(screwData(i) && i.hole ? { hole: i.hole } : {}), ...(screwData(i) && i.band !== undefined ? { band: i.band, rest: i.rest } : {}) })),
 });
 
 /**

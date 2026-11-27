@@ -150,6 +150,51 @@ describe("vlna 22 C3: procesní vrstva – střih a otisk během pohybu (bod 4)"
     expect(fa.scrap).toHaveLength(2);
   }, 240_000);
 
+  it("kolo 6 · 74i: střižník projde plechem během jednoho kroku – mezipolohy z řešiče, střih 314,159 mm³, ne „nezasáhl“ / „plný“", async () => {
+    // dřív: proc=1 removed=0, „bez záběru – nástroj obrobek nezasáhl“, ⚠ motion.process-miss vedle ℹ clash.work 314,159 mm³
+    const { short, con } = await run("74i", corpus("74i-process-between"));
+    const kv = short.split("\n").find((l) => /^= L\d+ asm "Lis" motion .* proc=1 /.test(l))!;
+    const m = / proc=1 removed=([\d.]+) scrap=(\d+) through=1$/.exec(kv)!;
+    expect(m, kv).toBeTruthy();
+    expect(Math.abs(Number(m[1]) - PI_R2_T) / PI_R2_T).toBeLessThan(0.01);
+    expect(m[2]).toBe("1");
+    expect(short).not.toMatch(/motion\.process-miss|nezasáhl/);
+    expect(con).toMatch(/střih 1 „Střižník“ → „Plech“: záběr od mezipolohy mezi kroky 0 a 1 \(t = [\d,]+ s\) · prostřiženo v mezipoloze mezi kroky 0 a 1/);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(krok 0\) → děrovaný \(krok 1\)/);
+    expect(con).toMatch(/^ stav výrobku „Plech“: děrovaný · odebráno 314,1\d+ mm³/m);
+    expect(con).toMatch(/na konci „Plech“ děrovaný, odebráno 314,1\d+ mm³, odpad 1/);
+    // ℹ clash.work jednotně „mezi kroky 0 a 1“ (dřív „v krocích mezi kroky“)
+    expect(short).toMatch(/clash\.work "Lis": pracovní kontakt „Plech“ × „Střižník“ mezi kroky 0 a 1 \(pravidlo proces střih 1\)/);
+    expect(short).not.toMatch(/v krocích mezi kroky/);
+  }, 240_000);
+
+  it("kolo 6 · 74j: otisk 0,1 mm z požadovaných 0,3 mm = ℹ process-partial; otisk + prostřižený střih = „děrovaný + v záběru“", async () => {
+    const { short, con } = await run("74j", corpus("74j-process-imprint-depth"));
+    // dřív removed=31.416 a hloubka 0,1 mm bez upozornění
+    expect(short).toMatch(/motion\.process-partial "Lis": procesní operace otisk 1: otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm/);
+    // dřív „Stav výrobku „Plech“: plný (kroky 0–4) → v záběru (kroky 5–6)“, přitom through=6 scrap=1
+    expect(short).toMatch(/^= L\d+ asm "Lis B" motion .* proc=2 removed=[\d.]+ scrap=1 through=6$/m);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(kroky 0–4\) → v záběru \(krok 5\) → děrovaný \+ v záběru \(krok 6\)/);
+    expect(con).toMatch(/^ stav výrobku „Plech“: děrovaný \+ v záběru · odebráno 314,1\d+ mm³ · hloubka 1 mm · odpad 1 oddělen/m);
+  }, 240_000);
+
+  it("kolo 6 · plán jádra: úsek, kde by nástroj obrobkem proskočil, chce mezipolohy; jemné kroky ne", async () => {
+    const { ws } = await run("plan", corpus("74d-process-cut").split("\npohyb motor")[0]);
+    const asm = ws.listDocs().find((d) => d.doc.kind === "assembly")!.doc as CadDoc;
+    const P = asm.components!.find((c) => c.name === "Plech")!;
+    const R = asm.components!.find((c) => c.name === "Razník")!;
+    const at = (z: number) => relMatrix(P.placement, { position: [50, 50, z], rotation: [0, 0, 0] });
+    const base: ProcReq = { target: { key: sourceKey(P.source), source: P.source }, tool: { key: sourceKey(R.source), source: R.source }, kind: "cut", rels: [at(20), at(-35)] };
+    const jump = await kernel.process({ ...base, plan: true });
+    expect(jump.gaps).toEqual([{ i: 1, n: 2 }]); // 55 mm posunu, razník 40 mm → polovina 20 mm → 2 mezipolohy
+    expect(jump.steps).toEqual([]); // plán bez booleovských operací
+    const fine = await kernel.process({ ...base, rels: [at(20), at(10.5), at(10), at(9.5)], plan: true });
+    expect(fine.gaps ?? []).toEqual([]);
+    // mimo obálku obrobku (vedle plechu) mezipolohy netřeba
+    const aside = await kernel.process({ ...base, rels: [relMatrix(P.placement, { position: [200, 50, 20], rotation: [0, 0, 0] }), relMatrix(P.placement, { position: [200, 50, -35], rotation: [0, 0, 0] })], plan: true });
+    expect(aside.gaps ?? []).toEqual([]);
+  }, 240_000);
+
   it("74f: dva střihy do téže díry = 314,159 mm³ jednou (dřív removed=628.319 scrap=2); dvě různé díry = součet 392,699 mm³ a 2 kusy odpadu", async () => {
     const { short, con } = await run("74f", corpus("74f-process-two-ops"));
     const kv = short.split("\n").filter((l) => /^= L\d+ asm "Lis" motion .* proc=2 /.test(l));

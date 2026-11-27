@@ -1,0 +1,30 @@
+# vlna 22, bod 4 (kolo 6): (1) otisk s hloubkou 0,3 mm, nástroj se zastaví o 0,1 mm v plechu → ℹ motion.process-partial
+# „otisk … 0,1 mm z požadovaných 0,3 mm“ (dřív bez upozornění); (2) otisk + střih téhož plechu: střih prostřižen v kroku 6,
+# otisk v záběru → stav „děrovaný + v záběru“ (dřív „v záběru (kroky 5–6)“, jedna operace = „děrovaný“)
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl Plech
+kvádr 80 80 1
+nový díl Střižník
+válec 20 40
+#--- run
+nová sestava Lis
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Střižník" v 50 50 20
+sestava vazba souosost "Střižník" válcová "Deska A" Ø20,2
+sestava vazba vzdálenost "Střižník" spodní "Deska A" horní hodnota 10 název "ZDVIH"
+pohyb motor lineární vazba "ZDVIH" 10..0,9 kroky 6 kolize
+pohyb proces ražení "Střižník" "Plech" hloubka 0,3
+pohyb krok 6
+nová sestava Lis B
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Střižník" v 50 50 20
+sestava vazba souosost "Střižník" válcová "Deska A" Ø20,2
+sestava vazba vzdálenost "Střižník" spodní "Deska A" horní hodnota 10 název "ZDVIH"
+pohyb motor lineární vazba "ZDVIH" 10..-2 kroky 6 kolize
+pohyb proces ražení "Střižník" "Plech" hloubka 0,3 název "Značka"
+pohyb proces střih "Střižník" "Plech" při motor 1 <= 0,5 odpad zůstane
+pohyb krok 6

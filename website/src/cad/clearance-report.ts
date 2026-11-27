@@ -35,6 +35,8 @@ export function stepRanges(list: readonly number[], max = 6): string {
 /** poloha minima: „v kroku 12 (t = 0,6 s)“, „mezi kroky 17 a 18 (po přímé dráze)“, „mezi kroky 17 a 18 (poloha 17,5; t = …)“ */
 function whereText(m: NonNullable<ClearancePair["min"]>): string {
   const t = nf(m.t, 3);
+  // poloha minima na přímé dráze dohledaná (kolo 6): poloha, čas a motory pro panel, úsečku i protokol
+  if (m.between && m.sweep && m.located) return tr("mezi kroky {0} a {1} (po přímé dráze: poloha {2}, t = {3} s, motory {4})", m.between[0], m.between[1], nf(m.pos, 3), t, m.motors.map((v) => nf(v, 3)).join("; ") || "–");
   if (m.between && m.sweep) return tr("mezi kroky {0} a {1} (po přímé dráze)", m.between[0], m.between[1]);
   if (m.between) return tr("mezi kroky {0} a {1} (zjemněno: poloha {2}, t = {3} s)", m.between[0], m.between[1], nf(m.pos, 3), t);
   return tr("v kroku {0} (t = {1} s)", Math.round(m.pos), t);
@@ -101,6 +103,8 @@ export function sweepKv(res: Res): string[] {
 
 /** dvojice pod limitem (nejmenší první) */
 const belowPairs = (pairs: readonly ClearancePair[], limit: number | null) => (limit === null ? [] : pairs.filter((p) => p.min && p.min.d < limit));
+/** úseky mezi kroky pod limitem: „17 a 18“, „17 a 18, 40 a 41“ */
+const segText = (segs: readonly [number, number][]) => segs.map(([a, b]) => tr("{0} a {1}", a, b)).join(", ");
 
 /** Řádky souhrnu studie o sledované vůli (prázdné, když se vůle nesledovala). */
 export function clearanceSummaryLines(res: Res, doc: CadDoc): string[] {
@@ -123,7 +127,11 @@ export function clearanceSummaryLines(res: Res, doc: CadDoc): string[] {
     const of = p.series.filter((v) => v !== null && v !== undefined).length;
     let lim = "";
     if (L !== null) {
-      if (m.d < L) lim = tr(" · ⚠ pod limitem {0} mm v {1} z {2} poloh (kroky {3})", mm(L), p.below.length, of, stepRanges(p.below)) + (m.between && !p.below.length ? tr(" · mezi polohami") : "");
+      // polohy kroků pod limitem a úseky MEZI kroky zvlášť (kolo 6: minimum mezi kroky 17 a 18 se nepočítá jako „krok 18“)
+      const bb = p.belowBetween ?? [];
+      if (m.d < L && p.below.length) lim = tr(" · ⚠ pod limitem {0} mm v {1} z {2} poloh (kroky {3})", mm(L), p.below.length, of, stepRanges(p.below)) + (bb.length ? tr("; mezi kroky {0}", segText(bb)) : "");
+      else if (m.d < L && bb.length) lim = tr(" · ⚠ pod limitem {0} mm mezi kroky {1} (v polohách kroků nad limitem)", mm(L), segText(bb));
+      else if (m.d < L) lim = tr(" · ⚠ pod limitem {0} mm v {1} z {2} poloh (kroky {3})", mm(L), p.below.length, of, stepRanges(p.below)) + (m.between ? tr(" · mezi polohami") : "");
       else if (refine && !p.unproven) lim = tr(" · limit {0} mm dodržen v celém pohybu (spojitě i mezi polohami)", mm(L));
       else lim = tr(" · limit {0} mm dodržen v {1} polohách (mezi polohami nepotvrzeno)", mm(L), of);
     }
@@ -150,7 +158,11 @@ export function clearanceCodes(res: Res, doc: CadDoc): ClrCode[] {
       const a = compName(doc, p.a);
       const b = compName(doc, p.b);
       const place = m.p1 && m.p2 ? ` – ${tr("místo")} ${fmtPt(m.p1)} ↔ ${fmtPt(m.p2)}` : "";
-      out.push({ code: "clash.clearance", args: [a, b, mm(m.d), mm(c.limit)], text: `${tr("vůle „{0}“ × „{1}“ {2} mm < {3} mm v krocích {4} (nejmenší {5})", a, b, mm(m.d), mm(c.limit), stepRanges(p.below) || "–", whereText(m))}${place}` });
+      const bb = p.belowBetween ?? [];
+      const head = !p.below.length && bb.length
+        ? tr("vůle „{0}“ × „{1}“ {2} mm < {3} mm mezi kroky {4} (nejmenší {5})", a, b, mm(m.d), mm(c.limit), segText(bb), whereText(m))
+        : tr("vůle „{0}“ × „{1}“ {2} mm < {3} mm v krocích {4} (nejmenší {5})", a, b, mm(m.d), mm(c.limit), stepRanges(p.below) || "–", whereText(m)) + (bb.length ? tr("; mezi kroky {0}", segText(bb)) : "");
+      out.push({ code: "clash.clearance", args: [a, b, mm(m.d), mm(c.limit)], text: `${head}${place}` });
     }
   }
   if (res.collisionsChecked) {
@@ -171,9 +183,11 @@ export function clearanceKv(res: Res): string[] {
   const m = best.min;
   const of = Math.max(0, ...c.pairs.map((p) => p.series.filter((v) => v !== null && v !== undefined).length));
   const below = c.limit === null ? null : Math.max(0, ...c.pairs.map((p) => p.below.length));
+  // úseky mezi kroky pod limitem zvlášť (`clear.below` = jen polohy kroků) – pole jen když nějaký je
+  const mid = c.limit === null ? 0 : Math.max(0, ...c.pairs.map((p) => p.belowBetween?.length ?? 0));
   return [
     `clear.min=${n(m.d)}${m.exact ? "" : "+"}`,
-    ...(c.limit !== null ? [`clear.limit=${n(c.limit)}`, `clear.below=${below}/${of}`] : []),
+    ...(c.limit !== null ? [`clear.limit=${n(c.limit)}`, `clear.below=${below}/${of}`, ...(mid ? [`clear.below.between=${mid}`] : [])] : []),
     `clear.at=${m.between ? `${m.between[0]}-${m.between[1]}` : Math.round(m.pos)}`,
     `clear.pairs=${c.pairs.length}`,
   ];
@@ -222,7 +236,7 @@ export function clearanceApi(res: Res, doc: CadDoc) {
             limit: c.limit,
             moving: c.moving,
             min: c.pairs[0]?.min ? { ...c.pairs[0].min, a: compName(doc, c.pairs[0].a), b: compName(doc, c.pairs[0].b) } : null,
-            pairs: c.pairs.map((p) => ({ a: compName(doc, p.a), b: compName(doc, p.b), min: p.min, below: p.below, series: p.series, unproven: p.unproven })),
+            pairs: c.pairs.map((p) => ({ a: compName(doc, p.a), b: compName(doc, p.b), min: p.min, below: p.below, ...(p.belowBetween?.length ? { belowBetween: p.belowBetween } : {}), series: p.series, unproven: p.unproven })),
             poses: c.poses,
             refined: c.refined,
           },

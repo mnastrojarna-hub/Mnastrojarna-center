@@ -151,6 +151,7 @@ export const CODES = [
   // vlna 22, bod 4: procesní vrstva (střih / otisk jako geometrická aproximace – cad/motion-process.ts)
   { code: "motion.process-miss", level: "warn", key: "procesní operace {0}: nástroj „{1}“ obrobek „{2}“ v okně operace nezasáhl – obrobek beze změny" },
   { code: "motion.process-partial", level: "note", key: "procesní operace {0}: obrobek „{1}“ neprostřižen – hloubka {2} mm" },
+  { code: "motion.process-between", level: "warn", key: "procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – mezipolohy nešly spočítat, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)" },
   { code: "motion.process-approx", level: "note", key: "procesní operace {0}: booleovsky spočítáno {1} z {2} kroků se záběrem (strop výkonu) – mezikroky převzaty" },
   { code: "motion.process-failed", level: "warn", key: "procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu" },
   { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },

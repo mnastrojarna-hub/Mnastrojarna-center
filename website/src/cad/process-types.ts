@@ -35,6 +35,12 @@ export type ProcReq = {
   others?: ProcOpSpec[];
   /** kombinované stavy, jejichž sítě se mají vrátit (index do `combined.states`) */
   meshCombined?: number[];
+  /**
+   * jen plán (kolo 6): bez booleovských operací vrátí `gaps` – úseky mezi sousedními polohami, ve kterých se nástroj vůči obrobku
+   * posune víc než o polovinu své délky ve směru posunu a jeho dráha (obálka) zasahuje obálku obrobku: tam by záběr mohl
+   * proběhnout jen MEZI polohami (razník projde plechem během jednoho kroku) – volající doplní mezipolohy a spočítá znovu
+   */
+  plan?: true;
 };
 /** operace bez obrobku (obrobek je společný) – `ProcReq.others` */
 export type ProcOpSpec = Pick<ProcReq, "tool" | "kind" | "depth" | "rels" | "maxOps">;
@@ -81,12 +87,19 @@ export type ProcRes = {
    * odebraných objemů všech operací v kroku; `scrap` = kusy sjednoceného odpadu prostřižených operací
    */
   combined?: { steps: number[]; states: ProcState[]; /** sjednocení selhalo (stav od té chvíle neurčen) */ error?: string };
+  /**
+   * plán (`ProcReq.plan`): úseky `i − 1 → i` (index do `rels`), kde je potřeba `n` mezipoloh, aby se záběr mezi polohami neztratil
+   * (sousední polohy nástroje se překrývají aspoň z poloviny jeho délky ve směru posunu); `capped` = potřeba víc než strop
+   */
+  gaps?: { i: number; n: number; capped?: true }[];
   /** výsledek z mezipaměti jádra */
   cached?: boolean;
   /** čas výpočtu [ms] */
   ms: number;
 };
 
+/** nejvýš tolik mezipoloh v jednom úseku (plán `gaps`) */
+export const PROC_MAX_SUB = 64;
 /** výchozí strop booleovských operací na operaci */
 export const PROC_MAX_OPS = 48;
 /** klíč požadavku (bez sítí): stejná studie a geometrie = tentýž výsledek (mezipaměť jádra i sítí v prohlížeči) */

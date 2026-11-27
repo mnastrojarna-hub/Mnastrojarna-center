@@ -18,7 +18,7 @@ import { leafLabel } from "@/cad/clash-report";
 import { clearanceSummaryLines, gapAt, sweepLabel, sweepOf, type GapGfx } from "@/cad/clearance-report";
 import { tr } from "@/cad/i18n";
 import type { MotionResult } from "@/cad/motion";
-import { clearanceOf } from "@/cad/motion-clearance";
+import { clearanceOf, type ClearancePair } from "@/cad/motion-clearance";
 import type { CadDoc, MotionClearance, MotionStudy } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -138,6 +138,9 @@ export function ClearanceSettings({ doc, study, onStudy }: { doc: CadDoc; study:
   );
 }
 
+/** krok pro skok na minimum: dohledaná poloha mezi kroky → nejbližší krok úseku (kolo 6), jinak začátek úseku / krok minima */
+const jumpStep = (m: NonNullable<ClearancePair["min"]>): number => (m.between ? (m.located ? Math.min(m.between[1], Math.max(m.between[0], Math.round(m.pos))) : m.between[0]) : Math.round(m.pos));
+
 /** Výsledek: spojitost kontroly, nejmenší vůle s místem a skokem na krok, graf vůle po krocích; úsečka vůle pro 3D okno. */
 export function ClearanceResult({ res, doc, step, onStep }: { res: MotionResult; doc: CadDoc; step: number; onStep: (i: number) => void }) {
   const ext = clearanceOf(res);
@@ -174,8 +177,8 @@ export function ClearanceResult({ res, doc, step, onStep }: { res: MotionResult;
             ))}
           </ul>
           {best?.min && (
-            <button type="button" data-clearance-jump onClick={() => onStep(Math.round(best.min!.between ? best.min!.between[0] : best.min!.pos))} className="rounded border border-[#cfd6de] bg-white px-2 py-0.5 text-[11px] hover:bg-[#f3f6f9]">
-              {tr("Na minimum (krok {0})", Math.round(best.min.between ? best.min.between[0] : best.min.pos))}
+            <button type="button" data-clearance-jump onClick={() => onStep(jumpStep(best.min!))} className="rounded border border-[#cfd6de] bg-white px-2 py-0.5 text-[11px] hover:bg-[#f3f6f9]">
+              {tr("Na minimum (krok {0})", jumpStep(best.min))}
             </button>
           )}
           <ClearanceChart res={res} step={step} />
