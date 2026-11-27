@@ -298,7 +298,7 @@ const ready = async (p, url = CAD) => {
     }
   }
   const stamp = ['Deska', 'Ocel', '1:1'].filter((w) => pdfText.includes(w));
-  step('7c výkres export pdf → PDF s razítkem', fPdf && /\.pdf$/.test(fPdf.name) && fs.readFileSync(fPdf.path).subarray(0, 5).toString() === '%PDF-' && fPdf.bytes > 5000 && pdfPages === 1 && stamp.length === 3 && /✓ výkres PDF: \S+\.pdf · [\d,]+ kB · výkres PDF – staženo \(bez dialogu\)/.test(outLog), `${fPdf && fPdf.name} ${fPdf && fPdf.bytes} B, stran ${pdfPages}, text razítka: ${stamp.join(', ')} (${pdfText.length} znaků textu${stamp.length === 3 ? '' : ': ' + pdfText.slice(0, 160)})`);
+  step('7c výkres export pdf → PDF s razítkem', fPdf && /\.pdf$/.test(fPdf.name) && fs.readFileSync(fPdf.path).subarray(0, 5).toString() === '%PDF-' && fPdf.bytes > 5000 && pdfPages === 1 && stamp.length === 3 && /ℹ výkres PDF: \S+\.pdf · [\d,]+ kB · výkres PDF – staženo \(bez dialogu\) · nálezy níže/.test(outLog) /* kolo 7 (22i): list s ⚠ → zápis ℹ */, `${fPdf && fPdf.name} ${fPdf && fPdf.bytes} B, stran ${pdfPages}, text razítka: ${stamp.join(', ')} (${pdfText.length} znaků textu${stamp.length === 3 ? '' : ': ' + pdfText.slice(0, 160)})`);
   // sdílený odkaz
   const url = (/^URL: (\S+)$/m.exec(outLog) || [])[1] || '';
   step('7d sdílet → adresa v protokolu', url.startsWith(CAD + '#s=') && /✓ sdílený odkaz vytvořen – „Deska“ \(model\)/.test(outLog), `${url.length} znaků; ${(/✓ sdílený odkaz[^\n]*/.exec(outLog) || ['?'])[0]}`);

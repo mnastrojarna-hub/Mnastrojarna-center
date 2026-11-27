@@ -231,7 +231,7 @@ export function makeKernelClient(t: KernelTransport) {
     datumGfx: (doc: CadDoc) => call({ op: "datumGfx", doc }),
     exportFile: (doc: CadDoc, format: ExportFormat) => call({ op: "export", doc, format }),
     /** exportovaný STEP / BREP znovu načtený jádrem a model: tělesa, objem, obálka (bez sítě – export-verify.ts) */
-    exportStats: (doc: CadDoc, bytes: Uint8Array, format: "step" | "brep") => call({ op: "exportStats", doc, bytes, format }),
+    exportStats: (doc: CadDoc, bytes: Uint8Array, format: "step" | "brep", full?: boolean) => call({ op: "exportStats", doc, bytes, format, ...(full ? { full } : {}) }),
     /** přesná kontrola platnosti tělesa (BRepCheck přesnou metodou) – `maxFaces` = nad tolik ploch se neprovede */
     validity: (doc: CadDoc, maxFaces?: number) => call({ op: "validity", doc, ...(maxFaces !== undefined ? { maxFaces } : {}) }),
     /** díly sestavy; `offset`/`total` = pořadí dávky v celém načítání (pro průběh „díl k z n“) */

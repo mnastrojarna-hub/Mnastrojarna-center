@@ -73,9 +73,9 @@ const phaseLabel = (e: RunEntry, p: string) => exportPhaseText(p, e.result?.form
 function ExportRow({ e, now }: { e: RunEntry; now: number }) {
   const ms = e.ms ?? (e.startedAt !== undefined ? now - e.startedAt : 0);
   const r = e.result ?? {};
-  const tone = e.state === "done" ? (r.check && !r.check.ok ? "text-amber-700" : "text-emerald-700") : e.state === "error" ? "text-brand-600" : e.state === "cancelled" ? "text-[#6b7785]" : "text-sky-700";
+  const tone = e.state === "done" ? (r.check && !r.check.ok ? "text-amber-700" : r.check?.note ? "text-slate-700" : "text-emerald-700") : e.state === "error" ? "text-brand-600" : e.state === "cancelled" ? "text-[#6b7785]" : "text-sky-700";
   return (
-    <li data-export-job={e.id} data-export-state={e.state} data-export-phase={e.phase ?? ""} data-export-rev={r.modelRev ?? ""} data-export-check={r.check ? (r.check.ok ? "ok" : "fail") : "none"} data-export-file={r.file ?? ""} className="border-b border-[#edf1f5] py-1 last:border-0">
+    <li data-export-job={e.id} data-export-state={e.state} data-export-phase={e.phase ?? ""} data-export-rev={r.modelRev ?? ""} data-export-check={r.check ? (r.check.ok ? (r.check.note ? "unchecked" : "ok") : "fail") : "none"} data-export-file={r.file ?? ""} className="border-b border-[#edf1f5] py-1 last:border-0">
       <div className="flex items-center gap-2">
         <span className={`font-semibold ${tone}`}>{runStateText(e.state)}</span>
         <span className="min-w-0 flex-1 truncate" title={e.label}>
@@ -97,7 +97,7 @@ function ExportRow({ e, now }: { e: RunEntry; now: number }) {
         <div className="text-[11px] text-[#4a5664]">
           {r.bytes !== undefined && r.written !== false ? kb(r.bytes) : null}
           {r.modelRev ? ` · ${tr("model")} ${r.modelRev}` : null}
-          {r.check ? ` · ${r.check.ok ? "✓" : "⚠"} ${r.check.text}` : null}
+          {r.check ? ` · ${r.check.ok ? (r.check.note ? "ℹ" : "✓") : "⚠"} ${r.check.text}` : null}
           {r.note ? ` · ${r.note}` : null}
           {e.error ? ` · ${e.error}` : null}
         </div>

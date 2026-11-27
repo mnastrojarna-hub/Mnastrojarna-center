@@ -162,7 +162,8 @@ describe("kontrola exportu (kernel.exportStats)", () => {
   const box = { solids: 1, volume: 6000, bbox: [[0, 0, 0], [30, 20, 10]] as [[number, number, number], [number, number, number]] };
   beforeEach(() => resetExportChecks());
   it("věrná kopie; opakovaný export nezměněného modelu z paměti; změna modelu / jiný formát = nová kontrola; neúspěch se nepamatuje", async () => {
-    const exportStats = vi.fn(async () => ({ model: box, file: { ...box, volume: 6000.000001 } }));
+    // soubor s rychlou kontrolou platnosti (valid: true) – bez ní je kontrola od 22c kolo 7 jen ℹ „nezkontrolována“, ne ✓
+    const exportStats = vi.fn(async () => ({ model: box, file: { ...box, volume: 6000.000001, valid: true } }));
     const k = { exportStats };
     const d = part("Deska", 30);
     const a = await verifyExport(k as never, d, new Uint8Array(1), "step");

@@ -104,7 +104,8 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     const f3 = await nextDownload(3);
     const f4 = await nextDownload(4);
     ok(f3 && /\.pdf$/.test(f3.name) && fs.readFileSync(f3.path).subarray(0, 5).toString() === '%PDF-', `výkres export pdf → ${f3 && f3.name} (${f3 && f3.bytes} B, %PDF)`);
-    ok(/✓ výkres PDF: \S+\.pdf · [\d,]+ kB · výkres PDF – staženo \(bez dialogu\)/.test(log), 'protokol: výkres PDF s názvem a velikostí');
+    // kolo 7 (22i, vědomě upraveno): list bez nepředepsaných tolerancí má ⚠ – zápis výkresu s nálezem listu je ℹ „· nálezy níže“, ne ✓
+    ok(/ℹ výkres PDF: \S+\.pdf · [\d,]+ kB · výkres PDF – staženo \(bez dialogu\) · nálezy níže/.test(log) && /⚠ Výkres nemá nepředepsané tolerance/.test(log) && !/✓ výkres PDF/.test(log), 'protokol: výkres PDF s názvem a velikostí (zápis ℹ, nález listu pod ním)');
     ok(f4 && f4.name === 'Skica_1.dxf' && fs.readFileSync(f4.path, 'utf8').includes('SECTION'), `skica export dxf → ${f4 && f4.name}`);
     ok(/✓ skica „Skica 1“: Skica_1\.dxf · [\d,]+ (B|kB) · skica DXF, 1 entit/.test(log), 'protokol: skica DXF');
 
@@ -395,7 +396,8 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     ok(/✗ řádek 1: list 2 neexistuje/.test(log) && !dl.includes('2.pdf'), 'revize: „výkres export pdf 2“ = list 2 (neexistuje → ✗, žádný soubor „2.pdf“)');
     n = dl.length;
     log = await run('výkres export pdf 1');
-    ok(/✓ výkres PDF, list 1: Tezky_vykres\.pdf/.test(log) && (await waitDl(n + 1)) === 'Tezky_vykres.pdf', '„výkres export pdf 1“ → list 1 v protokolu');
+    // kolo 7 (22i): list bez nepředepsaných tolerancí → zápis ℹ „· nálezy níže“, ne ✓
+    ok(/ℹ výkres PDF, list 1: Tezky_vykres\.pdf .*· nálezy níže/.test(log) && (await waitDl(n + 1)) === 'Tezky_vykres.pdf', '„výkres export pdf 1“ → list 1 v protokolu');
     const tisk = p.getByRole('button', { name: 'Tisk', exact: true });
     if (!(await tisk.isVisible({ timeout: 5000 }).catch(() => false))) await p.evaluate(() => window.mncad.run('výkres'));
     n = dl.length;

@@ -108,10 +108,13 @@ describe("výstupy textem se skutečným jádrem (B3)", async () => {
     expect(all, [...host.files.files.keys()].join(", ")).toBeTruthy();
     expect(pdfPages(all.data)).toBe(3);
     expect(all.file.sheets).toBe(3);
-    expect(r.console).toMatch(/^✓ výkres PDF, listů 3: Ulozeni_vykresy\.pdf · /m);
+    // vlna 22, 22i kolo 7 (test vědomě upraven): listy mají nálezy (⚠ bez nepředepsaných tolerancí, díl bez čísla) – zápis
+    // výkresu s nálezem listu je ℹ „· nálezy níže“, ne ✓ (dřív „✓ výkres PDF“ přímo nad ⚠ téhož exportu)
+    expect(r.console).toMatch(/^ℹ výkres PDF, listů 3: Ulozeni_vykresy\.pdf · .* · nálezy níže$/m);
+    expect(r.console).not.toMatch(/^✓ výkres PDF, listů/m); // list 1 (jen sestava, bez nálezu) zůstává ✓
     // „vše“ u sestavy s výkresy dílů = všechny listy (kontrakt B3: vícestránkové PDF), ne jen list sestavy
     expect(pdfPages(host.files.files.get("Vse.pdf")!.data)).toBe(3);
-    expect(r.console).toMatch(/^✓ výkres PDF, listů 3: Vse\.pdf · /m);
+    expect(r.console).toMatch(/^ℹ výkres PDF, listů 3: Vse\.pdf · .* · nálezy níže$/m);
     const one = [...host.files.files.values()].find((x) => !["Ulozeni_vykresy.pdf", "Vse.pdf"].includes(x.file.name) && x.file.format === "pdf")!;
     expect(pdfPages(one.data)).toBe(1);
     // DXF všech listů: ZIP „<základ>_dxf.zip“ (bez „_vykres_dxf_listy“)

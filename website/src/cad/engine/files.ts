@@ -130,15 +130,16 @@ const CHECKS_MAX = 4;
  * Exportovaný soubor znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) – `kernel.exportStats`, bez sítě a
  * bez úložiště importů. Jen úspěšná kontrola se pamatuje (další export nezměněného modelu ji převezme s poznámkou).
  */
-export async function verifyExport(kernel: Pick<KernelApi, "exportStats">, d: CadDoc, bytes: Uint8Array, format: "step" | "brep", parts?: SolidParts): Promise<ExportCheck> {
+export async function verifyExport(kernel: Pick<KernelApi, "exportStats">, d: CadDoc, bytes: Uint8Array, format: "step" | "brep", parts?: SolidParts, full = false): Promise<ExportCheck> {
   const label = format === "step" ? "STEP" : "BREP";
   // záznamy exportů (`outputs`, vlna 22 D2) mění dokument po každém exportu, model ne – do klíče nepatří (jinak by se
   // kontrola nezměněného modelu nikdy nepřevzala)
-  const key = `${format}:${JSON.stringify({ ...d, name: "", outputs: undefined })}`;
+  const key = `${format}${full ? ":full" : ""}:${JSON.stringify({ ...d, name: "", outputs: undefined })}`;
   const hit = checks.get(key);
   if (hit) return { ...hit, line: `${hit.line}${tr(" (model od minulé kontroly beze změny)")}` };
   try {
-    const { model, file } = await kernel.exportStats(d, bytes, format);
+    // `full` (přísný režim, 22c kolo 7): rychlá kontrola platnosti souboru i nad mezí ploch
+    const { model, file } = await (full ? kernel.exportStats(d, bytes, format, true) : kernel.exportStats(d, bytes, format));
     // soubor bez jediné plochy = nic se nenačetlo; soubor jen s plochami / skořepinami posoudí exportCheck (✗ out.no-solid, 22c)
     if (!file.solids && !(file.freeShells > 0) && !(file.freeFaces > 0) && !(file.volume > 0)) return checkFailed(label, tr("jádro v souboru nenašlo těleso ani plochy"));
     const c = exportCheck(model, file, label, parts);
@@ -539,8 +540,9 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
     else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
     if (job.check) {
       const c = job.check;
-      f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };
+      f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗ℹ]\s*/, "") };
       if (!c.ok) note({ code: c.code ?? "out.check-failed", text: f.check.text, level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+      else if (c.level === "note") note({ code: "msg.note", text: f.check.text, level: "note" }); // platnost souboru nezkontrolována (22c kolo 7)
     } else if (ms) {
       const v = solidVerdict(ms, "STL", "model", ms.parts);
       if (v) {

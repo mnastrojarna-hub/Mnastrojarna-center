@@ -280,7 +280,8 @@ const zipNames = (buf) => { const out = []; for (let i = 0; i + 46 < buf.length;
       const log = await run(p, 'výkres export pdf vše');
       f = await dl.catch(() => null);
       const txtPages = f ? pdfPages(fs.readFileSync(await f.path())) : 0;
-      ok(/✓ výkres PDF, listů 2: Hridel_Vykres_2_vykres\.pdf · [\d\s,.]+ (B|kB|MB) · výkres PDF – staženo \(bez dialogu\)/.test(log) && f && f.suggestedFilename() === 'Hridel_Vykres_2_vykres.pdf' && txtPages === 2, '17: text výkres export pdf vše → ' + ((log.match(/✓ výkres[^\n]*/) || [''])[0]) + ' · stažení ' + (f && f.suggestedFilename()) + `, stran ${txtPages}`);
+      // kolo 7 (22i, vědomě upraveno): listy bez nepředepsaných tolerancí mají ⚠ – zápis ℹ „· nálezy níže“, ne ✓
+      ok(/ℹ výkres PDF, listů 2: Hridel_Vykres_2_vykres\.pdf · [\d\s,.]+ (B|kB|MB) · výkres PDF – staženo \(bez dialogu\) · nálezy níže/.test(log) && f && f.suggestedFilename() === 'Hridel_Vykres_2_vykres.pdf' && txtPages === 2, '17: text výkres export pdf vše → ' + ((log.match(/✓ výkres[^\n]*/) || [''])[0]) + ' · stažení ' + (f && f.suggestedFilename()) + `, stran ${txtPages}`);
       // jiný výkres téhož dílu = jiný soubor (nepřepíše export Výkresu 2)
       await p.selectOption('[data-drawing-select]', ''); await p.waitForTimeout(4000);
       dl = p.waitForEvent('download', { timeout: 120000 });

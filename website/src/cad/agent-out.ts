@@ -17,7 +17,7 @@
  * `components/cad/agent-out-host.ts`.
  */
 import { cadLocale, tr } from "./i18n";
-import { EXACT_AUTO_FACES } from "./validity";
+import { EXACT_AUTO_FACES, EXPORT_VALID_FACES } from "./validity";
 import type { Vec3 } from "./types";
 import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
 import { partsText, solidVerdict, type SolidParts, type SolidStats } from "./solid-export";
@@ -421,7 +421,8 @@ export type ExportCheck = {
   volumeDiffPct: number;
   bboxDiff: number;
   solidsOk: boolean;
-  level?: "ok" | "warn" | "error";
+  /** "note" = soubor odpovídá modelu, ale jeho platnost se nekontrolovala vůbec (ploch nad mez) – ℹ, ne ✓ (22c kolo 7) */
+  level?: "ok" | "note" | "warn" | "error";
   code?: "out.no-solid" | "out.free-surfaces" | "out.check-failed" | "out.reload-invalid";
   /** která kontrola platnosti souboru proběhla (22a): přesná / jen rychlá / žádná */
   validCheck?: "exact" | "fast" | "none";
@@ -533,13 +534,17 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
       line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
     };
   // přesná kontrola souboru neproběhla: shoda v mírách ano, „věrná kopie“ ne – řádek řekne, co chybí (slabší tvrzení)
+  // platnost souboru nezkontrolovaná vůbec (ani rychle – ploch nad `EXPORT_VALID_FACES`): shoda v mírách platí, ale řádek je
+  // ℹ, ne ✓ (22c kolo 7 – dřív ✓ s chybnou větou „jen rychlou kontrolou“, ač neproběhla ani rychlá)
+  if (file.valid !== true) {
+    const why = file.faces !== undefined && file.faces > EXPORT_VALID_FACES ? tr("platnost souboru nezkontrolována ({0} ploch > {1}; přísný režim ji zkontroluje)", file.faces, EXPORT_VALID_FACES) : tr("platnost souboru nezkontrolována");
+    return { ...base, ok: true, level: "note", validCheck: "none", line: `ℹ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
+  }
   const why =
     file.validExact === null && file.faces !== undefined && file.faces > EXACT_AUTO_FACES
       ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla ({0} ploch > {1})", file.faces, EXACT_AUTO_FACES)
-      : file.valid === true
-        ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla")
-        : tr("platnost souboru nezkontrolována");
-  return { ...base, ok: true, level: "ok", validCheck: file.valid === true ? "fast" : "none", line: `✓ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
+      : tr("platnost souboru jen rychlou kontrolou – přesná neproběhla");
+  return { ...base, ok: true, level: "ok", validCheck: "fast", line: `✓ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
 }
 
 /** složení souboru / modelu pro `solidVerdict` */

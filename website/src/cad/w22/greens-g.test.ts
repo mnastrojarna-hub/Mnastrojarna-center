@@ -379,3 +379,78 @@ describe("kolo 6: řez výkresu mimo těleso se při výstupu PDF ohlásí jedno
     expect((h.files as MemoryFiles).files.size).toBe(1);
   });
 });
+
+describe("kolo 7: „✓ výkres PDF“ nad ⚠ / ✗ listu – zápis výkresu s nálezem není ✓; přísný režim soubor nezapíše (22i, 22c)", () => {
+  const run = async (t: string, strict = false) => {
+    const h = host();
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), t, h, { lang: "cs", strict }), { full: true });
+    return { r, files: (h.files as MemoryFiles).files };
+  };
+  const drawOk = (full: string | undefined) => (full ?? "").split("\n").filter((l) => /^✓ L\d+ výkres (PDF|DXF|SVG|DWG)/.test(l));
+  const NO_TOL = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres export pdf';
+  it("list bez nepředepsaných tolerancí: řádek zápisu ℹ „zapsáno, nálezy níže“, ⚠ pod ním, žádné „✓ výkres PDF“", { timeout: 180_000 }, async () => {
+    const { r, files } = await run(NO_TOL);
+    expect(drawOk(r.full)).toEqual([]);
+    expect(r.full).toMatch(/^ℹ L4 msg\.note "Deska A": výkres PDF: .* – zapsáno, nálezy níže$/m);
+    expect(r.entries.some((e) => e.line === 4 && e.code === "drawing.warning" && /nepředepsané tolerance/.test(e.text))).toBe(true);
+    expect(files.size).toBe(1); // bez přísného režimu se soubor zapíše
+  });
+  it("funkční plocha bez tolerované kóty (repro 79e): žádné „✓ výkres PDF“ nad ⚠ funkční polohy", { timeout: 180_000 }, async () => {
+    const { r } = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nfunkční F2 ±0,02\nvýkres export pdf');
+    expect(r.entries.some((e) => e.line === 6 && e.code === "drawing.warning" && /funkční poloha F2/.test(e.text))).toBe(true);
+    expect(drawOk(r.full)).toEqual([]);
+  });
+  it("řez mimo těleso (✗ na řádku příkazu řezu): zápis výkresu ℹ, ne ✓ – soubor ten nález nese", { timeout: 180_000 }, async () => {
+    const { r } = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres řez XZ odsazení 500\nvýkres export pdf');
+    expect(r.entries.filter((e) => e.code === "drawing.section-miss").map((e) => e.line)).toEqual([5]);
+    expect(drawOk(r.full)).toEqual([]);
+    expect(r.full).toMatch(/^ℹ L6 msg\.note "Deska A": výkres PDF: /m);
+  });
+  it("přísný režim: ⚠ listu zastaví běh a soubor výkresu se NEZAPÍŠE (žádný F, files=0); čistý list se zapíše a je ✓", { timeout: 180_000 }, async () => {
+    const a = await run(NO_TOL, true);
+    expect(a.r.protocol).toMatch(/^MNCAD\/1 STOP /);
+    expect(a.r.entries.find((e) => e.code === "drawing.warning")?.text).toMatch(/^soubor nezapsán \(přísný režim zastaví běh\) – Výkres nemá nepředepsané tolerance/);
+    expect(a.files.size).toBe(0);
+    expect(a.r.protocol).not.toMatch(/^F /m);
+    expect(a.r.full).not.toMatch(/výkres PDF: Deska/);
+    const ok = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres export pdf', true);
+    expect(ok.files.size).toBe(1);
+    expect(ok.r.protocol).not.toMatch(/^MNCAD\/1 STOP/);
+    expect(drawOk(ok.r.full)).toHaveLength(1); // ✓ zápisu zůstává jen u listu bez nálezu
+  });
+  it("přísný režim s výjimkou `přísně kromě drawing.warning`: soubor se zapíše, řádek zápisu ℹ, ⚠ pod ním", { timeout: 180_000 }, async () => {
+    const { r, files } = await run(NO_TOL.replace("výkres export pdf", "přísně kromě drawing.warning\nvýkres export pdf"), true);
+    expect(files.size).toBe(1);
+    expect(drawOk(r.full)).toEqual([]);
+    expect(r.entries.some((e) => e.code === "drawing.warning" && /^Výkres nemá/.test(e.text))).toBe(true);
+  });
+});
+
+describe("kolo 7: platnost souboru nad 3000 ploch – „✓ … jen rychlou kontrolou“ bez rychlé kontroly (22c)", () => {
+  const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [10, 10, 10]];
+  it("soubor nad mez bez jakékoli kontroly platnosti: ℹ „platnost souboru nezkontrolována (3500 ploch > 3000 …)“, ne ✓ a ne „jen rychlou kontrolou“", async () => {
+    const { exportCheck } = await import("../agent-out");
+    const c = exportCheck({ solids: 1, volume: 1000, bbox: box, valid: null }, { solids: 1, volume: 1000, bbox: box, valid: null, validExact: null, faces: 3500 }, "STEP");
+    expect(c.line).toMatch(/^ℹ kontrola STEP: .* → odpovídá modelu; platnost souboru nezkontrolována \(3500 ploch > 3000; přísný režim ji zkontroluje\)$/);
+    expect(c.line).not.toMatch(/rychlou kontrolou|věrná kopie|^✓/);
+    expect(c.level).toBe("note");
+    expect(c.validCheck).toBe("none");
+    // rychlá kontrola proběhla a prošla: ✓ se slabší větou zůstává (nad 400 ploch bez přesné)
+    const fast = exportCheck({ solids: 1, volume: 1000, bbox: box, valid: true }, { solids: 1, volume: 1000, bbox: box, valid: true, validExact: null, faces: 3500 }, "STEP");
+    expect(fast.line).toMatch(/^✓ .*jen rychlou kontrolou – přesná neproběhla \(3500 ploch > 400\)$/);
+  });
+  it("přísný režim: kontrola zpětným načtením žádá jádro o platnost bez meze ploch (`exportStats(…, full)`); bez přísného režimu ne", { timeout: 180_000 }, async () => {
+    const run = async (strict: boolean) => {
+      const h = host();
+      const calls: unknown[] = [];
+      const k = h.kernel as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const kernel = new Proxy(k, { get: (t, p) => (p === "exportStats" ? (...a: unknown[]) => (calls.push(a[3] ?? false), t.exportStats(...a)) : typeof t[p as string] === "function" ? (t[p as string] as (...x: unknown[]) => unknown).bind(t) : t[p as string]) });
+      const { resetExportChecks } = await import("../engine/files");
+      resetExportChecks();
+      await runReport(new MemoryWorkspace(), "nový díl Kostka\nkvádr 10 10 10\nexport step", { ...h, kernel: kernel as unknown as KernelApi }, { lang: "cs", strict });
+      return calls;
+    };
+    expect(await run(true)).toEqual([true]);
+    expect(await run(false)).toEqual([false]);
+  });
+});

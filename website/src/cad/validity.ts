@@ -29,6 +29,8 @@ export type ValidityResult = {
 export const EXACT_AUTO_FACES = 400;
 /** do kolika ploch proběhne přesná kontrola na vyžádání (`kontrola přesně`) */
 export const EXACT_MAX_FACES = 5000;
+/** nad kolik ploch se platnost souboru při kontrole exportu nekontroluje (drahé) – `valid: null`; přísný režim mez nemá */
+export const EXPORT_VALID_FACES = 3000;
 
 const secs = (ms: number) => {
   const s = (Math.round(ms / 10) / 100).toFixed(2);

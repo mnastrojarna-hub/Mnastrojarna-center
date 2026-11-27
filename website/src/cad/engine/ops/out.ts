@@ -69,14 +69,16 @@ type Out = { name: string; mime: string; data: Uint8Array; format: string };
  * úložiště odkazů s odkazem na stránku ke stažení (share-file.ts). Vrací zapsaný soubor (řádek F) – u base64 / odkazu jen
  * popis bez cesty; null = nedoručeno (✗ out.too-big, share.store-unavailable, share.rejected).
  */
-async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery, weak: false | "note" | "check" = false): Promise<OutFile | null> {
+async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery, weak: false | "note" | "check" | "findings" = false): Promise<OutFile | null> {
   const doc = runOf(ctx).doc.name;
   // `weak` (22c, 22i kolo 6): zápis souboru, o jehož výsledku rozhodne až kontrola níže (STEP / BREP se zpětným načtením,
   // model bez tělesa, volné plochy) – soubor je zapsaný, ale zápis se nepočítá mezi ✓ (ℹ „zapsáno – kontrola níže“); ✓ nese
   // jen kontrola, ⚠ / ✗ kontroly pak nestojí pod zeleným řádkem
-  // „check“ = výsledek nese kontrola zpětným načtením níže (věta „zapsáno, kontrola níže“); „note“ = jen ℹ (nález složení následuje)
-  const done = (text: string) => (weak ? void ctx.report.code("msg.note", { line: ctx.line, doc, text: weak === "check" ? `${text} – ${tr("zapsáno, kontrola níže")}` : text }) : e.ok(text));
-  const sym = (line: string) => (weak ? `${line.replace(/^✓/, "ℹ")}${weak === "check" ? ` · ${tr("kontrola níže")}` : ""}` : line);
+  // „check“ = výsledek nese kontrola zpětným načtením níže (věta „zapsáno, kontrola níže“); „note“ = jen ℹ (nález složení
+  // následuje / zazněl výš); „findings“ = výkres s nálezy listu, které následují (22i kolo 7: „zapsáno, nálezy níže“)
+  const tail = weak === "check" ? [tr("zapsáno, kontrola níže"), tr("kontrola níže")] : weak === "findings" ? [tr("zapsáno, nálezy níže"), tr("nálezy níže")] : null;
+  const done = (text: string) => (weak ? void ctx.report.code("msg.note", { line: ctx.line, doc, text: tail ? `${text} – ${tail[0]}` : text }) : e.ok(text));
+  const sym = (line: string) => (weak ? `${line.replace(/^✓/, "ℹ")}${tail ? ` · ${tail[1]}` : ""}` : line);
   if (how === "link") {
     const { shareFile, FileStoreError } = await import("../../share-file");
     try {
@@ -185,7 +187,8 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
       },
       write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", weak),
     },
-    { check: cmd.check !== false, verifyFirst: strictCheck, ...(ms?.parts ? { parts: ms.parts } : {}) },
+    // přísný režim: platnost souboru i nad mezí ploch (22c kolo 7 – dřív nad 3000 ploch nezkontrolována ani v přísném běhu)
+    { check: cmd.check !== false, verifyFirst: strictCheck, fullCheck: strictCheck, ...(ms?.parts ? { parts: ms.parts } : {}) },
   ).catch((err: unknown) => {
     // neúspěšný / zrušený export zůstane v dokumentu (bod 22h kolo 7 – cad/export-failures.ts): fáze, chyba, revize, čas
     const r = runOf(ctx);
@@ -211,7 +214,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (hold.check) {
     const c = hold.check;
     prePrint();
-    e.code(c.code ?? "out.check-failed", { text: unwritten(c.line.replace(/^[✓⚠✗]\s*/, "")), level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+    e.code(c.code ?? "out.check-failed", { text: unwritten(c.line.replace(/^[✓⚠✗ℹ]\s*/, "")), level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
     return;
   }
   if (!f) return;
@@ -235,10 +238,11 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     return;
   }
   const c = job.check!;
-  const text = c.line.replace(/^[✓⚠✗]\s*/, "");
+  const text = c.line.replace(/^[✓⚠✗ℹ]\s*/, "");
   f.check = { ok: c.ok, text };
   note(f.check);
-  if (c.ok) {
+  if (c.ok && c.level === "note") e.code("msg.note", { text, indent: "  " }); // platnost souboru nezkontrolována – ℹ, ne ✓
+  else if (c.ok) {
     e.console(`  ${c.line}`);
     e.ok(text);
   } else e.code(c.code ?? "out.check-failed", { text, indent: "  ", level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
@@ -266,7 +270,58 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   const one = typeof cmd.sheet === "number" || (typeof cmd.sheet === "string" && cmd.sheet !== "all" && cmd.sheet !== "doc");
   const what = many ? tr("výkres {0}, listů {1}", FMT, p.sheets ?? 1) : one ? tr("výkres {0}, list {1}", FMT, cmd.sheet as string | number) : tr("výkres {0}", FMT);
   const label = formatLabel(cmd.format) + (p.files ? ` · ZIP: ${p.files.join(", ")}` : "") + (p.width ? ` ${p.width} × ${p.height} px` : "");
-  const f = await deliver(ctx, e, p, what, label, cmd.deliver ?? "file");
+  // nálezy exportu se rozhodnou PŘED zápisem (22i / 22c kolo 7): soubor výkresu s ⚠ / ✗ listu není ✓ („✓ výkres PDF“ nad
+  // ⚠ „Výkres nemá nepředepsané tolerance“), ale ℹ „zapsáno, nálezy níže“; v přísném úseku nález, který běh zastaví, soubor
+  // nezapíše vůbec (dřív STOP exit 2 a PDF zůstal ve složce, řádek F)
+  type Finding = { code: Code; init: CodeEntryInit; unwritten: string };
+  const findings: Finding[] = [];
+  // 22g (kolo 6): výkres sestavy z kopie dílu starší než díl v záložce – řádek exportu to řekne sám (jako `--formats`),
+  // ne jen dřívější řádek změny dílu / listu; údaje v souboru jsou z vložení
+  if (d.kind === "assembly")
+    for (const sc of staleCopies(d, (n) => ctx.ws.findPart(n))) findings.push({ code: "asm.stale-copy", init: { text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", FMT, staleCopyText(sc)) }, unwritten: staleCopyText(sc) });
+  // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
+  // řez mimo těleso (22i kolo 6): ✗ drawing.section-miss jako u příkazu výkresu – a když ho protokol pro týž list už má
+  // (příkaz `výkres řez …`, konec bloku), podruhé se nehlásí (dřív navíc ⚠ drawing.warning s odznakem bez kódu řezu)
+  const labels = ids.map((sid) => sheetLabel(d, d.drawings?.findIndex((x) => x.id === sid) ?? 0));
+  let missOwned: boolean | null = null; // listy exportu, které běh měnil: nález řezu nese řádek příkazu výkresu
+  let elsewhere = ctx.report.entries.slice(before).some((x) => x.code === "drawing.stale"); // ⚠ zastaralého listu nad zápisem
+  for (const w of p.warnings) {
+    const wc = sheetWarningCode(w.text);
+    if (wc === "drawing.section-miss") {
+      const cands = w.sheet ? [w.sheet] : labels.length ? labels : [sheetLabel(d, 0)];
+      const known = () => cands.some((sheet) => ctx.report.entries.some((x) => sameSheetFinding(x, { code: wc, doc: d.name, text: sheetIssueText({ code: wc, sheet, text: w.text }) })));
+      if (!known() && missOwned === null) {
+        missOwned = false;
+        for (const sid of ids) if (ctx.draw && (await ctx.draw.reportNow(sid, [wc]))) missOwned = true;
+      }
+      // nález už na jiném řádku (příkaz řezu, konec bloku): soubor ho nese také – zápis není ✓, jen se neopakuje
+      if (known()) {
+        elsewhere = true;
+        continue;
+      }
+      findings.push({ code: wc, init: { args: issueArgs(wc, cands[0]!, w.text), level: "error" }, unwritten: sheetIssueText({ code: wc, sheet: cands[0]!, text: w.text }) });
+      continue;
+    }
+    const text = w.sheet ? `${w.sheet}: ${w.text}` : w.text;
+    findings.push({ code: wc === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", init: { text }, unwritten: text });
+  }
+  const unwritten = (text: string) => tr("soubor nezapsán (přísný režim zastaví běh) – {0}", text);
+  const stopper = findings.find((x) => !!ctx.strict?.escalates(x.code, ctx.line));
+  if (stopper) {
+    // přísný režim: soubor se nezapíše, nález, který běh zastaví, to řekne; ostatní nálezy listu beze změny
+    e.code(stopper.code, { text: unwritten(stopper.unwritten), ...(stopper.init.level ? { level: stopper.init.level } : {}) });
+    for (const x of findings) if (x !== stopper) e.code(x.code, { ...(x.code === "asm.stale-copy" ? { text: x.unwritten } : x.init), indent: "  " });
+    return;
+  }
+  // nález, který tento export ohlásil na jiném řádku (řez mimo těleso na řádku příkazu výkresu, ⚠ zastaralého listu
+  // s výjimkou), a přísný běh na něm zastaví: soubor se také nezapíše
+  const fresh = ctx.strict?.hit(ctx.report.entries.slice(before), ctx.line);
+  if (fresh) {
+    e.code("msg.note", { text: unwritten(fresh.text) });
+    return;
+  }
+  const weak = findings.length ? ("findings" as const) : elsewhere ? ("note" as const) : false;
+  const f = await deliver(ctx, e, p, what, label, cmd.deliver ?? "file", weak);
   if (f) f.sheets = p.sheets ?? 1;
   if (f) {
     const rev = ids.length === 1 ? ((d.drawings?.find((s) => s.id === ids[0])?.meta as { revision?: string } | undefined)?.revision ?? "") : "";
@@ -275,30 +330,8 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
     const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && !sameModel(s.issued, mid); });
     recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
   }
-  // 22g (kolo 6): výkres sestavy z kopie dílu starší než díl v záložce – řádek exportu to řekne sám (jako `--formats`),
-  // ne jen dřívější řádek změny dílu / listu; ✓ zápisu souboru zůstává, údaje v souboru jsou z vložení
-  if (f && d.kind === "assembly") for (const sc of staleCopies(d, (n) => ctx.ws.findPart(n))) e.code("asm.stale-copy", { text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", FMT, staleCopyText(sc)), indent: "  " });
-  // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
-  // řez mimo těleso (22i kolo 6): ✗ drawing.section-miss jako u příkazu výkresu – a když ho protokol pro týž list už má
-  // (příkaz `výkres řez …`, konec bloku), podruhé se nehlásí (dřív navíc ⚠ drawing.warning s odznakem bez kódu řezu)
-  const labels = ids.map((sid) => sheetLabel(d, d.drawings?.findIndex((x) => x.id === sid) ?? 0));
-  let missOwned: boolean | null = null; // listy exportu, které běh měnil: nález řezu nese řádek příkazu výkresu
-  for (const w of p.warnings) {
-    const wc = sheetWarningCode(w.text);
-    if (wc === "drawing.section-miss") {
-      const cands = w.sheet ? [w.sheet] : labels.length ? labels : [sheetLabel(d, 0)];
-      const known = () => cands.some((sheet) => ctx.report.entries.some((x) => sameSheetFinding(x, { code: wc, doc: d.name, text: sheetIssueText({ code: wc, sheet, text: w.text }) })));
-      if (known()) continue;
-      if (missOwned === null) {
-        missOwned = false;
-        for (const sid of ids) if (ctx.draw && (await ctx.draw.reportNow(sid, [wc]))) missOwned = true;
-      }
-      if (missOwned && known()) continue;
-      e.code(wc, { args: issueArgs(wc, cands[0]!, w.text), level: "error", indent: "  " });
-      continue;
-    }
-    e.code(wc === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
-  }
+  // nálezy listu se hlásí i bez doručení souboru (✗ out.too-big …); kopie dílu v sestavě jen u zapsaného souboru
+  for (const x of findings) if (f || x.code !== "asm.stale-copy") e.code(x.code, { ...x.init, indent: "  " });
 }
 
 /** id listů dokumentu `d` v rozsahu exportu (bez uloženého výkresu žádné; „doc“ = listy dokumentu, výkresy dílů z komponent ne) */

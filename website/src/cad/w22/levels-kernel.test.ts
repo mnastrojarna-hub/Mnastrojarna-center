@@ -129,6 +129,35 @@ describe("příčina prázdného výsledku je ověřená proti tělesu před ope
     expect(emptyResultCause(around)).toBeNull();
     expect(emptyResultCause(r.makeBaseBox(1, 1, 1) as never)).toBeNull(); // výsledek, který není z deníku operací
   });
+  it("kolo 7: „covered“ jen s přesným průnikem celého objemu – dva nástroje, mezi nimiž zůstane pás tělesa (vrcholy v nástrojích, obálka nástrojů těleso pokrývá), NENÍ covered", { timeout: 60_000 }, async () => {
+    // dřív stačila obálka + vrcholy: obě podmínky platí, a přesto nástroje těleso nepokrývají (pás Z 4…6 zůstane)
+    const { beginFeatureOps, emptyResultCause } = await import("../shape-health");
+    const { cutAll } = await import("../fastbool");
+    const body = r.makeBaseBox(10, 10, 10) as never as r.Shape3D;
+    // těleso = makeBaseBox(10, 10, 10) = [-5…5] × [-5…5] × [0…10]; nástroj = kvádr [-20…20]² × [-10…20] s dutinou [-2…2]² × [3…7]
+    const hollow = r.makeBox([-20, -20, -10], [20, 20, 20]).cut(r.makeBox([-2, -2, 3], [2, 2, 7]) as never) as never as r.Shape3D;
+    beginFeatureOps();
+    const slab = cutAll(body, [r.makeBox([-20, -20, -10], [20, 20, 4]) as never, r.makeBox([-20, -20, 6], [20, 20, 20]) as never]);
+    expect(emptyResultCause(slab)).toBeNull();
+    // nástroj s vnitřní dutinou uvnitř tělesa: také ne covered
+    beginFeatureOps();
+    expect(emptyResultCause(cutAll(body, [hollow]))).toBeNull();
+    // kontrola: plný nástroj stejné obálky je dál covered (důkaz objemem projde)
+    beginFeatureOps();
+    expect(emptyResultCause(cutAll(body, [r.makeBox([-20, -20, -10], [20, 20, 20]) as never]))).toBe("covered");
+  });
+  it("kolo 7: průnik – obálky se překrývají, tělesa ne (koule u rohu kvádru): „disjoint“ z nejkratší vzdálenosti; dotyk / překryv = null", { timeout: 60_000 }, async () => {
+    const { beginFeatureOps, emptyResultCause } = await import("../shape-health");
+    const body = r.makeBaseBox(10, 10, 10) as never as r.Shape3D;
+    beginFeatureOps();
+    // kvádr [-5…5]² × [0…10]; koule se středem [8; 8; 13] a poloměrem 4: obálka [4…12]² × [9…17] zasahuje do obálky kvádru,
+    // nejkratší vzdálenost od rohu [5; 5; 10] je √27 − 4 = 1,196 mm
+    const apart = body.intersect(r.makeSphere(4).translate([8, 8, 13]) as never) as never as r.Shape3D;
+    expect(emptyResultCause(apart)).toBe("disjoint");
+    beginFeatureOps();
+    const overlap = body.intersect(r.makeSphere(4).translate([6, 6, 11]) as never) as never as r.Shape3D; // roh kvádru v kouli
+    expect(emptyResultCause(overlap)).toBeNull();
+  });
 });
 
 describe("konečné těleso – nezkontrolováno není ✓", () => {
