@@ -1,0 +1,52 @@
+# vlna 23, 4. kolo (nálezy oponentů kola 3): slova v příponě kóty se počítají do 5 řádků; buňka razítka nese hodnotu svého
+# druhu (pokyn ✗); revize s pokynem ✗ i se „změna:“; „HV 650“ → 650 HV; „Black oxide“ → povrch; nástrojová ocel jiná než
+# model ✗; pokyn v popisu plochy modelu ✗; kopie listu při dělení výkres + poznámky ✗; 2D: blok „ISO7200_TITLE“ agenta
+# se počítá, rámeček tolerance a značka drsnosti s pokyny ✗
+nový díl "Deska"
+kvádr 100 60 12
+díra 9 skrz v 50 30
+materiál 1.2379
+výkres A3 měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres nepředepsané ISO 2768-mK
+výkres razítko číslo="MN-1" kreslil="AI"
+výkres upravit a4 přípona=" lapovat"
+výkres upravit a5 přípona=" leštit"
+výkres značka text "Odmastit" v 30 120
+výkres značka text "Konzervovat" v 30 115
+výkres značka text "Zabalit do VCI" v 30 110
+výkres značka text "Označit rytinou" v 30 105
+výkres razítko tepelné="Konzervovat olejem" úhly="Označit rytinou"
+výkres revize A "změna: odmastit a konzervovat"
+výkres revize A "Ø9 → Ø10"
+výkres značka text "HV 650" v 30 95
+výkres značka text "Black oxide" v 30 90
+výkres značka text "Vanadis 23" v 30 85
+poznámka F3 "Odmastit"
+poznámka F2 "Lapovat"
+výkres stav
+výkres list nový "Detail"
+výkres A3 měřítko 1:1 pohledy přední,horní,levý
+výkres značka text "Expedovat" v 30 120
+výkres stav vše
+stav
+#--- run
+2d nový Deska2D
+#--- run
+2d obdélník 0,0 100,60
+#--- run
+2d mtext 10,200 @120,-30 "Odmastit\PKonzervovat\PZabalit"
+#--- run
+2d blok ISO7200_TITLE 10,200 e2
+#--- run
+2d vložit ISO7200_TITLE 10,150
+#--- run
+2d vložit ISO7200_TITLE 10,100
+#--- run
+2d tolerance řetězec "Kalit a popustit 58 HRC%%vČernit" 120,40
+#--- run
+2d drsnost 30,60 0 "Odmastit a konzervovat olejem"
+#--- run
+2d drsnost 50,60 0 "Ra 1,6"
+#--- run
+2d stav

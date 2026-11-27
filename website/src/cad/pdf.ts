@@ -33,6 +33,7 @@ function toBase64(buf: ArrayBuffer): string {
 const DASH: Record<string, number[]> = {
   hidden: [3, 1.5],
   center: [12, 3, 1.5, 3],
+  chain: [12, 3, 1.5, 3],
   cut: [12, 3, 1.5, 3],
 };
 

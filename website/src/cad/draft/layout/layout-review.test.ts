@@ -177,9 +177,10 @@ describe("změna formátu: výchozí výřez se přizpůsobí", () => {
     expect(vpOf().scale).toBe(0.5);
     const r = ok("vzhled-stránky A4 na-výšku");
     const vp = vpOf();
-    closeP(vp.c, [110, 171.5]);
+    // razítko 2D výkresu má technický pás 10 mm (vlna 23, R1) – kreslicí plocha nad ním je o 10 mm nižší
+    closeP(vp.c, [110, 176.5]);
     close(vp.w, 170);
-    close(vp.h, 221);
+    close(vp.h, 211);
     close(vp.scale, 0.1);
     const tb = lay().entities.find((e) => e.type === "insert" && (e as DInsert).block === TITLE_BLOCK) as DInsert;
     expect(tb.attribs!.find((a) => a.tag === "MERITKO")!.value).toBe("1:10");

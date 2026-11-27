@@ -259,6 +259,9 @@ export class RunVerifier {
     }
     if (!states.length || states.some((x) => x === "error" || x === "warn")) return true;
     if (line !== null && red.has(line)) return true;
+    // řádek načtení s ✗ / ⚠ téhož dokumentu (pravidla textu výkresu, vlna 23 – načtený soubor / JSON): „bez ⚠ a ✗“ by mu
+    // odporovalo – prvky jsou v pořádku, ale dokument zelený není
+    if (this.ctx.report.entries.some((e) => (e.line ?? null) === line && e.doc === doc.name && (e.level === "error" || e.level === "warn"))) return true;
     const last = [...doc.features].reverse().map((f) => st.get(f.id)).find((s) => s?.body);
     const unchecked = states.filter((x) => x === "unchecked").length;
     const data = { loaded: { features: states.length, unchecked, ...(last?.body ? { body: levelsData({ ok: true, body: last.body }).body } : {}) } };

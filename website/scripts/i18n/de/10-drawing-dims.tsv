@@ -18,7 +18,6 @@
 ✓ kóty: žádné automatické (odstraněno vygenerovaných: {0})	✓ Maße: keine automatischen (erzeugte entfernt: {0})
 ✓ nepředepsané tolerance {0}	✓ Allgemeintoleranzen {0}
 ✓ nový list výkresu „{0}“ (Chytré kóty)	✓ neues Zeichnungsblatt „{0}“ (intelligente Bemaßung)
-✓ obecná drsnost {0} (poznámka u razítka)	✓ allgemeine Rauheit {0} (Hinweis am Schriftfeld)
 ✓ poznámka: {0}	✓ Hinweis: {0}
 ✓ tolerance {0} → {1} ({2})	✓ Toleranz {0} → {1} ({2})
 ✓ výkres: {0}	✓ Zeichnung: {0}
@@ -50,7 +49,6 @@ měřítko: 1:2, 2:1, 1:1 nebo auto	Maßstab: 1:2, 2:1, 1:1 oder auto
 na šířku	quer
 na výšku	hoch
 Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou	Ersetzt nur erzeugte Maße – eigene Maße und Hinweise bleiben
-Nepředepsaná drsnost {0}	Allgemeine Oberflächenrauheit {0}
 neznámý pohled „{0}“ – přední, horní, levý, pravý, zadní, spodní, iso	unbekannte Ansicht „{0}“ – vorne, oben, links, rechts, hinten, unten, iso
 od základny	Bezugsbemaßung
 osy	Mittellinien

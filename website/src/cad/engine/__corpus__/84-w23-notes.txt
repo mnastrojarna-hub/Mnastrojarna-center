@@ -1,0 +1,29 @@
+# vlna 23 (požadavek majitele 27. 11.): výkres strojařsky – klíčové údaje v razítku, místní popis odkazem z modelu,
+# oblastní úprava tlustou čerchovanou čarou, nad razítkem nejvýš 5 krátkých řádků, žádný list jen s poznámkami (R1–R7)
+nový díl "Deska"
+kvádr 100 60 12
+díra 9 skrz v 50 30
+materiál 1.2379
+výkres A3 měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres nepředepsané ISO 2768-mK
+výkres razítko číslo="MN-1" tepelné="kalit a popustit" tvrdost="58-60 HRC" povrch="černit" hrany="ISO 13715 -0,3" drsnost="Ra 3,2"
+výkres značka text "Ra 1,6" v 30 60
+výkres značka text "Brousit" v 30 55
+výkres značka text "Odmastit, konzervovat" v 30 50
+výkres poznámka "Tepelně zpracovat kalit a popustit na tvrdost 58 až 60 HRC podle předpisu výrobce oceli"
+výkres poznámka "Při jakékoli nejasnosti kontaktujte konstruktéra."
+výkres značka poznámka "Kalit 58 HRC" na Ø9
+poznámka F2 "Lapovat"
+úprava F3 tepelná "62+2 HRC" od 10 do 40
+výkres značka text "Oznacit" v 30 45
+výkres značka text "Balit" v 30 40
+výkres značka text "Expedovat" v 30 35
+výkres list nový "Detail"
+výkres pohledy iso
+výkres značka text "Technicke pozadavky viz list 1" v 30 60
+výkres list 1
+výkres stav
+#--- run
+poznámka F2 "Brousit"
+výkres stav

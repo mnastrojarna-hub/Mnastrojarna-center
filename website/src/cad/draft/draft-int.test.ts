@@ -50,7 +50,7 @@ export const TOOLMAKER = `
 2d kóta-lineární 120,0 120,40 140,20; kóta-řetězová 120,80
 2d kóta-průměr e8 30,55
 2d kóta-poloměr e6 -10,95
-2d mtext 130,80 @60,-20 "Neoznačená sražení 1×45°\\PDrsnost Ra 3,2"
+2d mtext 130,80 @60,-20 "Odmastit\\PKonzervovat"
 2d tolerance poloha ø0.05M A,B 130,40
 2d hladina aktuální RAZÍTKO
 2d obdélník 0,-60 @80,-20

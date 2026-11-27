@@ -1,0 +1,32 @@
+# vlna 23, 4. kolo – popisy s odkazem, 2D tolerance a drsnost, druh hodnoty buňky razítka, původ po uložení, kopie listu
+„{0}“ je pokyn („{1}“), ne hodnota buňky – pokyny pro výrobu a expedici na výkres nepatří	„{0}“ is an instruction („{1}“), not a cell value – manufacturing and shipping instructions do not belong on the drawing
+„{0}“ je pokyn pro výrobu / expedici („{1}“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří	„{0}“ is a manufacturing / shipping instruction („{1}“) – a face note carries a technical item (e.g. „Grind“, „Lap“); instructions belong neither in the model nor on the drawing
+„{0}“ není obecná tolerance (např. „ISO 2768-mK“, „ISO 22081“, tabulka „X. ±0,1 / X.X ±0,1“)	„{0}“ is not a general tolerance (e.g. „ISO 2768-mK“, „ISO 22081“, table „X. ±0.1 / X.X ±0.1“)
+„{0}“ není polotovar (např. „tyč Ø40×120“, „plech 40×160×185“)	„{0}“ is not a stock (e.g. „bar Ø40×120“, „plate 40×160×185“)
+„{0}“ není povrchová úprava (např. „černit“, „Zn 8 µm“, „RAL 9005“, „eloxovat“, „bez úpravy“)	„{0}“ is not a surface treatment (e.g. „black oxide“, „Zn 8 µm“, „RAL 9005“, „anodize“, „none“)
+„{0}“ není stav hran (např. „ISO 13715 -0,3“, „srazit 0,5×45°“, „otupit“)	„{0}“ is not an edge condition (e.g. „ISO 13715 -0.3“, „chamfer 0.5×45°“, „break edges“)
+„{0}“ není tepelné zpracování (např. „kalit a popustit“, „cementovat CHT 0,8“, „nitridovat“, „zušlechtit“)	„{0}“ is not a heat treatment (e.g. „harden and temper“, „case harden CHT 0.8“, „nitride“, „quench and temper“)
+„{0}“ není tolerance sražení (např. „±0,2“)	„{0}“ is not a chamfer tolerance (e.g. „±0.2“)
+„{0}“ není tolerance úhlů (např. „±0°30′“, „±0,5°“)	„{0}“ is not an angle tolerance (e.g. „±0°30′“, „±0.5°“)
+atribut razítka {0}: {1}	title block attribute {0}: {1}
+buňka razítka {0} „{1}“: {2}	title block cell {0} „{1}“: {2}
+dokument „{0}“ je jen nosič textu (holé těleso z primitiv, víc řádků poznámek ({1}) než kót) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	document „{0}“ is only a text carrier (bare primitive body, more note lines ({1}) than dimensions) – no notes-only drawing is created; put the data in the title block of the part drawing
+dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}	agent document (JSON / setDocument in this run, or a file with text saved by an agent): {0}{1}
+export odmítnut – {0}	export refused – {0}
+geometrická tolerance „{0}“ je pokyn („{1}“) – rámeček nese jen značku, hodnotu a základny	geometric tolerance „{0}“ is an instruction („{1}“) – the frame carries only the symbol, value and datums
+geometrická tolerance „{0}“ nese text („{1}“) – rámeček nese jen značku, hodnotu a základny (např. ⌖ Ø0,1 A B)	geometric tolerance „{0}“ carries text („{1}“) – the frame carries only the symbol, value and datums (e.g. ⌖ Ø0.1 A B)
+geometrická tolerance „{0}“ obsahuje údaj razítka ({1}) – {2}	geometric tolerance „{0}“ contains title block data ({1}) – {2}
+list „{0}“ opakuje pohledy listu „{1}“ a nenese nic vlastního (žádný řez, detail ani ruční kóta) – smažte ho (výkres list smazat {2}) nebo na něm nastavte jiné pohledy	sheet „{0}“ repeats the views of sheet „{1}“ and carries nothing of its own (no section, detail or manual dimension) – delete it (drawing sheet delete {2}) or set other views on it
+list „{0}“ opakuje pohledy listu „{1}“, který nese poznámky – výkres se na „list s výkresem + list s poznámkami“ nedělí; jeden list s pohledy, kótami a nejvýš 5 řádky nad razítkem, druhý list smažte (výkres list smazat {2})	sheet „{0}“ repeats the views of sheet „{1}“, which carries notes – a drawing is not split into „drawing sheet + notes sheet“; one sheet with views, dimensions and at most 5 lines above the title block, delete the other (drawing sheet delete {2})
+materiál „{0}“ je pokyn („{1}“) – materiál je označení (např. „1.2379“, „C45“)	material „{0}“ is an instruction („{1}“) – the material is a designation (e.g. „1.2379“, „C45“)
+neviditelné znaky v textu (měkké dělení, nulová mezera) – pište text bez nich	invisible characters in the text (soft hyphen, zero-width space) – write the text without them
+plocha ?	face ?
+polotovar „{0}“ nese údaj jiného pole ({1}) – do polotovaru jen rozměr a druh (např. „tyč Ø40×120“, „plech 40×160×185“), tvrdost a úpravy do jejich buněk	stock „{0}“ carries data of another field ({1}) – the stock holds only size and kind (e.g. „bar Ø40×120“, „plate 40×160×185“), hardness and treatments go to their cells
+revize {0} „{1}“ je pokyn („{2}“), ne popis změny výkresu – pokyny do tabulky revizí nepatří ani s „změna:“ / „→“ (popis změny např. „Ø20 → Ø22“, „doplněna díra Ø9“)	revision {0} „{1}“ is an instruction („{2}“), not a description of a drawing change – instructions do not belong in the revision table, not even with „change:“ / „→“ (a change e.g. „Ø20 → Ø22“, „added hole Ø9“)
+ze souboru {0}	from file {0}
+ze souboru	from file
+značka drsnosti „{0}“ je pokyn („{1}“) – značka nese hodnotu Ra / Rz a nanejvýš jedno slovo způsobu výroby	surface symbol „{0}“ is an instruction („{1}“) – the symbol carries the Ra / Rz value and at most one word of the production method
+značka drsnosti „{0}“ nemá hodnotu Ra / Rz – slova bez hodnoty jsou poznámka (např. „Ra 0,8“ + postup „broušeno“)	surface symbol „{0}“ has no Ra / Rz value – words without a value are a note (e.g. „Ra 0.8“ + method „ground“)
+značka drsnosti „{0}“ obsahuje údaj razítka ({1}) – {2}	surface symbol „{0}“ contains title block data ({1}) – {2}
+značka drsnosti „{0}“: {1} slova – způsob výroby nejvýš jedním slovem (pole ISO 1302)	surface symbol „{0}“: {1} words – production method in at most one word (ISO 1302 field)
+model {0}	model {0}

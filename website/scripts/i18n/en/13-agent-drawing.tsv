@@ -81,7 +81,6 @@ pohled „{0}“ na listu není – pohledy: {1}	view “{0}” is not on the sh
 poloviční	half
 posun	shift
 pozice komponent (balónky)	component positions (balloons)
-poznámka potřebuje text: výkres značka poznámka "Kalit 58 HRC" na Ø40	a note needs a text: drawing mark note "Harden 58 HRC" on Ø40
 Prohlížeč nepodporuje kreslení do canvasu.	The browser does not support drawing into a canvas.
 přichyceno ke geometrii	snapped to geometry
 razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí	sheet title block (number, author and revision also into the document properties, material into the material designation) and the revision table
@@ -96,7 +95,6 @@ střed	center
 střed detailu	detail center
 střed detailu {0} je mimo pohled {1} – rozsahy ukáže výkres stav	detail center {0} is outside the {1} view – drawing status shows the ranges
 text se umisťuje na list: výkres značka text "…" v x y (mm listu od levého dolního rohu)	text is placed on the sheet: drawing mark text "…" at x y (sheet mm from the lower left corner)
-text: výkres značka text "Kalit 58 HRC" v 20 30 [výška 5] (mm listu od levého dolního rohu)	text: drawing mark text "Harden 58 HRC" at 20 30 [height 5] (sheet mm from the lower left corner)
 umístit	place
 v bodě {0} je více kružnic (R {1}) – zadejte r	there are several circles at {0} (R {1}) – give r
 v pohledu {0} není kružnice se středem {1}{2} – kružnice: {3}	the {0} view has no circle with center {1}{2} – circles: {3}

@@ -116,7 +116,9 @@ export class DrawingTracker {
         const stale = d.kind === "assembly" ? staleCopies(d, (n) => ctx.ws.findPart(n)) : [];
         for (const sc of stale) this.add1(line, "asm.stale-copy", d.name, staleCopyText(sc), t.lines);
         // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku
-        if (!stale.length && !rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
+        // rady ℹ k ručnímu textu (člověk v GUI – vlna 23, R6) ✓ nezastaví, ale ✓ je nezamlčí: „poznámky: N rad ℹ“
+        const hints = rb.entries.filter((e) => e.level === "note" && /^drawing\.(?:notes-|note-|leaders-)/.test(e.code ?? "") && e.code !== "drawing.note-to-title" && this.onBlock(e, d.name, t.lines)).length;
+        if (!stale.length && !rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines, hints);
       } catch (e) {
         if (isCancelled(e)) throw e;
         this.add1(line, "op.failed", d.name, codeText("op.failed", errMessage(e)), t.lines);
@@ -151,17 +153,26 @@ export class DrawingTracker {
     this.known.set(issue.sheetId, set);
   }
 
+  /** záznam dokumentu `doc` na některém z řádků bloku */
+  private onBlock(e: Entry, doc: string, lines: number[]): boolean {
+    if (e.doc !== undefined && e.doc !== doc) return false;
+    const dl = (e.data as { lines?: unknown } | undefined)?.lines;
+    return [...(e.lines ?? []), ...(e.line !== null ? [e.line] : []), ...(Array.isArray(dl) ? (dl as number[]) : [])].some((l) => lines.includes(l));
+  }
+
   /** ✗ / ⚠ výkresu (nebo chyba příkazu) dokumentu `doc` na některém z řádků bloku */
   private findingOf(e: Entry, doc: string, lines: number[]): boolean {
     if (e.level !== "error" && !(e.level === "warn" && e.code?.startsWith("drawing."))) return false;
     if (e.doc !== undefined && e.doc !== doc) return false;
-    const at = [...(e.lines ?? []), ...(e.line !== null ? [e.line] : []), ...(((e.data as { lines?: number[] } | undefined)?.lines ?? []) as number[])];
+    // `data.lines` = řádky bloku (pole); jiné záznamy mohou mít pod `lines` číslo (počet řádků textu) – to řádek skriptu není
+    const dl = (e.data as { lines?: unknown } | undefined)?.lines;
+    const at = [...(e.lines ?? []), ...(e.line !== null ? [e.line] : []), ...(Array.isArray(dl) ? (dl as number[]) : [])];
     return at.some((l) => lines.includes(l));
   }
 
   /** ✓ listu po vyhodnocení (řádek posledního příkazu bloku): pohledy, řezy a Chytré kóty bez hlášení */
-  private sheetOk(line: number, doc: string, sheet: string, lines: number[]): void {
-    const text = tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)", sheet);
+  private sheetOk(line: number, doc: string, sheet: string, lines: number[], hints = 0): void {
+    const text = hints ? tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, razítko) · ruční text: {1} rad ℹ (pravidla pro agenty, člověka neomezují)", sheet, hints) : tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)", sheet);
     if (this.ctx.log) this.ctx.log.body.push({ line, text: `✓ ${text}` });
     this.ctx.report.add({ line, level: "ok", text, doc, data: { lines } });
   }

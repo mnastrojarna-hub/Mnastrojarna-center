@@ -22,16 +22,18 @@ Polohy děr: kóty od hran (horní) – na listu 4/4
 U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
 Razítko: název Deska A · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
 Revize: žádné
-Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané „ISO 2768-mK“ · drsnost — · technický pás razítka +10 mm (1 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
-  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
-  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 115…315, y 233…273
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 115…315, y 89…209
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 24000 mm³ · těleso platné
 ✓ Sloučení 1 (combine) · úběr 12000 mm³ (50 % nástroje) · těleso platné
@@ -67,15 +69,17 @@ Polohy děr: kóty od hran (horní) – na listu 0/4
 U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
 Razítko: název Deska A · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
 Revize: žádné
-Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané „ISO 2768-mK“ · drsnost — · technický pás razítka +10 mm (1 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
-  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
-  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
+  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 115…315, y 233…273
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 115…315, y 89…209
 ⚠ řádek 8: list List 1: kóty neúplné – chybí 8 (velikosti 4/6, polohy 0/6): 20 (Kvádr 2); 2× Ø8 skrz (Díra 1, Díra 2) – na listu 1× z 2×; poloha Kvádr 2 – X 35; poloha Kvádr 2 – Y 20; poloha Díra 1 – X 15; poloha Díra 1 – Y 15; a dalších 2
 ✓ výkres PDF: Deska_A_vykres.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
   ⚠ kóty neúplné – chybí 8 (velikosti 4/6, polohy 0/6): 20 (Kvádr 2); 2× Ø8 skrz (Díra 1, Díra 2) – na listu 1× z 2×; poloha Kvádr 2 – X 35; poloha Kvádr 2 – Y 20; poloha Díra 1 – X 15; poloha Díra 1 – Y 15; a dalších 2

@@ -21,6 +21,7 @@ import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
 import { staleCopies, staleCopyText, staleHints } from "../asm-refresh";
 import type { PdfFonts } from "../pdf";
+import { CodedError } from "./codes";
 import { sketchToDxf } from "../sketch";
 import type { AsmComponent, CadDoc, ExportFormat, Feature } from "../types";
 import type { AsmEnvOptions } from "./asm-env";
@@ -391,6 +392,9 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
     if (!csv) throw new Error(tr("Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá."));
     return { name: `${base}_kusovnik.csv`, mime: OUT_MIME.csv, data: csv, format, warnings: [] };
   }
+  // listy s porušením pravidel textu agenta se neexportují (vlna 23 – jako exportDrawing; všechny výkresy dokumentu)
+  // i výchozí list dokumentu bez výkresu (D5: název dílu a materiál se tisknou v razítku)
+  (await import("../drawing-agent")).exportGuard(d, (d.drawings ?? []).map((_, i) => i));
   const sheets = await documentSheets(env, d);
   // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
   // díly v záložkách: zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` jako v `kusovník`
@@ -484,7 +488,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.notes-loaded" | "drawing.notes-limit" | "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet" | "drawing.leaders-limit" | "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
@@ -553,6 +557,13 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   if (d.kind === "draft") {
     // DXF / DWG 2D výkresu píše stejný exportér jako `2d export …` (běží i v Node); tisk PDF / SVG rozvržení je jen v aplikaci
     if ((fmt === "dxf" || fmt === "dwg") && d.draft) {
+      // pravidla textu 2D výkresu (vlna 23): text agenta s porušením se nezapíše; text ze souboru z disku = ⚠ (D1)
+      const g = (await import("../draft/agent-notes")).draftExportGuard(d.draft);
+      if (g.bad.length) {
+        note({ code: "drawing.notes-limit", args: [d.name, tr("export odmítnut – {0}{1}", g.bad[0].text, g.bad.length > 1 ? tr(" (a dalších {0} nálezů – 2d stav)", g.bad.length - 1) : "")], level: "error" });
+        return [];
+      }
+      if (g.loaded.length) note({ code: "drawing.notes-loaded", args: [d.name, tr("text 2D výkresu ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů) – agent ho nezměnil, export je povolen. První: {1}", g.loaded.length, g.loaded[0].text)], level: "warn" });
       const f = await (await import("../draft/io")).draftExport(d.draft, fmt, { name: base });
       for (const w of f.warnings.slice(0, 5)) note({ code: "drawing.warning", text: w, level: "warn" });
       return [await write(`${base}.${fmt}`, f.mime, f.data, fmt)];
@@ -577,6 +588,20 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   }
   // dokument bez výkresu: výchozí list – jako `výkres export` (⚠ drawing.default-sheet, přísný režim ho zastaví)
   if (!hasDrawings(d)) note({ code: "drawing.default-sheet" });
+  // výstup výkresu z textové cesty (CLI --formats, HTTP): list s porušením pravidel textu agenta se nezapíše (vlna 23)
+  // i výchozí list dokumentu bez výkresu (D5 – název dílu a materiál v razítku jdou stejnou kontrolou)
+  {
+    const da = await import("../drawing-agent");
+    try {
+      const loaded = da.exportGuard(d, (d.drawings ?? []).map((_, i) => i));
+      // D1: text ze souboru otevřeného z disku export nezastaví, ale ✓ to není
+      if (loaded.length) note({ code: "drawing.notes-loaded", args: [d.drawings?.[0]?.name ?? tr("list {0}", 1), da.loadedText(d, loaded)], level: "warn" });
+    } catch (e) {
+      if (!(e instanceof CodedError)) throw e;
+      note({ code: e.code as OutNote["code"], args: e.args, level: "error" });
+      return [];
+    }
+  }
   const sheets = await documentSheets(env, d);
   // kód podle textu jádra (sheet-eval.ts): rovina řezu mimo těleso = ✗ drawing.section-miss (B5), jinak ⚠ drawing.warning;
   // list jako vyhodnocení listu během běhu (engine/drawing-track.ts) – job.ts tutéž hlášku podruhé nepřidá

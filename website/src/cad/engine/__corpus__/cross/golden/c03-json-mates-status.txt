@@ -1,5 +1,6 @@
 === run 1 ===
 ✓ dokument „Uložení“ (0 prvků) – otevře se v nové záložce
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 
 Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
