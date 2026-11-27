@@ -85,6 +85,57 @@ describe("22d: Tažení po šroubovici s thread= je závit v kontrole dílu, kon
     expect(cs).toContain("M20×1,5 (15 dl.)");
   });
 
+  it("kolo 6 (oprava po oponentuře): EN popisky kontroly kót bez české diakritiky u všech druhů prvků – i „R5 (rohy)“ zaoblených rohů obdélníku", () => {
+    // dřív: dim-check.ts pushoval `R${fmt(e.r)} (rohy)` mimo tr() → EN kontrola kót vypsala „4. R5 (rohy) (Sketch 1)“
+    const sk = {
+      id: "s1", type: "sketch", name: "Sketch 1", plane: "XY",
+      entities: [
+        { id: "e1", type: "rect", cx: 0, cy: 0, w: 50, h: 30, r: 5 },
+        { id: "e2", type: "slot", cx: 0, cy: 0, length: 20, width: 6, angle: 0 },
+        { id: "e3", type: "polygon", cx: 0, cy: 0, r: 4, sides: 6, angle: 0 },
+        { id: "e4", type: "ellipse", cx: 0, cy: 0, rx: 3, ry: 2, angle: 0 },
+        { id: "e5", type: "circle", cx: 0, cy: 0, r: 2 },
+      ],
+    } as unknown as Feature;
+    const rsk = { id: "s2", type: "sketch", name: "Sketch 2", plane: "XY", entities: [{ id: "r1", type: "rect", cx: 10, cy: 20, w: 8, h: 40, r: 0 }] } as unknown as Feature;
+    const feats = [
+      sk,
+      { id: "x1", type: "extrude", name: "Extrude 1", sketchId: "s1", distance: 10, mode: "add" },
+      rsk,
+      { id: "v1", type: "revolve", name: "Revolve 1", sketchId: "s2", axis: "y", angle: 360, mode: "add" },
+      { id: "f1", type: "fillet", name: "Fillet 1", radius: 2, edges: [] },
+      { id: "c1", type: "chamfer", name: "Chamfer 1", distance: 1, edges: [] },
+      { id: "sh1", type: "shell", name: "Shell 1", thickness: 2, faces: [] },
+      { id: "p1", type: "pattern", name: "Pattern 1", kind: "linear", spacing: 10, spacing2: 12, count: 2, count2: 2, featureIds: [] },
+      { id: "sp1", type: "spring", name: "Spring 1", radius: 5, pitch: 3, turns: 4, wire: 1 },
+    ] as unknown as Feature[];
+    const labels = () => expectedDims({ ...emptyDoc(), features: feats }, [[0, 0, 0], [50, 30, 10]]).map((e) => e.label);
+    try {
+      setLang("en");
+      const en = labels();
+      expect(en).toContain("R5 (corners)");
+      expect(en.filter((l) => /[ěščřžýáíéůúĚŠČŘŽÝÁÍÉŮÚ]|rohy|délka|šířka|výška|hl\.|skrz/.test(l))).toEqual([]);
+      setLang("de");
+      expect(labels()).toContain("R5 (Ecken)");
+    } finally {
+      setLang("cs");
+    }
+    expect(labels()).toContain("R5 (rohy)");
+  });
+
+  it("kolo 6 (oprava po oponentuře): běh --lang en „skica XY: obdélník 50 30 zaoblení-rohů 5 … výkres kontrola kót“ – bez „(rohy)“", { timeout: 300_000 }, async () => {
+    const text = 'nový díl "Deska R"\nskica XY: obdélník 50 30 zaoblení-rohů 5\nvysunout 10\nvýkres A4\nvýkres kótovat\nvýkres kontrola kót';
+    try {
+      setLang("en");
+      const r = finalizeReport(await runReport(new MemoryWorkspace(), text, host(), { lang: "en" }), { full: true });
+      const full = r.full ?? "";
+      expect(full, full).toMatch(/R5/);
+      expect(full).not.toMatch(/rohy/);
+    } finally {
+      setLang("cs");
+    }
+  });
+
   it("kolo 6: EN běh „feature surf.helixSweep … drawing check dims“ – řádek kontroly kót celý anglicky (délka i název prvku)", { timeout: 300_000 }, async () => {
     const text = 'new part "Nut E"\ntube 30 16.5 20\nfeature surf.helixSweep profile=thread60 thread=M18x1.5 side=internal turns=12 mode=cut\ndrawing A4\ndrawing dimension\ndrawing check dims';
     try {

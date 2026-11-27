@@ -9,7 +9,7 @@ import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
 import "./fastbox";
 import { MESH_ANGULAR, meshTolerance } from "./fastbool";
 import { compositionOf, describeCheck, isValidShape, sameSignature, signatureOf, solidsVolume, type ShapeCheck, type ShapeSignature } from "./check";
-import { beginFeatureOps, carryHealth, flagInvalidBody, invalidLeadText, invalidSince, opChainOf, verifyEffectOnly, verifyResult } from "./shape-health";
+import { beginFeatureOps, carryHealth, emptyResultCause, flagInvalidBody, invalidLeadText, invalidSince, opChainOf, verifyEffectOnly, verifyResult } from "./shape-health";
 import { FEATURE_CHECK_FACES, FINAL_CHECK_FACES, effectOf, resultTypeError, settleBodyChecks, type Composition, type EffectOp } from "./feature-levels";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
@@ -901,7 +901,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     if (changing && sig && sig.faces <= FEATURE_CHECK_FACES) {
       // síť jako pro zobrazení + kontrola; výsledek s příznakem vady: operace znovu s tolerancí, pak oprava tělesa (shape-health.ts)
       const v = verifyResult(next, f, volumes, invalidSince(body));
-      if (body && bodySig && !v.check.solids && bodySig.faces > 0) throw new Error(noSolidError(f, v.check));
+      if (body && bodySig && !v.check.solids && bodySig.faces > 0) throw new Error(noSolidError(f, v.check, !v.check.solids && !v.check.shells && !v.check.faces ? emptyResultCause(next) : null));
       if (v.shape !== next) {
         next = v.shape;
         sig = signatureOf(next) ?? sig;
@@ -1345,11 +1345,12 @@ function boolModeOf(f: Feature): string | undefined {
  * Hláška ✗, když po prvku nezůstalo objemové těleso (22b, kolo 6). Prázdný výsledek odebrání / průniku znamená, že nástroj
  * ubral celé těleso (není to selhání jádra); rada o dráze a profilu platí jen pro tažení; jinak obecná věta s rozborem.
  */
-export function noSolidError(f: Feature, c: ShapeCheck): string {
+export function noSolidError(f: Feature, c: ShapeCheck, cause: "covered" | "disjoint" | null = null): string {
   const mode = boolModeOf(f);
   const empty = !c.solids && !c.shells && !c.faces;
-  if (empty && mode === "cut") return tr("Nástroj ubral celé těleso – po odebrání nezůstal žádný materiál (nástroj překrývá celé těleso). Zmenšete nebo posuňte nástroj, nebo změňte režim.");
-  if (empty && mode === "intersect") return tr("Průnik s nástrojem je prázdný – nástroj se s tělesem nepřekrývá, nezůstal žádný materiál. Posuňte nebo zvětšete nástroj, nebo změňte režim.");
+  // jistá příčina jen ověřená proti tělesu před operací (`emptyResultCause`): prázdný výsledek sám může být i selhání jádra
+  if (empty && mode === "cut" && cause === "covered") return tr("Nástroj ubral celé těleso – po odebrání nezůstal žádný materiál (nástroj překrývá celé těleso). Zmenšete nebo posuňte nástroj, nebo změňte režim.");
+  if (empty && mode === "intersect" && cause === "disjoint") return tr("Průnik s nástrojem je prázdný – nástroj se s tělesem nepřekrývá, nezůstal žádný materiál. Posuňte nebo zvětšete nástroj, nebo změňte režim.");
   const sweep = f.type === "sweep" || (f.type === "ext" && (f.ext === "surf.sweep" || f.ext === "surf.helixSweep"));
   if (sweep) return tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).", describeCheck(c));
   return tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry prvku (rozměry, polohu, režim).", describeCheck(c));

@@ -252,7 +252,7 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
           else if (e.type === "rect") {
             push(out, "lin", e.w, `${fmt(e.w)}`, src);
             push(out, "lin", e.h, `${fmt(e.h)}`, src);
-            if (e.r > 0) push(out, "rad", e.r, `R${fmt(e.r)} (rohy)`, src);
+            if (e.r > 0) push(out, "rad", e.r, tr("R{0} (rohy)", fmt(e.r)), src);
           } else if (e.type === "slot") {
             push(out, "lin", e.length, tr("{0} (délka drážky)", fmt(e.length)), src);
             push(out, "lin", e.width, tr("{0} (šířka drážky)", fmt(e.width)), src);

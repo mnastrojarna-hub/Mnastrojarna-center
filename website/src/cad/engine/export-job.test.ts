@@ -63,6 +63,31 @@ describe("export jako úloha – fáze, kontrola zpětným načtením, revize mo
     expect(phases).toEqual(["model", "convert", "write", "verify"]);
   });
 
+  it("zadržení zápisu po kontrole (`hold`, přísný režim 22c kolo 6): soubor se nezapíše a fáze „zápis“ se nehlásí", async () => {
+    // dřív: přísný běh, jehož nález kontroly zastaví běh, soubor nezapsal, ale průběh (--progress / fáze hostitele) ohlásil
+    // fázi „write“ souboru, který nevznikl
+    resetExportChecks();
+    const { kernel } = fakeKernel({ fileStats: { ...stats, volume: 1000 } });
+    const phases: ExportPhase[] = [];
+    const write = vi.fn(async () => 1);
+    const seen: boolean[] = [];
+    const r = await runExportJob(part(), "step", { kernel: kernel as never, write, phase: (p) => phases.push(p), hold: (c) => (seen.push(c.ok), c.ok ? null : { out: -1 }) });
+    expect(seen).toEqual([false]);
+    expect(write).not.toHaveBeenCalled();
+    expect(r.out).toBe(-1);
+    expect(phases).toEqual(["model", "convert", "verify"]);
+    expect(r.phases.map((p) => p.phase)).toEqual(["model", "convert", "verify"]);
+    // kontrola projde → `hold` vrátí null → zápis jako dřív
+    resetExportChecks();
+    const ok = fakeKernel();
+    const ph2: ExportPhase[] = [];
+    const w2 = vi.fn(async () => 2);
+    const r2 = await runExportJob(part(), "step", { kernel: ok.kernel as never, write: w2, phase: (p) => ph2.push(p), hold: (c) => (c.ok ? null : { out: -1 }) });
+    expect(w2).toHaveBeenCalledTimes(1);
+    expect(r2.out).toBe(2);
+    expect(ph2).toEqual(["model", "convert", "verify", "write"]);
+  });
+
   it("STL bez kontroly; sestava bez samostatné přestavby (skládá se při převodu); `bez kontroly` vynechá kontrolu", async () => {
     const { kernel } = fakeKernel();
     const ph1: ExportPhase[] = [];

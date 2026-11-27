@@ -9,3 +9,4 @@ Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametr
 zapsáno, kontrola níže	written, check below
 kontrola níže	check below
 soubor nezapsán (přísný režim zastaví běh) – {0}	file not written (strict mode stops the run) – {0}
+R{0} (rohy)	R{0} (corners)

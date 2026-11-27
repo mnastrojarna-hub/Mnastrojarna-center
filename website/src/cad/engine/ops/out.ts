@@ -165,20 +165,23 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     {
       kernel: ctx.host.kernel,
       phase: (p) => ctx.host.phase?.(`export:${fmt}`, p),
-      write: async (data, check) => {
-        if (check && !check.ok && stops(check.code ?? "out.check-failed")) {
-          hold.check = check;
-          return null;
-        }
-        return deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", weak);
+      // nález kontroly zpětným načtením, který zastaví přísný běh: soubor se nezapíše a fáze „zápis“ se neohlásí
+      hold: (check) => {
+        if (check.ok || !stops(check.code ?? "out.check-failed")) return null;
+        hold.check = check;
+        return { out: null };
       },
+      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", weak),
     },
     { check: cmd.check !== false, verifyFirst: strictCheck, ...(ms?.parts ? { parts: ms.parts } : {}) },
   );
   const f = job.out;
   const prePrint = () => {
     if (!pre) return;
-    if (pre.level === "ok") {
+    // volné plochy vedle tělesa (známé před zápisem): „těleso platné“ platí jen pro tělesa, soubor nese i plochy – žádné ✓
+    // hned nad ⚠ out.free-surfaces téhož exportu (oponentura kola 6, var/c1), jen ℹ s týmž textem
+    if (pre.level === "ok" && (ms?.free ?? 0) > 0) e.code("msg.note", { text: pre.text, indent: "  " });
+    else if (pre.level === "ok") {
       e.console(`  ✓ ${pre.text}`);
       e.ok(pre.text);
     } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });

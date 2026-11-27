@@ -501,6 +501,53 @@ export function opChainOf(result: Shape): { kind: BoolKind | null; tool: number 
   return { kind, tool: chain.reduce((sum, o) => sum + toolsVolume(o), 0) };
 }
 
+/** vzdálenost bodu od tvaru (BRepExtrema; bod uvnitř tělesa = 0) */
+function pointDistance(shape: r.AnyShape, p: Vec3): number {
+  const oc: OC = r.getOC();
+  const v = r.makeVertex(p);
+  const q = new oc.BRepExtrema_DistShapeShape();
+  try {
+    q.LoadS1(shape.wrapped);
+    q.LoadS2(v.wrapped);
+    q.Perform(new oc.Message_ProgressRange());
+    return q.IsDone() ? (q.Value() as number) : Infinity;
+  } finally {
+    q.delete();
+    v.delete();
+  }
+}
+
+/**
+ * Proč je prázdný výsledek booleovské operace prvku prázdný (22b, kolo 6 – oponentura: hláška „Nástroj ubral celé těleso“
+ * nesmí stát jen na prázdném výsledku, ten může vrátit i selhávající výpočet jádra). Ověřuje se proti tělesu PŘED operací:
+ * - `"covered"` – odebrání: obálka nástroje obsahuje obálku tělesa a každý vrchol tělesa leží v nástroji nebo na jeho povrchu;
+ * - `"disjoint"` – průnik: obálka nástroje se s obálkou tělesa nepřekrývá;
+ * - `null` – nepotvrzeno (jiná operace, výsledek není z deníku operací, nebo podmínka neplatí) → obecná hláška „jádro selhalo“.
+ */
+export function emptyResultCause(result: Shape): "covered" | "disjoint" | null {
+  let op: (BoolOp & { out: Shape }) | undefined;
+  for (let i = journal.length - 1; i >= 0 && !op; i--) if (journal[i].out === result) op = journal[i];
+  if (!op || !op.tools.length) return null;
+  try {
+    const [[a0x, a0y, a0z], [a1x, a1y, a1z]] = op.a.boundingBox.bounds;
+    const tb = op.tools.map((t) => t.boundingBox.bounds);
+    const t0 = [0, 1, 2].map((k) => Math.min(...tb.map((b) => b[0][k])));
+    const t1 = [0, 1, 2].map((k) => Math.max(...tb.map((b) => b[1][k])));
+    const a0 = [a0x, a0y, a0z];
+    const a1 = [a1x, a1y, a1z];
+    const tol = 1e-4 * (Math.hypot(a1x - a0x, a1y - a0y, a1z - a0z) || 1) + 1e-6;
+    if (op.kind === "Common") return [0, 1, 2].some((k) => t1[k] < a0[k] - tol || t0[k] > a1[k] + tol) ? "disjoint" : null;
+    if (op.kind !== "Cut") return null;
+    if (![0, 1, 2].every((k) => t0[k] <= a0[k] + tol && t1[k] >= a1[k] - tol)) return null;
+    const verts = subShapes(op.a, "VERTEX").map((v) => new r.Vertex(v as never).asTuple() as Vec3);
+    if (!verts.length) return null;
+    const near = 1e-6 * (Math.hypot(a1x - a0x, a1y - a0y, a1z - a0z) || 1) + 1e-7;
+    return verts.every((p) => op.tools.some((t) => pointDistance(t, p) <= near)) ? "covered" : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Zasíťuje těleso stejně jako zobrazení – kontrola platnosti pak vidí totéž co kontrola na konci stavby. Síť může výsledek
  * kontroly změnit jen u hran, jejichž vrchol leží mimo křivku hrany dál, než je přesnost sítě hrany, a to dovolí jen výrazně

@@ -306,8 +306,10 @@ describe("kolo 6: „✓ export STEP“ a pak ⚠ / ✗ – zápis souboru není
   const SHELL = 'nový díl "Deska A"\nskica XY: obdélník 40 30\nprvek surf.extrude sketchId="Skica 1" distance=20\nskica XY: obdélník 40 30\nprvek surf.planar sketchId="Skica 2"\nskica XY odsazení 20: obdélník 40 30\nprvek surf.planar sketchId="Skica 3"\nprvek surf.sew tolerance=0.01';
   const run = async (t: string, strict = false) => {
     const h = host();
+    const phases: string[] = [];
+    h.phase = (op, p) => void phases.push(`${op}:${p}`);
     const r = finalizeReport(await runReport(new MemoryWorkspace(), t, h, { lang: "cs", strict }), { full: true });
-    return { r, files: (h.files as MemoryFiles).files };
+    return { r, files: (h.files as MemoryFiles).files, phases };
   };
   const exportOk = (full: string | undefined) => (full ?? "").split("\n").filter((l) => /^✓ L\d+ export (STEP|BREP)/.test(l));
   it("závit šroubovicí (⚠ out.reload-invalid): řádek zápisu ℹ „zapsáno, kontrola níže“, žádné „✓ … export STEP“ nad ⚠", { timeout: 300_000 }, async () => {
@@ -320,6 +322,14 @@ describe("kolo 6: „✓ export STEP“ a pak ⚠ / ✗ – zápis souboru není
     const { r } = await run('nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano\nexport step\nexport stl');
     expect(r.entries.filter((e) => e.code === "out.free-surfaces")).toHaveLength(2);
     expect((r.full ?? "").split("\n").filter((l) => /^✓ L\d+ export (STEP|STL)/.test(l))).toEqual([]);
+  });
+  it("volné plochy vedle tělesa (var/c1, repro 22c L25): ani „✓ těleso: přesná kontrola platnosti“ nestojí nad ⚠ out.free-surfaces – jen ℹ", { timeout: 180_000 }, async () => {
+    // oponentura kola 6: zápis už byl ℹ, ale ✓ přesné kontroly tělesa zůstal přímo nad ⚠ téhož exportu
+    const { r } = await run('nový díl "Deska B"\nkvádr 40 30 20\nskica XZ: čára -10 5 50 5 otevřená\nprvek surf.extrude sketchId="Skica 1" distance=60 symmetric=ano\nexport step');
+    expect(r.entries.some((e) => e.code === "out.free-surfaces")).toBe(true);
+    const lines = (r.full ?? "").split("\n");
+    expect(lines.filter((l) => /^✓ L5 /.test(l))).toEqual([]);
+    expect(lines.some((l) => /^ℹ L5 msg\.note "Deska B": těleso: přesná kontrola platnosti .* – platné/.test(l)), r.full).toBe(true);
   });
   it("platné těleso: zápis ℹ, ✓ jen z kontroly („věrná kopie modelu“)", { timeout: 180_000 }, async () => {
     const { r } = await run("nový díl Kostka\nkvádr 10 10 10\nexport step");
@@ -335,10 +345,13 @@ describe("kolo 6: „✓ export STEP“ a pak ⚠ / ✗ – zápis souboru není
     const b = await run('nový díl "Šroub B"\nválec 18 30\nzávit M18×1,5 délka 20 v 0 0 10 šroubovice\nexport step', true);
     expect(b.r.entries.find((e) => e.code === "out.reload-invalid")?.text).toMatch(/^soubor nezapsán/);
     expect(b.files.size).toBe(0);
+    // fáze průběhu (CLI --progress / hostitel): kontrola ano, zápis NE – soubor nevznikl (dřív hlášena fáze „write“)
+    expect(b.phases.filter((p) => p.startsWith("export:step:"))).toEqual(["export:step:model", "export:step:convert", "export:step:verify"]);
     const c = await run(`${SHELL}\nexport step`);
     expect(c.files.size).toBe(1); // bez přísného režimu se soubor zapíše (✗ out.no-solid, F check=fail)
     const ok = await run("nový díl Kostka\nkvádr 10 10 10\nexport step", true);
     expect(ok.files.size).toBe(1); // čistá kontrola: zapíše se i v přísném režimu
+    expect(ok.phases.filter((p) => p.startsWith("export:step:"))).toEqual(["export:step:model", "export:step:convert", "export:step:verify", "export:step:write"]);
     expect(ok.r.protocol).not.toMatch(/^MNCAD\/1 STOP/);
   });
 });

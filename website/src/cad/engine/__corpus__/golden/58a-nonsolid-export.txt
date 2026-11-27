@@ -63,7 +63,7 @@ Prvky:
     profil: žádný uzavřený obrys – otevřená křivka e1 (konce [-10; 5] a [50; 5]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
  3. Plošné vysunutí [ext, id #] ✓ těleso platné + 1 volná plocha – 
 ℹ export STEP: c3-teleso-plocha.step · 21 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
-  ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 7
+  ℹ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 7
   ⚠ kontrola STEP: soubor obsahuje vedle těles (1) i plochy mimo tělesa (volných skořepin 1, volných ploch 0) – nejsou objemem, objem a hmotnost jsou jen z těles
 ✓ nový díl „Deska C“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže

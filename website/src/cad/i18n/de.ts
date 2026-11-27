@@ -7758,6 +7758,7 @@ export const DE: Record<string, string> = {
  "R konec": "R Ende",
  "R poloměr": "R Radius",
  "R začátek": "R Anfang",
+ "R{0} (rohy)": "R{0} (Ecken)",
  "R{0}, hrany {1}": "R{0}, Kanten {1}",
  "R{0}, setback {1}{2}, hrany {3}": "R{0}, Rückversatz {1}{2}, Kanten {3}",
  "R1 (začátek hrany)": "R1 (Kantenanfang)",
