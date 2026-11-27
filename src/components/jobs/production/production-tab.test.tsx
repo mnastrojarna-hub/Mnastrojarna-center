@@ -21,6 +21,7 @@ vi.mock("@/components/access-provider", () => ({
 
 import { JobDetailProvider } from "@/components/jobs/detail/detail-context";
 import { ProductionTab, type JobProductionData } from "./production-tab";
+import { DeliveryTab } from "./delivery-tab";
 import { ProductionHeaderBadges } from "./production-chip";
 import type { JobDetail, JobFormOptions, JobListItem } from "@/lib/jobs/types";
 import type { JobClosingInfo, JobOperation } from "@/lib/jobs/production-types";
@@ -75,6 +76,8 @@ function render(j: JobDetail, d: JobProductionData | null, perms = ADMIN): strin
   return renderToString(
     <JobDetailProvider jobId={j.id} perms={perms} options={options}>
       <ProductionTab job={j} data={d} />
+      {/* dodání, podepsaný DL, faktura a platba jsou od 28. 11. ve vlastní záložce */}
+      <DeliveryTab job={j} data={d} flow={null} />
     </JobDetailProvider>,
   ).replace(/<!-- -->/g, "");
 }

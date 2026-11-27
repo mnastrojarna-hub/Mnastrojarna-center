@@ -16,6 +16,7 @@ const LOADERS: Record<LazyDetailTab, () => Promise<AnyComponent>> = {
   historie: () => import("./history-tab").then((m) => m.HistoryTab),
   komunikace: () => import("@/components/jobs/communication/communication-tab").then((m) => m.CommunicationTab),
   vyroba: () => import("@/components/jobs/production/production-tab").then((m) => m.ProductionTab),
+  dodani: () => import("@/components/jobs/production/delivery-tab").then((m) => m.DeliveryTab),
   nakup: () => import("@/components/jobs/purchasing/purchasing-tab").then((m) => m.PurchasingTab),
 };
 

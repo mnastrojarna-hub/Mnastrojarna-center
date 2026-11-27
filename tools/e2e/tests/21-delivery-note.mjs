@@ -1,7 +1,8 @@
 // E2E 21 · Dodací list při zápisu dodání (oprava z bety 29. 10.: „po Dodáno k nám neumí vygenerovat DL").
 // Majitel: zakázka „Dodáno k nám" → další krok „Zapsat dodání a dodací list" → dílčí dodávka → výsledek
 // (číslo DL, Stáhnout PDF, Poslat zákazníkovi → mail s PDF) → chip dodání odkazuje na DL → Doklady →
-// „DL na zbývající položky" → druhý DL (jiné číslo) → Dodáno zákazníkovi; mobil 390 px celý průchod;
+// „DL na zbývající položky" → druhý DL (jiné číslo), stav zůstává (27. 11.: Dodáno zákazníkovi až s podepsaným DL)
+// → záložka „Dodání & faktura" → „Potvrdit bez souboru" → Dodáno zákazníkovi; mobil 390 px celý průchod;
 // zaměstnanec DL vystaví; Kniha nabízí stejný krok. S DL_SHOTS=<adresář> navíc screenshoty dialogu,
 // výsledku a Dokumentů v 1280 / 390 px, světlý i tmavý režim.
 //   E2E_BASE_URL=http://localhost:3500 DL_SHOTS=<adresář> node tools/e2e/tests/21-delivery-note.mjs
@@ -89,6 +90,18 @@ async function inBook(page, j, segment = "") {
   return (await page.locator(`main a[href^="/orders/${j.id}"]`).count()) > 0;
 }
 
+/** Záložka „Dodání & faktura" → karta konce toku → „Potvrdit bez souboru" (podepsaný DL bez skenu). */
+async function confirmDlInTab(page, j) {
+  await openJob(page, j, "?tab=dodani");
+  const closing = page.locator("section#konec-toku");
+  await closing.waitFor({ timeout: 20_000 });
+  const box = closing.locator('[data-testid="confirmed-dl-optional"]');
+  await box.waitFor({ timeout: 15_000 });
+  expect(norm(await box.innerText()).includes("Podepsaný dodací list od zákazníka"), "box podepsaného DL");
+  await box.getByRole("button", { name: /Potvrdit bez souboru/ }).click();
+  await eventually(() => expect(stage(j) === "dodano_zakaznikovi", `DB: po potvrzeném DL Dodáno zákazníkovi (${stage(j)})`), { timeout: 20_000 });
+}
+
 async function submitAndResult(page, dlg) {
   await dlg.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click();
   const res = dlg.locator('[data-testid="delivery-note-result"]');
@@ -161,7 +174,7 @@ await test("Dodáno k nám: další krok „Zapsat dodání a dodací list“ �
 }));
 
 // ═════════════ 2. Doklady → DL na zbývající položky → druhý DL → Dodáno zákazníkovi ═════════════
-await test("Doklady ▾: stáhnout vystavený DL (bez nového čísla) + „DL na zbývající položky“ → druhý DL, Dodáno zákazníkovi, chip „Dodáno“ → DL", () => withContext(browser, errors, async (context) => {
+await test("Doklady ▾: stáhnout vystavený DL (bez nového čísla) + „DL na zbývající položky“ → druhý DL (stav zůstává, další krok Nahrát potvrzený DL); Potvrdit bez souboru → Dodáno zákazníkovi, chip dodání → DL", () => withContext(browser, errors, async (context) => {
   expect(firstDl, "první DL existuje");
   const page = await context.newPage();
   await login(page, USERS.obchod);
@@ -178,18 +191,24 @@ await test("Doklady ▾: stáhnout vystavený DL (bez nového čísla) + „DL n
   const { number, text } = await submitAndResult(page, dlg);
   expect(number !== firstDl, `druhý DL má vlastní číslo (${number} ≠ ${firstDl})`);
   expect(text.includes("2. dodávka — konečná"), `označení konečné dodávky (${text.slice(0, 160)})`);
-  await eventually(() => expect(stage(A) === "dodano_zakaznikovi", `DB: Dodáno zákazníkovi (${stage(A)})`), { timeout: 20_000 });
+  await eventually(() => expect(notes(A).length === 2, "druhý DL zapsán"), { timeout: 20_000 });
+  expect(stage(A) === "dodano_k_nam", `DL na vše stav neposune — čeká na podepsaný DL (${stage(A)})`);
   expect(notes(A).map((r) => r[0]).join(",") === `${firstDl},${number}`, "delivery_notes: dva DL v pořadí");
   await page.keyboard.press("Escape");
   await openJob(page, A);
-  const chip = page.locator('[data-testid="delivery-chip-link"]').first();
-  await chip.waitFor({ timeout: 20_000 });
-  const ct = norm(await chip.innerText());
-  expect(ct.includes("Dodáno") && ct.includes(number), `chip „Dodáno“ → poslední DL (${ct})`);
   await page.getByRole("button", { name: "Doklady (PDF)" }).click();
   expect(await page.getByRole("menuitem", { name: /^Dodací list DL-/ }).count() === 2, "Doklady: oba DL ke stažení");
   expect(await page.getByRole("menuitem", { name: /DL na zbývající položky/ }).count() === 0, "nic nezbývá → bez „DL na zbývající“");
   await page.keyboard.press("Escape");
+  expect(norm(await page.locator("main").innerText()).includes("Další krok: Nahrát potvrzený DL"), "další krok: Nahrát potvrzený DL");
+  expect(await page.getByRole("button", { name: "Vystavit fakturu", exact: true }).count() === 0, "faktura se před potvrzeným DL nenabízí");
+  // podepsaný DL (27. 11.) → teprve teď Dodáno zákazníkovi; chip dodání → poslední DL
+  await confirmDlInTab(page, A);
+  await openJob(page, A);
+  const chip = page.locator('[data-testid="delivery-chip-link"]').first();
+  await chip.waitFor({ timeout: 20_000 });
+  const ct = norm(await chip.innerText());
+  expect(/Dodáno|DL potvrzen/.test(ct) && ct.includes(number), `chip dodání → poslední DL (${ct})`);
   await shot(page, S("03-delivered"));
 
   // 31. 10.: DL na vše → Kniha: Dokončené, ne Objednávky v běhu (ani v Hodnotě v běhu — stejný výběr)
@@ -198,7 +217,7 @@ await test("Doklady ▾: stáhnout vystavený DL (bez nového čísla) + „DL n
 }));
 
 // ═════════════ 3. Mobil 390 px ═════════════
-await test("mobil 390 px: Zapsat dodání a dodací list → rovnou potvrdit (předvyplněno vše) → výsledek, stránka nepřetéká", () => withContext(browser, errors, async (context) => {
+await test("mobil 390 px: Zapsat dodání a dodací list → rovnou potvrdit (předvyplněno vše) → výsledek, stránka nepřetéká; stav zůstává, Potvrdit bez souboru → Dodáno zákazníkovi", () => withContext(browser, errors, async (context) => {
   const M = job("majitel-mobil", "na_sklade");
   const page = await context.newPage();
   await login(page, USERS.obchod);
@@ -212,8 +231,11 @@ await test("mobil 390 px: Zapsat dodání a dodací list → rovnou potvrdit (p�
   expect(await res.getByRole("button", { name: /Vytisknout/ }).isVisible(), "Vytisknout je vidět");
   await expectNoOverflow(page, "výsledek 390 px");
   await shot(page, S("05-mobile-result"));
-  await eventually(() => expect(stage(M) === "dodano_zakaznikovi", "na skladě → dodáno vše → Dodáno zákazníkovi"), { timeout: 20_000 });
-  expect(notes(M).length === 1 && notes(M)[0][0] === number, "jeden DL");
+  await eventually(() => expect(notes(M).length === 1 && notes(M)[0][0] === number, "jeden DL"), { timeout: 20_000 });
+  expect(stage(M) === "na_sklade", `na skladě → DL na vše → stav zůstává (${stage(M)})`);
+  await res.getByRole("button", { name: "Hotovo" }).click();
+  await confirmDlInTab(page, M);
+  await expectNoOverflow(page, "Dodání & faktura 390 px");
 }, { mobile: true }));
 
 // ═════════════ 4. Zaměstnanec + Kniha ═════════════
@@ -245,7 +267,7 @@ await test("DL dodavatele se neukáže jako náš (chip, karta); dodáno bez DL 
   sql(`update order_items set delivered_quantity = 6 where order_id = ${lit(L.id)} and position = 0`);
   const page = await context.newPage();
   await login(page, USERS.obchod);
-  await openJob(page, L, "?tab=vyroba");
+  await openJob(page, L, "?tab=dodani");
   const card = page.getByRole("region", { name: "Dodání zákazníkovi" });
   await card.waitFor({ timeout: 20_000 });
   expect(await page.locator('[data-testid="delivery-chip-link"]').count() === 0, "chip neodkazuje na DL dodavatele");
@@ -260,7 +282,7 @@ await test("DL dodavatele se neukáže jako náš (chip, karta); dodáno bez DL 
   const qty = sql(`select string_agg(quantity::numeric::text, ',' order by position) from delivery_note_items i join delivery_notes n on n.id = i.delivery_note_id where n.order_id = ${lit(L.id)}`);
   expect(qty === "6.000" || qty === "6", `DL nese dodaných 6 ks, ne objednané (${qty})`);
   await page.keyboard.press("Escape");
-  await openJob(page, L, "?tab=vyroba");
+  await openJob(page, L, "?tab=dodani");
   const chip = page.locator('[data-testid="delivery-chip-link"]').first();
   await chip.waitFor({ timeout: 20_000 });
   expect(norm(await chip.innerText()).includes(number), `chip → náš DL ${number}`);
@@ -302,7 +324,7 @@ if (SHOTS) {
         await openJob(page, J, "?tab=dokumenty");
         await page.waitForTimeout(500);
         await page.screenshot({ path: path.join(SHOTS, `03-documents-${c.tag}.png`), fullPage: true });
-        await openJob(page, J, "?tab=vyroba");
+        await openJob(page, J, "?tab=dodani");
         await page.getByRole("region", { name: "Dodání zákazníkovi" }).scrollIntoViewIfNeeded().catch(() => {});
         await page.waitForTimeout(300);
         await page.screenshot({ path: path.join(SHOTS, `04-delivery-card-${c.tag}.png`) });

@@ -1,7 +1,8 @@
 // E2E 23 · Konec toku (A2, beta 29. 10.): „nefunguje ani vytvoření faktury … chybí tam vytvoření PDFka a odeslání
 // úplně stejně, jako je to u nabídky", „když mám něco ve výrobě, nemám možnost kliknout a vygenerovat dodací list".
-// Majitel (obchodník): zakázka Ve výrobě → „Zapsat dodání a dodací list" (z výroby) → Dodáno zákazníkovi →
-// hlavní „Vystavit fakturu" (bez potvrzeného DL) → návrh e-mailu („Zrušit" nic nevystaví) → „Vystavit a odeslat"
+// Majitel (obchodník): zakázka Ve výrobě → záložka „Dodání & faktura" → „Zapsat dodání a dodací list" → stav zůstává,
+// další krok „Nahrát potvrzený DL" (27. 11.) → „Potvrdit bez souboru" → Dodáno zákazníkovi →
+// hlavní „Vystavit fakturu" → návrh e-mailu („Zrušit" nic nevystaví) → „Vystavit a odeslat"
 // (PDF s QR, mail s PDF) → Vyfakturováno → znovu otevřít = jen poslat znovu → „Zadat platbu" → Dokončeno.
 // Desktop i 390 px. Záloha nikdy nezmizí (ochrana triggeru), jde i před fakturou. Dílčí dodávka / nic dodáno =
 // žádná faktura (ani odkazem). Zaměstnanec fakturu nevidí ani neotevře.
@@ -55,7 +56,7 @@ const CUST = sql(`insert into customers (name, country, owner_id, email, contact
 let seq = 0;
 /**
  * Zakázka Ve výrobě s běžícím krokem (U nás) a dvěma oceněnými položkami — hlavní tlačítko je posun výroby,
- * dodání a DL jsou na kartě výroby a v ⋯. stage ≠ ve_vyrobe = zakázka rovnou v daném stavu (bez kroku).
+ * dodání a DL jsou v záložce „Dodání & faktura" a v ⋯. stage ≠ ve_vyrobe = zakázka rovnou v daném stavu (bez kroku).
  */
 function job(name, stage = "ve_vyrobe") {
   seq += 1;
@@ -110,6 +111,15 @@ async function deliverAll(page, dlg) {
   return { number: m[1], res, delivery };
 }
 
+/** Karta konce toku (záložka „Dodání & faktura") → „Potvrdit bez souboru" → Dodáno zákazníkovi. */
+async function confirmDl(page, j) {
+  const box = page.locator('section#konec-toku [data-testid="confirmed-dl-optional"]');
+  await box.waitFor({ timeout: 20_000 });
+  expect(norm(await box.innerText()).includes("Podepsaný dodací list od zákazníka"), "box podepsaného DL");
+  await box.getByRole("button", { name: /Potvrdit bez souboru/ }).click();
+  await eventually(() => expect(row(j).status === "dodano_zakaznikovi", `potvrzený DL → Dodáno zákazníkovi (${row(j).status})`), { timeout: 20_000 });
+}
+
 const invoiceFiles = (j) => sql(`select string_agg(version::text || ':' || archived, ',' order by version) from job_files where job_id = ${lit(j.id)} and kind = 'faktura'`);
 
 /** Hlavní „Vystavit fakturu" → dialog odeslání: jen návrh e-mailu (Komu předvyplněno), faktura ještě nevznikla. */
@@ -125,36 +135,43 @@ async function openInvoice(page) {
 
 // ═════════════ 1. Majitel, desktop: Ve výrobě → DL → faktura (PDF + e-mail) → platba → Dokončeno ═════════════
 const A = job("majitel-desktop");
-await test("desktop: Ve výrobě → „Zapsat dodání a dodací list“ z výroby → Dodáno → „Vystavit fakturu“ (bez potvrzeného DL) → PDF → odeslat → „Zadat platbu“ → Dokončeno", () => withContext(browser, errors, async (context) => {
+await test("desktop: Ve výrobě → „Dodání & faktura“ → „Zapsat dodání a dodací list“ (stav zůstává) → „Potvrdit bez souboru“ → Dodáno → „Vystavit fakturu“ → PDF → odeslat → „Zadat platbu“ → Dokončeno", () => withContext(browser, errors, async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, A, "?tab=vyroba");
-  // hlavní tlačítko je posun výroby; dodání + DL je vidět i tak (souhrn výroby, karta Dodání, ⋯)
+  // hlavní tlačítko je posun výroby; dodání + DL jsou v záložce „Dodání & faktura" (28. 11., z Technologie pryč) a v ⋯
   expect(await nextBtn(page, "Zapsat dodání a dodací list").count() === 0, "ve výrobě není dodání hlavním tlačítkem (běží krok)");
-  // review A2 #10: na Technologii jen JEDNO tlačítko „Zapsat dodání a dodací list" (karta Dodání, plán sk. 2);
-  // souhrn výroby nahoře na kartu jen odkáže (na mobilu je níž)
-  const shortcut = page.locator('[data-testid="summary-delivery"]');
-  await shortcut.waitFor({ timeout: 20_000 });
-  expect(norm(await shortcut.innerText()).includes("Dodání zákazníkovi ↓"), "souhrn výroby: odkaz na kartu Dodání");
   const panel = page.locator("main [role=tabpanel][data-state=active]");
-  expect(await panel.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).count() === 1, "Technologie: jedno tlačítko DL");
-  const dcard = page.getByRole("region", { name: "Dodání zákazníkovi" });
+  await panel.waitFor({ timeout: 20_000 });
+  expect(await panel.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).count() === 0, "Technologie: bez tlačítka DL (přesunuto)");
+  expect(await page.locator("section#konec-toku").count() === 0, "Technologie: bez karty konce toku");
   await shot(page, S("01-ve-vyrobe"));
-  await shortcut.click();
+  await page.getByRole("tab", { name: /Dodání & faktura/ }).click();
+  const dcard = page.getByRole("region", { name: "Dodání zákazníkovi" });
+  await dcard.waitFor({ timeout: 20_000 });
+  expect(await page.locator("main [role=tabpanel][data-state=active]").getByRole("button", { name: /^Zapsat dodání a dodací list/ }).count() === 1, "Dodání & faktura: jedno tlačítko DL");
   await dcard.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click();
   const { number: dl, res, delivery } = await deliverAll(page, page.getByRole("dialog"));
   await shot(page, S("02-dl-result"));
   await res.getByRole("button", { name: "Hotovo" }).click();
   await delivery.waitFor({ state: "hidden", timeout: 10_000 });
-  await eventually(() => expect(row(A).status === "dodano_zakaznikovi", `100 % dodáno → Dodáno zákazníkovi (${row(A).status})`), { timeout: 20_000 });
-  expect(notesCount(A) === 1, "jeden DL");
+  await eventually(() => expect(notesCount(A) === 1, "jeden DL"), { timeout: 20_000 });
+  expect(row(A).status === "ve_vyrobe", `100 % dodáno, DL nepodepsaný → stav zůstává (${row(A).status})`);
 
-  // Dodáno → hlavní „Vystavit fakturu" hned (potvrzený DL není podmínka); karta jen odkazuje nahoru
-  await openJob(page, A, "?tab=vyroba");
-  await nextBtn(page, "Vystavit fakturu").waitFor({ timeout: 20_000 });
+  // DL vystaven → další krok „Nahrát potvrzený DL", faktura ještě ne
+  await openJob(page, A, "?tab=dodani");
+  await nextBtn(page, "Nahrát potvrzený DL").waitFor({ timeout: 20_000 });
+  expect(await nextBtn(page, "Vystavit fakturu").count() === 0, "bez potvrzeného DL žádné „Vystavit fakturu“");
   const closing = page.getByRole("region", { name: "Dodání, faktura a platba" });
+  const ct0 = norm(await closing.innerText());
+  expect(ct0.includes(`Dodáno — ${dl}`) && ct0.includes("Fakturu vystavíš po nahrání podepsaného dodacího listu"), `karta: DL hotový, faktura po podepsaném DL (${ct0.slice(0, 300)})`);
+  await confirmDl(page, A);
+
+  // Dodáno → hlavní „Vystavit fakturu"; karta jen odkazuje nahoru
+  await openJob(page, A, "?tab=dodani");
+  await nextBtn(page, "Vystavit fakturu").waitFor({ timeout: 20_000 });
   const ct = norm(await closing.innerText());
-  expect(ct.includes(`Dodáno — ${dl}`) && ct.includes("nepovinné") && ct.includes("Fakturu vystavíš tlačítkem Vystavit fakturu nahoře"), `karta: DL hotový, potvrzení nepovinné, faktura nahoře (${ct.slice(0, 300)})`);
+  expect(ct.includes(`Dodáno — ${dl}`) && ct.includes("Zákazník potvrdil převzetí") && ct.includes("Fakturu vystavíš tlačítkem Vystavit fakturu nahoře"), `karta: DL potvrzený, faktura nahoře (${ct.slice(0, 300)})`);
   expect(!/Zapsat fakturu|Označit zaplaceno|Zrušit úhradu/.test(ct), "žádné staré cesty (Zapsat fakturu / Označit zaplaceno / Zrušit úhradu)");
   await shot(page, S("03-dodano"));
 
@@ -206,7 +223,7 @@ await test("desktop: Ve výrobě → „Zapsat dodání a dodací list“ z výr
   expect(JSON.stringify(row(A)) === JSON.stringify(before), `datum a splatnost beze změny (${JSON.stringify(row(A))})`);
 
   // Vyfakturováno → „Zadat platbu" → Doplatit zbytek → Zaplaceno → Dokončeno
-  await openJob(page, A, "?tab=vyroba");
+  await openJob(page, A, "?tab=dodani");
   const closing2 = page.getByRole("region", { name: "Dodání, faktura a platba" });
   await eventually(async () => expect(norm(await closing2.innerText()).includes(fv), "karta: číslo faktury + PDF"));
   expect(await closing2.locator('a[href^="/api/jobs/files/"]').filter({ hasText: "PDF" }).count() === 1, "karta: odkaz na PDF faktury");
@@ -219,16 +236,16 @@ await test("desktop: Ve výrobě → „Zapsat dodání a dodací list“ z výr
   await shot(page, S("06-payment"));
   await pay.getByRole("button", { name: "Zaplaceno" }).click();
   await eventually(() => expect(row(A).status === "dokonceno" && row(A).paidAt !== "-", `DB: Dokončeno, zaplaceno (${JSON.stringify(row(A))})`), { timeout: 20_000 });
-  await openJob(page, A, "?tab=vyroba");
+  await openJob(page, A, "?tab=dodani");
   await page.getByText("Zakázka dokončena ✓").waitFor({ timeout: 15_000 });
-  // review A2 #12: po faktuře je nepovinný potvrzený DL jen malý odkaz
+  // po faktuře: potvrzený DL je hotový krok, žádné nové potvrzování
   const done = norm(await page.getByRole("region", { name: "Dodání, faktura a platba" }).innerText());
-  expect(done.includes("Nahrát potvrzený DL (nepovinné)") && !done.includes("Potvrdit bez souboru"), `dokončeno: potvrzený DL jen odkaz (${done.slice(0, 200)})`);
+  expect(done.includes("Zákazník potvrdil převzetí") && !done.includes("Potvrdit bez souboru"), `dokončeno: DL potvrzen, bez potvrzování (${done.slice(0, 200)})`);
   await shot(page, S("07-dokonceno"));
 }));
 
 // ═════════════ 2. Mobil 390 px: ⋯ → dodání, hlavní tlačítka, nic nepřetéká ═════════════
-await test("mobil 390 px: ⋯ „Zapsat dodání a dodací list“ ve výrobě → Vystavit fakturu → Vystavit, neposílat → Zadat platbu → Dokončeno; nic nepřetéká", () => withContext(browser, errors, async (context) => {
+await test("mobil 390 px: ⋯ „Zapsat dodání a dodací list“ ve výrobě → „Nahrát potvrzený DL“ → Potvrdit bez souboru → Vystavit fakturu → Vystavit, neposílat → Zadat platbu → Dokončeno; nic nepřetéká", () => withContext(browser, errors, async (context) => {
   const M = job("majitel-mobil");
   const page = await context.newPage();
   await login(page, USERS.obchod);
@@ -240,7 +257,16 @@ await test("mobil 390 px: ⋯ „Zapsat dodání a dodací list“ ve výrobě �
   await expectNoOverflow(page, "výsledek DL 390 px");
   await res.getByRole("button", { name: "Hotovo" }).click();
   await delivery.waitFor({ state: "hidden", timeout: 10_000 });
-  await eventually(() => expect(row(M).status === "dodano_zakaznikovi", "Dodáno zákazníkovi"), { timeout: 20_000 });
+  await eventually(() => expect(notesCount(M) === 1, "DL vystaven"), { timeout: 20_000 });
+  expect(row(M).status === "ve_vyrobe", `DL bez podpisu stav neposune (${row(M).status})`);
+  await openJob(page, M);
+  // hlavní krok „Nahrát potvrzený DL" → přepne na záložku „Dodání & faktura" (mobil: Vyfotit DL)
+  await nextBtn(page, "Nahrát potvrzený DL").click();
+  await page.locator("section#konec-toku").waitFor({ timeout: 20_000 });
+  expect(await page.getByRole("tab", { name: /Dodání & faktura/ }).getAttribute("data-state") === "active", "záložka Dodání & faktura je aktivní");
+  expect(await page.locator("section#konec-toku").getByText("Vyfotit DL").isVisible(), "mobil: Vyfotit DL");
+  await expectNoOverflow(page, "Dodání & faktura 390 px");
+  await confirmDl(page, M);
   await openJob(page, M);
   const { dlg } = await openInvoice(page);
   await expectNoOverflow(page, "dialog faktury 390 px");
@@ -269,7 +295,7 @@ await test("záloha: „Zadat platbu“ 3 000 v kartě, pak starý přímý záp
   await eventually(() => expect(row(D).status === "fakturovano", `faktura zapsaná → Vyfakturováno (${row(D).status})`));
   const page = await context.newPage();
   await login(page, USERS.obchod);
-  await openJob(page, D, "?tab=vyroba");
+  await openJob(page, D, "?tab=dodani");
   const closing = page.getByRole("region", { name: "Dodání, faktura a platba" });
   await closing.getByRole("button", { name: "Zadat platbu" }).click();
   const pay = page.getByRole("dialog").filter({ hasText: "Zadat platbu" });
@@ -284,7 +310,7 @@ await test("záloha: „Zadat platbu“ 3 000 v kartě, pak starý přímý záp
   // zrušení úhrady zápisem do zakázky smaže jen automatický doplatek
   sql(`update orders set paid_at = null, paid_amount = null where id = ${lit(D.id)}`);
   expect(sql(`select string_agg(amount::numeric::text, ',') from job_payments where job_id = ${lit(D.id)}`).replace(/\.00/g, "") === "3000", "záloha 3 000 zůstala");
-  await openJob(page, D, "?tab=vyroba");
+  await openJob(page, D, "?tab=dodani");
   const t = norm(await page.getByRole("region", { name: "Dodání, faktura a platba" }).innerText());
   expect(t.includes("Odebrat") && !t.includes("Zrušit úhradu") && !t.includes("Označit zaplaceno"), `karta: Odebrat u úhrady, bez hromadného rušení (${t.slice(0, 300)})`);
   await shot(page, S("08-deposit"));
@@ -317,7 +343,7 @@ await test("zaměstnanec: v Dodáno zákazníkovi hlavní „Potvrdit DL“, v D
     await sales.close();
   }
   const fvFile = sql(`select id from job_files where job_id = ${lit(W.id)} and kind = 'faktura' and not archived`);
-  await openJob(page, W, "?tab=vyroba");
+  await openJob(page, W, "?tab=dodani");
   const card = page.getByRole("region", { name: "Dodání, faktura a platba" });
   await eventually(async () => expect(norm(await card.innerText()).includes(row(W).inv), "karta: číslo faktury"));
   expect(await card.locator(`a[href="/api/jobs/files/${fvFile}"]`).count() === 0, "karta: bez odkazu na PDF faktury");
@@ -344,7 +370,7 @@ await test("ve výrobě: záloha „Zadat platbu“ před fakturou; dílčí dod
   await eventually(() => expect(row(Z).soFar === 2000 && row(Z).status === "ve_vyrobe", `záloha 2 000, stav Ve výrobě (${JSON.stringify(row(Z))})`), { timeout: 20_000 });
   // dílčí dodávka (Příruba 10/10, Hřídel 0/4)
   sql(`update order_items set delivered_quantity = quantity where order_id = ${lit(Z.id)} and position = 0`);
-  await openJob(page, Z, "?tab=vyroba");
+  await openJob(page, Z, "?tab=dodani");
   const card = norm(await page.getByRole("region", { name: "Dodání, faktura a platba" }).innerText());
   expect(card.includes("Fakturu vystavíš, až bude dodáno vše") && !card.includes("Vystavit fakturu"), `karta: faktura až po dodání všeho (${card.slice(0, 300)})`);
   await page.getByRole("button", { name: "Doklady (PDF)" }).click();
@@ -380,18 +406,21 @@ if (SHOTS) {
         await snap(page, `01-ve-vyrobe-${c.tag}`);
         await openJob(page, J, "?tab=vyroba");
         await snap(page, `02-ve-vyrobe-technologie-${c.tag}`);
+        await openJob(page, J, "?tab=dodani");
         await page.getByRole("region", { name: "Dodání zákazníkovi" }).getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click();
         const { res, delivery } = await deliverAll(page, page.getByRole("dialog"));
         await res.getByRole("button", { name: "Hotovo" }).click();
         await delivery.waitFor({ state: "hidden", timeout: 10_000 });
-        await eventually(() => expect(row(J).status === "dodano_zakaznikovi", "Dodáno"), { timeout: 20_000 });
+        await openJob(page, J, "?tab=dodani");
+        await snap(page, `02b-dl-vystaven-karta-${c.tag}`);
+        await confirmDl(page, J);
         await openJob(page, J);
         await snap(page, `03-dodano-${c.tag}`);
         await page.getByRole("button", { name: "Doklady (PDF)" }).click();
         await page.getByRole("menuitem").first().waitFor({ timeout: 10_000 });
         await snap(page, `04-doklady-${c.tag}`);
         await page.keyboard.press("Escape");
-        await openJob(page, J, "?tab=vyroba");
+        await openJob(page, J, "?tab=dodani");
         await page.getByRole("region", { name: "Dodání, faktura a platba" }).scrollIntoViewIfNeeded().catch(() => {});
         await snap(page, `05-dodano-karta-${c.tag}`);
         const { dlg } = await openInvoice(page);
@@ -400,7 +429,7 @@ if (SHOTS) {
         await eventually(() => expect(row(J).status === "fakturovano", "Vyfakturováno"));
         await openJob(page, J);
         await snap(page, `07-vyfakturovano-${c.tag}`);
-        await openJob(page, J, "?tab=vyroba");
+        await openJob(page, J, "?tab=dodani");
         await page.getByRole("region", { name: "Dodání, faktura a platba" }).scrollIntoViewIfNeeded().catch(() => {});
         await snap(page, `08-vyfakturovano-karta-${c.tag}`);
         await nextBtn(page, "Zadat platbu").click();
@@ -412,7 +441,7 @@ if (SHOTS) {
         await eventually(() => expect(row(J).status === "dokonceno", "Dokončeno"), { timeout: 20_000 });
         await openJob(page, J);
         await snap(page, `10-dokonceno-${c.tag}`);
-        await openJob(page, J, "?tab=vyroba");
+        await openJob(page, J, "?tab=dodani");
         await page.getByRole("region", { name: "Dodání, faktura a platba" }).scrollIntoViewIfNeeded().catch(() => {});
         await snap(page, `11-dokonceno-karta-${c.tag}`);
       } finally {
