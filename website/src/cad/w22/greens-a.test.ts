@@ -35,7 +35,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setLang } from "../i18n";
 import { setHostAssets } from "../host-assets";
 import { makeKernelClient } from "../kernel-client";
@@ -303,6 +303,63 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
     }
   }, 240_000);
 
+  it("20. (kolo 6) vazba na levý schod, levý smazán: druhý schod na TÉŽE rovině se stejnou plochou není „táž plocha“ – ✗ mate.lost, žádné ℹ mate.renumbered ani „vazby 1/1 ok“", async () => {
+    const script = `nový díl "Deska A"\nkvádr 60 40 10\nkvádr 20 40 5 v 0 0 5 odebrat\nkvádr 20 40 5 v 40 0 5 odebrat\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 5 15 30\nsestava vazba kontakt "Přidržovač" spodní "Deska A" F3\nsestava upravit "Deska A"\nsmazat "Kvádr 2"\nsestava hotovo\nsestava vazby\nstav`;
+    const out = await short(new MemoryWorkspace(), script);
+    expect(out).not.toMatch(/mate\.renumbered/);
+    expect(out).not.toMatch(/^✓ L13 /m);
+    expect(out).toMatch(/^✗ L13 mate\.lost "Sestava A": vazba 1 Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference B F3 dílu „Deska A“ \(rovinná \+Z · střed \[10; 20; 5\] · 800 mm²\)/m);
+    expect(con).not.toMatch(/vazby 1\/1 ok|F7 – ok/);
+    expect(dLine(out, "Sestava A")).toMatch(/ mates=0\/1\(lost=1\) /);
+  }, 240_000);
+
+  it("21. (kolo 6) dokument se ztracenou referencí znovu otevřený: `stav` i konec běhu → ⚠ mate.lost (hlavička není OK warn=0), přísný režim zastaví", async () => {
+    const ws0 = new MemoryWorkspace();
+    await runReport(ws0, `nový díl "Deska A"\nkvádr 60 40 10\nkvádr 20 40 5 v 0 0 5 odebrat\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 40 10 30\nsestava vazba kontakt "Přidržovač" spodní "Deska A" F3\nsestava upravit "Deska A"\nsmazat "Kvádr 2"\nsestava hotovo`, hostOf());
+    const saved = JSON.stringify(ws0.present());
+    expect(saved).toMatch(/"lost":/);
+    // otevřený dokument + stav
+    const out = await short(new MemoryWorkspace(), `${saved}\nstav`);
+    expect(out).not.toMatch(/^MNCAD\/1 OK .* warn=0 /);
+    expect(out).toMatch(/^⚠ L2 mate\.lost "Sestava A": vazba 1 Kontakt „Přidržovač“ F5 → „Deska A“ F3 – ztracená reference/m);
+    expect(out.match(/mate\.lost/g)?.length).toBe(1); // jednou za běh (konec běhu ji neopakuje)
+    expect(statusLines(out)[0]).toMatch(/ mates=0\/1\(lost=1\) /);
+    // otevřený dokument bez `stav` (CLI --open + export): hláška na konci běhu
+    const opened = await short(new MemoryWorkspace(), saved);
+    expect(opened).toMatch(/^⚠ L- mate\.lost "Sestava A"/m);
+    // přísný režim: STOP
+    const rep = await runReport(new MemoryWorkspace(), `${saved}\nstav`, hostOf(), { strict: true });
+    const strict = formatShort(rep, { budget: Infinity });
+    expect(strict).toMatch(/^MNCAD\/1 (STOP|FAIL) /);
+    // další běh nad týmž prostorem bez změny: znovu jen se `stav`, ne na konci každého běhu
+    const ws = new MemoryWorkspace();
+    await runReport(ws, saved, hostOf());
+    const again = await short(ws, "sestava");
+    expect(again).not.toMatch(/mate\.lost/);
+  }, 240_000);
+
+  it("22. (kolo 6, bod 22h) export se stavbou: fáze „přestavba modelu“ se hlásí DŘÍV než průběh stavby (build i/n)", async () => {
+    const events: string[] = [];
+    const stop = kernel.onProgress((p) => {
+      if (p && p.phase !== "start") events.push(`progress:${p.op}`);
+    });
+    try {
+      const host: EngineHost = { ...hostOf(), phase: (op, ph) => events.push(`phase:${op}:${ph}`) };
+      await runReport(new MemoryWorkspace(), 'nový díl "Export F"\nkvádr 20 10 10\nválec 3 10 v 10 5 0 odebrat\nexport step bez kontroly', host, { hooks: { opStart: (_l: number | null, op: string) => void events.push(`op:${op}`) } });
+    } finally {
+      stop();
+    }
+    const at = events.findIndex((e) => /^op:out/.test(e));
+    expect(at).toBeGreaterThanOrEqual(0);
+    const after = events.slice(at + 1);
+    const model = after.indexOf("phase:export:step:model");
+    expect(model).toBeGreaterThanOrEqual(0);
+    const build = after.findIndex((e) => e.startsWith("progress:"));
+    if (build >= 0) expect(model).toBeLessThan(build);
+    expect(after.filter((e) => e === "phase:export:step:model").length).toBe(1); // fáze jednou, ne dvakrát
+    expect(after).toContain("phase:export:step:convert");
+  }, 240_000);
+
   it("10. zrušený běh (signál po 1. řádku): žádné ✓ za další řádky, MNCAD/1 FAIL, run.state cancelled, dokument beze změny", async () => {
     const ws = new MemoryWorkspace();
     await runReport(ws, 'nový díl "Zrušený"\nkvádr 30 30 5', hostOf());
@@ -367,6 +424,57 @@ describe("vlna 22 A4: žádné falešné zelené u ověření odkazu a softwarov
     const bad = await verifyShareLink(r.url.slice(0, k) + (r.url[k] === "A" ? "B" : "A") + r.url.slice(k + 1));
     expect(bad.ok).toBe(false);
     expect((await verifyShareLink("https://www.mnastrojarna.cz/cad")).ok).toBe(false);
+  });
+
+  it("18. (kolo 6) náhradní dlouhý odkaz: úložiště odpovědělo HTTP 500 php_too_old → důvod nese PHP a HTTP 500, ne nepravdivé „neodpovídá“", async () => {
+    setLang("cs");
+    const { resetShareProbe } = await import("../share");
+    const { shareWithPolicy } = await import("../engine/share-out");
+    const store = "http://127.0.0.1:9/cad/share/";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: false, error: "php_too_old", php: "5.6.40", need: "7.0" }), { status: 500, headers: { "content-type": "application/json" } })));
+    try {
+      for (const want of ["auto", "store"] as const) {
+        resetShareProbe();
+        const notes: { code: string; text?: string }[] = [];
+        const r = await shareWithPolicy(doc, { days: 10, view: "model", want, base: "https://example.test/cad", store }, (n) => notes.push(n));
+        expect(r?.mode ?? null).toBe(want === "auto" ? "link" : null);
+        const text = notes.map((n) => n.text ?? "").join("\n");
+        expect(notes.map((n) => n.code)).toEqual([want === "auto" ? "share.fallback-link" : "share.store-unavailable"]);
+        expect(text).toMatch(/HTTP 500/);
+        expect(text).toMatch(/PHP 5\.6\.40/);
+        expect(text).not.toMatch(/neodpovídá/);
+      }
+      // server vůbec neodpověděl (síť): „neodpovídá“ je pravda a důvod se připojí
+      resetShareProbe();
+      vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+      const notes: { code: string; text?: string }[] = [];
+      await shareWithPolicy(doc, { days: 10, view: "model", want: "auto", base: "https://example.test/cad", store }, (n) => notes.push(n));
+      expect(notes[0].text).toMatch(/neodpovídá \(http:\/\/127\.0\.0\.1:9\/cad\/share\/\) – server nedostupný/);
+    } finally {
+      vi.unstubAllGlobals();
+      resetShareProbe();
+    }
+  });
+
+  it("19. (kolo 6) poznámka nad softwarově VYKRESLENÝM modelem není chyba: žádné „3D okno nelze spustit“ ani barvy chyby (cs/en/de)", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ViewportFallback } = await import("../../components/cad/viewport-fallback");
+    const failure = { error: new Error("WebGL context could not be created"), probe: { ok: false, api: null, vendor: null, renderer: null, software: false, reason: "no-webgl" } };
+    try {
+      for (const lang of ["cs", "en", "de"] as const) {
+        setLang(lang);
+        const html = renderToStaticMarkup(createElement(ViewportFallback, { failure, core: "OCCT", onRetry: () => undefined, onCopy: () => undefined, scene: { mesh: null } }));
+        const note = html.match(/<div[^>]*data-soft-note[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+        expect(note).not.toBe("");
+        const text = note.replace(/<[^>]+>/g, "");
+        expect(text).toContain(softStatusText());
+        expect(text).not.toMatch(/nelze spustit|cannot start|kann nicht/i);
+        expect(note).not.toMatch(/#fff7f6|#f3c6c2/i);
+      }
+    } finally {
+      setLang("cs");
+    }
   });
 
   it("13. stav prostředí bez WebGL netvrdí, že 3D běží (ani zelený stav jádra místo něj)", () => {

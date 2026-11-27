@@ -69,7 +69,7 @@ import { springComps, springSeatMates } from "./asm-spring";
 import { lostSpringComps, springLostSides } from "./spring-lost";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
-import { entPrint, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
+import { entPrint, faceBoxes, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
 import { isKinMate } from "./mates-kin";
 import { conflictText, preferOutcome, solveStatic, type StaticConflict } from "./mates-static";
 import { isLimitMate } from "./motion-quasi";
@@ -101,7 +101,7 @@ import type { ClrReq, ClrRes } from "./clearance-types";
 import type { ProcReq, ProcRes } from "./process-types";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
-export type PartFaces = { faces: { face: number; info: PartFace; area?: number }[]; truncated: boolean };
+export type PartFaces = { faces: { face: number; info: PartFace; area?: number; box?: [Vec3, Vec3] }[]; truncated: boolean };
 
 /** Jádro a stav aplikace pro příkazy sestavy. */
 export type AsmEnv = {
@@ -207,9 +207,10 @@ export async function faceInfo(env: AsmEnv, key: string, index: number): Promise
  * Táž plocha v upraveném dílu (po přečíslování) – jen při skutečné geometrické shodě (cad/mate-remap.ts `matchFace`): přesná shoda,
  * nebo jediná plocha na téže rovině / ose; žádná nebo víc možností = null (ztracená reference – nikdy „nejbližší“ jiná plocha).
  */
-export function sameFace(old: PartFace, faces: PartFaces["faces"], _tol = 1e-4, oldIndex = -1): number | null {
+export function sameFace(old: PartFace, faces: PartFaces["faces"], _tol = 1e-4, oldIndex = -1, area?: number, box?: [Vec3, Vec3]): number | null {
   void _tol;
-  const m = matchFace(facePrint(old), faces, oldIndex);
+  // „táž plocha, změnila velikost“ jen s překryvem s původní plochou (plocha mm² / obálka – vlna 22 kolo 6); bez nich null
+  const m = matchFace(facePrint(old, area, box), faces, oldIndex);
   return m.state === "lost" ? null : m.face;
 }
 
@@ -223,13 +224,14 @@ export async function partFaces(env: AsmEnv, key: string, result: BuildResult | 
   const total = result?.metrics?.faces ?? 0;
   const n = Math.min(total, FACE_LIMIT);
   const areas = result?.mesh ? faceAreas(result.mesh) : [];
+  const boxes = result?.mesh ? faceBoxes(result.mesh) : [];
   const faces: PartFaces["faces"] = [];
   for (let start = 0; start < n; start += 25) {
     const idx = Array.from({ length: Math.min(25, n - start) }, (_, k) => start + k);
     const infos = await Promise.all(idx.map((i) => faceInfo(env, key, i)));
     const cones = await Promise.all(infos.map((f, k) => (f?.kind === "cylinder" && env.isCone ? env.isCone(key, idx[k]).catch(() => false) : Promise.resolve(false))));
     infos.forEach((f, k) => {
-      if (f && f.kind !== "other") faces.push({ face: idx[k], info: { ...f, cone: cones[k] || undefined }, area: areas[idx[k]] });
+      if (f && f.kind !== "other") faces.push({ face: idx[k], info: { ...f, cone: cones[k] || undefined }, area: areas[idx[k]], ...(boxes[idx[k]] ? { box: boxes[idx[k]] } : {}) });
     });
   }
   const out = { faces, truncated: total > n };
@@ -348,8 +350,8 @@ export async function remapAsmRefs(prev: CadDoc, next: CadDoc, env: AsmEnv): Pro
         print = info ? entPrint(info) : null;
       } else {
         const info = await faceInfo(env, j.was.key, ref.face);
-        const area = info ? (await partFaces(env, j.was.key, built.get(j.was.key))).faces.find((f) => f.face === ref.face)?.area : undefined;
-        print = info ? facePrint(info, area) : null;
+        const row = info ? (await partFaces(env, j.was.key, built.get(j.was.key))).faces.find((f) => f.face === ref.face) : undefined;
+        print = info ? facePrint(info, row?.area, row?.box) : null;
       }
     }
     if (!j.now) {

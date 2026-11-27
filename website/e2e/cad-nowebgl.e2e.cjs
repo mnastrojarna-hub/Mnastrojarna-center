@@ -93,6 +93,7 @@ const setPos = async (p, text) => {
     await p.keyboard.press('Escape').catch(() => {});
     await p.locator('[data-viewport-help]').click({ position: { x: 5, y: 5 } }).catch(() => {});
     const note = await p.locator('[data-soft-note]').innerText();
+    ok(!/nelze spustit|cannot start|kann nicht/i.test(note), `A: upozornění nad vykresleným modelem netvrdí, že 3D nelze spustit (vlna 22 kolo 6, bod 21): ${note.slice(0, 80).replace(/\s+/g, ' ')}`);
     ok(/Softwarové zobrazení – WebGL není dostupné/.test(note) && /Klik vybere plochu, hranu nebo vrchol/.test(note) && /vyber F3 E2/.test(note) && /window\.mncad\.select/.test(note), 'A: upozornění – zjednodušený náhled, výběr kliknutím, textem „vyber“ a window.mncad.select');
 
     // prázdný díl → prázdné plátno; po textovém příkazu se model objeví

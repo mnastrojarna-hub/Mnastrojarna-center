@@ -514,13 +514,20 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
     return [f];
   }
   if (fmt === "step" || fmt === "stl") {
+    // fáze „přestavba modelu“ PŘED stavbou při složení modelu (vlna 22 kolo 6, bod 22h – dřív až po řádcích build i/n)
+    let lastPhase = "";
+    const phase = (p: string) => {
+      if (p !== lastPhase) host.phase?.(`out:${fmt}`, p);
+      lastPhase = p;
+    };
+    phase("model");
     // složení modelu (22c): bez tělesa → STL ✗ out.no-solid, u STEP to řekne kontrola souboru; jména komponent sestavy
     const ms = await modelSolids(host.kernel, ws, d, o.hooks ?? {});
     // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ; model bez tělesa ne
     const pre = fmt === "step" && ms?.solids !== 0 && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
     // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením
     const { runExportJob } = await import("./export-job");
-    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase: (p) => host.phase?.(`out:${fmt}`, p), write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) });
+    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase, write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) });
     const f = job.out;
     f.modelRev = job.modelRev;
     f.phases = job.phases;

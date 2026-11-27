@@ -768,8 +768,9 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
    `sestava upravit "Čep"` → další řádky pracují s dílem (`díra 3 skrz v 0 0`…) → `sestava hotovo` vrátí díl do sestavy
    (změna platí pro všechny stejné komponenty); `sestava otevřít "Čep"` = kopie v nové záložce.
    **Reference vazeb po změně dílu:** `sestava hotovo` (i tlačítko „← Zpět do sestavy“ – stejná kontrola) ověří každou plochu /
-   hranu vazeb do změněného dílu podle geometrie: táž plocha s jiným číslem = ℹ `mate.renumbered` (F3 → F5), plocha, která
-   zmizela nebo po změně odpovídá víc plochám = ✗ `mate.lost` – **nikdy se tiše nepřipojí jinam**: vazba je mimo řešení,
+   hranu vazeb do změněného dílu podle geometrie: táž plocha s jiným číslem = ℹ `mate.renumbered` (F3 → F5; „táž rovina, plocha
+   změnila velikost“ jen tehdy, když se nová plocha PŘEKRÝVÁ s otiskem staré – druhý schod na téže rovině jinde není táž plocha),
+   plocha, která zmizela nebo po změně odpovídá víc plochám = ✗ `mate.lost` – **nikdy se tiše nepřipojí jinam**: vazba je mimo řešení,
    komponenta se kvůli ní nehýbe, stav „ztracená reference“, `mates=0/1(lost=1)`, souhrn `sestava hotovo` je bez ✓
    („→ … vrácen … – stav vazeb níže“). Oprava: `sestava vazba 1 plocha b F6` (nová plocha strany B, F-číslo nebo pravidlo
    jako u nové vazby; bez strany = ztracená strana) nebo `sestava vazba 1 smazat`; ztracená hrana / vrchol = táž entita
@@ -1277,7 +1278,9 @@ textové `export step` – i export z menu) → zápis souboru. Seznam **Exporty
 velikost, kontrolu a revizi modelu i po konci (`data-export-job`, `data-export-state`); úlohu jde zrušit – soubor, který
 už založil dialog „Uložit jako“, se odstraní. `window.mncad.exportFile` vrací `{ …, modelRev, check, job }`, průběh
 ukazuje `window.mncad.exports()`. CLI `--progress` vypisuje fáze jménem (`  export:step: převod do STEP`,
-`  build: síť modelu`). Soubor STEP nese revizi v hlavičce (`FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision
+`  build: síť modelu`; „přestavba modelu“ před řádky `build i/n`). Zásah hlídače (✗ `run.timeout` / `run.memory` /
+`run.cancelled`) nese poslední fázi a průběh: „časový limit 10 s vypršel (ve fázi: přestavba modelu, 2/2)“, `data.phase`
+(model | convert | verify | write), `data.progress` (`build 2/2 …`). Soubor STEP nese revizi v hlavičce (`FILE_DESCRIPTION(('Open CASCADE Model','MNCAD model revision
 r\X\B7a1b2c3'),…)`). Záznam exportu v dokumentu (`exporty`, panel Výstupy) nese úlohu – stav, čas `⏱ 0,4 s`, fáze a
 kontrolu (`kontrola ✓` jen s provedenou kontrolou) – a revizi EXPORTOVANÉHO modelu: změní-li se model během exportu,
 záznam je hned zastaralý. Selhání převodu řekne fázi, zprávu jádra a stav modelu (těleso, prvky s chybou).
@@ -2631,7 +2634,7 @@ třídí. Nejčastější:
 | `name.renamed` ⚠ / `name.renamed-auto` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
 | `material.density-assumed` ⚠ / `material.class` ℹ | `materiál X` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | `materiál hlinik` + označení |
 | `asm.stale-copy` ⚠ | díl změněný po `vložit` (prvek, číslo, materiál, druh, výkres) – komponenta je kopie, změna se do sestavy sama nepromítne; hlásí se na řádku změny i u `kusovník`, listu sestavy a `stav` | `sestava obnovit "X"` (`vše`, `údaje`) |
-| `mate.lost` ✗ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí | `sestava vazba N plocha b <plocha>` / `sestava vazba N smazat` |
+| `mate.lost` ✗ / ⚠ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí (✗ u kroku, který ji ztratil; ⚠ při `stav` a na konci běhu nad otevřeným dokumentem se ztracenou referencí – přísný režim zastaví) | `sestava vazba N plocha b <plocha>` / `sestava vazba N smazat` |
 | `mate.renumbered` ℹ / `mate.restored` ℹ | táž plocha má po úpravě dílu jiné číslo / ztracená plocha je zpět (přesná shoda) | – |
 | `bom.make-incomplete` ⚠ / `bom.docs` ℹ | vyráběný díl bez čísla výkresu, výkresu nebo označení materiálu / souhrn dokumentace u výstupů sestavy („vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“) | `výkres razítko číslo=…` a `materiál …` v dílu, `sestava obnovit`, `druh nakupovaný` |
 | `clash.thread` ℹ, `clash.underhead` ℹ / `clash.real` ⚠ | `kolize`, `kontrola sestava` i `pohyb … kolize` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen `clash.real` řešit; `pohyb krok N` vypíše kolize kroku |

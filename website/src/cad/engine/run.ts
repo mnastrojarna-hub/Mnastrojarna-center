@@ -18,6 +18,7 @@ import { CodedError, codeDef, codeText, isCode, type Code } from "./codes";
 import { lintOp } from "./lint";
 import { DrawingTracker } from "./drawing-track";
 import { reportStaleSheets } from "./outputs-ops";
+import { reportLostRefs } from "./lost-refs";
 import { StrictState, type StrictMark } from "./strict";
 import { RunVerifier, verifyKey } from "./verify";
 import { freshenRunDoc } from "./spring-fresh";
@@ -348,6 +349,7 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
     rb.code("build.failed", { doc: d.name, args: [names] });
   }
   reportStaleSheets(ctx, d, { end: true }); // vydaný list, který změna modelu v běhu zneplatnila – ⚠ drawing.stale (bod 20)
+  reportLostRefs(ctx, d, { end: true, statusLine: r.lastOp?.k === "status" ? r.lastOp.line : null }); // načtený / změněný dokument se ztracenou referencí vazby – ⚠ mate.lost (bod 20, kolo 6)
   // přísný režim i po posledním řádku: ✗/⚠ závěrečné stavby (bez řádku = stav na konci skriptu) zastaví – v konzoli
   // prohlížeče stejně jako v CLI (pojistka cli/job.ts se ptá téže funkce)
   if (ranAll) stopOn(rb.entries.slice(beforeFinal), null);
