@@ -1,6 +1,6 @@
 // E2E vlna 22 – balík V, etapa V1 (produkční build): body 13 a 14 zprávy majitele.
 //  1. bod 13: studie 0,65 s / 112 kroků → `pohyb export webm` → WebM má délku 0,65 s ± 1 snímek (dřív 2,926 s), 20 bloků s časy
-//     i·33,3 ms, snímky se liší (otisky dat bloků) – ve WebGL i bez WebGL (E2E_NOGL=1) i v řezu; 0,25× → 2,6 s; hláška uvádí délku
+//     i·33,3 ms, snímky se liší (otisky dat bloků) – ve WebGL i bez WebGL (oba průchody v každém výchozím volání, viz níže) i v řezu; 0,25× → 2,6 s; hláška uvádí délku
 //     a poměr; zpráva exportu (data-video-*) = kontrola souboru a obrazu;
 //  2. bod 14: lišta přehrávání ukotvená dole (▶, časová osa, čas a krok, rychlost), kompaktní režim skryje panel studie, panel
 //     Řez modelem nepadne pod panel studie, „Uložit pohled“ uloží kameru a řez do studie (window.mncad.getDocument), výběr pohledu
