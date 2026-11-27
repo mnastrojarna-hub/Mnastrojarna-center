@@ -1,0 +1,16 @@
+# vlna 22, body 22i a 22c (kolo 7): zápis výkresu je ✓ jen u listu bez nálezu – list bez nepředepsaných tolerancí a funkční
+# plocha bez tolerované kóty dají ℹ „· nálezy níže“ a ⚠ pod ním; čistý list (Deska B) zůstává ✓
+nový díl "Deska A"
+kvádr 60 40 10
+výkres A4
+výkres export pdf
+#--- run
+výkres nepředepsané ISO 2768-mK
+funkční F2 ±0,02
+výkres export pdf jako "Deska A funkční"
+#--- run
+nový díl "Deska B"
+kvádr 60 40 10
+výkres A4
+výkres nepředepsané ISO 2768-mK
+výkres export pdf

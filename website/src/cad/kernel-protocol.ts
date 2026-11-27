@@ -36,7 +36,7 @@ export type KernelReq =
   | { id: number; op: "face"; index: number }
   | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
   /** kontrola exportu z konzole: soubor znovu načíst a změřit proti modelu (export-verify.ts) */
-  | { id: number; op: "exportStats"; doc: CadDoc; bytes: Uint8Array; format: "step" | "brep" }
+  | { id: number; op: "exportStats"; doc: CadDoc; bytes: Uint8Array; format: "step" | "brep"; full?: boolean }
   /** přesná kontrola platnosti tělesa dokumentu (BRepCheck přesnou metodou, vlna 22 bod 22a – validity-kernel.ts) */
   | { id: number; op: "validity"; doc: CadDoc; maxFaces?: number }
   /** `offset`/`total` = pořadí dávky v celém načítání sestavy (průběh „díl k z n“) */

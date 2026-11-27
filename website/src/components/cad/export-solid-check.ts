@@ -12,7 +12,7 @@ import type { KernelShapeStats } from "@/cad/export-verify";
 import { isVolumeFormat, solidVerdict, type SolidParts, type SolidStats } from "@/cad/solid-export";
 import type { CadDoc } from "@/cad/types";
 
-export type GuiExportCheck = { level: "ok" | "warn" | "error"; text: string; format: string };
+export type GuiExportCheck = { level: "ok" | "note" | "warn" | "error"; text: string; format: string };
 
 type StatsKernel = { exportStats: (doc: CadDoc, bytes: Uint8Array, format: "step" | "brep") => Promise<{ model: KernelShapeStats; file: KernelShapeStats }> };
 

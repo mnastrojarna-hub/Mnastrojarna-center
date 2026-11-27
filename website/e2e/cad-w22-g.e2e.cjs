@@ -366,6 +366,20 @@ const start = async (p, url) => {
     const gr = await menuExport(/STEP AP214 \(\.step\)/);
     ok(gr.level === 'warn' && /NEPROJDE přesnou kontrolou platnosti/.test(gr.text) && !/věrná kopie/.test(gr.text), '7c: GUI export STEP závitu šroubovicí → ⚠ (ne ✓ věrná kopie): ' + gr.text.slice(0, 140));
     await g.screenshot({ path: S + 'w22g-22a-export-reload.png' });
+    // 7d) 22i / 22c (kolo 7): „✓ výkres PDF“ nad ⚠ listu – zápis výkresu s nálezem listu je ℹ „zapsáno, nálezy níže“ (prohlížeč =
+    //     CLI); řádek `přísně` = přísný úsek: soubor výkresu s nálezem se nezapíše (žádný F, files=0), čistý list je ✓
+    const DRAW = 'nový díl "Deska D"\nkvádr 60 40 10\nvýkres A4\nvýkres export pdf';
+    const dFull = norm(await runFresh(DRAW, { protocol: 'full' }));
+    const dCli = norm(cli(DRAW, ['--full']));
+    fs.writeFileSync(S + 'w22g-22i-drawing-browser.txt', dFull + '\n');
+    fs.writeFileSync(S + 'w22g-22i-drawing-cli.txt', dCli + '\n');
+    const dl = (t) => linesOf(t, /^ℹ L4 msg\.note "Deska D": výkres PDF: /)[0] || '';
+    ok(/– zapsáno, nálezy níže$/.test(dl(dFull)) && dl(dFull) === dl(dCli) && !/^✓ L4 výkres PDF/m.test(dFull) && /^⚠ L4 drawing\.warning "Deska D": Výkres nemá nepředepsané tolerance/m.test(dFull), '7d: výkres s ⚠ listu → zápis ℹ „zapsáno, nálezy níže“, ne ✓ (prohlížeč = CLI): ' + dl(dFull).slice(0, 120));
+    const sCliD = norm(cli('přísně\n' + DRAW, ['--full']));
+    const sFullD = norm(await runFresh('přísně\n' + DRAW, { protocol: 'full' }));
+    ok(/^MNCAD\/1 STOP /.test(sCliD) && !/^F pdf /m.test(sCliD) && /files=0/.test(sCliD) && /^⚠ L5 drawing\.warning "Deska D": soubor nezapsán \(přísný režim zastaví běh\) – Výkres nemá/m.test(sCliD) && /soubor nezapsán \(přísný režim zastaví běh\)/.test(sFullD) && !/výkres PDF: /.test(sFullD), '7d: `přísně` + výkres s ⚠ → STOP, soubor nezapsán (CLI files=0, prohlížeč bez řádku zápisu)');
+    const cCli = norm(cli('přísně\nnový díl "Deska D"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres export pdf', ['--full']));
+    ok(/^✓ L6 výkres PDF: /m.test(cCli) && /^F pdf /m.test(cCli) && !/STOP/.test(cCli), '7d: čistý list v přísném úseku → ✓ zápisu a soubor (F pdf)');
     await gc.close();
   }
 

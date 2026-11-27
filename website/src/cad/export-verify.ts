@@ -12,7 +12,7 @@ import { shapeOfDoc } from "./asm-kernel";
 import { compositionOf, exactCheck, isValidShape, solidComposition, solidsVolume } from "./check";
 import { importBREP } from "./formats/kernel-import";
 import type { CadDoc, Vec3 } from "./types";
-import { EXACT_AUTO_FACES } from "./validity";
+import { EXACT_AUTO_FACES, EXPORT_VALID_FACES } from "./validity";
 
 /**
  * Míry tvaru pro kontrolu exportu: `volume` jen z objemových těles (22c – pseudoobjem skořepin a ploch se nepočítá),
@@ -52,8 +52,7 @@ export type KernelShapeStats = {
   devSamples?: number;
 };
 
-/** nad kolik ploch se platnost souboru při kontrole exportu nekontroluje (drahé) – `valid: null` */
-export const EXPORT_VALID_FACES = 3000;
+export { EXPORT_VALID_FACES } from "./validity";
 
 const free = (s: unknown) => {
   try {
@@ -63,8 +62,12 @@ const free = (s: unknown) => {
   }
 };
 
-/** objem těles (přesně z B-rep), obálka (přesná – fastbox), složení a platnost; `exact` = i přesná kontrola (do `EXACT_AUTO_FACES` ploch) */
-export function shapeStats(s: r.AnyShape, exact = false): KernelShapeStats {
+/**
+ * objem těles (přesně z B-rep), obálka (přesná – fastbox), složení a platnost; `exact` = i přesná kontrola (do `EXACT_AUTO_FACES`
+ * ploch); `full` = rychlá kontrola platnosti bez meze `EXPORT_VALID_FACES` (přísný režim – 22c kolo 7: nad mezí trvá sekundy až
+ * desítky sekund, deska s 3000 otvory ~10 s)
+ */
+export function shapeStats(s: r.AnyShape, exact = false, full = false): KernelShapeStats {
   let volume = 0;
   try {
     volume = solidsVolume(s); // jen tělesa – skořepina / plocha objem nemá
@@ -74,7 +77,7 @@ export function shapeStats(s: r.AnyShape, exact = false): KernelShapeStats {
   const b = (s as r.Shape3D).boundingBox.bounds as [Vec3, Vec3];
   const c = solidComposition(s);
   const free = compositionOf(s).free;
-  const valid = c.faces <= EXPORT_VALID_FACES ? isValidShape(s) : null;
+  const valid = full || c.faces <= EXPORT_VALID_FACES ? isValidShape(s) : null;
   const x = exact && c.faces <= EXACT_AUTO_FACES ? exactCheck(s) : null;
   return { solids: c.solids, volume, bbox: [[b[0][0], b[0][1], b[0][2]], [b[1][0], b[1][1], b[1][2]]], shells: c.shells, closedShells: c.closedShells, freeShells: c.freeShells, closedFree: c.closedFree, freeFaces: c.freeFaces, free, valid, faces: c.faces, validExact: x ? x.valid : null, ...(x && !x.valid ? { badFaces: x.badFaces } : {}) };
 }
@@ -208,19 +211,19 @@ function retolExact(s: r.AnyShape): { valid: boolean; badFaces: number; maxTol: 
  * kontroluje i přesnou metodou (do `EXACT_AUTO_FACES` ploch, 22a); model přesně jen tehdy, když soubor přesnou kontrolou
  * neprojde (aby hláška rozlišila „vadu přinesl soubor“ od „model je vadný už sám“) – u platného souboru se čas neplýtvá.
  */
-export async function exportStats(doc: CadDoc, bytes: Uint8Array, format: "step" | "brep"): Promise<{ model: KernelShapeStats; file: KernelShapeStats }> {
+export async function exportStats(doc: CadDoc, bytes: Uint8Array, format: "step" | "brep", full = false): Promise<{ model: KernelShapeStats; file: KernelShapeStats }> {
   const body = await shapeOfDoc(doc);
   if (!body) throw new Error(tr("Model je prázdný."));
   let file: r.AnyShape | null = null;
   try {
     file = format === "step" ? await r.importSTEP(new Blob([bytes as BlobPart])) : importBREP(new TextDecoder().decode(bytes));
     if (!file || (file as { isNull?: boolean }).isNull) throw new Error(tr("soubor neobsahuje žádný tvar"));
-    const fileStats = shapeStats(file, true);
+    const fileStats = shapeStats(file, true, full);
     // soubor přesně neplatný: příčina doložená přepočtem tolerancí (jen nad načteným souborem, viz retolExact)
     const rt = fileStats.validExact === false ? retolExact(file) : null;
     if (rt) Object.assign(fileStats, { retolValid: rt.valid, retolMaxTol: rt.maxTol }, rt.valid ? {} : { retolBadFaces: rt.badFaces });
     if (rt?.dev) Object.assign(fileStats, { devMax: rt.dev.max, devOver: rt.dev.over, devSamples: rt.dev.n });
-    const modelStats = shapeStats(body, fileStats.validExact === false);
+    const modelStats = shapeStats(body, fileStats.validExact === false, full);
     if (fileStats.validExact === false) {
       // mez pro tolerance po přepočtu a srovnání odchylky křivek: tytéž míry modelu (tvar modelu se jen čte)
       try {

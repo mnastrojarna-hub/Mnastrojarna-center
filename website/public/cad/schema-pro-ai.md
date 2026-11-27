@@ -2967,7 +2967,7 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
   kontrola; v přísném režimu proběhne kontrola před zápisem a soubor, jehož nález běh zastaví, se nezapíše (ani soubor
   bez tělesa / s volnými plochami, ani ⚠ `out.reload-invalid` – „soubor nezapsán (přísný režim zastaví běh) – …“): řádek F `check=ok|fail`, při rozdílu ⚠ `out.check-failed` (soubor nejde načíst = ✗). „→ věrná kopie
   modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
-  modelu; platnost souboru jen rychlou kontrolou …“), jinak ⚠ `out.reload-invalid` s počtem vadných ploch, a jen soubor
+  modelu; platnost souboru jen rychlou kontrolou …“; nad 3000 ploch se bez přísného režimu neprovede ani rychlá kontrola → ℹ „→ odpovídá modelu; platnost souboru nezkontrolována (N ploch > 3000; přísný režim ji zkontroluje)“, ne ✓ – přísný režim kontroluje platnost souboru bez meze ploch), jinak ⚠ `out.reload-invalid` s počtem vadných ploch, a jen soubor
   s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ `out.no-solid` (i když
   odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ `out.free-surfaces` s počty (u sestavy jména
   komponent). STL / 3MF a `export step bez kontroly` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
@@ -2984,6 +2984,13 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
   ⚠ `drawing.default-sheet` a exportuje se výchozí list (stejně u `--formats pdf`; `--strict` ho zastaví). 2D výkres
   (`2d nový …`) se exportuje příkazem `2d export dxf|dwg` (v CLI soubor do `--out` s řádkem F, stejně `2d tisk` = PDF
   rozvržení a `--formats dxf,dwg`) – `výkres export` na něm dá ✗ s tímto důvodem.
+  **Řádek zápisu výkresu je ✓ jen u listu bez nálezu.** Nálezy listu (⚠ `drawing.warning` – např. „Výkres nemá
+  nepředepsané tolerance“, funkční poloha bez tolerované kóty –, ⚠ `drawing.dims-incomplete`, ✗ `drawing.section-miss`,
+  ⚠ `asm.stale-copy`) se rozhodnou před zápisem: s nálezem je zápis ℹ „výkres PDF: … – zapsáno, nálezy níže“ (konzole
+  „· nálezy níže“) a nálezy stojí pod ním; nález, který protokol už má na jiném řádku (řez mimo těleso na řádku příkazu
+  řezu, ⚠ zastaralého listu), dá zápis ℹ bez věty. V přísném režimu se soubor s nálezem, který běh zastaví, **nezapíše**:
+  „⚠ … soubor nezapsán (přísný režim zastaví běh) – <nález>“, žádný řádek F, `files=0`; `přísně kromě drawing.warning`
+  soubor zapíše (zápis ℹ, ⚠ pod ním).
 - **CLI `--formats auto`** (výchozí) = STEP hlavního dokumentu + `.mncad` + jedno PDF všech listů (jako `výkres export pdf
   dokument`, má-li výkres dokument nebo díl v jeho komponentách); `--formats pdf` totéž PDF, `dxf|dwg|svg` soubor na
   list, `csv` kusovník sestavy. Listy spočítané v běhu (`výkres export pdf dokument`) převezme `--formats pdf` téhož

@@ -1109,7 +1109,7 @@ export function CadApp() {
         const name = `${safeName(d.name)}.${meta.ext}`;
         const h = exportRun(appRuns, { format: meta.f as ExportFormat3d, label: `${meta.label} · ${name}`, source: "api", target: null }, exportDepsRef.current());
         const r = await h.done;
-        return { name, mime: meta.mime, bytes: r.data.byteLength, base64: toB64(r.data), modelRev: r.modelRev, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗]\s*/, "") } } : {}), ...(r.check && !r.check.ok ? { warning: r.check.line } : {}), job: appRuns.snapshot(h.entry) };
+        return { name, mime: meta.mime, bytes: r.data.byteLength, base64: toB64(r.data), modelRev: r.modelRev, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗ℹ]\s*/, "") } } : {}), ...(r.check && !r.check.ok ? { warning: r.check.line } : {}), job: appRuns.snapshot(h.entry) };
       },
     }, () => apiHostRef.current);
     // každé volání nejdřív zapíše rozepsané změny (22e, 22f); výstupy počkají na dokončený stav (12) – run-host.ts guardApi
@@ -2711,7 +2711,8 @@ export function CadApp() {
       setExportChk(null);
       const r = await h.done;
       const bytes = r.data.byteLength;
-      const check = r.check ? (r.check.ok ? " · ✓" : " · ⚠ " + r.check.line.replace(/^[✓⚠✗]\s*/, "")) : "";
+      // platnost souboru nezkontrolována (ploch nad mez – 22c kolo 7): ℹ s větou, ne ✓
+      const check = r.check ? (r.check.ok ? (r.check.level === "note" ? " · ℹ " + r.check.line.replace(/^[✓⚠✗ℹ]\s*/, "") : " · ✓") : " · ⚠ " + r.check.line.replace(/^[✓⚠✗ℹ]\s*/, "")) : "";
       // objemový formát (22c): STEP / BREP – kontrola úlohy (zpětné načtení, ✗ bez tělesa, ⚠ volné plochy); STL / 3MF – složení modelu
       const chk: GuiExportCheck | null = r.check
         ? { level: r.check.level ?? (r.check.ok ? "ok" : "warn"), text: r.check.line, format }
@@ -4327,7 +4328,7 @@ export function CadApp() {
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
             {!sketch && <OutputsPanel doc={doc} analyses={staleNow} copies={copiesNow} onRecompute={() => runAgentRef.current("přepočítat vše")} />}
             {exportChk && (
-              <div data-export-check={exportChk.level} data-export-format={exportChk.format} role={exportChk.level === "ok" ? "status" : "alert"} className={`absolute bottom-24 left-1/2 z-30 flex max-w-[90%] -translate-x-1/2 items-start gap-2 rounded-md border px-3 py-2 text-[12px] shadow-xl ${exportChk.level === "error" ? "border-red-300 bg-red-50 text-red-900" : exportChk.level === "warn" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
+              <div data-export-check={exportChk.level} data-export-format={exportChk.format} role={exportChk.level === "ok" || exportChk.level === "note" ? "status" : "alert"} className={`absolute bottom-24 left-1/2 z-30 flex max-w-[90%] -translate-x-1/2 items-start gap-2 rounded-md border px-3 py-2 text-[12px] shadow-xl ${exportChk.level === "error" ? "border-red-300 bg-red-50 text-red-900" : exportChk.level === "warn" ? "border-amber-300 bg-amber-50 text-amber-900" : exportChk.level === "note" ? "border-slate-300 bg-slate-50 text-slate-800" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
                 <span>{exportChk.text}</span>
                 <button type="button" aria-label={tr("Zavřít")} className="ml-1 shrink-0 opacity-60 hover:opacity-100" onClick={() => setExportChk(null)}>×</button>
               </div>

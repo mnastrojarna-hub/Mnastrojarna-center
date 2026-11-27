@@ -64,7 +64,7 @@ Prvky:
 Exporty (1, zastaralých 1) · model je teď r·?:
   1. ⚠ PDF „Deska_A_vykres.pdf“ · list List 1 · rev. A · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·?, exportujte znovu: výkres export pdf
 ⚠ řádek 4: vydaný výkres neodpovídá modelu: list „List 1“ se exportuje s revizí A, ale rev. A byla vydána z modelu r·? a model je teď r·? – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat B
-✓ výkres PDF: Deska A znovu.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
+ℹ výkres PDF: Deska A znovu.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 40 × 10 mm (X 0…30, Y 0…40, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12

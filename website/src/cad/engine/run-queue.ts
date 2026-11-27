@@ -66,7 +66,8 @@ export type RunResult = {
   file?: string;
   format?: string;
   bytes?: number;
-  check?: { ok: boolean; text: string };
+  /** `note` = soubor odpovídá modelu, platnost souboru ale nezkontrolována (ℹ, ne ✓ – 22c kolo 7) */
+  check?: { ok: boolean; text: string; note?: boolean };
   modelRev?: string;
   /** soubor nebyl zapsán (zrušeno / chyba) – a jestli se prázdný cíl dialogu „Uložit jako“ smazal */
   written?: boolean;

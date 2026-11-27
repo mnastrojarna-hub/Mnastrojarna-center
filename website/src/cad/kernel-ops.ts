@@ -370,7 +370,7 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         break;
       }
       case "exportStats":
-        reply(post, m, await exportStats(m.doc, m.bytes, m.format));
+        reply(post, m, await exportStats(m.doc, m.bytes, m.format, m.full === true));
         break;
       case "validity":
         reply(post, m, await validityOfDoc(m.doc, m.maxFaces !== undefined ? { maxFaces: m.maxFaces } : {}));

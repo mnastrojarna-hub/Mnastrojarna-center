@@ -517,12 +517,30 @@ function pointDistance(shape: r.AnyShape, p: Vec3): number {
   }
 }
 
+/** nejkratší vzdálenost dvou tvarů (BRepExtrema; těleso uvnitř tělesa = 0); -Infinity = nespočítáno (nic se nepotvrdí) */
+function shapeDistance(a: Shape, b: Shape): number {
+  const oc: OC = r.getOC();
+  const q = new oc.BRepExtrema_DistShapeShape();
+  try {
+    q.LoadS1(a.wrapped);
+    q.LoadS2(b.wrapped);
+    q.Perform(new oc.Message_ProgressRange());
+    return q.IsDone() ? (q.Value() as number) : -Infinity;
+  } finally {
+    q.delete();
+  }
+}
+
 /**
  * Proč je prázdný výsledek booleovské operace prvku prázdný (22b, kolo 6 – oponentura: hláška „Nástroj ubral celé těleso“
  * nesmí stát jen na prázdném výsledku, ten může vrátit i selhávající výpočet jádra). Ověřuje se proti tělesu PŘED operací:
- * - `"covered"` – odebrání: obálka nástroje obsahuje obálku tělesa a každý vrchol tělesa leží v nástroji nebo na jeho povrchu;
- * - `"disjoint"` – průnik: obálka nástroje se s obálkou tělesa nepřekrývá;
- * - `null` – nepotvrzeno (jiná operace, výsledek není z deníku operací, nebo podmínka neplatí) → obecná hláška „jádro selhalo“.
+ * - `"covered"` – odebrání: obálka nástroje obsahuje obálku tělesa, každý vrchol tělesa leží v nástroji nebo na jeho povrchu
+ *   (nutné podmínky, levné) A objem přesného průniku tělesa s nástroji je celý objem tělesa (postačující důkaz – kolo 7: dřív
+ *   jen obálka a vrcholy, nástroj s vnitřní dutinou, do níž se vešel vnitřek tělesa bez vrcholů, by prošel);
+ * - `"disjoint"` – průnik: obálka nástroje se s obálkou tělesa nepřekrývá, nebo je nejkratší vzdálenost tělesa od každého
+ *   nástroje (BRepExtrema, těleso uvnitř tělesa = 0) větší než tolerance;
+ * - `null` – nepotvrzeno (jiná operace, výsledek není z deníku operací, podmínka neplatí nebo průnik nejde spočítat) →
+ *   obecná hláška „jádro selhalo“.
  */
 export function emptyResultCause(result: Shape): "covered" | "disjoint" | null {
   let op: (BoolOp & { out: Shape }) | undefined;
@@ -536,13 +554,21 @@ export function emptyResultCause(result: Shape): "covered" | "disjoint" | null {
     const a0 = [a0x, a0y, a0z];
     const a1 = [a1x, a1y, a1z];
     const tol = 1e-4 * (Math.hypot(a1x - a0x, a1y - a0y, a1z - a0z) || 1) + 1e-6;
-    if (op.kind === "Common") return [0, 1, 2].some((k) => t1[k] < a0[k] - tol || t0[k] > a1[k] + tol) ? "disjoint" : null;
+    if (op.kind === "Common") {
+      if ([0, 1, 2].some((k) => t1[k] < a0[k] - tol || t0[k] > a1[k] + tol)) return "disjoint";
+      return op.tools.every((t) => shapeDistance(op!.a, t) > tol) ? "disjoint" : null;
+    }
     if (op.kind !== "Cut") return null;
     if (![0, 1, 2].every((k) => t0[k] <= a0[k] + tol && t1[k] >= a1[k] - tol)) return null;
     const verts = subShapes(op.a, "VERTEX").map((v) => new r.Vertex(v as never).asTuple() as Vec3);
     if (!verts.length) return null;
     const near = 1e-6 * (Math.hypot(a1x - a0x, a1y - a0y, a1z - a0z) || 1) + 1e-7;
-    return verts.every((p) => op.tools.some((t) => pointDistance(t, p) <= near)) ? "covered" : null;
+    if (!verts.every((p) => op!.tools.some((t) => pointDistance(t, p) <= near))) return null;
+    // postačující důkaz: přesný průnik tělesa s nástroji má celý objem tělesa (ne jen obálka a vrcholy)
+    const va = volumeOf(op.a);
+    const vc = overlapVolume(op);
+    if (!(va > 0) || !Number.isFinite(vc)) return null;
+    return vc >= va * (1 - 1e-6) - 1e-9 ? "covered" : null;
   } catch {
     return null;
   }
