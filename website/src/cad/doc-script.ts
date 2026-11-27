@@ -30,6 +30,7 @@
  * Čistý modul bez prohlížeče a bez jádra; stejný dokument a volby dají vždy stejný text.
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
+import { materialClass } from "./agent-strict";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
 import { processScript } from "./agent-process";
@@ -1767,7 +1768,13 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
 
 /* ───────────────────────── díl ───────────────────────── */
 function emitDocMeta(c: Ctx, doc: CadDoc) {
-  if (doc.material && doc.material !== "ocel") c.line(`${c.w("material")} ${doc.material}`);
+  // označení, ze kterého se pozná JINÁ třída, než má dokument (třída změněná po označení – nabídka Materiál v GUI, `materiál
+  // nerez` po `materiál ČSN 11 423`): `materiál <označení>` nastaví třídu podle označení, proto se třída zapíše AŽ ZA označení
+  // (třída označení nechá). Dřív třída před označením → po přečtení třída označení = jiná hustota bez hlášky (vlna 22 kolo 7)
+  const des = doc.materialName?.trim();
+  const ofDes = des ? materialClass(des) : null;
+  const classAfter = !!ofDes && ofDes !== (doc.material || "ocel");
+  if (doc.material && doc.material !== "ocel" && !classAfter) c.line(`${c.w("material")} ${doc.material}`);
   if (doc.materialName?.trim()) {
     const l = `${c.w("material")} ${doc.materialName.trim()}`;
     let ok = false;
@@ -1781,6 +1788,7 @@ function emitDocMeta(c: Ctx, doc: CadDoc) {
     if (ok) c.line(l);
     else c.note(tr("označení materiálu „{0}“ nejde zapsat příkazem materiál (čte se jako třída materiálu)", doc.materialName));
   }
+  if (classAfter) c.line(`${c.w("material")} ${doc.material || "ocel"}`);
   if (doc.color && /^#[0-9a-f]{6}$/i.test(doc.color)) c.line(`${c.w("color")} ${doc.color}`);
   // druh položky kusovníku dílu (vlna 22, bod 19): `druh nakupovaný katalog "…" výrobce "…"`
   if (doc.supply && doc.kind !== "assembly") {

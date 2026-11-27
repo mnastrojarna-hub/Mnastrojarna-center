@@ -20,8 +20,18 @@ import { runScript } from "../engine/run";
 import { greenThenRed, realHost } from "./real-host";
 
 const SCRIPT = fs.readFileSync(path.resolve(__dirname, "../engine/__corpus__/83-asm-hundred-text.txt"), "utf8");
-/** limit času běhu v Node (CLI ~1,3 s; s rezervou na zatížený stroj) */
-const LIMIT_MS = 60_000;
+/**
+ * Limit času běhu v Node (CLI ~1,3 s, vitest ~0,8 s). Kolo 7 (oponent kola 6): dřív 60 s = zelené i při 40× zpomalení.
+ * Teď dvě pojistky: absolutní strop 10 s (~8× rezerva na zatížený stroj) a poměr k témuž skriptu zmenšenému na 20 komponent
+ * (`SMALL`, týž běh, týž stroj – zatížení stroje se v poměru krátí): lineární růst ≈ 5×, kvadratický (řešení vazeb / kolizí
+ * po dvojicích) ≈ 25× → FAIL nad `SCALE_MAX`.
+ */
+const LIMIT_MS = 10_000;
+const SCALE_MAX = 12;
+/** korpus 83 zmenšený na 20 komponent (2 desky, 2 lišty, 1 řada 8 šroubů polem, 1 řada 8 kolíků) a 21 vazeb */
+const SMALL = SCRIPT.split("\n")
+  .filter((l) => !/"Š [2-6]"|"Šroub M8 \((9|\d\d)\)"|"K [2-6]-/.test(l))
+  .join("\n");
 
 let host: () => EngineHost;
 beforeAll(async () => {
@@ -33,11 +43,17 @@ describe("bod 23: sestava 100 komponent postavená textem (korpus 83)", () => {
   it("100 komponent, 101/101 vazeb, jedna skutečná kolize, stručný protokol ≤ 2048 B bez přebytku, čas pod limitem", async () => {
     // kolo 6 (oponent): šrouby textovým polem, ne jednotlivými vložit – rozsáhlá sestava polem je to, co má zůstat v regresi
     expect(SCRIPT.match(/^sestava pole "Š \d" 8 rozteč 34 směr X$/gm)).toHaveLength(6);
+    // zmenšený skript (zároveň zahřátí jádra): 20 komponent, 21/21 vazeb – měřítko pro poměr
+    const s0 = Date.now();
+    const rs = finalizeReport(await runReport(new MemoryWorkspace(), SMALL, host()));
+    const small = Math.max(Date.now() - s0, 50);
+    expect(rs.protocol ?? "").toMatch(/ comp=20 parts=5 mates=21\/21 /);
     const t0 = Date.now();
     const ws = new MemoryWorkspace();
     const r = finalizeReport(await runReport(ws, SCRIPT, host()));
     const ms = Date.now() - t0;
     expect(ms, `běh ${ms} ms`).toBeLessThan(LIMIT_MS);
+    expect(ms / small, `100 komponent ${ms} ms / 20 komponent ${small} ms`).toBeLessThan(SCALE_MAX);
     // stručný protokol: celý v rozpočtu, nic nevytlačené do přebytku
     const text = r.protocol ?? "";
     expect(DEFAULT_BUDGET).toBe(2048);
