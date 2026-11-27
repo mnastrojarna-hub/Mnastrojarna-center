@@ -415,3 +415,18 @@ describe("B5 – slovník (correct-F5)", () => {
     expect(PART_NAMES.filter((n) => docNameIssue(n))).toEqual([]);
   });
 });
+
+describe("kusovník: normalizované označení nakupovaného dílu není údaj razítka", () => {
+  it("třída tvrdosti / pevnosti v označení podle normy projde", async () => {
+    const { bomCellIssue } = await import("../drawing-notes-rules");
+    for (const v of ["ISO 7089 – 8 – 200HV", "Podložka ISO 7089 8 200 HV", "DIN 912 M8×30 – 12.9", "ISO 4762 M6×20 A2-70", "ČSN EN ISO 7089 8 – 300HV"]) {
+      expect(bomCellIssue("name", v), v).toBeNull();
+      expect(bomCellIssue("catalog", v), v).toBeNull();
+    }
+  });
+  it("pokyn nebo tepelné zpracování za číslem normy dál neprojde", async () => {
+    const { bomCellIssue } = await import("../drawing-notes-rules");
+    expect(bomCellIssue("name", "ISO 7089 Kalit a popustit")).not.toBeNull();
+    expect(bomCellIssue("name", "DIN 912 Zabalit do VCI")).not.toBeNull();
+  });
+});

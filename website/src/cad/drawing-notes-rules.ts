@@ -1086,6 +1086,8 @@ export function docNameIssue(name: string): { code: "drawing.note-style" | "draw
   return { code: "drawing.note-style", text: tr("název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří", cut(t), ni.word ?? "") };
 }
 
+/** označení podle normy (ISO / DIN / EN / ČSN / ANSI / JIS + číslo normy) */
+const STANDARD_PART_RE = /(?:^|[\s(])(?:ISO|DIN|EN|ČSN|CSN|ANSI|ASME|JIS|UNI|NF|BS)\s?(?:EN\s?|ISO\s?)?\d{2,5}\b/i;
 /** buňky kusovníku sestavy, které agent zapisuje příkazem `sestava komponenta …` (kolo 5, bypass-F6 / correct-F2) */
 export type BomField = "name" | "number" | "group" | "material" | "alias" | "catalog" | "vendor" | "size" | "grade";
 /**
@@ -1101,7 +1103,11 @@ export function bomCellIssue(field: BomField, value: string): { code: "drawing.n
   const pw = processWords(v);
   const iw = instructionWord(v);
   if (pw.length || iw) return { code: "drawing.note-style", text: tr("„{0}“ je pokyn („{1}“) – kusovník nese název, číslo a označení, pokyny pro výrobu a expedici na výkres nepatří", cut(v), pw[0] ?? iw ?? "") };
-  const bad = field === "material" || field === "grade" ? titleDataIn(v, ["material"], true) : titleDataIn(v, [], false);
+  // normalizované označení nakupovaného dílu („ISO 7089 – 8 – 200HV“, „DIN 912 M8×30 – 12.9“, „ISO 4762 A2-70“) nese třídu
+  // pevnosti / tvrdosti jako součást označení podle normy – to není údaj razítka
+  const std = STANDARD_PART_RE.test(v);
+  const bad = (field === "material" || field === "grade" ? titleDataIn(v, ["material"], true) : titleDataIn(v, [], false))
+    .filter((p) => !(std && (p.key === "hardness" || p.key === "material")));
   if (bad.length) return { code: "drawing.note-title-data", text: tr("„{0}“ obsahuje údaj razítka ({1}) – v kusovníku jen označení materiálu (např. „1.2379“); tepelné zpracování, tvrdost a povrch patří do razítka výkresu dílu: {2}", cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) };
   return null;
 }
