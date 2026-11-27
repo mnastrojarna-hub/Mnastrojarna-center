@@ -441,7 +441,7 @@ describe("recenze int2, nález 2: drawing.section-legacy v přísném režimu re
 });
 
 describe("recenze B4: výkres – mezistav bloku, list v normálním běhu, kódy nezávislé na jazyce", () => {
-  const T7 = 'nový díl A\nkvádr 20 20 10\nvýkres A4\nvýkres značka text "KALIT 58 HRC KALIT" v 240 20 výška 5';
+  const T7 = 'nový díl A\nkvádr 20 20 10\nvýkres A4\nvýkres značka text "ODMASTIT A ZABALIT" v 240 20 výška 5';
   // List kvádru bez úplných kót hlásí i kontrolu kót (vlna 22, bod 18 – ⚠ drawing.dims-incomplete); tyto případy zkoumají
   // překryv, proto přísný běh výjimkou `kromě drawing.dims-incomplete` a výpis kódů bez ní (její přítomnost se ověří zvlášť).
   const overlapCodes = (r: RunReport) => coded(r).filter((c) => c.includes("drawing.") && !c.includes("drawing.dims-incomplete"));

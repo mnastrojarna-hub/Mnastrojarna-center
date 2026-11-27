@@ -36,12 +36,14 @@ beforeEach(() => activeSheet.set(null, false));
 
 describe("listy: nový, přepnout, přejmenovat, smazat – příkazy pracují s aktivním listem", () => {
   it("příkazy nad 2. listem nemění 1. list; výkres list 1 vrátí práci na 1. list", async () => {
-    const { doc, log } = await run(plateDoc(), 'výkres A3\nvýkres list nový "Detail"\nvýkres A4 na výšku\nvýkres poznámka "jen list 2"');
+    const { doc, log } = await run(plateDoc(), 'výkres A3\nvýkres list nový "Detail"\nvýkres A4 na výšku\nvýkres hrany srazit 0,3');
     expect(doc.drawings!.map((s) => s.name)).toEqual(["List 1", "Detail"]);
     expect(opts(doc, 0).sheet).toBe("A3");
     expect(opts(doc, 1)).toMatchObject({ sheet: "A4", orientation: "portrait" });
-    expect(meta(doc, 1).note).toBe("jen list 2");
-    expect(meta(doc, 0).note).toBeUndefined();
+    expect(meta(doc, 1).edges).toBe("srazit 0,3");
+    expect(meta(doc, 0).edges).toBeUndefined();
+    // vlna 23 (R5): poznámka agenta na listu 2 = ✗ drawing.notes-sheet (volný text jen na listu 1)
+    await expect(run(doc, 'výkres poznámka "jen list 2"')).rejects.toThrow(/poznámky mimo list 1/);
     expect(activeSheetIndex(doc)).toBe(1);
     expect(log).toMatch(/✓ nový list 2 „Detail“ \(Chytré kóty\) – další příkazy výkresu pracují s ním/);
     expect(log).toMatch(/✓ výkres: A4, na výšku · list 2 „Detail“/);
@@ -130,12 +132,14 @@ describe("značky: na kótu i do bodu pohledu (přichycení), text na listu", ()
     expect(g.texts.map((t) => t.s)).toEqual(expect.arrayContaining(["Ra 1,6", "0,02", "A"]));
   });
   it("bod pohledu: přichytí se k hraně; mimo pohled = chyba s rozsahem; detail; text v mm listu (y nahoru)", async () => {
-    const { doc, log } = await run(plateDoc(), 'výkres značka drsnost Ra 0,8 pohled přední v 10 19,4\nvýkres značka základna pohled horní v -50,6 0\nvýkres značka text "Kalit" v 20 30 výška 5\nvýkres značka poznámka "pozn." pohled přední v 0 10 posun 20 10');
+    const { doc, log } = await run(plateDoc(), 'výkres značka drsnost Ra 0,8 pohled přední v 10 19,4\nvýkres značka základna pohled horní v -50,6 0\nvýkres značka text "Odmastit" v 20 30 výška 5\nvýkres značka poznámka "pozn." pohled přední v 0 19,4 posun 20 10');
     const [ra, datum, text, note] = anns(doc).filter((a) => !a.auto);
     expect(ra).toMatchObject({ view: "front", type: "roughness", at: [10, -20] });
     expect(datum).toMatchObject({ view: "top", type: "datum", label: "A", at: [-50, 0] });
-    expect(text).toMatchObject({ view: "sheet", type: "text", text: "Kalit", size: 5, at: [20, 267] });
-    expect(note).toMatchObject({ view: "front", type: "note", text: "pozn.", leader: [0, -10], at: [20, -20] });
+    expect(text).toMatchObject({ view: "sheet", type: "text", text: "Odmastit", size: 5, at: [20, 267], by: "agent" });
+    expect(note).toMatchObject({ view: "front", type: "note", text: "pozn.", leader: [0, -20], at: [20, -30], by: "agent" });
+    // vlna 23 (R2): odkaz agenta do volného bodu pohledu (ne na hranu / bod / kružnici) = ✗ drawing.note-free-leader
+    await expect(run(doc, 'výkres značka poznámka "pozn." pohled přední v 0 10')).rejects.toThrow(/poznámka bez cíle v geometrii/);
     expect(log).toMatch(/drsnost Ra 0,8 → přední \[10; 19,4\] – hrana/);
     expect(log).toMatch(/základna A → horní \[−50,6; 0\] – hrana/);
     await expect(run(doc, "výkres značka drsnost Ra 1 pohled přední v 0 90")).rejects.toThrow(/bod \[0; 90\] je mimo pohled přední \(x −50…50, y 0…20 mm\)/);

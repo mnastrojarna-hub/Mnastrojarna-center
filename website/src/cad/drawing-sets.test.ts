@@ -126,13 +126,13 @@ describe("export všech listů (chyba 17)", () => {
     expect(fixtureCalls.n).toBe(3);
   });
   it("DXF / SVG vše = ZIP s jedním souborem na list; jeden list = obyčejný soubor; CSV = kusovník jednou", async () => {
-    const { doc } = await run(plateDoc(), 'výkres list nový "Detail"\nvýkres značka text "JEN DETAIL" v 20 30');
+    const { doc } = await run(plateDoc(), 'výkres list nový "Detail"\nvýkres značka drsnost Ra 0,4 pohled přední v 10 19,4');
     const z = await exportDrawing(doc, "dxf", { sheet: "all" }, fixtureCompute);
     expect(z).toMatchObject({ name: "Deska_vykres_dxf_listy.zip", mime: "application/zip", sheets: 2, files: ["Deska_list1_List_1.dxf", "Deska_list2_Detail.dxf"] });
     const entries = readZip(Buffer.from(z.base64, "base64"));
     expect(entries.map((e) => e.name)).toEqual(z.files);
     const svgs = await Promise.all(readZip(Buffer.from((await exportDrawing(doc, "svg", { sheet: "all" }, fixtureCompute)).base64, "base64")).map(async (e) => new TextDecoder().decode(await e.read())));
-    expect(svgs.map((s) => s.includes("JEN DETAIL"))).toEqual([false, true]);
+    expect(svgs.map((s) => s.includes("Ra 0,4"))).toEqual([false, true]);
     const single = await exportDrawing(plateDoc(), "svg", { sheet: "all" }, fixtureCompute);
     expect(single.name).toBe("Deska_vykres.svg");
     const csv = await exportDrawing({ ...doc, kind: "assembly" }, "csv", { sheet: "all" }, fixtureCompute, { bom: [{ pos: 1, name: "Díl", qty: 1 }] });

@@ -99,15 +99,19 @@ describe("šablony razítka", () => {
       expect(all).toMatch(/4 ks/);
       expect(all).toContain("ISO 2768-mK");
       expect(info.fields.every((f) => !f.small)).toBe(true);
-      expect(info.h).toBe(titleBlockSize({ template: t }).h);
+      // technické údaje (tolerance, tepelné, povrch, úhly, sražení …) mají buňky – ISO 7200 a kompaktní s technickým pásem (vlna 23, R1)
+      expect(info.h).toBe(titleBlockSize({ ...full, template: t as TitleTemplate }).h);
+      expect(info.h).toBe(titleBlockSize({ template: t }).h + (t === "toolmaker" ? 0 : 10));
+      for (const k of ["heatTreatment", "surfaceTreatment", "tolerance", "edges"]) expect(info.fields.find((f) => f.key === k)?.where, `${t} ${k}`).toBe("cell");
       // nástrojářská má vše v buňkách – patička jen „Rozměry v mm“
       if (t === "toolmaker") expect(info.fields.filter((f) => f.where === "footer")).toEqual([]);
       else expect(info.fields.filter((f) => f.where === "footer").map((f) => f.key)).toEqual(expect.arrayContaining(["customer", "project", "stock", "quantity"]));
     });
   }
-  it("ISO 7200: patička jako dřív – „Rozměry v mm · Nepředepsané tolerance … · Hrany: …“ a „List i/n“; nástrojářská má list v buňce", () => {
+  it("ISO 7200: nepředepsané tolerance a hrany v technickém pásu razítka (vlna 23, R1), patička „Rozměry v mm“ a „List i/n“; nástrojářská má list v buňce", () => {
     const iso = draw({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°", sheetIndex: 2, sheetCount: 3 });
-    expect(iso.info.footer[0]).toBe("Rozměry v mm · Nepředepsané tolerance ISO 2768-mK · Hrany: srazit 0,5×45°");
+    expect(iso.info.footer[0]).toBe("Rozměry v mm");
+    expect(iso.info.fields.filter((f) => f.key === "tolerance" || f.key === "edges").map((f) => `${f.key}:${f.where}:${f.value}`)).toEqual(["edges:cell:srazit 0,5×45°", "tolerance:cell:ISO 2768-mK"]);
     expect(iso.info.footer[1]).toBe("List 2/3");
     const tm = draw({ tolerance: "ISO 2768-mK", sheetIndex: 2, sheetCount: 3, template: "toolmaker" });
     expect(tm.info.footer).toEqual(["Rozměry v mm"]);
@@ -178,8 +182,9 @@ describe("nepředepsané tolerance", () => {
     const f = generalTolFields(parseGeneralTol("desetinná"));
     expect(f).toEqual({ tolerance: "X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005", tolTable: ["±0,1", "±0,1", "±0,01", "±0,005"] });
     expect(generalTolOf(f)).toEqual({ kind: "decimals", rows: f.tolTable });
-    // razítko: v ISO 7200 v patičce, v nástrojářské tabulka v buňce
-    expect(draw(f).info.footer[0]).toBe("Rozměry v mm · Nepředepsané tolerance X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005");
+    // razítko: v ISO 7200 tabulka v buňce technického pásu (vlna 23, R1), v nástrojářské v buňce šablony
+    expect(draw(f).info.footer[0]).toBe("Rozměry v mm");
+    for (const s of ["X. ±0,1", "X.X ±0,1", "X.XX ±0,01", "X.XXX ±0,005"]) expect(draw(f).texts.map((t) => t.s)).toContain(s);
     const tm = draw({ ...f, template: "toolmaker" });
     for (const s of ["X. ±0,1", "X.X ±0,1", "X.XX ±0,01", "X.XXX ±0,005"]) expect(tm.texts.map((t) => t.s)).toContain(s);
   });

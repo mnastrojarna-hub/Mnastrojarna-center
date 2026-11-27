@@ -48,16 +48,17 @@ describe("drawingFile – soubory z hotového listu", () => {
 
 describe("exportDrawing – list podle čísla / názvu, Chytré kóty a značky jako výkresové prostředí", () => {
   it("SVG aktivního / zadaného listu obsahuje kóty a značky toho listu", async () => {
-    let doc = await run(plateDoc(), 'výkres A3\nvýkres značka drsnost Ra 1,6 na Ø40\nvýkres list nový "Detail"\nvýkres značka text "JEN LIST 2" v 20 30');
+    let doc = await run(plateDoc(), 'výkres A3\nvýkres značka drsnost Ra 1,6 na Ø40\nvýkres list nový "Detail"\nvýkres značka drsnost Ra 0,4 pohled přední v 10 19,4');
     const second = await exportDrawing(doc, "svg", {}, fixtureCompute);
     expect(second.name).toBe("Deska_vykres.svg");
     expect(second.mime).toBe("image/svg+xml");
-    expect(b64(second.base64)).toContain("JEN LIST 2");
+    // (vlna 23, R5: volný text agenta jen na listu 1 – značkou listu 2 je drsnost)
+    expect(b64(second.base64)).toContain("Ra 0,4");
     expect(b64(second.base64)).not.toContain("Ra 1,6");
     const first = await exportDrawing(doc, "svg", { sheet: 1 }, fixtureCompute);
     expect(b64(first.base64)).toContain("Ra 1,6");
     expect(b64(first.base64)).toContain("Ø40");
-    expect(b64(first.base64)).not.toContain("JEN LIST 2");
+    expect(b64(first.base64)).not.toContain("Ra 0,4");
     const byName = await exportDrawing(doc, "dxf", { sheet: "detail" }, fixtureCompute);
     expect(b64(byName.base64)).toContain("ENTITIES");
     expect(byName.bytes).toBe(Buffer.from(byName.base64, "base64").length);

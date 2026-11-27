@@ -548,7 +548,7 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Poznámka s odkazovou čarou: šipka ukazuje na prvek, text stojí vedle.",
-    when: "Krátký pokyn u konkrétní plochy nebo hrany (např. Brousit, Lapovat). Tepelné zpracování, tvrdost, povrch a hrany celého dílu patří do razítka.",
+    when: "Krátký pokyn u plochy nebo hrany (Brousit, Lapovat). Tepelné zpracování, tvrdost, povrch a hrany dílu do razítka.",
     steps: ["Klikněte, kam má šipka ukazovat.", "Klikněte umístění textu.", "Napište Text poznámky a potvrďte OK."],
     cmd: 'výkres značka poznámka "Lapovat" na Ø40',
     note: "Agent píše popis plochy do modelu (poznámka F7 \"Brousit\") – výkres ho převezme se šipkou.",
@@ -574,7 +574,7 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Vloží volný text na list, bez odkazové čáry.",
-    when: "Krátká obecná poznámka nad razítkem (heslovitě, strojařsky nejvýš 5 řádků). Tepelné zpracování, tvrdost, povrch, hrany a tolerance zapište do razítka.",
+    when: "Krátká poznámka nad razítkem (heslovitě, nejvýš 5 řádků). Tepelné zpracování, tvrdost, povrch a hrany do razítka.",
     steps: ["Klikněte na místo textu na listu.", "Napište Text, upravte Výška písma [mm] (výchozí 3,5) a potvrďte OK."],
     cmd: 'výkres značka text "Odmastit" v 20 30',
     note: "Text patří k listu, ne k pohledu – při posunu pohledu zůstane na místě.",

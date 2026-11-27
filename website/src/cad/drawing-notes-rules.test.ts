@@ -139,3 +139,26 @@ describe("R2/R3 – popisy a úpravy z modelu", () => {
     expect(zoneLegendOf(pmi)).toEqual(["Z1, Z2 tepelná: 58+2 HRC"]);
   });
 });
+
+describe("R2/R3 – převod dokumentu na skript (doc → script) nese popisy a úpravy modelu", () => {
+  it("poznámka F2 / úprava F3 … od … do … se zapíšou a přečtou jako příkazy modelu", async () => {
+    const { docToScript } = await import("./doc-script");
+    const { parseAgentText } = await import("./agent");
+    const doc = { app: "mnastrojarna-cad", version: 2, name: "Deska", material: "ocel", features: [{ id: "b", name: "Kvádr 1", type: "box", size: [100, 60, 12], position: [0, 0, 0], centered: false, mode: "new" }], functional: [
+      { id: "f1", kind: "note", face: { index: 1 }, text: "Brousit" },
+      { id: "f2", kind: "treatment", face: { index: 2 }, text: "62+2 HRC", what: "heat", from: 10, to: 40 },
+    ] } as unknown as CadDoc;
+    const s = docToScript(doc).text;
+    expect(s).toMatch(/^poznámka F2 "Brousit"$/m);
+    expect(s).toMatch(/^úprava F3 tepelná "62\+2 HRC" od 10 do 40$/m);
+    const ops = parseAgentText('poznámka F2 "Brousit"\núprava F3 tepelná "62+2 HRC" od 10 do 40').ops as unknown as { k: string; cmd: Record<string, unknown> }[];
+    expect(ops.map((o) => o.cmd)).toEqual([{ kind: "note", face: 1, text: "Brousit" }, { kind: "treatment", face: 2, what: "heat", text: "62+2 HRC", from: 10, to: 40 }]);
+  });
+  it("ruční poznámka u razítka, která pravidlům agenta nevyhoví, se do skriptu nezapíše jako řádek, který by selhal", async () => {
+    const { docToScript } = await import("./doc-script");
+    const doc = { app: "mnastrojarna-cad", version: 2, name: "Deska", material: "ocel", features: [{ id: "b", name: "Kvádr 1", type: "box", size: [100, 60, 12], position: [0, 0, 0], centered: false, mode: "new" }], drawings: [{ id: "s1", name: "List 1", options: { sheet: "A3", dimensions: "none" }, meta: { note: "Kalit a popustit na 58 HRC, pokud není uvedeno jinak.", noteBy: "user" }, annotations: [] }] } as unknown as CadDoc;
+    const r = docToScript(doc);
+    expect(r.text).not.toMatch(/poznámka=/);
+    expect(r.text).toMatch(/skript nepřenese/);
+  });
+});

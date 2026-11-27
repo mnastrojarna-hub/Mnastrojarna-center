@@ -548,7 +548,7 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Note with a leader: the arrow points at the feature, the text stands beside it.",
-    when: "Short instruction at a specific face or edge (e.g. Grind, Lap). Heat treatment, hardness, finish and edges of the whole part belong in the title block.",
+    when: "Short instruction at a face or edge (Grind, Lap). Heat treatment, hardness, finish and edges of the part go in the title block.",
     steps: ["Click where the arrow should point.", "Click the text location.", "Type the Note text and confirm OK."],
     cmd: 'drawing mark note "Lap" on Ø40',
     note: "An agent writes a face note into the model (note F7 \"Grind\") – the drawing takes it over with an arrow.",
@@ -574,7 +574,7 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Places free text on the sheet, without a leader.",
-    when: "Short general note above the title block (keyword style, at most 5 lines). Write heat treatment, hardness, finish, edges and tolerances into the title block.",
+    when: "Short note above the title block (keywords, at most 5 lines). Heat treatment, hardness, finish and edges go in the title block.",
     steps: ["Click the text location on the sheet.", "Type the Text, adjust Text height [mm] (default 3.5) and confirm OK."],
     cmd: 'drawing mark text "Degrease" at 20 30',
     note: "The text belongs to the sheet, not to a view – it stays put when a view moves.",

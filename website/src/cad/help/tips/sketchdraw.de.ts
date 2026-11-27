@@ -548,7 +548,7 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Anmerkung mit Hinweislinie: der Pfeil zeigt auf das Element, der Text steht daneben.",
-    when: "Kurzer Hinweis an einer bestimmten Fläche oder Kante (z. B. Schleifen, Läppen). Wärmebehandlung, Härte, Oberfläche und Kanten des ganzen Teils gehören ins Schriftfeld.",
+    when: "Kurzer Hinweis an Fläche oder Kante (Schleifen, Läppen). Wärmebehandlung, Härte, Oberfläche und Kanten des Teils ins Schriftfeld.",
     steps: ["Klicken, wohin der Pfeil zeigen soll.", "Position des Textes anklicken.", "Anmerkungstext eingeben und mit OK bestätigen."],
     cmd: 'zeichnung symbol hinweis "Läppen" an Ø40',
     note: "Ein Agent schreibt den Flächenhinweis ins Modell (hinweis F7 \"Schleifen\") – die Zeichnung übernimmt ihn mit Pfeil.",
@@ -574,7 +574,7 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Setzt freien Text auf das Blatt, ohne Hinweislinie.",
-    when: "Kurzer allgemeiner Hinweis über dem Schriftfeld (stichwortartig, höchstens 5 Zeilen). Wärmebehandlung, Härte, Oberfläche, Kanten und Toleranzen ins Schriftfeld.",
+    when: "Kurzer Hinweis über dem Schriftfeld (stichwortartig, max. 5 Zeilen). Wärmebehandlung, Härte, Oberfläche und Kanten ins Schriftfeld.",
     steps: ["Position des Textes auf dem Blatt anklicken.", "Text eingeben, Schrifthöhe [mm] anpassen (Standard 3,5) und mit OK bestätigen."],
     cmd: 'zeichnung symbol text "Entfetten" bei 20 30',
     note: "Der Text gehört zum Blatt, nicht zu einer Ansicht – er bleibt stehen, wenn eine Ansicht verschoben wird.",

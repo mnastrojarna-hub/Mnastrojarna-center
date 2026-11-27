@@ -517,7 +517,7 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
   if (noViews && !o.bomOnly) out.push({ level: "warn", code: "drawing.sheet-empty", kind: "other", text: tr("list nemá žádný pohled – list jen s poznámkami nebo prázdný list výkres nemá; přidejte pohledy (výkres pohledy přední,horní) nebo list smažte (výkres list smazat {0})", pos + 1), sheetId: s.id, data: { sheetPos: pos + 1 } });
   // R5: další list, který jen opakuje pohledy dřívějšího listu výkresu (rozdělení „výkres + poznámky“): jeho pohledy jsou
   // podmnožinou pohledů dřívějšího listu, nemá řez / detail / model navíc a kromě vygenerovaných kót nese jen volný text
-  if (pos > 0 && !noViews && plainViews(o)) {
+  if (pos > 0 && !noViews && !o.bomOnly && plainViews(o)) {
     const mine = res ? [...res.views.map((v) => v.key), ...(o.views.iso ? ["iso"] : [])] : viewsOnSheet(o);
     // stejné měřítko (list s pohledem ve větším měřítku je detailní list, ne kopie)
     const twin = set.slice(0, pos).find((j) => {

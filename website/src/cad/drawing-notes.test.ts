@@ -31,14 +31,15 @@ describe("výrobní požadavky jen na vyžádání", () => {
     expect(all).toContain("Rozměry v mm");
     expect(all).toContain("ČSN 11 423");
   });
-  it("tolerance a hrany se uvedou jen zadané, každá zvlášť", () => {
+  it("tolerance a hrany se uvedou jen zadané, každá zvlášť – v buňkách razítka (vlna 23, R1), ne v patičce", () => {
     const d1 = makeDrawing(plate(), { name: "Deska", material: "Ocel", tolerance: "ISO 2768-mK" });
-    expect(d1.texts.map((t) => t.s).join("\n")).toMatch(/Nepředepsané tolerance ISO 2768-mK/);
-    expect(d1.texts.map((t) => t.s).join("\n")).not.toMatch(/Hrany/);
+    const t1 = d1.texts.map((t) => t.s);
+    expect(t1).toEqual(expect.arrayContaining(["Nepředepsané tolerance", "ISO 2768-mK"]));
+    expect(t1.join("\n")).not.toMatch(/Hrany|Nepředepsané tolerance ISO/);
     const d2 = makeDrawing(plate(), { name: "Deska", material: "Ocel", edges: "srazit 0,5×45°" });
-    const all2 = d2.texts.map((t) => t.s).join("\n");
-    expect(all2).toMatch(/Hrany: srazit 0,5×45°/);
-    expect(all2).not.toMatch(/2768/);
+    const t2 = d2.texts.map((t) => t.s);
+    expect(t2).toEqual(expect.arrayContaining(["Hrany", "srazit 0,5×45°"]));
+    expect(t2.join("\n")).not.toMatch(/2768|Hrany:/);
   });
 });
 

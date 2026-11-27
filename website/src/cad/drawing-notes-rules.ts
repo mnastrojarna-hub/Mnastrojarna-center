@@ -224,7 +224,8 @@ export function noteStyle(text: string, max = NOTE_MAX_CHARS): string | null {
   const ws = t.split(/\s+/).filter((w) => /\p{L}/u.test(w));
   if (ws.length > NOTE_MAX_WORDS) return tr("{0} slov – heslovitě nejvýš {1}", ws.length, NOTE_MAX_WORDS);
   if (/[.!?]\s+\p{L}/u.test(t)) return tr("víc vět na řádku");
-  if (/[!?]$/.test(t) || (/\.$/.test(t) && !/\b(?:ap|atd|tzv|max|min|cca|resp|tj|tl|č|st|ks|č\.\s*v|W\.Nr)\.$/i.test(t))) return tr("věta s tečkou na konci");
+  // tečka za zkratkou („pozn.“, „max.“, „W.Nr.“) není věta – věta = aspoň tři slova a tečka / ! / ? na konci
+  if (ws.length >= 3 && (/[!?]$/.test(t) || (/\.$/.test(t) && !/\b(?:ap|atd|tzv|max|min|cca|resp|tj|tl|č|st|ks|pozn|W\.Nr)\.$/i.test(t)))) return tr("věta s tečkou na konci");
   if ((t.match(/,\s+(?=\D)/g) ?? []).length > 2) return tr("víc než dvě čárky (souvětí)");
   const sw = words(t).find((w) => SENTENCE_W.has(w));
   if (sw) return tr("slovo věty „{0}“", sw);

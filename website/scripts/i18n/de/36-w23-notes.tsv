@@ -62,7 +62,6 @@ poznámka potřebuje krátký text: výkres značka poznámka "Lapovat" na Ø40 
 poznámka: za plochou zadejte krátký popis v uvozovkách – {0}	hinweis: nach der Fläche einen kurzen Text in Anführungszeichen angeben – {0}
 poznámku u razítka listu „{0}“ („{1}“) skript nepřenese – textová cesta agenta přijme jen krátký heslovitý řádek na listu 1 bez údajů razítka (vlna 23); přeneste dokument jako JSON	der Schriftfeldhinweis von Blatt „{0}“ („{1}“) wird vom Skript nicht übertragen – der Textweg des Agenten nimmt nur eine kurze stichwortartige Zeile auf Blatt 1 ohne Schriftfeldangaben an; Dokument als JSON übertragen
 Poznámky nad razítkem: {0}/{1} řádků{2}	Hinweise über dem Schriftfeld: {0}/{1} Zeilen{2}
-pravidlo pro každého agenta: materiál, tepelné zpracování, tvrdost, povrch, hrany, nepředepsané tolerance a obecná drsnost vždy v razítku; místní popis odkazem z modelu; nad razítkem nejvýš 5 krátkých heslovitých řádků v celém výkresu (✗ drawing.notes-limit / drawing.note-style / drawing.note-title-data); volný text jen na listu 1 (✗ drawing.notes-sheet); list bez pohledu ⚠ drawing.sheet-empty; člověk v GUI omezen není	Regel für jeden Agenten: Werkstoff, Wärmebehandlung, Härte, Oberfläche, Kanten, Allgemeintoleranzen und allgemeine Rauheit immer im Schriftfeld; örtliche Hinweise als Hinweislinien aus dem Modell; über dem Schriftfeld höchstens 5 kurze stichwortartige Zeilen in der ganzen Zeichnung (✗ drawing.notes-limit / drawing.note-style / drawing.note-title-data); freier Text nur auf Blatt 1 (✗ drawing.notes-sheet); Blatt ohne Ansicht ⚠ drawing.sheet-empty; ein Mensch in der GUI ist nicht eingeschränkt
 Rada: nad razítkem je {0} řádků textu – strojařsky stačí {1} krátkých; údaje (tepelné zpracování, tvrdost, povrch, hrany, tolerance, drsnost) patří do razítka, popis plochy k ploše odkazem.	Tipp: über dem Schriftfeld stehen {0} Textzeilen – {1} kurze genügen; Angaben (Wärmebehandlung, Härte, Oberfläche, Kanten, Toleranzen, Rauheit) gehören ins Schriftfeld, ein Flächenhinweis mit Hinweislinie an die Fläche.
 ručně {0}	manuell {0}
 řádek má {0} znaků (nejvýš {1})	die Zeile hat {0} Zeichen (höchstens {1})
@@ -90,6 +89,7 @@ výkres razítko název="…" číslo="…" kreslil="…" kontroloval="…" schv
 výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)	Zeichnung: Blatt „{0}“ ohne Befund ausgewertet (Ansichten, Schnitte, Smarte Maße, Hinweise und Schriftfeld)
 Z modelu: {0}	Aus dem Modell: {0}
 zkraťte a slučte řádky; údaje razítka zapište do razítka (výkres razítko tepelné=… tvrdost=… povrch=… hrany=… drsnost=…, výkres nepředepsané ISO 2768-mK); popis plochy jako odkaz se šipkou v modelu (poznámka F7 "…"); oblastní úpravu jako čerchovanou čáru (úprava F7 tepelná "58+2 HRC"); nadbytečné smažte (výkres smazat a3)	Zeilen kürzen und zusammenfassen; Schriftfeldangaben ins Schriftfeld (zeichnung schriftfeld wärmebehandlung=… härte=… oberflächenbehandlung=… kanten=… rauheit=…, zeichnung allgemein ISO 2768-mK); Flächenhinweis als Hinweislinie mit Pfeil im Modell (hinweis F7 "…"); örtliche Behandlung als Strichpunktlinie (behandlung F7 wärme "58+2 HRC"); Überflüssiges löschen (zeichnung löschen a3)
+např. Odmastit	z. B. Entfetten
 #!dynamic – texty kódů protokolu (src/cad/engine/codes.ts), překládají se za běhu tr(def.key)
 list {0}: poznámky nad razítkem – {1}	Blatt {0}: Hinweise über dem Schriftfeld – {1}
 list {0}: poznámka není strojařsky heslovitá – {1}	Blatt {0}: Hinweis nicht technisch stichwortartig – {1}
@@ -97,3 +97,4 @@ list {0}: údaj razítka v poznámce – {1}	Blatt {0}: Schriftfeldangabe in ein
 list {0}: poznámky mimo list 1 – {1}	Blatt {0}: Hinweise außerhalb von Blatt 1 – {1}
 list {0}: poznámka bez cíle v geometrii – {1}	Blatt {0}: Hinweis ohne Ziel in der Geometrie – {1}
 list {0}: přesunuto do razítka – {1}	Blatt {0}: ins Schriftfeld verschoben – {1}
+Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)	Technische Zeichnung – Schriftfeld, Hinweislinien, höchstens 5 Zeilen (Regel für jeden Agenten)

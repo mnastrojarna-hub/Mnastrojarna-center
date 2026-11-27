@@ -142,10 +142,12 @@ describe("šablona nástrojářská + logo + nepředepsané tolerance ve všech 
     expect(tx).toEqual(expect.arrayContaining(["ACME a.s.", "Ing. Kontrolor", "Ing. Schvalovatel", "plech 40×160×185"]));
     expect(ents.filter((e) => e.objectName === "SOLID").length).toBeGreaterThanOrEqual(logo.trace!.rects.length / 4);
   }, 60_000);
-  it("kompaktní šablona: menší razítko, pole mimo šablonu v patičce", () => {
+  it("kompaktní šablona: menší razítko (+ technický pás 10 mm, vlna 23 R1), ostatní pole mimo šablonu v patičce", () => {
     const d = makeDrawing(plate(), { ...meta(), template: "compact" });
-    expect([d.titleBlock!.h, d.titleBlock!.template]).toEqual([27, "compact"]);
+    expect([d.titleBlock!.h, d.titleBlock!.template]).toEqual([37, "compact"]);
     const foot = d.titleBlock!.footer.join(" ");
-    for (const s of ["Zákazník: ACME a.s.", "Polotovar: plech 40×160×185", "Počet kusů: 4 ks", "Nepředepsané tolerance X. ±0,1"]) expect(foot, s).toContain(s);
+    for (const s of ["Zákazník: ACME a.s.", "Polotovar: plech 40×160×185", "Počet kusů: 4 ks"]) expect(foot, s).toContain(s);
+    expect(foot).not.toMatch(/Nepředepsané tolerance|Tepelné zpracování|Povrchová úprava/);
+    expect(d.titleBlock!.fields.find((f) => f.key === "tolerance")?.where).toBe("cell");
   });
 });

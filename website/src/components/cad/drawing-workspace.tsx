@@ -1899,7 +1899,7 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
       {kind === "note" && field("text", tr("Text poznámky"), tr("např. Brousit (krátký popis u plochy)"))}
       {kind === "text" && (
         <>
-          {field("text", tr("Text"), tr("např. Kalit 58 ± 2 HRC"))}
+          {field("text", tr("Text"), tr("např. Odmastit"))}
           {field("size", tr("Výška písma [mm]"))}
         </>
       )}
