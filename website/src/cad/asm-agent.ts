@@ -749,6 +749,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       const what: string[] = [];
       /** ℹ material.class / ⚠ material.density-assumed k označení materiálu komponenty (jako příkaz dílu `materiál …`) */
       const matCodes: { code: string; args?: unknown[] }[] = [];
+      /** řádek „→ … uložen jako označení“ místo ✓, je-li hustota komponenty jen předpoklad */
+      let assumed: string | undefined;
       const moved = !!(p.at || p.move || p.rotation || p.turn);
       if (p.at) c.placement.position = [...p.at] as Vec3;
       if (p.move) c.placement.position = c.placement.position.map((v, k) => Math.round((v + p.move![k]) * 1e6) / 1e6) as Vec3;
@@ -798,7 +800,11 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           if (note) matCodes.push({ code: note.code, args: note.args });
         }
         const cls = MATERIALS.find((m) => m.id === (c.source.kind === "part" ? c.source.doc.material : id));
-        what.push(tr("materiál {0}", c.source.kind === "part" && c.source.doc.materialName ? tr("„{0}“ (hustota podle: {1})", c.source.doc.materialName, cls?.label ?? "?") : (cls?.label ?? id ?? p.material)));
+        if (matCodes.some((x) => x.code === "material.density-assumed") && c.source.kind === "part") {
+          // hustota je PŘEDPOKLAD → žádné ✓ pro materiál (jako příkaz dílu `materiál …` v engine/ops/meta.ts): vlastní řádek „→“
+          // (ℹ msg.note) vedle ⚠ material.density-assumed; ostatní změny téhož příkazu (poloha, barva …) dál ✓ (vlna 22 kolo 6)
+          assumed = tr("→ komponenta „{0}“: materiál „{1}“ uložen jako označení do razítka – třída se z něj nepoznala, hustota zůstává podle třídy „{2}“ ({3} g/cm³); pro jinou hustotu zadejte: materiál {4}", c0.name, c.source.doc.materialName ?? p.material, cls?.label ?? "?", cls?.density ?? "?", MATERIALS.map((x) => x.id).join("|"));
+        } else what.push(tr("materiál {0}", c.source.kind === "part" && c.source.doc.materialName ? tr("„{0}“ (hustota podle: {1})", c.source.doc.materialName, cls?.label ?? "?") : (cls?.label ?? id ?? p.material)));
       }
       if (p.supply) {
         // druh položky kusovníku na komponentě (přepis druhu dílu); kind null = zpět na výchozí druh (bom-model.ts)
@@ -843,7 +849,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         movedOthers = s.moved.filter((id) => id !== c.id);
         conflict = s.conflict;
       } else if (moved) doc = await refreshSprings(doc, env); // bez vazeb: délka pružin podle nové polohy dosedací komponenty
-      log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
+      if (what.length) log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
+      if (assumed) log.push(assumed);
       if (movedOthers.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, movedOthers)));
       if (st && Object.values(st).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
       const codes = [...matCodes, ...(conflict ? [conflictCode(conflict)] : [])];

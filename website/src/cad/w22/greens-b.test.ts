@@ -44,10 +44,23 @@ describe("greens b: označení materiálu bez rozpoznané třídy není ✓", ()
     expect(l6.some((e) => e.level === "ok" && /ČSN 11 423.*hustota podle: Ocel/.test(e.text))).toBe(true);
     const l7 = at(r, 7);
     expect(l7.some((e) => e.level === "warn" && e.code === "material.density-assumed"), JSON.stringify(l7)).toBe(true);
+    // kolo 6, oponent: dřív „✓ komponenta … materiál „Hardox 400“ (hustota podle: Ocel)“ vedle ⚠ – falešná zelená; teď jako díl
+    expect(l7.filter((e) => e.level === "ok"), JSON.stringify(l7)).toEqual([]);
+    expect(l7.some((e) => e.code === "msg.note" && /Hardox 400.*uložen jako označení/.test(e.text ?? ""))).toBe(true);
     const asm = ws.present();
     const src = asm.components?.[0]?.source;
     expect(src?.kind).toBe("part");
     if (src?.kind === "part") expect([src.doc.material, src.doc.materialName]).toEqual(["ocel", "Hardox 400"]);
+  }, 60_000);
+
+  it("komponenta: materiál bez rozpoznané třídy + jiná změna v jednom příkazu → ✓ jen pro tu změnu, materiál „→“ + ⚠", async () => {
+    const r = await runScript(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 10 10 10\nnová sestava "S"\nvložit "Deska A"\nsestava komponenta "Deska A" materiál "Hardox 400" barva #ff0000', host());
+    const l5 = at(r, 5);
+    const oks = l5.filter((e) => e.level === "ok");
+    expect(oks.length, JSON.stringify(l5)).toBe(1);
+    expect(oks[0].text).toMatch(/barva #ff0000/);
+    expect(oks[0].text).not.toMatch(/Hardox/);
+    expect(l5.some((e) => e.level === "warn" && e.code === "material.density-assumed")).toBe(true);
   }, 60_000);
 });
 

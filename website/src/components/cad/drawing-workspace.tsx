@@ -1550,7 +1550,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
 
           <Section title={tr("Razítko")}>
             {/* šablona, logo, firma, všechna pole a nepředepsané tolerance (drawing-title-panel.tsx – jako výkres razítko …) */}
-            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} docTemplates={doc.titleTemplates} onDocTemplates={onTitleTemplates} />
+            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} materialDoc={onMaterialChange && doc.kind !== "assembly" && doc.kind !== "draft" ? doc : undefined} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} docTemplates={doc.titleTemplates} onDocTemplates={onTitleTemplates} />
             <Row label={tr("Opracování hran")}>
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>

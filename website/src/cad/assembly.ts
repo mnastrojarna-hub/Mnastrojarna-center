@@ -691,6 +691,17 @@ export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): C
   const n = Math.max(1, Math.round(p.count));
   if (p.kind === "circular" && !(Math.hypot(...axisVec(p.axis)) > 1e-12)) throw new Error(tr("Osa kruhového pole je nulový vektor – zadejte směr osy."));
   const copies: AsmComponent[] = [];
+  // názvy kopií „X (2)“, „X (3)“ … jen volná čísla: druhé pole téhož dílu (dvě komponenty „X“ s přezdívkami) dřív dalo
+  // podruhé „X (2)“ – dvě komponenty stejného jména z pole (vlna 22 kolo 6, bod 23); první pole čísluje jako dřív
+  const used = new Set(comps.map((x) => x.name));
+  let num = 1;
+  const nextName = () => {
+    do num++;
+    while (used.has(`${c.name} (${num})`));
+    const nm = `${c.name} (${num})`;
+    used.add(nm);
+    return nm;
+  };
   for (let k = 1; k < n; k++) {
     let placement: Placement;
     if (p.kind === "linear") {
@@ -702,7 +713,7 @@ export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): C
       const rel = apply3(Rk, [c.placement.position[0] - p.center[0], c.placement.position[1] - p.center[1], c.placement.position[2] - p.center[2]]);
       placement = { position: [rel[0] + p.center[0], rel[1] + p.center[1], rel[2] + p.center[2]].map((v) => Math.round(v * 1e6) / 1e6) as Vec3, rotation: eulerXYZ(mul3(Rk, rotMatrix(c.placement.rotation))) };
     }
-    copies.push(componentCopy(c, { name: `${c.name} (${k + 1})`, placement, fixed: false }));
+    copies.push(componentCopy(c, { name: nextName(), placement, fixed: false }));
   }
   const next = [...comps];
   next.splice(i + 1, 0, ...copies);
@@ -725,7 +736,11 @@ export function mirrorComponent(doc: CadDoc, compId: string, plane: "XY" | "XZ" 
   pos[k] = 2 * offset - pos[k];
   const R = rotMatrix(c.placement.rotation);
   const R2 = mul3(mul3(S, R), S);
-  const copy: AsmComponent = componentCopy(c, { name: `${c.name} (zrcadlo)`, placement: { position: pos, rotation: eulerXYZ(R2) }, fixed: false });
+  // jako u pole: druhé zrcadlení téže komponenty dostane volný název „X (zrcadlo 2)“, ne druhé „X (zrcadlo)“
+  const names = new Set(comps.map((x) => x.name));
+  let name = `${c.name} (zrcadlo)`;
+  for (let m = 2; names.has(name); m++) name = `${c.name} (zrcadlo ${m})`;
+  const copy: AsmComponent = componentCopy(c, { name, placement: { position: pos, rotation: eulerXYZ(R2) }, fixed: false });
   const next = [...comps];
   next.splice(i + 1, 0, copy);
   return { ...doc, components: next };

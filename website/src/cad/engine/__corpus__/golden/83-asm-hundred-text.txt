@@ -19,102 +19,66 @@
 ✓ komponenta „Lišta“ vložena do sestavy · přezdívka „Lišta zadní“
 ✓ vazba Zámek „Lišta“ [Lišta přední] → „Deska A“: ok · poloha beze změny
 ✓ vazba Zámek „Lišta“ [Lišta zadní] → „Deska A“: ok · poloha beze změny
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1-8“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2-8“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3-8“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4-8“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5-8“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-1“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-2“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-3“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-4“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-5“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-6“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-7“
-✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6-8“
-✓ vazba Zámek „Šroub M8“ [Š 1-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 1-8] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 2-8] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 3-8] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 4-8] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 5-8] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-1] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-2] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-3] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-4] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-5] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-6] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-7] → „Deska B“: ok · poloha beze změny
-✓ vazba Zámek „Šroub M8“ [Š 6-8] → „Deska B“: ok · poloha beze změny
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 1“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (2)“ [64; 25; 62] … poslední „Šroub M8 (8)“ [268; 25; 62] (polohy všech: sestava komponenty)
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 2“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (9)“ [64; 55; 62] … poslední „Šroub M8 (15)“ [268; 55; 62] (polohy všech: sestava komponenty)
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 3“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (16)“ [64; 85; 62] … poslední „Šroub M8 (22)“ [268; 85; 62] (polohy všech: sestava komponenty)
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 4“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (23)“ [64; 115; 62] … poslední „Šroub M8 (29)“ [268; 115; 62] (polohy všech: sestava komponenty)
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 5“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (30)“ [64; 145; 62] … poslední „Šroub M8 (36)“ [268; 145; 62] (polohy všech: sestava komponenty)
+✓ komponenta „Šroub M8“ vložena do sestavy · přezdívka „Š 6“
+✓ pole „Šroub M8“: 8 ks (lineární, rozteč 34 mm, směr [1; 0; 0]) – kopie 7 kopií: první „Šroub M8 (37)“ [64; 175; 62] … poslední „Šroub M8 (43)“ [268; 175; 62] (polohy všech: sestava komponenty)
+✓ vazba Zámek „Šroub M8“ [Š 1] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (2)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (3)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (4)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (5)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (6)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (7)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (8)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8“ [Š 2] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (9)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (10)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (11)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (12)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (13)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (14)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (15)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8“ [Š 3] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (16)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (17)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (18)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (19)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (20)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (21)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (22)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8“ [Š 4] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (23)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (24)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (25)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (26)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (27)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (28)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (29)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8“ [Š 5] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (30)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (31)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (32)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (33)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (34)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (35)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (36)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8“ [Š 6] → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (37)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (38)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (39)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (40)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (41)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (42)“ → „Deska B“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M8 (43)“ → „Deska B“: ok · poloha beze změny
 ✓ komponenta „Kolík 6“ vložena do sestavy · přezdívka „K 1-1“
 ✓ komponenta „Kolík 6“ vložena do sestavy · přezdívka „K 1-2“
 ✓ komponenta „Kolík 6“ vložena do sestavy · přezdívka „K 1-3“
@@ -212,12 +176,12 @@
 ✓ vazba Zámek „Kolík 6“ [K 6-7] → „Deska A“: ok · poloha beze změny
 ✓ vazba Zámek „Kolík 6“ [K 6-8] → „Deska A“: ok · poloha beze změny
 Dokument: „Sto dílů“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
-Komponenty: Deska A [0; 0; 0] ⚓ · Deska B [0; 0; 50] · Lišta [Lišta přední] [0; -30; 0] · Lišta [Lišta zadní] [0; 210; 0] · Šroub M8 [Š 1-1] [30; 25; 62] · Šroub M8 [Š 1-2] [64; 25; 62] · Šroub M8 [Š 1-3] [98; 25; 62] · Šroub M8 [Š 1-4] [132; 25; 62] · Šroub M8 [Š 1-5] [166; 25; 62] · Šroub M8 [Š 1-6] [200; 25; 62] · Šroub M8 [Š 1-7] [234; 25; 62] · Šroub M8 [Š 1-8] [268; 25; 62] · Šroub M8 [Š 2-1] [30; 55; 62] · Šroub M8 [Š 2-2] [64; 55; 62] · Šroub M8 [Š 2-3] [98; 55; 62] · Šroub M8 [Š 2-4] [132; 55; 62] · Šroub M8 [Š 2-5] [166; 55; 62] · Šroub M8 [Š 2-6] [200; 55; 62] · Šroub M8 [Š 2-7] [234; 55; 62] · Šroub M8 [Š 2-8] [268; 55; 62] · Šroub M8 [Š 3-1] [30; 85; 62] · Šroub M8 [Š 3-2] [64; 85; 62] · Šroub M8 [Š 3-3] [98; 85; 62] · Šroub M8 [Š 3-4] [132; 85; 62] · Šroub M8 [Š 3-5] [166; 85; 62] · Šroub M8 [Š 3-6] [200; 85; 62] · Šroub M8 [Š 3-7] [234; 85; 62] · Šroub M8 [Š 3-8] [268; 85; 62] · Šroub M8 [Š 4-1] [30; 115; 62] · Šroub M8 [Š 4-2] [64; 115; 62] · Šroub M8 [Š 4-3] [98; 115; 62] · Šroub M8 [Š 4-4] [132; 115; 62] · Šroub M8 [Š 4-5] [166; 115; 62] · Šroub M8 [Š 4-6] [200; 115; 62] · Šroub M8 [Š 4-7] [234; 115; 62] · Šroub M8 [Š 4-8] [268; 115; 62] · Šroub M8 [Š 5-1] [30; 145; 62] · Šroub M8 [Š 5-2] [64; 145; 62] · Šroub M8 [Š 5-3] [98; 145; 62] · Šroub M8 [Š 5-4] [132; 145; 62] · Šroub M8 [Š 5-5] [166; 145; 62] · Šroub M8 [Š 5-6] [200; 145; 62] · Šroub M8 [Š 5-7] [234; 145; 62] · Šroub M8 [Š 5-8] [268; 145; 62] · Šroub M8 [Š 6-1] [30; 175; 62] · Šroub M8 [Š 6-2] [64; 175; 62] · Šroub M8 [Š 6-3] [98; 175; 62] · Šroub M8 [Š 6-4] [132; 175; 62] · Šroub M8 [Š 6-5] [166; 175; 62] · Šroub M8 [Š 6-6] [200; 175; 62] · Šroub M8 [Š 6-7] [234; 175; 62] · Šroub M8 [Š 6-8] [268; 175; 62] · Kolík 6 [K 1-1] [47; 40; 10] · Kolík 6 [K 1-2] [81; 40; 10] · Kolík 6 [K 1-3] [115; 40; 10] · Kolík 6 [K 1-4] [149; 40; 10] · Kolík 6 [K 1-5] [183; 40; 10] · Kolík 6 [K 1-6] [217; 40; 10] · Kolík 6 [K 1-7] [251; 40; 10] · Kolík 6 [K 1-8] [285; 40; 10] … a dalších 40 (sestava)
+Komponenty: Deska A [0; 0; 0] ⚓ · Deska B [0; 0; 50] · Lišta [Lišta přední] [0; -30; 0] · Lišta [Lišta zadní] [0; 210; 0] · Šroub M8 [Š 1] [30; 25; 62] · Šroub M8 (2) [64; 25; 62] · Šroub M8 (3) [98; 25; 62] · Šroub M8 (4) [132; 25; 62] · Šroub M8 (5) [166; 25; 62] · Šroub M8 (6) [200; 25; 62] · Šroub M8 (7) [234; 25; 62] · Šroub M8 (8) [268; 25; 62] · Šroub M8 [Š 2] [30; 55; 62] · Šroub M8 (9) [64; 55; 62] · Šroub M8 (10) [98; 55; 62] · Šroub M8 (11) [132; 55; 62] · Šroub M8 (12) [166; 55; 62] · Šroub M8 (13) [200; 55; 62] · Šroub M8 (14) [234; 55; 62] · Šroub M8 (15) [268; 55; 62] · Šroub M8 [Š 3] [30; 85; 62] · Šroub M8 (16) [64; 85; 62] · Šroub M8 (17) [98; 85; 62] · Šroub M8 (18) [132; 85; 62] · Šroub M8 (19) [166; 85; 62] · Šroub M8 (20) [200; 85; 62] · Šroub M8 (21) [234; 85; 62] · Šroub M8 (22) [268; 85; 62] · Šroub M8 [Š 4] [30; 115; 62] · Šroub M8 (23) [64; 115; 62] · Šroub M8 (24) [98; 115; 62] · Šroub M8 (25) [132; 115; 62] · Šroub M8 (26) [166; 115; 62] · Šroub M8 (27) [200; 115; 62] · Šroub M8 (28) [234; 115; 62] · Šroub M8 (29) [268; 115; 62] · Šroub M8 [Š 5] [30; 145; 62] · Šroub M8 (30) [64; 145; 62] · Šroub M8 (31) [98; 145; 62] · Šroub M8 (32) [132; 145; 62] · Šroub M8 (33) [166; 145; 62] · Šroub M8 (34) [200; 145; 62] · Šroub M8 (35) [234; 145; 62] · Šroub M8 (36) [268; 145; 62] · Šroub M8 [Š 6] [30; 175; 62] · Šroub M8 (37) [64; 175; 62] · Šroub M8 (38) [98; 175; 62] · Šroub M8 (39) [132; 175; 62] · Šroub M8 (40) [166; 175; 62] · Šroub M8 (41) [200; 175; 62] · Šroub M8 (42) [234; 175; 62] · Šroub M8 (43) [268; 175; 62] · Kolík 6 [K 1-1] [47; 40; 10] · Kolík 6 [K 1-2] [81; 40; 10] · Kolík 6 [K 1-3] [115; 40; 10] · Kolík 6 [K 1-4] [149; 40; 10] · Kolík 6 [K 1-5] [183; 40; 10] · Kolík 6 [K 1-6] [217; 40; 10] · Kolík 6 [K 1-7] [251; 40; 10] · Kolík 6 [K 1-8] [285; 40; 10] … a dalších 40 (sestava)
 Vazby: 101 (101 ok)
 Sestava: 100 komponent (100 dílů po rozložení podsestav) · obálka 300 × 260 × 82 mm · objem Σ 1485,97 cm³ · hmotnost Σ 11,665 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 kolize: 1 – šroub v závitu 0, skutečné 1
-⚠ řádek 218: kolize „Deska B“ × „Kolík 6 [K 6-8]“ (113,1 mm³) – místo [285; 190; 52] · obálka 6 × 6 × 4 mm
+⚠ řádek 184: kolize „Deska B“ × „Kolík 6 [K 6-8]“ (113,1 mm³) – místo [285; 190; 52] · obálka 6 × 6 × 4 mm
 ✓ Kvádr 1 (box) · přidáno 600000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 720000 mm³ · těleso platné
 ✓ Kvádr 3 (box) · přidáno 48000 mm³ · těleso platné
@@ -225,7 +189,7 @@ kolize: 1 – šroub v závitu 0, skutečné 1
 ✓ Válec 2 (cylinder) · přidáno 452,4 mm³ · těleso platné
 
 Dokument: „Sto dílů“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
-Komponenty: Deska A [0; 0; 0] ⚓ · Deska B [0; 0; 50] · Lišta [Lišta přední] [0; -30; 0] · Lišta [Lišta zadní] [0; 210; 0] · Šroub M8 [Š 1-1] [30; 25; 62] · Šroub M8 [Š 1-2] [64; 25; 62] · Šroub M8 [Š 1-3] [98; 25; 62] · Šroub M8 [Š 1-4] [132; 25; 62] · Šroub M8 [Š 1-5] [166; 25; 62] · Šroub M8 [Š 1-6] [200; 25; 62] · Šroub M8 [Š 1-7] [234; 25; 62] · Šroub M8 [Š 1-8] [268; 25; 62] · Šroub M8 [Š 2-1] [30; 55; 62] · Šroub M8 [Š 2-2] [64; 55; 62] · Šroub M8 [Š 2-3] [98; 55; 62] · Šroub M8 [Š 2-4] [132; 55; 62] · Šroub M8 [Š 2-5] [166; 55; 62] · Šroub M8 [Š 2-6] [200; 55; 62] · Šroub M8 [Š 2-7] [234; 55; 62] · Šroub M8 [Š 2-8] [268; 55; 62] · Šroub M8 [Š 3-1] [30; 85; 62] · Šroub M8 [Š 3-2] [64; 85; 62] · Šroub M8 [Š 3-3] [98; 85; 62] · Šroub M8 [Š 3-4] [132; 85; 62] · Šroub M8 [Š 3-5] [166; 85; 62] · Šroub M8 [Š 3-6] [200; 85; 62] · Šroub M8 [Š 3-7] [234; 85; 62] · Šroub M8 [Š 3-8] [268; 85; 62] · Šroub M8 [Š 4-1] [30; 115; 62] · Šroub M8 [Š 4-2] [64; 115; 62] · Šroub M8 [Š 4-3] [98; 115; 62] · Šroub M8 [Š 4-4] [132; 115; 62] · Šroub M8 [Š 4-5] [166; 115; 62] · Šroub M8 [Š 4-6] [200; 115; 62] · Šroub M8 [Š 4-7] [234; 115; 62] · Šroub M8 [Š 4-8] [268; 115; 62] · Šroub M8 [Š 5-1] [30; 145; 62] · Šroub M8 [Š 5-2] [64; 145; 62] · Šroub M8 [Š 5-3] [98; 145; 62] · Šroub M8 [Š 5-4] [132; 145; 62] · Šroub M8 [Š 5-5] [166; 145; 62] · Šroub M8 [Š 5-6] [200; 145; 62] · Šroub M8 [Š 5-7] [234; 145; 62] · Šroub M8 [Š 5-8] [268; 145; 62] · Šroub M8 [Š 6-1] [30; 175; 62] · Šroub M8 [Š 6-2] [64; 175; 62] · Šroub M8 [Š 6-3] [98; 175; 62] · Šroub M8 [Š 6-4] [132; 175; 62] · Šroub M8 [Š 6-5] [166; 175; 62] · Šroub M8 [Š 6-6] [200; 175; 62] · Šroub M8 [Š 6-7] [234; 175; 62] · Šroub M8 [Š 6-8] [268; 175; 62] · Kolík 6 [K 1-1] [47; 40; 10] · Kolík 6 [K 1-2] [81; 40; 10] · Kolík 6 [K 1-3] [115; 40; 10] · Kolík 6 [K 1-4] [149; 40; 10] · Kolík 6 [K 1-5] [183; 40; 10] · Kolík 6 [K 1-6] [217; 40; 10] · Kolík 6 [K 1-7] [251; 40; 10] · Kolík 6 [K 1-8] [285; 40; 10] … a dalších 40 (sestava)
+Komponenty: Deska A [0; 0; 0] ⚓ · Deska B [0; 0; 50] · Lišta [Lišta přední] [0; -30; 0] · Lišta [Lišta zadní] [0; 210; 0] · Šroub M8 [Š 1] [30; 25; 62] · Šroub M8 (2) [64; 25; 62] · Šroub M8 (3) [98; 25; 62] · Šroub M8 (4) [132; 25; 62] · Šroub M8 (5) [166; 25; 62] · Šroub M8 (6) [200; 25; 62] · Šroub M8 (7) [234; 25; 62] · Šroub M8 (8) [268; 25; 62] · Šroub M8 [Š 2] [30; 55; 62] · Šroub M8 (9) [64; 55; 62] · Šroub M8 (10) [98; 55; 62] · Šroub M8 (11) [132; 55; 62] · Šroub M8 (12) [166; 55; 62] · Šroub M8 (13) [200; 55; 62] · Šroub M8 (14) [234; 55; 62] · Šroub M8 (15) [268; 55; 62] · Šroub M8 [Š 3] [30; 85; 62] · Šroub M8 (16) [64; 85; 62] · Šroub M8 (17) [98; 85; 62] · Šroub M8 (18) [132; 85; 62] · Šroub M8 (19) [166; 85; 62] · Šroub M8 (20) [200; 85; 62] · Šroub M8 (21) [234; 85; 62] · Šroub M8 (22) [268; 85; 62] · Šroub M8 [Š 4] [30; 115; 62] · Šroub M8 (23) [64; 115; 62] · Šroub M8 (24) [98; 115; 62] · Šroub M8 (25) [132; 115; 62] · Šroub M8 (26) [166; 115; 62] · Šroub M8 (27) [200; 115; 62] · Šroub M8 (28) [234; 115; 62] · Šroub M8 (29) [268; 115; 62] · Šroub M8 [Š 5] [30; 145; 62] · Šroub M8 (30) [64; 145; 62] · Šroub M8 (31) [98; 145; 62] · Šroub M8 (32) [132; 145; 62] · Šroub M8 (33) [166; 145; 62] · Šroub M8 (34) [200; 145; 62] · Šroub M8 (35) [234; 145; 62] · Šroub M8 (36) [268; 145; 62] · Šroub M8 [Š 6] [30; 175; 62] · Šroub M8 (37) [64; 175; 62] · Šroub M8 (38) [98; 175; 62] · Šroub M8 (39) [132; 175; 62] · Šroub M8 (40) [166; 175; 62] · Šroub M8 (41) [200; 175; 62] · Šroub M8 (42) [234; 175; 62] · Šroub M8 (43) [268; 175; 62] · Kolík 6 [K 1-1] [47; 40; 10] · Kolík 6 [K 1-2] [81; 40; 10] · Kolík 6 [K 1-3] [115; 40; 10] · Kolík 6 [K 1-4] [149; 40; 10] · Kolík 6 [K 1-5] [183; 40; 10] · Kolík 6 [K 1-6] [217; 40; 10] · Kolík 6 [K 1-7] [251; 40; 10] · Kolík 6 [K 1-8] [285; 40; 10] … a dalších 40 (sestava)
 Vazby: 101 (101 ok)
 Sestava: 100 komponent (100 dílů po rozložení podsestav) · obálka 300 × 260 × 82 mm · objem Σ 1485,97 cm³ · hmotnost Σ 11,665 kg
 Kolize: 1 – skutečné 1: Deska B × Kolík 6 [K 6-8] (113,1 mm³) v místě [285; 190; 52] (zkontrolováno ?)
