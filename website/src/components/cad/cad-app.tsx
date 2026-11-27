@@ -339,6 +339,14 @@ export function CadApp() {
   const parentAsm = asmStack.length ? asmStack[asmStack.length - 1] : null;
   const setParentAsm = (v: null) => setAsmStack(v === null ? [] : []);
   const vp = useRef<ViewportHandle>(null);
+  /** kolo 7, bod 5: klik na nález v panelu Kolize přiblíží 3D okno (WebGL i softwarový náhled) na místo průniku */
+  const [clashFocus, setClashFocus] = useState("");
+  const focusClash = useCallback((at: Vec3, box?: [Vec3, Vec3]) => {
+    const r = box ? Math.max(2, 0.5 * Math.hypot(box[1][0] - box[0][0], box[1][1] - box[0][1], box[1][2] - box[0][2]) * 3) : 10;
+    vp.current?.focus(at, r);
+    const t = vp.current?.viewState?.()?.target;
+    setClashFocus(t ? t.map((v) => Math.round(v * 1000) / 1000).join(";") : "");
+  }, []);
   const sk = useRef<SketcherHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   /** výběr souboru, který se vloží do otevřené sestavy jako komponenta (Vložit díl / model, Data › Import do sestavy) */
@@ -4307,7 +4315,7 @@ export function CadApp() {
               </FloatPanel>
             )}
             {isAsm && clashOpen && (
-              <ClashPanel key={docKeyNow} doc={doc} docKey={docKeyNow} state={clashState} entry={clashEntry} id={resultIdOf(clashEntry)} busy={clashBusy === docKeyNow} top={explode > 0 ? 150 : 12} onRecheck={() => void runInterference()} onClose={() => setClashOpen(false)} onSelect={setAsmSel} onRules={(add, del) => commit(add.reduce((d, r) => withRule(d, r), del ? withoutRule(doc, del) : doc))} onTol={(mm) => commit({ ...doc, clashTol: mm })} />
+              <ClashPanel key={docKeyNow} doc={doc} docKey={docKeyNow} state={clashState} entry={clashEntry} id={resultIdOf(clashEntry)} busy={clashBusy === docKeyNow} top={explode > 0 ? 150 : 12} onRecheck={() => void runInterference()} onClose={() => setClashOpen(false)} onSelect={setAsmSel} onFocus={focusClash} focused={clashFocus} onRules={(add, del) => commit(add.reduce((d, r) => withRule(d, r), del ? withoutRule(doc, del) : doc))} onTol={(mm) => commit({ ...doc, clashTol: mm })} />
             )}
             {shared && (tabId === shared.tabId || tabStrip.find((t) => t.id === tabId)?.srcTabId === shared.tabId) && (
               <div role="status" className="absolute left-1/2 top-2 z-30 flex max-w-[94%] -translate-x-1/2 items-center gap-3 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 px-3 py-1.5 text-[12px] text-[#26303b] shadow">

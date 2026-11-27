@@ -92,6 +92,11 @@ export type ProcRes = {
    * (sousední polohy nástroje se překrývají aspoň z poloviny jeho délky ve směru posunu); `capped` = potřeba víc než strop
    */
   gaps?: { i: number; n: number; capped?: true }[];
+  /**
+   * plán (kolo 7): úseky `i − 1 → i`, ve kterých obálka dráhy nástroje zasahuje obálku obrobku (i bez potřeby mezipoloh) – záběr
+   * v úseku je možný; volající podle toho pozná, že bez polohy v okamžiku začátku operace (mezi kroky) výsledek nezjistí
+   */
+  near?: number[];
   /** výsledek z mezipaměti jádra */
   cached?: boolean;
   /** čas výpočtu [ms] */

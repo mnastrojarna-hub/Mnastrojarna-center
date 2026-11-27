@@ -29,7 +29,7 @@ Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Stři�
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Střižník“: ΔZ −9,1 mm
  stojí: 2 („Deska A“, „Plech“)
-Kolize v pohybu: kroků s kolizí 1 z 7 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 6
+Kolize v pohybu: kroků s kolizí 1 z 7 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v kroku 6
  kontrolováno spojitě i mezi polohami (7 poloh + 5 mezipoloh ze zjemnění; úseky: průnik už v poloze 1)
 Vazby splněny ve všech krocích
 ⚠ řádek 7: v pohybu „Plech“ × „Střižník“ od kroku 6 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 31,416 mm³ – místo [50; 50; 10,95] v kroku 6
@@ -44,7 +44,7 @@ Vazby splněny ve všech krocích
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
  otisk 1 „Střižník“ → „Plech“: záběr od kroku 6 (t = 2 s) · odebráno 31,416 mm³ · hloubka 0,1 mm
 Stav výrobku „Plech“: plný (kroky 0–5) → v záběru (krok 6)
-ℹ řádek 8: pracovní kontakt „Plech“ × „Střižník“ v krocích 6 (pravidlo proces otisk 1), největší průnik 31,416 mm³
+ℹ řádek 8: pracovní kontakt „Plech“ × „Střižník“ v kroku 6 (pravidlo proces otisk 1), největší průnik 31,416 mm³
 ℹ řádek 8: procesní operace otisk 1: otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm
 Krok 6 (t = 2 s, motory 0,9):
  Deska A [0; 0; 0]
@@ -90,8 +90,8 @@ Kolize v pohybu: kroků s kolizí 0 z 7 · šroub v závitu 0 dvojic · skutečn
  kontrolováno spojitě i mezi polohami (7 poloh + 6 mezipoloh ze zjemnění; úseky: mez posunu 1, dráha posuvu 1, průnik už v poloze 2)
 Vazby splněny ve všech krocích
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
- Značka „Střižník“ → „Plech“: záběr od kroku 5 (t = 1,667 s) · odebráno 94,248 mm³ · hloubka 0,3 mm
- střih 2 „Střižník“ → „Plech“: záběr od kroku 5 (t = 1,667 s) · prostřiženo v kroku 6 (t = 2 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (zůstane na místě)
+ Značka „Střižník“ → „Plech“: záběr od mezipolohy mezi kroky 4 a 5 (t = 1,583 s) · odebráno 94,248 mm³ · hloubka 0,3 mm
+ střih 2 „Střižník“ → „Plech“: záběr od mezipolohy mezi kroky 4 a 5 (t = 1,583 s) · prostřiženo v kroku 6 (t = 2 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (zůstane na místě)
  „Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení – společný objem operací jen jednou; součet operací 408,407 mm³)
 Stav výrobku „Plech“: plný (kroky 0–4) → v záběru (krok 5) → děrovaný + v záběru (krok 6)
 ℹ řádek 18: pracovní kontakt „Plech“ × „Střižník“ v krocích 5–6 (pravidlo proces Značka), největší průnik 314,159 mm³

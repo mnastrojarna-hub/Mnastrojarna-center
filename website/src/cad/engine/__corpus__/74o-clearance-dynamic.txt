@@ -1,0 +1,22 @@
+# vlna 22, bod 6 (kolo 7 – „vůle v dynamice neověřena“): nůž kolem kolíku z korpusu 74h v DYNAMICE (200 snímků po 10 ms).
+# Vůle se měří ve snímcích dynamiky a mezi nimi po přímé dráze: 0,03 mm < 0,05 mm mezi snímky 96 a 102, poloha v úseku jen
+# „přibližně … interpolováno podílem dráhy“ (dynamika nemá řešič mezipoloh); level=dyn, ⚠ clash.clearance, nikdy „dodržen“
+nový díl Rám
+kvádr 200 40 10
+nový díl Doraz
+kvádr 10 40 10
+nový díl Kolík
+válec 2 20
+nový díl Nůž
+kvádr 1 40 10
+#--- run
+nová sestava Sestava 6V
+vložit "Rám" ukotvit
+vložit "Doraz" v -10 0 10 ukotvit
+vložit "Kolík" v 100 41,03 10 ukotvit
+vložit "Nůž" v 12 0 10
+sestava vazba vzdálenost "Nůž" -X "Doraz" +X hodnota 12 název "POSUV"
+pohyb motor lineární vazba "POSUV" 12..192 kroky 36 kolize
+pohyb dynamika čas 2 krok 0,01 gravitace vyp
+pohyb vůle "Nůž" "Kolík" min 0,05
+stav

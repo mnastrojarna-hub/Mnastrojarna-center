@@ -1,0 +1,22 @@
+# vlna 22, bod 6 (kolo 7 – „vůle při rotaci neověřena“): klika 40 × 10 se otáčí kolem čepu Ø10 (12 kroků po 30°), kolík Ø6 stojí
+# 38,855 mm od osy. Roh kliky (35; 5) projde kolem kolíku ve vzdálenosti 38,855 − 3 − √(35² + 5²) = 0,500 mm při natočení ±8,13°
+# – MEZI kroky 0 a 1 a 11 a 12 (v krocích je nejmenší 0,855 mm na čele). Očekáváno: clear.min ≈ 0,501 (zjemnění při natáčení),
+# clear.below=0/13 clear.below.between=2, ⚠ clash.clearance „0,501 mm < 0,7 mm mezi kroky 0 a 1, 11 a 12“, nikdy „dodržen“
+nový díl Základ
+kvádr 100 100 10
+díra 10 skrz v 50 50
+nový díl Klika
+kvádr 40 10 5
+díra 10 skrz v 5 5
+nový díl Kolík
+válec 6 20
+#--- run
+nová sestava Rot
+vložit "Základ" ukotvit
+vložit "Klika" v 45 45 10
+vložit "Kolík" v 88,855 50 10 ukotvit
+sestava vazba souosost "Klika" válcová "Základ" Ø10
+sestava vazba vzdálenost "Klika" spodní "Základ" horní hodnota 0
+pohyb motor rotační "Klika" 0..360 kroky 12
+pohyb vůle "Klika" "Kolík" min 0,7
+stav
