@@ -41,8 +41,15 @@ export type ClearanceMin = {
   bPath?: string[];
   /** minimum leží mezi dvěma kroky (zjemnění / dráha posuvu) */
   between?: [number, number];
-  /** z dráhy posuvu (přesné minimum po přímé dráze, poloha v úseku nezjištěna) */
+  /** z dráhy posuvu (přesné minimum po přímé dráze) */
   sweep?: boolean;
+  /** poloha minima na přímé dráze dohledána (`pos`, `t`, `motors` a body v té poloze – kolo 6); bez toho jen „mezi kroky“ */
+  located?: true;
+  /**
+   * `pos` / `t` / `motors` jen lineárně interpolované podílem dráhy (řešič polohu nepotvrdil: bez řešiče, posuv nerovnoměrný
+   * v čase – klika, vačka – a řešič čas nedohledal): vzdálenost a body jsou přesné, poloha v úseku přibližná („přibližně“)
+   */
+  approxAt?: true;
 };
 export type ClearancePair = {
   a: string;
@@ -52,8 +59,14 @@ export type ClearancePair = {
   series: (number | null)[];
   /** nejbližší body v krocích (úsečka vůle ve 3D) */
   pts: ([Vec3, Vec3] | null)[];
-  /** kroky pod limitem */
+  /** kroky pod limitem (jen polohy kroků – vůle v krocích) */
   below: number[];
+  /**
+   * úseky mezi kroky [k0, k1], ve kterých vůle klesla pod limit, i když v krocích samotných ne (dráha posuvu / zjemnění) – vypisují se
+   * zvlášť „mezi kroky 17 a 18“ (kolo 6: dřív se úsek započítal jako krok 18 do „pod limitem v 1 z 37 poloh (kroky 18)“, krok 18
+   * přitom měl 1,25 mm)
+   */
+  belowBetween?: [number, number][];
   /** kroky, kde je hodnota řady jen dolní mez z obálek (jádro dvojici přesně nezměřilo) – anotace píše „nejméně …“ */
   lower?: number[];
   /** průnik v některé poloze (vzdálenost 0) */
@@ -327,11 +340,11 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
       if (d) w.s.dist.set(pairKey(w.a, w.b), d);
     });
   };
-  const sweepOf = async (s0: Sample, s1: Sample, a: string, b: string, cutoff: number, touch: boolean) => {
+  const sweepOf = async (s0: Sample, s1: Sample, a: string, b: string, cutoff: number, touch: boolean, locate = false) => {
     const req: ClrReq = {
       doc: { ...doc, components: (doc.components ?? []).map((c) => (s0.place[c.id] ? { ...c, placement: s0.place[c.id] } : c)) },
       poses: [s1.place],
-      sweep: [{ a, b, from: 0, to: 1, cutoff, ...(touch ? { touch: true } : {}) }],
+      sweep: [{ a, b, from: 0, to: 1, cutoff, ...(touch ? { touch: true } : {}), ...(locate ? { locate: true } : {}) }],
     };
     return (await kernel!(req)).sweep?.[0] ?? null;
   };
@@ -356,6 +369,46 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
     return { pos: s0.pos + (s1.pos - s0.pos) * f, t: tt, place: m.place, motors: m.motors, dist: new Map() };
   };
 
+  /**
+   * čas v úseku s0 → s1, ve kterém relativní posun dvojice (a, b) leží v podílu `f` přímé dráhy t0 → t1 (řešič mezipolohy,
+   * půlení času; posun po dráze se v úseku bere jako monotónní – přímost úseku ověřila mezipoloha). null = bez řešiče /
+   * nedohledáno v toleranci → poloha jen interpolovaná (`approxAt`).
+   */
+  const locateOnPath = (s0: Sample, s1: Sample, t0: Vec3, t1: Vec3, f: number, a: string, b: string, poseAt: PoseAt | undefined): { pos: number; t: number; motors: number[] } | null => {
+    if (!poseAt || !(s1.t > s0.t)) return null;
+    const dir = sub(t1, t0);
+    const L = len(dir);
+    if (L < 1e-12) return null;
+    const tol = Math.max(1e-6, 1e-4 * L);
+    const frac = (m: { place: Record<string, Placement> }) => {
+      const r = rel({ pos: 0, t: 0, place: { ...s0.place, ...m.place }, motors: [], dist: new Map() }, a, b);
+      const w = sub(r.t, t0);
+      return (w[0] * dir[0] + w[1] * dir[1] + w[2] * dir[2]) / (L * L);
+    };
+    let lo = s0.t;
+    let hi = s1.t;
+    let t = s0.t + (s1.t - s0.t) * f; // první odhad = lineární (u rovnoměrného posuvu hned přesný)
+    for (let it = 0; it < 32; it++) {
+      const m = poseAt(t);
+      if (!m) return null;
+      const tt = m.t ?? t;
+      const g = frac(m) - f;
+      if (Math.abs(g) * L <= tol) {
+        const u = (tt - s0.t) / (s1.t - s0.t);
+        return { pos: s0.pos + (s1.pos - s0.pos) * u, t: tt, motors: [...m.motors] };
+      }
+      if (g < 0) lo = tt;
+      else hi = tt;
+      if (!(hi > lo)) return null;
+      t = (lo + hi) / 2;
+    }
+    return null;
+  };
+
+  const addBelowBetween = (p: ClearancePair, seg: [number, number]) => {
+    const list = (p.belowBetween ??= []);
+    if (!list.some((x) => x[0] === seg[0] && x[1] === seg[1])) list.push([seg[0], seg[1]]);
+  };
   /** zaznamená vzdálenost sledované dvojice ve vzorku (krok: řada a limit; mezipoloha: jen minimum) */
   const recordPair = (pk: string, s: Sample, step: number | null, between?: [number, number]) => {
     const p = pairs.get(pk);
@@ -368,6 +421,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
       else if (p.lower?.includes(step)) p.lower = p.lower.filter((k) => k !== step);
       if (limit !== null && d.d < limit) p.below.push(step);
     }
+    if (step === null && between && limit !== null && d.d < limit) addBelowBetween(p, between);
     if (d.d <= 0) p.contact = true;
     if (!p.min || d.d < p.min.d - 1e-12 || (Math.abs(d.d - p.min.d) <= 1e-12 && !d.exact && p.min.exact === false))
       p.min = { d: d.d, exact: d.exact, pos: s.pos, t: s.t, motors: s.motors, ...(d.p1 ? { p1: d.p1 } : {}), ...(d.p2 ? { p2: d.p2 } : {}), ...(d.aPath ? { aPath: d.aPath } : {}), ...(d.bPath ? { bPath: d.bPath } : {}), ...(between ? { between } : {}) };
@@ -449,7 +503,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
       } else if (straight && !m && poseAt) straight = false; // přímost nejde ověřit – půlit
       if (straight) {
         const swCut = x.clr && !moving ? Infinity : x.clr ? reach : 1e-6;
-        let sw = await sweepOf(s0, s1, x.a, x.b, swCut, touching);
+        let sw = await sweepOf(s0, s1, x.a, x.b, swCut, touching, x.clr && !touching);
         // Konce v dotyku: dráhu počítá jádro pro B zmenšené k středu obálky. U dutého B (pouzdro na sloupku, deska s dírou)
         // zmenšení zúží díru a dráha „zajede“ do A i při čistém klouzání. Stejně platný důkaz klouzání je dráha zmenšeného A
         // vůči B (obrácené pořadí dvojice) – stačí jeden z obou; skutečný průchod tělesem najdou oba. Bez toho výsledek závisel na
@@ -464,11 +518,33 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
         }
         if (sw?.ok && Number.isFinite(sw.d)) {
           if (x.clr && sw.exact && sw.d < Math.min(d0.d, d1.d) - tolC) {
-            // menší vůle uvnitř úseku (po přímé dráze): přesná hodnota a body, poloha v úseku neurčena
+            // menší vůle uvnitř úseku (po přímé dráze): přesná hodnota; poloha na dráze (zlomek `s`) a body A, B v ní z jádra
+            // (kolo 6) – bez ní jen „mezi kroky k0 a k1“ (střed úseku, body na dráze)
             const p = pairs.get(pk);
-            if (p && (!p.min || sw.d < p.min.d))
-              p.min = { d: sw.d, exact: true, pos: (s0.pos + s1.pos) / 2, t: (s0.t + s1.t) / 2, motors: s0.motors.map((v, i) => (v + (s1.motors[i] ?? v)) / 2), ...(sw.p1 ? { p1: sw.p1 } : {}), ...(sw.p2 ? { p2: sw.p2 } : {}), ...(sw.aPath ? { aPath: sw.aPath } : {}), ...(sw.bPath ? { bPath: sw.bPath } : {}), between: [k0, k1], sweep: true };
-            if (p && limit !== null && sw.d < limit && !p.below.includes(k1) && !p.below.includes(k0)) p.below.push(k1);
+            const f = sw.s;
+            const lerp = (u: number, v: number) => (f === undefined ? (u + v) / 2 : u + (v - u) * f);
+            if (p && (!p.min || sw.d < p.min.d)) {
+              // podíl dráhy `f` → čas a motory: lineární interpolace platí jen pro posuv rovnoměrný v čase; řešičem se dohledá čas,
+              // ve kterém relativní posun dvojice leží v podílu `f` (oponent kola 6: klika – hodnoty na 3 místa jen přibližné)
+              const at = f === undefined ? null : locateOnPath(s0, s1, r0.t, r1.t, f, x.a, x.b, poseAt);
+              p.min = {
+                d: sw.d,
+                exact: true,
+                pos: at ? at.pos : lerp(s0.pos, s1.pos),
+                t: at ? at.t : lerp(s0.t, s1.t),
+                motors: at ? at.motors : s0.motors.map((v, i) => lerp(v, s1.motors[i] ?? v)),
+                ...(sw.p1 ? { p1: sw.p1 } : {}),
+                ...(sw.p2 ? { p2: sw.p2 } : {}),
+                ...(sw.aPath ? { aPath: sw.aPath } : {}),
+                ...(sw.bPath ? { bPath: sw.bPath } : {}),
+                between: [k0, k1],
+                sweep: true,
+                ...(f !== undefined ? { located: true as const } : {}),
+                ...(f !== undefined && !at ? { approxAt: true as const } : {}),
+              };
+            }
+            // pod limitem jen MEZI kroky: zvlášť (dřív se úsek započítal jako krok k1 – „pod limitem v 1 z 37 poloh (kroky 18)“)
+            if (p && limit !== null && sw.d < limit) addBelowBetween(p, [k0, k1]);
           }
           // bez dotyku dráhy, nebo dotyk bez objemu (klouzání po ploše) = dokázáno; průchod tělesem → najít polohu půlením
           const pass = sw.d <= 1e-9 && (sw.pen ?? Infinity) > 1e-3;

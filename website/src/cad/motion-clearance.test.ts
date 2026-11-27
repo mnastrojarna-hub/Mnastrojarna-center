@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
 import { clearanceTracker, moveBound, stepTravel, type ClearanceEnv, type PoseAt } from "./motion-clearance";
+import { clearanceSummaryLines } from "./clearance-report";
 import type { ClrDist, ClrReq, ClrRes, ClrSweep } from "./clearance-types";
 import type { MotionClashes, MotionResult, MotionStep } from "./motion";
 import type { AsmComponent, CadDoc, Placement, Vec3 } from "./types";
@@ -23,7 +24,7 @@ const pl = (x: number, y = 0, z = 0, rz = 0): Placement => ({ position: [x, y, z
 const comp = (id: string, p: Placement): AsmComponent => ({ id, name: id, source: { kind: "part", doc: emptyDoc(id) }, placement: p }) as AsmComponent;
 
 /** falešné jádro: tělesa = kvádry (jen posuv) nebo koule; vzdálenost analyticky, dráha posuvu = obálka kvádru přes posun */
-function fakeKernel(shapes: Record<string, Shape>) {
+function fakeKernel(shapes: Record<string, Shape>, opt: { locate?: boolean } = {}) {
   const calls = { dist: 0, sweep: 0 };
   const world = (id: string, p: Placement): { lo: Vec3; hi: Vec3 } | { c: Vec3; r: number } => {
     const s = shapes[id];
@@ -72,6 +73,16 @@ function fakeKernel(shapes: Record<string, Shape>) {
       const B0 = world(q.b, b0) as { lo: Vec3; hi: Vec3 };
       const sw = { lo: [0, 1, 2].map((i) => B0.lo[i] + Math.min(0, v[i])) as Vec3, hi: [0, 1, 2].map((i) => B0.hi[i] + Math.max(0, v[i])) as Vec3 };
       const d = dist(A, sw);
+      // (`opt.locate`, kolo 6) poloha minima na dráze jako jádro: první nejmenší vzdálenost z 2001 poloh, body v té poloze
+      if (opt.locate && q.locate && d.d > 1e-9) {
+        let best = { s: 0, d: Infinity as number, r: d };
+        for (let j = 0; j <= 2000; j++) {
+          const u = j / 2000;
+          const r = dist(A, world(q.b, { ...b0, position: [0, 1, 2].map((i) => b0.position[i] + v[i] * u) as Vec3 }));
+          if (r.d < best.d - 1e-12) best = { s: u, d: r.d, r };
+        }
+        return { ...best.r, d: d.d, ok: true, v, s: best.s };
+      }
       // jako jádro: konce bez dotyku + dotyk s dráhou = průchod (∞); konce v dotyku = rozhodne „zmenšená dráha“ (zde objem překryvu)
       return { ...d, ok: true, v, ...(d.d <= 1e-9 ? { pen: q.touch ? overlap(A, sw) : Infinity } : {}) };
     });
@@ -216,6 +227,31 @@ describe("sledovaná vůle (vlna 22, bod 6)", () => {
     expect(p.series[0]).toBeGreaterThan(8);
     expect(p.min!.d).toBeCloseTo(0.5, 9);
     expect(p.min!.between).toEqual([0, 1]);
+  });
+
+  it("kolo 6 · poloha minima mezi kroky: čas a motor z řešiče (posuv nerovnoměrný v čase), bez řešiče „přibližně“", async () => {
+    // oponent kola 6: poloha / t / motory byly lineární interpolací podílem dráhy `s` – přesné jen u posuvu úměrného motoru.
+    // B jede po X přes A 0,5 mm nad ním, x(t) = 20 t + 1,5 sin 2πt (přímo, nerovnoměrně; v půlce úseku na úsečce – přímost projde)
+    const sh: Record<string, Shape> = { a: { kind: "box", lo: [9, 0, 0], hi: [11, 10, 10] }, b: { kind: "box", lo: [0, 0, 0], hi: [1, 10, 10] } };
+    const d: CadDoc = { ...emptyDoc("X"), kind: "assembly", components: [comp("a", pl(0)), comp("b", pl(0, 0, 10.5))] } as CadDoc;
+    const x = (t: number) => 20 * t + 1.5 * Math.sin(2 * Math.PI * t);
+    const k = fakeKernel(sh, { locate: true });
+    const res = await study(d, { clearance: k.clearance }, 1, (t) => ({ b: pl(x(t), 0, 10.5) }), { collisions: false, clearance: { pairs: [{ a: "a", b: "b" }], limit: 1 } });
+    const m = res.clearance!.pairs[0].min!;
+    expect(m.d).toBeCloseTo(0.5, 9);
+    expect(m.located).toBe(true);
+    // podíl dráhy 0,4 (x = 8); lineárně by vyšlo t = 0,4 (x(0,4) = 8,88 – jiná poloha); řešič dohledá t s x(t) = 8
+    expect(Math.abs(x(m.t) - 8)).toBeLessThan(1e-2);
+    expect(Math.abs(m.t - 0.4)).toBeGreaterThan(0.01);
+    expect(m.motors[0]).toBeCloseTo(m.t, 9);
+    expect(m.approxAt).toBeUndefined();
+    expect(clearanceSummaryLines(res, d).join("\n")).not.toMatch(/přibližně/);
+    // bez řešiče (snímky): poloha jen interpolovaná – výslovně „přibližně … interpolováno podílem dráhy“
+    const blind = await study(d, { clearance: fakeKernel(sh, { locate: true }).clearance }, 1, (t) => ({ b: pl(x(t), 0, 10.5) }), { collisions: false, solver: false, clearance: { pairs: [{ a: "a", b: "b" }], limit: 1 } });
+    const mb = blind.clearance!.pairs[0].min!;
+    expect(mb.approxAt).toBe(true);
+    expect(mb.t).toBeCloseTo(0.4, 9);
+    expect(clearanceSummaryLines(blind, d).join("\n")).toMatch(/mezi kroky 0 a 1 \(po přímé dráze: přibližně poloha 0,4, t = 0,4 s, motory 0,4 – interpolováno podílem dráhy\)/);
   });
 
   it("„pohyblivé“: dvojice blíž než limit + rezerva se najdou samy", async () => {

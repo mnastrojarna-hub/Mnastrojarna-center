@@ -20,6 +20,11 @@
  *     záběr PŘED začátkem operace zůstává ⚠ skutečnou kolizí
  * 10. úroveň „+ geometrická aproximace“ a věta „není to simulace materiálu“ jsou u každého výsledku s procesní vrstvou; bez spočtené
  *     procesní vrstvy (jádro bez operace, chyba) žádný stav „děrovaný“ ani „odebráno“ – jen „nespočítáno“ s ⚠
+ *
+ * Kolo 6:
+ *  8c. vůle pod limitem jen MEZI kroky: nikdy „dodržen v celém pohybu“ a nikdy „pod limitem v 1 z N poloh (kroky K)“ – „mezi kroky“
+ * 11. procesní vrstva: záběr možný jen mezi kroky a mezipolohy nespočítané → nikdy „nezasáhl“, „plný“ na konci ani ⚠ process-miss
+ * 12. se skutečným jádrem: „limit dodržen … spojitě“ nesmí vyjít, když jemné vzorkování TÉŽE dráhy (360 kroků) najde vůli pod limitem
  */
 import { describe, expect, it } from "vitest";
 import { setLang } from "../i18n";
@@ -169,6 +174,20 @@ describe("vlna 22 C1: žádné falešné zelené u tříd kolizí (bod 5)", () =
     expect(clearanceSummaryLines({ steps, collisionsChecked: false } as never, d)).toEqual([]); // vůle nespočítána = žádná věta
   });
 
+  it("8c. vůle pod limitem jen mezi kroky: ne „dodržen v celém pohybu“, ne „v 1 z N poloh (kroky K)“ – zvlášť „mezi kroky 17 a 18“", () => {
+    // kolo 6: dřív úsek 17–18 započten jako krok 18 („pod limitem 0,05 mm v 1 z 37 poloh (kroky 18)“, krok 18 = 1,25 mm)
+    const steps = Array.from({ length: 37 }, (_, i) => ({ i, t: i / 18, motors: [12 + 5 * i], clashes: [] }));
+    const series = steps.map(() => 1.25);
+    const p: ClearancePair = { a: "r", b: "pl", min: { d: 0.03, exact: true, pos: 17.44, t: 0.969, motors: [99.19], between: [17, 18], sweep: true, located: true }, series, pts: series.map(() => null), below: [], belowBetween: [[17, 18]], unproven: 0 };
+    const res = { steps, collisionsChecked: false, clearance: { limit: 0.05, moving: false, pairs: [p], poses: 37, refined: 36 } };
+    const d = { ...doc, motion: { motors: [], duration: 2, steps: 36, clearance: { pairs: [{ a: "r", b: "pl" }], limit: 0.05 } } } as CadDoc;
+    const t = clearanceSummaryLines(res as never, d).join("\n");
+    expect(t).not.toMatch(/dodržen/);
+    expect(t).not.toMatch(/z 37 poloh|\(kroky 18\)/);
+    expect(t).toMatch(/⚠ pod limitem 0,05 mm mezi kroky 17 a 18 \(v polohách kroků nad limitem\)/);
+    expect(t).toMatch(/nejmenší 0,03 mm mezi kroky 17 a 18 \(po přímé dráze: poloha 17,44, t = 0,969 s, motory 99,19\)/);
+  });
+
   it("8b. `stav` motion=ok jen bez vůle pod limitem; „Kolize: žádný průnik“ bez sledované vůle vždy s „vůle nekontrolována“", () => {
     // fáze 2 kolo 3: dřív motion=ok, i když text stavu ⚠ vůle pod limitem měl; souhrn pohybu bez vůle neříkal „vůle nekontrolována“
     const steps = [0, 1, 2].map((i) => ({ i, t: i, motors: [i], clashes: [] as ClashDetail[], place: {}, conflicts: [] }));
@@ -243,4 +262,113 @@ describe("vlna 22 C3: žádné falešné zelené v procesní vrstvě (bod 4)", (
     expect(processStatusText(none, pdoc)).not.toMatch(/děrovaný|odebráno/);
     expect(processCodes(none, pdoc).map((c) => c.code)).toContain("motion.process-failed");
   });
+
+  it("11. záběr možný jen mezi kroky a mezipolohy nespočítané: nikdy „nezasáhl“, „plný“ na konci ani ⚠ process-miss", async () => {
+    // kolo 6: dřív „bez záběru – nástroj obrobek nezasáhl“ + „na konci plný“ vedle ℹ clash.work 314 mm³ mezi kroky
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })) } as unknown as MotionResult;
+    const calls: ProcReq[] = [];
+    const k2 = async (q: ProcReq): Promise<ProcRes> => {
+      calls.push(q);
+      const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as [number, number, number], thickness: null, volume0: 100, ms: 0 };
+      if (q.plan) return { ...base, steps: [], gaps: [{ i: 1, n: 2 }] };
+      // v polohách kroků nástroj obrobek nemá; v mezipolohách (kolik jich je navíc) prostřihne
+      return { ...base, steps: q.rels.map((m, i) => (m && q.rels.length > 3 && i === 1 ? { contact: true, depth: 1, through: true, state: 1 } : { contact: false, depth: 0, through: i > 1 && q.rels.length > 3, state: i > 1 && q.rels.length > 3 ? 1 : 0 })), states: [...base.states, { removed: 50, volume: 50, scrap: [{ volume: 50, center: [0, 0, 0] }] }] };
+    };
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl" }] } } as unknown as CadDoc;
+    const blind = await processRun(d0, jump, { process: k2 }); // bez řešiče mezipoloh (dynamika)
+    const txt = [...processLines(blind, d0), processStatusText(blind, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(blind, d0)).not.toMatch(/plný/);
+    expect(txt).toMatch(/výsledek procesu nezjištěn/);
+    const codes = processCodes(blind, d0).map((c) => c.code);
+    expect(codes).not.toContain("motion.process-miss");
+    expect(codes).toContain("motion.process-between");
+    // s mezipolohami z řešiče: požadavek s polohami navíc, výsledek po krocích studie (děrovaný od kroku 1)
+    const seen = await processRun(d0, jump, { process: k2 }, { poseAt: (_k, t) => ({ place: { pl: { position: [0, 0, 0], rotation: [0, 0, 0] }, r: { position: [0, 0, 20 - 20 * t], rotation: [0, 0, 0] } } }) });
+    expect(calls.some((q) => !q.plan && q.rels.length === 5)).toBe(true);
+    expect(processOf(seen)!.ops[0].steps.length).toBe(3);
+    expect(processOf(seen)!.ops[0].contact?.between).toEqual([0, 1]);
+    expect(processStatusText(seen, d0)).toMatch(/děrovaný/);
+    expect(processCodes(seen, d0).map((c) => c.code)).not.toContain("motion.process-between");
+  });
+
+  it("11b. úsek nad strop mezipoloh (tenký nástroj, dlouhý krok): nikdy „nezasáhl“ / „plný“ – ⚠ process-between „víc než 64 mezipoloh“", async () => {
+    // kolo 6 oprava (oponent): plán vrátil `capped`, planSub ho nečetl – přidal 64 poloh, nástroj obrobkem dál „proskočil“ a
+    // vrstva psala „bez záběru – nástroj obrobek nezasáhl“, „plný“ a ⚠ process-miss vedle ℹ clash.work mezi kroky
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })) } as unknown as MotionResult;
+    const calls: ProcReq[] = [];
+    const k3 = async (q: ProcReq): Promise<ProcRes> => {
+      calls.push(q);
+      const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as [number, number, number], thickness: null, volume0: 100, ms: 0 };
+      if (q.plan) return { ...base, steps: [], gaps: [{ i: 1, n: 64, capped: true }] };
+      return { ...base, steps: q.rels.map(() => ({ contact: false, depth: 0, through: false, state: 0 })) }; // ani 64 poloh nástroj nezachytí
+    };
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl" }] } } as unknown as CadDoc;
+    const out = await processRun(d0, jump, { process: k3 }, { poseAt: (_k, t) => ({ place: { pl: { position: [0, 0, 0], rotation: [0, 0, 0] }, r: { position: [0, 0, 20 - 20 * t], rotation: [0, 0, 0] } } }) });
+    const txt = [...processLines(out, d0), processStatusText(out, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(out, d0)).not.toMatch(/plný/);
+    expect(txt).toMatch(/záběr jen mezi kroky – výsledek procesu nezjištěn \(úsek před krokem 1 by potřeboval víc než 64 mezipoloh\)/);
+    const codes = processCodes(out, d0);
+    expect(codes.map((c) => c.code)).not.toContain("motion.process-miss");
+    expect(codes.find((c) => c.code === "motion.process-between")?.text).toMatch(/víc než 64 mezipoloh/);
+    expect(processOf(out)!.ops[0]).toMatchObject({ unresolved: 1, unresolvedWhy: "cap" });
+    // poloviční vzorek úseku se nepočítá (výsledek by byl jen zdánlivý): požadavek výpočtu jen s polohami kroků
+    expect(calls.filter((q) => !q.plan).every((q) => q.rels.length === 3)).toBe(true);
+  });
+
+  it("11c. spojitá kontrola kolizí našla nástroj × obrobek mezi kroky, procesní vrstva nic: nezjištěn, ne „nezasáhl“", async () => {
+    // pojistka: plán úsek nevybral (žádné mezery), jádro v polohách kroků záběr nenašlo, kontrola kolizí mezi kroky 0 a 1 ano
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })), between: [{ k0: 0, k1: 1, clashes: [det("pl", "r", "real", { volume: 9.817 })] }] } as unknown as MotionResult;
+    const k4 = async (q: ProcReq): Promise<ProcRes> => ({ states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1], thickness: null, volume0: 100, ms: 0, steps: q.plan ? [] : q.rels.map(() => ({ contact: false, depth: 0, through: false, state: 0 })) });
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl" }] } } as unknown as CadDoc;
+    const out = await processRun(d0, jump, { process: k4 });
+    const txt = [...processLines(out, d0), processStatusText(out, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(out, d0)).not.toMatch(/plný/);
+    expect(txt).toMatch(/kontrola kolizí našla průnik před krokem 1, procesní vrstva v polohách ne/);
+    const codes = processCodes(out, d0).map((c) => c.code);
+    expect(codes).not.toContain("motion.process-miss");
+    expect(codes).toContain("motion.process-between");
+    expect(processOf(out)!.ops[0]).toMatchObject({ unresolved: 1, unresolvedWhy: "clash" });
+    // stejná kolize mezi kroky, ale jiná dvojice (ne nástroj × obrobek operace): pojistka se nezapne, ⚠ process-miss zůstává
+    const other = { ...jump, between: [{ k0: 0, k1: 1, clashes: [det("d", "r", "real")] }] } as unknown as MotionResult;
+    const o2 = await processRun(d0, other, { process: k4 });
+    expect(processCodes(o2, d0).map((c) => c.code)).toContain("motion.process-miss");
+  });
+});
+
+describe("vlna 22 C2 kolo 6: spojitá vůle se skutečným jádrem není větší než jemné vzorkování téže dráhy (bod 6)", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { setHostAssets } = await import("../host-assets");
+  const { makeKernelClient } = await import("../kernel-client");
+  const { inProcessTransport } = await import("../kernel-inprocess");
+  const { runReport } = await import("../engine/run-protocol");
+  const { formatConsole, formatShort } = await import("../engine/protocol");
+  const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
+  const FONTS = path.resolve(__dirname, "../../../public/fonts");
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
+  const kernel = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await kernel.init();
+  const host = (): EngineHost => ({ kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+  const setup = fs.readFileSync(path.resolve(__dirname, "../engine/__corpus__/74h-clearance-pin-side.txt"), "utf8").split("\n").filter((l) => !/^(#|pohyb|stav)/.test(l));
+
+  it("12. „limit dodržen … spojitě“ nevyjde, když 360 kroků téže dráhy najde vůli pod limitem (dřív 36 kroků 1,03 mm ✓, 360 kroků 0,03 mm ⚠)", async () => {
+    const run = async (steps: number, pair: string) => {
+      const r = await runReport(new MemoryWorkspace(), [...setup, `pohyb motor lineární vazba "POSUV" 12..192 kroky ${steps} kolize`, `pohyb vůle ${pair} min 0,05`].join("\n"), host());
+      const short = formatShort(r, { budget: Infinity, notes: true });
+      const min = Number(/ clear\.min=([\d.]+)/.exec(short)![1]);
+      return { min, con: formatConsole(r), short };
+    };
+    const fine = await run(360, '"Nůž" "Kolík"');
+    expect(fine.min).toBeLessThan(0.05); // jemné vzorkování: pod limitem
+    for (const pair of ['"Nůž" "Kolík"', '"Kolík" "Nůž"']) {
+      const coarse = await run(36, pair);
+      // spojitá kontrola je nejvýš tak velká jako nejmenší vzorek téže dráhy (je to minimum přes celou dráhu)
+      expect(coarse.min, pair).toBeLessThanOrEqual(fine.min + 1e-6);
+      expect(coarse.con, pair).not.toMatch(/limit 0,05 mm dodržen v celém pohybu/);
+      expect(coarse.short, pair).toMatch(/clash\.clearance/);
+    }
+  }, 600_000);
 });

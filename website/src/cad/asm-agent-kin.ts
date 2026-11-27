@@ -21,7 +21,7 @@ import { KIN_SPEC, accepts, entKindOf, kinDefaults, kinHasValue, type EntKind, t
 import { MATE_LABEL, faceAreas, worldGeo, type FaceGeo, type KinMateType } from "./mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "./mates-kin";
 import { springSeatMates } from "./asm-spring";
-import { defaultStudy, motionFindings, motionGroups, motionMotorNotes, motorProblem, motorText, poseDoc, runMotion, type MotionResult } from "./motion";
+import { defaultStudy, motionFindings, motionGroups, motionMotorNotes, motorProblem, motorText, poseDoc, runMotion, type MotionResult, type MotionStep } from "./motion";
 import { levelKv, levelLine, levelOf, studyMode } from "./motion-mode";
 import { devText } from "./motion-quasi";
 import { motionSlot, motionState, motionStateOf, runStored } from "./motion-cache";
@@ -34,7 +34,7 @@ import { fmtNum } from "./engine/protocol";
 import { applyDynCmd, dynamicRun, dynStudyLine } from "./asm-agent-dyn";
 import { applyMotionViewCmd, type MotionVideoSignal } from "./agent-motion-view";
 // vůle a spojitá kontrola kolizí mezi kroky (vlna 22, bod 6): sledovač, výstupy, příkaz `pohyb vůle …`
-import { clearancePost, clearanceTracker } from "./motion-clearance";
+import { clearancePost, clearanceTracker, type PoseAt } from "./motion-clearance";
 import { clearanceCodes, clearanceKv, clearanceStepLines } from "./clearance-report";
 import { applyClearanceCmd } from "./agent-clearance";
 import { applyProcessCmd, processListLines } from "./agent-process";
@@ -263,8 +263,15 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
         // procesní vrstva (vlna 22, bod 4): střih / otisk nad polohami kroků – odvozený výsledek, uloží se s výsledkem studie
         return processRun(doc, tracker ? await clearancePost(r, tracker) : r, env);
       }
-      const r = await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep, cancel, ...(tracker ? { between: (row, prev, poseAt) => tracker.step(row, prev, poseAt) } : {}) });
-      return processRun(doc, tracker ? tracker.finish(r) : r, env);
+      // mezipolohy řešiče úseků (k−1, k) – i pro procesní vrstvu (kolo 6: razník projde plechem mezi kroky → mezipolohy, ne „nezasáhl“)
+      const poseAts = new Map<number, PoseAt>();
+      const wantPose = !!study!.process?.length;
+      const between = tracker || wantPose ? async (row: MotionStep, prev: MotionStep | null, poseAt: PoseAt) => {
+        if (wantPose) poseAts.set(row.i, poseAt);
+        if (tracker) await tracker.step(row, prev, poseAt);
+      } : undefined;
+      const r = await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep, cancel, ...(between ? { between } : {}) });
+      return processRun(doc, tracker ? tracker.finish(r) : r, env, { poseAt: (k, t) => poseAts.get(k)?.(t) ?? null });
     },
     opts.cancel,
     opts.onStep,

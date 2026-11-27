@@ -1,0 +1,25 @@
+# vlna 22, bod 6 (kolo 6): kolík Ø2 stojí 0,03 mm vedle dráhy nože (osa kolíku napříč pohybu) – vůle po přímé dráze mezi kroky
+# 17 a 18 je 0,03 mm < 0,05 mm v OBOU pořadích dvojice (dřív „Nůž“ × „Kolík“ 1,03 mm „limit dodržen v celém pohybu (spojitě)“,
+# „Kolík“ × „Nůž“ 0,03 mm, ale „pod limitem v 1 z 37 poloh (kroky 18)“, krok 18 přitom 1,25 mm): minimum mezi kroky je zvlášť,
+# s polohou v úseku (t, motor) a body nože a kolíku v té poloze
+nový díl Rám
+kvádr 200 40 10
+nový díl Doraz
+kvádr 10 40 10
+nový díl Kolík
+válec 2 20
+nový díl Nůž
+kvádr 1 40 10
+nová sestava Sestava 6V
+vložit "Rám" ukotvit
+vložit "Doraz" v -10 0 10 ukotvit
+vložit "Kolík" v 100 41,03 10 ukotvit
+vložit "Nůž" v 12 0 10
+sestava vazba vzdálenost "Nůž" -X "Doraz" +X hodnota 12 název "POSUV"
+pohyb motor lineární vazba "POSUV" 12..192 kroky 36 kolize
+pohyb vůle "Nůž" "Kolík" min 0,05
+stav
+pohyb vůle smazat
+pohyb vůle "Kolík" "Nůž" min 0,05
+pohyb stav
+pohyb krok 18

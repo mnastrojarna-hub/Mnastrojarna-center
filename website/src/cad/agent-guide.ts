@@ -908,8 +908,12 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   1 ks\`, \`Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)\`; úroveň \`kinematika + geometrická
   aproximace\`, strojově \`level=kin+geo … proc=1 removed=314.159 scrap=1 through=21\` na konci řádku. Pracovní záběr nástroje do obrobku od
   začátku operace = ℹ \`clash.work\` (pravidlo „proces střih 1“, jeden model s \`kolize pravidlo pracovní\`), nikdy ⚠ clash.real; nástroj,
-  který obrobek nezasáhne = ⚠ \`motion.process-miss\`; neprostřiženo = ℹ \`motion.process-partial\`; strop 48 booleovských operací na
-  operaci = ℹ \`motion.process-approx\`. \`pohyb krok N\` vypíše stav výrobku a hloubku zásahu; \`stav\` stav na konci. Dokument se NEMĚNÍ:
+  který obrobek nezasáhne = ⚠ \`motion.process-miss\`; neprostřiženo = ℹ \`motion.process-partial\` (i otisk mělčí než zadaná hloubka:
+  \`otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm\`); strop 48 booleovských operací na operaci = ℹ \`motion.process-approx\`. Krok delší
+  než polovina nástroje ve směru pohybu (razník projde plechem mezi dvěma kroky): procesní vrstva doplní mezipolohy z řešiče
+  (\`záběr od mezipolohy mezi kroky 0 a 1 (t = 0,667 s)\`); nejdou-li spočítat (dynamika, řešič bez řešení), úsek by potřeboval víc než 64 mezipoloh
+  (tenký nástroj, dlouhý krok) nebo spojitá kontrola kolizí najde nástroj × obrobek mezi kroky a procesní vrstva ne = ⚠ \`motion.process-between\`
+  „výsledek procesu nezjištěn“ s důvodem a stav výrobku \`nezjištěn\`, nikdy „plný“ ani „nezasáhl“. Víc operací: hotový výsledek má přednost – \`děrovaný + v záběru\`. \`pohyb krok N\` vypíše stav výrobku a hloubku zásahu; \`stav\` stav na konci. Dokument se NEMĚNÍ:
   krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
   TÉMŽE obrobku se kombinuje: stav obrobku = obrobek − sjednocení odebraných objemů všech operací v kroku (druhý střih do téže díry
   nic nepřidá: \`proc=2 removed=314.159 scrap=1\`, řádek \`„Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení …; součet
@@ -3133,7 +3137,11 @@ souhrn \`Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku 0
 0,05 mm v 11 z 11 poloh (kroky 0–10)\` + ⚠ \`clash.clearance\`; nad limitem „limit … dodržen v celém pohybu (spojitě i mezi polohami)“
 jen se zjemněním bez nepotvrzených úseků, jinak „dodržen v N polohách (mezi polohami nepotvrzeno)“. Strojová pole na konci řádku
 pohybu: \`clear.min=0.01 clear.limit=0.05 clear.below=11/11 clear.at=0 clear.pairs=1\` (\`clear.min=2.5+\` = jen dolní mez z obálek,
-\`clear.at=17-18\` = mezi kroky). \`pohyb krok N\` vypíše vůli kroku s body, CSV má sloupce \`Vůle A × B [mm]\`, \`window.mncad.motion()\`
+\`clear.at=17-18\` = mezi kroky; \`clear.below=N/M\` počítá JEN polohy kroků – minimum pod limitem nalezené mezi kroky je zvlášť
+\`clear.below.between=K\` (K úseků) a v textu „mezi kroky 17 a 18 (poloha 17,438, t = 0,969 s, motory 99,188)“, takže
+\`clear.below=0/37 clear.below.between=1\` = limit porušen mezi kroky; rozhoduje vždy \`clear.min\` < \`clear.limit\` a ⚠ \`clash.clearance\`).
+Poloha / čas / motory v úseku jsou lineárně interpolované podílem dráhy – přesné u posunu úměrného motoru, jinak (klika, vačka)
+přibližné, protokol pak připíše „přibližně“. \`pohyb krok N\` vypíše vůli kroku s body, CSV má sloupce \`Vůle A × B [mm]\`, \`window.mncad.motion()\`
 vrací \`clearance\` (limit, min s dvojicí, polohou a body, dvojice s řadou po krocích), \`sweep\` (režim, polohy, zjemnění, největší
 posun) a \`between\` (kontakty mezi kroky). V aplikaci: Pohybová studie › „Vůle a spojitost kontroly“ (dvojice / pohyblivé díly,
 limit, „Kolize i mezi kroky“), výsledek s tlačítkem „Na minimum“ a grafem vůle po krocích (\`data-clearance-chart\`), úsečka

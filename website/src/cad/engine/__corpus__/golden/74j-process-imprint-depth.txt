@@ -1,0 +1,113 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Střižník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 6400 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 12566,4 mm³ · těleso platné
+
+Dokument: „Střižník“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 40 mm (X -10…10, Y -10…10, Z 0…40) · objem 12,57 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 12566,4 mm³ · těleso platné – Ø20 × 40 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Lis“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy (ukotvená)
+✓ komponenta „Střižník“ vložena do sestavy
+✓ vazba Souosost „Střižník“ F1 → „Deska A“ F7: ok · poloha beze změny
+✓ vazba ZDVIH „Střižník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → 0,9 mm ↓ zdvih 9,1 mm
+ pohání: „Střižník“ · směr −Z
+Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → 0,9 mm ↓ zdvih 9,1 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −9,1 mm
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 1 z 7 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 6
+ kontrolováno spojitě i mezi polohami (7 poloh + 5 mezipoloh ze zjemnění; úseky: průnik už v poloze 1)
+Vazby splněny ve všech krocích
+⚠ řádek 7: v pohybu „Plech“ × „Střižník“ od kroku 6 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 31,416 mm³ – místo [50; 50; 10,95] v kroku 6
+ℹ procesní operace 1. otisk „Střižník“ → „Plech“ · hloubka 0,3 mm · od dotyku nástroje
+Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → 0,9 mm ↓ zdvih 9,1 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −9,1 mm
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 0 z 7 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (7 poloh + 5 mezipoloh ze zjemnění; úseky: průnik už v poloze 1)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ otisk 1 „Střižník“ → „Plech“: záběr od kroku 6 (t = 2 s) · odebráno 31,416 mm³ · hloubka 0,1 mm
+Stav výrobku „Plech“: plný (kroky 0–5) → v záběru (krok 6)
+ℹ řádek 8: pracovní kontakt „Plech“ × „Střižník“ v krocích 6 (pravidlo proces otisk 1), největší průnik 31,416 mm³
+ℹ řádek 8: procesní operace otisk 1: otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm
+Krok 6 (t = 2 s, motory 0,9):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Střižník [50; 50; 10,9]
+ pracovní kontakt: Plech × Střižník
+ stav výrobku „Plech“: v záběru · odebráno 31,416 mm³ · hloubka 0,1 mm
+ zásah otisk 1: 0,1 mm (geometrická aproximace)
+✓ nová sestava „Lis B“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy (ukotvená)
+✓ komponenta „Střižník“ vložena do sestavy
+✓ vazba Souosost „Střižník“ F1 → „Deska A“ F7: ok · poloha beze změny
+✓ vazba ZDVIH „Střižník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -2 mm ↓ zdvih 12 mm
+ pohání: „Střižník“ · směr −Z
+Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -2 mm ↓ zdvih 12 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −12 mm
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 2 z 7 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (7 poloh + 6 mezipoloh ze zjemnění; úseky: mez posunu 1, dráha posuvu 1, průnik už v poloze 2)
+Vazby splněny ve všech krocích
+⚠ řádek 16: v pohybu „Plech“ × „Střižník“ od kroku 5 (t = 1,667 s): kroků 2, dvojic komponent 1, největší průnik 314,159 mm³ – místo [50; 50; 10,5] v kroku 5
+ℹ procesní operace 1. Značka (otisk) „Střižník“ → „Plech“ · hloubka 0,3 mm · od dotyku nástroje
+Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -2 mm ↓ zdvih 12 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −12 mm
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 0 z 7 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (7 poloh + 6 mezipoloh ze zjemnění; úseky: mez posunu 1, dráha posuvu 1, průnik už v poloze 2)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ Značka „Střižník“ → „Plech“: záběr od kroku 5 (t = 1,667 s) · odebráno 94,248 mm³ · hloubka 0,3 mm
+Stav výrobku „Plech“: plný (kroky 0–4) → v záběru (kroky 5–6)
+ℹ řádek 17: pracovní kontakt „Plech“ × „Střižník“ v krocích 5–6 (pravidlo proces Značka), největší průnik 314,159 mm³
+ℹ procesní operace 2. střih „Střižník“ → „Plech“ · do prostřižení · od motor 1 ≤ 0,5 · odpad: zůstane na místě
+Pohybová studie: 6 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -2 mm ↓ zdvih 12 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Střižník“: ΔZ −12 mm
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 0 z 7 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (7 poloh + 6 mezipoloh ze zjemnění; úseky: mez posunu 1, dráha posuvu 1, průnik už v poloze 2)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ Značka „Střižník“ → „Plech“: záběr od kroku 5 (t = 1,667 s) · odebráno 94,248 mm³ · hloubka 0,3 mm
+ střih 2 „Střižník“ → „Plech“: záběr od kroku 5 (t = 1,667 s) · prostřiženo v kroku 6 (t = 2 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (zůstane na místě)
+ „Plech“: 2 operací, celkem odebráno 314,159 mm³ (sjednocení – společný objem operací jen jednou; součet operací 408,407 mm³)
+Stav výrobku „Plech“: plný (kroky 0–4) → v záběru (krok 5) → děrovaný + v záběru (krok 6)
+ℹ řádek 18: pracovní kontakt „Plech“ × „Střižník“ v krocích 5–6 (pravidlo proces Značka), největší průnik 314,159 mm³
+Krok 6 (t = 2 s, motory -2):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Střižník [50; 50; 8]
+ pracovní kontakt: Plech × Střižník
+ stav výrobku „Plech“: děrovaný + v záběru · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 oddělen
+ zásah Značka: 0,3 mm (geometrická aproximace)
+ zásah střih 2: 1 mm (geometrická aproximace)
+
+Dokument: „Lis B“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [10; 10; 10] ⚓ · Střižník [50; 50; 20]
+Vazby: 2 (2 ok)
+Pohybová studie: motorů 1 · kroků 6 · 2 s · kolize – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 60 mm · objem Σ 115,76 cm³ · hmotnost Σ 0,909 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 6 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), vůle nekontrolována, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + v záběru, odebráno 314,159 mm³, odpad 1 (podrobně pohyb stav)

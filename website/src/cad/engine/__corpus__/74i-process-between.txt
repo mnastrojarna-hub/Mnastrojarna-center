@@ -1,0 +1,21 @@
+# vlna 22, bod 4 (kolo 6): střižník Ø20 × 40 projde plechem 1 mm během JEDNOHO kroku (zdvih 55 mm) – procesní vrstva doplní
+# mezipolohy z řešiče a spočítá střih (dřív „bez záběru – nástroj obrobek nezasáhl“, proc=1 removed=0, stav „plný“, vedle
+# ℹ clash.work 314,159 mm³ „v krocích mezi kroky“); text ℹ clash.work „mezi kroky 0 a 1“
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl Plech
+kvádr 80 80 1
+nový díl Střižník
+válec 20 40
+#--- run
+nová sestava Lis
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Střižník" v 50 50 20
+sestava vazba souosost "Střižník" válcová "Deska A" Ø20,2
+sestava vazba vzdálenost "Střižník" spodní "Deska A" horní hodnota 10 název "ZDVIH"
+pohyb motor lineární vazba "ZDVIH" 10..-45 kroky 1 kolize
+pohyb proces střih "Střižník" "Plech"
+pohyb krok 1
+stav
