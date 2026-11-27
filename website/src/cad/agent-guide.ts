@@ -718,7 +718,8 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \
    obálka je **přesná** obálka těles všech viditelných listových dílů v jejich umístění (jádro, ne síť, bez skic a pomocné
    geometrie; i natočené díly, např. otočení 0 0 20).
 6. \`sestava komponenta "Čep" v x y z | posun dx dy dz | otočení rx ry rz | pootočit X 90 | ukotvit | uvolnit | skrýt | zobrazit |
-   barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel\` (třída hustoty, jiný text = označení do kusovníku);
+   barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel\` (třída hustoty, jiný text = označení do kusovníku;
+   třída po označení jako u dílu: označení zůstává, odporuje-li mu, \`→ … v razítku zůstává – patří jiné třídě\` + ⚠, ne ✓);
    po přesunu se vazby přepočítají (přesunutá komponenta drží). \`sestava odebrat "X"\` (i s jejími vazbami),
    \`sestava duplikovat "X" [posun 50 0 0]\`, \`sestava izolovat "X"\`, \`sestava zobrazit vše\`.
 7. \`sestava pole "X" 4 rozteč 25 [směr Y|dx dy dz]\`, \`sestava pole "X" kruhové 6 [úhel 360] [osa Z] [v cx cy cz]\` (kopie
