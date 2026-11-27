@@ -97,21 +97,15 @@ describe("drift řešiče pohybu (P7) – deska vedená dvěma sloupky jen podé
     expect(res.conflictSteps).toBe(14);
     expect(res.steps.filter((s) => s.conflicts.length).map((s) => s.i)).toEqual(Array.from({ length: 14 }, (_, i) => 27 + i));
     const issues = motionIssues(res, doc);
-    expect(issues.map((x) => [x.code, x.level, x.mate, x.step, x.steps])).toEqual([
-      ["motion.conflict", "warn", "d", 27, [27, 40]],
-      ["motion.conflict", "warn", "l1", 27, [27, 40]],
-      ["motion.conflict", "warn", "l2", 27, [27, 40]],
-    ]);
+    // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit
+    expect(issues.map((x) => [x.code, x.level, x.mate, x.step, x.steps])).toEqual([["motion.conflict", "warn", "d", 27, [27, 40]]]);
     expect(issues[0].t[0]).toBeCloseTo(1.35, 9);
-    expect(issues[1].args).toEqual(["Mez vzdálenosti S → K", "27–40 (t = 1.35–2 s)"]);
-    expect(issues[1].text).toBe("pohyb porušuje vazbu „Mez vzdálenosti S → K“ v kroku 27–40 (t = 1.35–2 s)");
+    expect(issues[0].args).toEqual(["Vzdálenost U → B", "27–40 (t = 1.35–2 s)"]);
+    const lim = motionFindings(res, doc).find((x) => x.code === "motion.motor-limit")!;
+    expect(lim.text).toMatch(/brání: „Mez vzdálenosti S → K“ .*; „Mez vzdálenosti S → M“ /);
     const sum = motionSummary(res, doc);
     expect(sum.join("\n")).toMatch(/⚠ nesplněné vazby v 14 krocích/);
-    expect(sum.filter((l) => l.startsWith(" ⚠ motion.conflict "))).toEqual([
-      " ⚠ motion.conflict pohyb porušuje vazbu „Vzdálenost U → B“ v kroku 27–40 (t = 1.35–2 s)",
-      " ⚠ motion.conflict pohyb porušuje vazbu „Mez vzdálenosti S → K“ v kroku 27–40 (t = 1.35–2 s)",
-      " ⚠ motion.conflict pohyb porušuje vazbu „Mez vzdálenosti S → M“ v kroku 27–40 (t = 1.35–2 s)",
-    ]);
+    expect(sum.filter((l) => l.startsWith(" ⚠ motion.conflict "))).toEqual([" ⚠ motion.conflict pohyb porušuje vazbu „Vzdálenost U → B“ v kroku 27–40 (t = 1.35–2 s)"]);
   });
 
   it("protokol motion.conflict nezávisí na id vazeb (uid = Math.random): pořadí podle dokumentu, stejný text", async () => {
@@ -122,12 +116,15 @@ describe("drift řešiče pohybu (P7) – deska vedená dvěma sloupky jen podé
       const ren = { ...doc, mates: doc.mates!.map((m) => ({ ...m, id: ids[m.id] ?? m.id })) };
       const res = await runMotion(ren, geo, { ...study(60, 20), motors: [{ id: "mo", kind: "linear", mate: ids.d, from: 175, to: 115 }] });
       const issues = motionIssues(res, ren);
-      expect(issues.map((x) => x.mate)).toEqual([ids.d, ids.l1, ids.l2]);
-      texts.push(motionSummary(res, ren).filter((l) => l.includes("motion.conflict")));
+      // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit; pořadí podle dokumentu se teď hlídá u bránících mezí v motion.motor-limit
+      expect(issues.map((x) => x.mate)).toEqual([ids.d]);
+      const lim = motionFindings(res, ren).find((x) => x.code === "motion.motor-limit")!.text;
+      texts.push([...motionSummary(res, ren).filter((l) => l.includes("motion.conflict")), lim]);
     }
     expect(texts[1]).toEqual(texts[0]);
     expect(texts[2]).toEqual(texts[0]);
-    expect(texts[0].length).toBe(3);
+    expect(texts[0].length).toBe(2);
+    expect(texts[0][1]).toMatch(/brání: „Mez vzdálenosti S → K“ .*; „Mez vzdálenosti S → M“ /);
   });
 
   it("zdvih 40 mm (splnitelný): žádný konflikt, deska klesne přesně o 40 mm", async () => {
@@ -153,16 +150,13 @@ describe("drift řešiče pohybu (P7) – deska vedená dvěma sloupky jen podé
     const texts = (["cs", "en", "de"] as const).map((l) => {
       setLang(l);
       const x = motionIssues(res, doc);
-      expect(x.map((i) => [i.code, i.steps, i.args[1]])).toEqual([
-        ["motion.conflict", [14, 20], "14–20 (t = 1.4–2 s)"],
-        ["motion.conflict", [14, 20], "14–20 (t = 1.4–2 s)"],
-        ["motion.conflict", [14, 20], "14–20 (t = 1.4–2 s)"],
-      ]);
-      return x[1].text;
+      // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit
+      expect(x.map((i) => [i.code, i.steps, i.args[1]])).toEqual([["motion.conflict", [14, 20], "14–20 (t = 1.4–2 s)"]]);
+      return x[0].text;
     });
     expect(new Set(texts).size).toBe(3);
-    expect(texts[1]).toBe("the motion violates mate “Distance limit S → K” in step 14–20 (t = 1.4–2 s)");
-    expect(texts[2]).toMatch(/^die Bewegung verletzt die Verknüpfung „.* S → K“ in Schritt 14–20 \(t = 1\.4–2 s\)$/);
+    expect(texts[1]).toBe("the motion violates mate “Distance U → B” in step 14–20 (t = 1.4–2 s)");
+    expect(texts[2]).toMatch(/^die Bewegung verletzt die Verknüpfung „.* U → B“ in Schritt 14–20 \(t = 1\.4–2 s\)$/);
   });
 });
 
@@ -304,16 +298,13 @@ describe("bod 8 – priorita tvrdých podmínek: motor × mez × pevná vzdálen
       expect(s.place.A.position[2]).toBeCloseTo(47.5, 5);
       expect(s.place.H.position[2]).toBeCloseTo(34.5, 4);
       expect(s.reached![0]).toBeCloseTo(37.5, 5);
-      // konfliktní množina: motor (ZDVIH) a blokující meze / pevné vazby (stabilní kód motion.conflict po vazbách)
-      expect([...s.conflicts].sort()).toEqual(["mez", "pevna", "zdvih"]);
+      // nesplněný je jen pohon motoru (ZDVIH); blokující meze / pevné vazby jsou splněné – jen v odchylkách („brání“)
+      // (vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit)
+      expect([...s.conflicts].sort()).toEqual(["zdvih"]);
       expect(s.devs!.map((x) => x.id).sort()).toEqual(["mez", "pevna", "zdvih"]);
     }
     expect(res.conflictSteps).toBe(5);
-    expect(motionIssues(res, d).map((x) => [x.mate, x.steps])).toEqual([
-      ["zdvih", [8, 12]],
-      ["pevna", [8, 12]],
-      ["mez", [8, 12]],
-    ]);
+    expect(motionIssues(res, d).map((x) => [x.mate, x.steps])).toEqual([["zdvih", [8, 12]]]);
     const f8 = motionFindings(res, d);
     expect(f8.map((x) => [x.code, x.steps])).toEqual([["motion.motor-limit", [8, 12]]]);
     expect(f8[0].text).toMatch(/^motor 1 stojí na mezi v krocích 8–12 \(t = 1\.333–2 s\): žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm – brání: /);

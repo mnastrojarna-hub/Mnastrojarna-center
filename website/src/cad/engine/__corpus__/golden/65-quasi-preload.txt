@@ -84,7 +84,6 @@ Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, ko
 ✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)
 Pohybová studie: motorů 1 · kroků 12
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
-Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl
  „Přidržovač“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −19,35 mm
  „Deska A“: ΔZ −30,35 mm

@@ -23,9 +23,8 @@ Kolize v pohybu: kroků s kolizí 0 z 37 · šroub v závitu 0 dvojic · skuteč
  kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
 Vazby splněny ve všech krocích
 ⚠ řádek 18: v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není – místo [100; 20; 15]
-Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize · r·?
  1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
-Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Nůž“: ΔX +180 mm
  stojí: 3 („Rám“, „Doraz“, „Kolík“)
@@ -53,7 +52,6 @@ Vazby splněny ve všech krocích
 ⚠ řádek 21: v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není – místo [100; 20; 15]
 Pohybová studie: motorů 1 · kroků 180 · 2 s · kolize
  1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
-Pohybová studie: 180 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Nůž“: ΔX +180 mm
  stojí: 3 („Rám“, „Doraz“, „Kolík“)

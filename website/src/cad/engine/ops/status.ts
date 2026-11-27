@@ -7,6 +7,7 @@ import { asmHooks, sayKv, type OpHandler } from "./util";
 import { withValidity } from "../validity-store";
 import { reportStaleCopies } from "../bom-notes";
 import { reportStaleSheets } from "../outputs-ops";
+import { reportLostSprings } from "../spring-fresh";
 
 export const statusOp: OpHandler<"status"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -20,4 +21,5 @@ export const statusOp: OpHandler<"status"> = async (op, ctx) => {
   sayKv(ctx, statusKv(r.doc, shown, asm, stale), docStatusText(r.doc, shown, asm, stale));
   reportStaleCopies(ctx, r.doc); // kopie dílu starší než díl v záložce – ⚠ s příkazem obnovy (bod 22g)
   reportStaleSheets(ctx, r.doc); // vydaný list ze starší revize modelu – ⚠ drawing.stale (bod 20)
+  reportLostSprings(ctx, r.doc, op.line); // ztracená dosedací plocha pružiny – ⚠ spring.lost, ne čistý stav (bod 7, kolo 6)
 };

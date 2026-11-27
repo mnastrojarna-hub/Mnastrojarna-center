@@ -203,6 +203,17 @@ export function dropMotion(store: MotionStore, key: string): void {
  * Výsledek se uloží pod otiskem vstupu `d`, jen když výpočet doběhl celý (nezrušili ho všichni volající), nebyl nahrazen a v úložišti
  * není novější záznam.
  */
+/**
+ * Záznam skutečného výpočtu studie ve sdíleném modelu výpočtů aplikace (vlna 22, bod 12 – kolo 6): aplikace sem zaregistruje
+ * `RunTracker` (components/cad/motion-runs.ts) – každý NOVÝ výpočet (panel, `window.mncad.motion()`, textový příkaz) dostane id
+ * a revizi vstupu, připojení k běžícímu výpočtu téhož vstupu ani výsledek z mezipaměti nový záznam nezaloží. CLI hook nemá.
+ */
+export type MotionRunHook = (d: CadDoc, key: string) => { end: (state: "done" | "superseded" | "cancelled" | "error", error?: string) => void };
+let runHook: MotionRunHook | null = null;
+export const setMotionRunHook = (h: MotionRunHook | null) => {
+  runHook = h;
+};
+
 export async function runStored(
   slot: MotionSlot,
   d: CadDoc,
@@ -229,6 +240,7 @@ export async function runStored(
   const cancelled = () => me.waiters.every((w) => !!w?.());
   store.running.set(key, me);
   bump();
+  const rec = runHook?.(d, key);
   me.promise = (async () => {
     try {
       const res = await compute(
@@ -236,6 +248,7 @@ export async function runStored(
         (k, n) => me.listeners.forEach((f) => f(k, n)),
       );
       if (me.superseded) throw new MotionSuperseded();
+      rec?.end(cancelled() ? "cancelled" : "done");
       if (!cancelled()) {
         const cur = store.byDoc.get(key);
         if (!cur || cur.seq < me.seq) {
@@ -248,6 +261,9 @@ export async function runStored(
         }
       }
       return res;
+    } catch (e) {
+      rec?.end(e instanceof MotionSuperseded || me.superseded ? "superseded" : (e as { name?: string })?.name === "CadCancelled" || cancelled() ? "cancelled" : "error", e instanceof Error ? e.message : String(e));
+      throw e;
     } finally {
       if (store.running.get(key) === me) store.running.delete(key);
       bump();

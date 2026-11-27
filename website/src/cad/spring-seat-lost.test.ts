@@ -134,7 +134,8 @@ describe("ztracená dosedací plocha pružiny po změně dílu (skutečné jádr
     const full = formatFull(r);
     const short = shortProtocol(r, { budget: Infinity }).text;
     const dLine = short.split("\n").find((l) => l.startsWith('D "Sestava A" '))!;
-    expect(dLine).toMatch(/^D "Sestava A" asm comp=3 parts=3 .*\bsprings\.lost=1$/);
+    // kolo 6: springs.lost stojí před clash= v řádku D i ve výpisu `= … status` (stejné pořadí polí)
+    expect(dLine).toMatch(/^D "Sestava A" asm comp=3 parts=3 .*\bsprings\.lost=1(?: clash=\S+)?$/);
     expect(dLine).not.toMatch(/\bmates=/); // bez vazeb žádné mates=, značka nese jen pružina
     expect(short).toMatch(new RegExp(`^= L${n} status "Sestava A" asm comp=3 parts=3 V\\.sum=\\S+ m=\\S+ bbox=\\S+ springs\\.lost=1 clash=`, "m"));
     expect(short).toMatch(/^Σ docs=\d+ comp=3 .*\bsprings\.lost=1 files=/m);

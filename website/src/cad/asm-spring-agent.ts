@@ -38,6 +38,40 @@ async function ensureSeatGeo(doc: CadDoc, env: AsmEnv): Promise<void> {
   await ensureMateRefs(seats, (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
 }
 
+/**
+ * Dosedací plochy pružin, které v dílu NEJSOU (vlna 22, bod 7 – kolo 6): dokument z vnější úpravy / jiné verze dílu (JSON, .mncad,
+ * `--open`) nese číslo plochy, které postavený díl nemá (`face` ≥ počet ploch). Taková strana dostane `MateRef.lost` (why „none“) –
+ * stejně jako po změně dílu v `sestava hotovo` (cad/spring-lost.ts): délka a síla se z ní nepočítají a strojové řádky nesou
+ * `springs.lost=N`. Díl, který nejde postavit (počet ploch neznámý), se nemění – `stav` pak řekne „nezkontrolováno“.
+ */
+export async function markMissingSeats(doc: CadDoc, env: AsmEnv): Promise<{ doc: CadDoc; marked: string[] }> {
+  if (doc.kind !== "assembly" || !springComps(doc).length) return { doc, marked: [] };
+  const flat = flattenAssembly(doc);
+  const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
+  const marked: string[] = [];
+  const comps: AsmComponent[] = [];
+  for (const c of doc.components ?? []) {
+    const s = c.spring;
+    if (!s) {
+      comps.push(c);
+      continue;
+    }
+    let next: SpringDef = s;
+    for (const k of ["a", "b"] as const) {
+      const ref = s[k];
+      if (!ref || ref.lost || ref.ent) continue;
+      const leaf = byLeaf.get(ref.leaf ?? ref.compId);
+      if (!leaf) continue;
+      const faces = (await ensureBuilt(env, [leaf])).get(leaf.key)?.metrics?.faces;
+      if (typeof faces !== "number" || faces <= 0 || (ref.face >= 0 && ref.face < faces)) continue;
+      next = { ...next, [k]: { ...ref, lost: { kind: "plane", origin: [0, 0, 0], normal: [0, 0, 0], why: "none" } } };
+    }
+    if (next !== s) marked.push(c.id);
+    comps.push(next === s ? c : { ...c, spring: next });
+  }
+  return marked.length ? { doc: { ...doc, components: comps }, marked } : { doc, marked };
+}
+
 /** Délky pružin podle aktuálních poloh komponent (po přepočtu vazeb); beze změny vrací tentýž dokument. */
 export async function refreshSprings(doc: CadDoc, env: AsmEnv): Promise<CadDoc> {
   if (doc.kind !== "assembly" || !springComps(doc).length) return doc;

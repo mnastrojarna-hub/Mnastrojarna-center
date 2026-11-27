@@ -57,7 +57,7 @@ import {
   type CompFaceRow,
   type TabInfo,
 } from "./agent-asm";
-import { tr } from "./i18n";
+import { getLang, tr } from "./i18n";
 import { csvCaption, supplyWord } from "./bom-model";
 import { copyFieldsText, refreshPlan, staleCopies, staleCopyText } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
@@ -71,7 +71,7 @@ import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
 import { entPrint, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
 import { isKinMate } from "./mates-kin";
-import { conflictText, solveStatic, type StaticConflict } from "./mates-static";
+import { conflictText, preferOutcome, solveStatic, type StaticConflict } from "./mates-static";
 import { isLimitMate } from "./motion-quasi";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import {
@@ -719,7 +719,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       // ✓ jen pro vazbu, která po změně platí v geometrii (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i);
       // konflikt = ⚠ a polohy beze změny (žádný kompromis v dokumentu – bod 8)
       const okNow = !s.conflict && (!after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed");
-      log.push(tr("{0} vazba {1} ({2}): {3}{4}", okNow ? "✓" : "⚠", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
+      // preferovaná strana, kterou rovnováha pružiny / vazby přebila: ne „✓ … preferovaná strana min · ok“, ale ⚠ s tím, kde díl je
+      // (vlna 22, bod 2 – kolo 6); stejnou polohu pak kinematika začne skokem (⚠ motion.start-jump krok 0)
+      const po = cmd.prefer && after && okNow ? preferOutcome(s.doc, geoProvider(s.doc, env), after) : null;
+      if (po && !po.met) {
+        const where = po.at ? tr("drží ji u {0}", po.at) : tr("hodnota {0}", String(Math.round(po.g * 1000) / 1000).replace(".", getLang() === "en" ? "." : ","));
+        what.push(po.spring ? tr("preference se neuplatnila (pružina tlačí k {0}; {1})", po.side === "min" ? "max" : "min", where) : tr("preference se neuplatnila (jiné vazby; {0})", where));
+      }
+      log.push(tr("{0} vazba {1} ({2}): {3}{4}", okNow && !(po && !po.met) ? "✓" : "⚠", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
       if (s.moved.length) log.push(tr("  pohnuto: {0}", movedText(s.doc, s.moved)));
       else if (s.conflict) log.push(tr("  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)"));
       log.push(...solveNotes(s.doc, s));

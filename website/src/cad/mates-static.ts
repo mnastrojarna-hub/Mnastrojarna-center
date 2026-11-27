@@ -12,7 +12,7 @@
  */
 import { kinCluster, kinCtx, memoGeo, solveMates, type GeoProvider, type MateStatus, type SolveResult } from "./mates";
 import { dofValue, kinResidual, pivotOf, placementOf, poseOf, rigidGroups, type Pose } from "./mates-kin";
-import { devText, isLimitMate, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
+import { devText, isLimitMate, limitGap, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
 import { getLang, tr } from "./i18n";
 import type { AsmComponent, CadDoc, Mate, Placement } from "./types";
 
@@ -139,6 +139,25 @@ function statusAt(doc: CadDoc, geo: GeoProvider, mates: Mate[], solved: Record<s
     out[m.id] = !r ? "missing" : Math.sqrt(r.reduce((s, v) => s + v * v, 0)) > 1e-3 ? "conflict" : "ok";
   }
   return out;
+}
+
+/**
+ * Uplatnila se preferovaná strana meze v polohách dokumentu? (vlna 22, bod 2 – kolo 6) Rovnováha pružin a preferencí je měkká:
+ * pružina s předpětím ji může přebít (přidržovač zůstane u druhé meze). `null` = mez bez preference nebo bez geometrie.
+ */
+export function preferOutcome(doc: CadDoc, geo: GeoProvider, m: Mate): { met: boolean; g: number; side: "min" | "max"; at?: "min" | "max"; spring: boolean } | null {
+  if (!m.prefer || !isLimitMate(m)) return null;
+  const poses = new Map<string, Pose>((doc.components ?? []).map((c) => [c.id, poseOf(c.placement)] as const));
+  const ctx = kinCtx(poses, memoGeo(geo));
+  const x = limitGap(m, ctx);
+  if (!x) return null;
+  const want = m.prefer === "min" ? x.min : x.max;
+  if (want === undefined) return null;
+  const tol = 1e-3;
+  const at = x.min !== undefined && Math.abs(x.g - x.min) < tol ? "min" : x.max !== undefined && Math.abs(x.g - x.max) < tol ? "max" : undefined;
+  const ids = new Set([m.a.compId, m.b.compId]);
+  const spring = springTerms(doc, ctx).some((sp) => sp.seats.some((id) => ids.has(id)) || ids.has(sp.id));
+  return { met: Math.abs(x.g - want) < tol, g: x.g, side: m.prefer, ...(at ? { at } : {}), spring };
 }
 
 /**

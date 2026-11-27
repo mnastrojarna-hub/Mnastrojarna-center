@@ -14,6 +14,7 @@ import type { CadDoc } from "../types";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "./host";
 import { MemoryWorkspace } from "./memory-workspace";
 import { formatConsole } from "./protocol";
+import { springsCount } from "./kv";
 import { runScript } from "./run";
 import { verifyKeyOf } from "./verify";
 
@@ -87,6 +88,29 @@ describe("bod 7: pružina po načtení dokumentu – délka z dosedacích ploch 
     expect(stale).toHaveLength(1);
     expect(stale[0].line).toBeNull();
     expect(formatConsole(r)).toMatch(/„Pružina“ 15 mm .* – délka odvozená z dosedacích ploch/);
+  }, 240_000);
+
+  it("dosedací plocha, kterou díl nemá (vnější úprava, plocha 99): ⚠ spring.lost při načtení i při `stav`, springs.lost=1, --strict STOP (kolo 6)", async () => {
+    // dřív: otevření bez ⚠, řádek D bez springs.lost, `stav` „uložená délka, s dosedacími plochami nezkontrolováno“ a pak jen ⚠ clash.real
+    const lostDoc = JSON.parse(JSON.stringify(built)) as CadDoc;
+    for (const c of lostDoc.components ?? []) if (c.spring) c.spring.b.face = 99;
+    const ws = new MemoryWorkspace();
+    // `stav` uprostřed skriptu (poslední `stav` vypíše závěrečný stav běhu – D a hlavička nesou springs.lost / ⚠ z načtení)
+    const r = await runScript(ws, `${JSON.stringify(lostDoc)}\nstav\nkolize`, hostOf());
+    const lost = r.entries.filter((e) => e.code === "spring.lost");
+    // tentýž text na řádku načtení (1) i `stav` (2) = jeden záznam ×2 (protokol slučuje opakované záznamy)
+    expect(lost[0].line).toBe(1);
+    expect(lost.reduce((n, e) => n + (e.count ?? 1), 0)).toBe(2);
+    expect(lost[0].level).toBe("warn");
+    expect(lost[0].text).toMatch(/pružina „Pružina“: ztracená dosedací plocha B F100 \(„Deska A“\) – délka a síla nezkontrolovány; oprava: sestava pružina "Pružina" mezi "Přidržovač" F6 "Deska A" <plocha>/);
+    expect(ws.present().components!.find((c) => c.name === "Pružina")!.spring!.b.lost).toBeTruthy();
+    expect(springsCount(ws.present())).toEqual({ total: 1, lost: 1 }); // = springs.lost=1 v řádku D, = status a Σ
+    // přísný režim zastaví (dřív exit 0)
+    const ws2 = new MemoryWorkspace();
+    await ws2.openInTab(lostDoc);
+    const st = await runScript(ws2, "stav", hostOf(), { strict: true, preloaded: [{ key: verifyKeyOf(ws2.docKey(), ws2.present()), doc: ws2.present() }] });
+    expect(st.entries.some((e) => e.code === "spring.lost")).toBe(true);
+    expect(st.stopped).toBeTruthy();
   }, 240_000);
 
   it("dokument, jehož délka plochám odpovídá: žádné ⚠ spring.stale", async () => {

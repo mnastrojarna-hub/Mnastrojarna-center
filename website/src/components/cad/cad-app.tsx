@@ -116,6 +116,7 @@ import { ComputeChip, progressLabel } from "./compute-chip";
 import { discardPending, flushPending, historyRule, pendingCount, setDocKeyGetter } from "./flush-barrier";
 import { appRuns, guardApi, motionSignalHold, outputGate, runsSnapshot, textRun } from "./run-host";
 import { computeBegin, computesSnapshot, tracked, type ComputeKind, type ComputeRun } from "./compute-runs";
+import { trackedMotion } from "./motion-runs"; // výpočty pohybové studie v témže modelu výpočtů (vlna 22, bod 12)
 import { ComputeStatus } from "./compute-status";
 import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
@@ -1017,7 +1018,9 @@ export function CadApp() {
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
         const k = await import("@/cad/asm-agent-kin");
         const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
-        const res = await k.motionRun(d, asmEnvRef.current());
+        // záznam výpočtu ve sdíleném modelu výpočtů (id v…, revize vstupu, stav – vlna 22, bod 12; panel Pohyb totéž)
+        const env = asmEnvRef.current();
+        const { res, run } = await trackedMotion(d, () => k.motionRun(d, env));
         // časový plán videa s uloženými volbami studie (vlna 22, bod 13 – cad/motion-video.ts)
         const video = await import("@/cad/motion-video").then((m) => m.videoApi(res, d.motion)).catch(() => null);
         // první SKUTEČNÁ kolize (šroub v závitu, dotyk ani pracovní kontakt ne) s popisem instance a místem; kroky s třídami dvojic
@@ -1028,7 +1031,7 @@ export function CadApp() {
         const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
         // procesní vrstva: operace, stav výrobku po krocích, úroveň „geometrická aproximace“ (vlna 22, bod 4)
         const proc = (await import("@/cad/motion-process")).processApi(res, d);
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
+        return { ...(run ? { run } : {}), steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;

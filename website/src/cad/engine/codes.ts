@@ -156,6 +156,8 @@ export const CODES = [
   { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },
   // pružina po načtení dokumentu (vlna 22, bod 7): délka se odvozuje z dosedacích ploch – cad/asm-spring.ts springDrift
   { code: "spring.stale", level: "warn", key: "pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch" },
+  // dosedací plocha pružiny, kterou díl nemá (po načtení dokumentu, `stav`): délka a síla nezkontrolovány – kolo 6 (cad/spring-lost.ts)
+  { code: "spring.lost", level: "warn", key: "pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}" },
   // výsledek studie jen pro stav sestavy, pro který vznikl (vlna 22, bod 1); motory: rozsah × rychlost a začátek (body 9, 11) – cad/motor-model.ts
   { code: "motion.stale", level: "warn", key: "výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“" },
   { code: "motion.recomputed", level: "note", key: "pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}" },

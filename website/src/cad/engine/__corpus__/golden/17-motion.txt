@@ -24,14 +24,13 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 ✓ vazba Vzdálenost „Jezdec“ F1 → „Vodítko“ F1 · 10 mm · obráceně: ok · „Jezdec“ poloha [-10; 0; 10]
 ✓ motor 1: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
  pohání: „Jezdec“ · směr −X
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Jezdec“: ΔX −40 mm
  stojí: 1 („Vodítko“)
 Vazby splněny ve všech krocích
-Pohybová studie: motorů 1 · kroků 4
+Pohybová studie: motorů 1 · kroků 4 · 2 s · r·?
  1. lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Jezdec“: ΔX −40 mm
  stojí: 1 („Vodítko“)
