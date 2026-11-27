@@ -19,7 +19,7 @@ poznámka F2 "Lapovat"
 výkres značka text "Oznacit" v 30 45
 výkres značka text "Balit" v 30 40
 výkres značka text "Expedovat" v 30 35
-výkres list nový "Poznámky"
+výkres list nový "Detail"
 výkres pohledy iso
 výkres značka text "Technicke pozadavky viz list 1" v 30 60
 výkres list 1

@@ -56,7 +56,7 @@ export type DrawingMeta = {
   /** poznámka v patičce (např. „Nekótované rozměry dle 3D modelu (STEP)“); prázdné = nic – nedoplňuje se automaticky */
   note?: string;
   /** kdo poznámku zapsal (vlna 23, R6): agent = textová cesta, user = GUI; chybí = starší dokument (ručně) */
-  noteBy?: "agent" | "user";
+  noteBy?: "agent" | "user" | "loaded";
   /** tvrdost (např. „58–60 HRC“) – buňka razítka (R1) */
   hardness?: string;
   /** obecná drsnost (např. „Ra 3,2“) – buňka razítka se značkou ISO 1302 (R1) */
@@ -1727,6 +1727,15 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       const ext = boundsOf(feet);
       let fits = ext.w <= area.w + 1e-6 && ext.h <= area.h + 1e-6;
       let off: Vec2 = [area.x - ext.x, area.y - ext.y];
+      // kolo 3 (D6): místo pro kóty se zmenšilo jen kvůli výšce (vyšší razítko s technickým pásem) – vodorovně, kde místo je,
+      // se mřížka posune o chybějící rezervu (kóty vlevo od pohledů jinak přetínaly rám: korpus 79 „20“ / „60“)
+      if (fits && room < ROOM) {
+        // posun nejvýš na střed volného místa a ne pod tabulku revizí / jiné pevné tabulky ve výšce mřížky
+        let shift = Math.max(0, area.w - ext.w) / 2;
+        const top = ext.y + off[1];
+        for (const q of fixed) if (q.y < top + ext.h && q.y + q.h > top) shift = Math.min(shift, q.x - 3 - (ext.x + off[0] + ext.w));
+        if (shift > 0) off[0] += shift;
+      }
       let beside = false;
       if (!fits && ext.w <= frame.w + 1e-6 && ext.h <= frame.h + 1e-6) {
         // Pás nad razítkem nestačí (vysoké razítko – nástrojářská šablona 180×64, tabulky): než se zmenší měřítko, mřížka se
@@ -1735,9 +1744,12 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
         // k rámu a k hranám razítka / tabulek; přednost má poloha nejvýš vlevo.
         // vlna 23: přisazení k rámu nechá před rámem rezervu EDGE (vícenásobné Chytré kóty sahají dál než DIM_ROOM – vyšší
         // razítko s technickým pásem jinak posunulo pohled až k rámu a kóta ho přetínala); bez rezervy jen, když jinak nevyjde
+        // kolo 3 (D6): rezerva 12 mm, když se vejde (kóty Chytrých kót ve více řadách – korpus 79: svislá „20“ / „60“ přetínala
+        // rám i s rezervou 6), jinak 6 mm, jinak bez rezervy
         const EDGE = 6;
-        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w, frame.x + EDGE - ext.x, frame.x + frame.w - EDGE - ext.x - ext.w]);
-        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h, frame.y + EDGE - ext.y, frame.y + frame.h - EDGE - ext.y - ext.h]);
+        const EDGE2 = 12;
+        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w, frame.x + EDGE - ext.x, frame.x + frame.w - EDGE - ext.x - ext.w, frame.x + EDGE2 - ext.x, frame.x + frame.w - EDGE2 - ext.x - ext.w]);
+        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h, frame.y + EDGE - ext.y, frame.y + frame.h - EDGE - ext.y - ext.h, frame.y + EDGE2 - ext.y, frame.y + frame.h - EDGE2 - ext.y - ext.h]);
         for (const q of fixed)
           for (const f of feet) {
             sxs.add(q.x - f.x - f.w);
@@ -1750,8 +1762,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
           for (const dy of sys) {
             if (!inside({ x: ext.x + dx, y: ext.y + dy, w: ext.w, h: ext.h }, frame)) continue;
             if (feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)))) continue;
-            const clear = Math.min(ext.x + dx - frame.x, frame.x + frame.w - ext.x - dx - ext.w, ext.y + dy - frame.y, frame.y + frame.h - ext.y - dy - ext.h);
-            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y) + (clear < EDGE - 1e-6 ? 1e5 : 0);
+            // rezerva zvlášť vodorovně a svisle (svislá rezerva nad vysokým razítkem často nejde – vodorovná ano)
+            const cx = Math.min(ext.x + dx - frame.x, frame.x + frame.w - ext.x - dx - ext.w);
+            const cy = Math.min(ext.y + dy - frame.y, frame.y + frame.h - ext.y - dy - ext.h);
+            const pen = (c: number) => (c < EDGE - 1e-6 ? 1e5 : c < EDGE2 - 1e-6 ? 1e4 : 0);
+            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y) + pen(cx) + pen(cy);
             if (!best || sc < best.sc - 1e-9) best = { o: [dx, dy], sc };
           }
         if (best) {

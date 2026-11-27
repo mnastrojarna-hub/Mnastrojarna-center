@@ -88,6 +88,16 @@ export const titleUsage = () =>
 
 /** tvrdost s jednotkou: 58 HRC, 58–60 HRC, 58+2 HRC, 650 HV10, 220 HB, 60 ± 2 HRC */
 const HARDNESS_RE = /^(?:min\.?\s*|max\.?\s*|≥\s*|≤\s*)?\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?\s*(?:HRC|HRB|HRA|HV\s?\d{0,2}|HBW|HB)\b/i;
+/**
+ * D3: hodnota, kterou poznámka přesouvá do buňky razítka, musí mít tvar, jaký přijme `výkres razítko …=` (tvrdost
+ * s jednotkou „58–60 HRC“, drsnost s hodnotou „Ra 3,2“) – jinak důvod (null = v pořádku).
+ */
+export function titleValueProblem(key: string, value: string): string | null {
+  const v = value.trim();
+  if (key === "hardness" && !HARDNESS_RE.test(v)) return tr("tvrdost „{0}“ nemá tvar hodnoty s jednotkou (např. „58–60 HRC“, „650 HV10“)", v);
+  if (key === "roughness" && !/^(?:R[az]|Rmax)\s*\d|^\d|^N\d/.test(v)) return tr("drsnost „{0}“ nemá hodnotu (např. „Ra 3,2“)", v);
+  return null;
+}
 const NONE = new Set(["", "ne", "no", "nein", "none", "zadne", "zadna", "zadny", "keine", "kein", "smazat", "delete", "loschen", "loeschen", "-", "—"]);
 
 /**

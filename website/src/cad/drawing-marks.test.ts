@@ -161,7 +161,7 @@ describe("značky: na kótu i do bodu pohledu (přichycení), text na listu", ()
 
 describe("ruční kóty, úpravy a mazání", () => {
   it("vodorovně po hraně (asociativní), svisle, průměr, úhel – hodnoty a strana mimo pohled", async () => {
-    const { doc, log } = await run(plateDoc(), "kótovat nic\nvýkres kóta vodorovně pohled přední -50 20 50 20 odsazení 8\nvýkres kóta svisle pohled přední 50 0 50 20\nvýkres kóta průměr pohled horní střed 0 0\nvýkres kóta úhel pohled přední -50 20 50 20 50 20 50 0\nvýkres kóta šikmo pohled horní -50 -30 50 30 text \"úhlopříčka\"");
+    const { doc, log } = await run(plateDoc(), "kótovat nic\nvýkres kóta vodorovně pohled přední -50 20 50 20 odsazení 8\nvýkres kóta svisle pohled přední 50 0 50 20\nvýkres kóta průměr pohled horní střed 0 0\nvýkres kóta úhel pohled přední -50 20 50 20 50 20 50 0\nvýkres kóta šikmo pohled horní -50 -30 50 30 text \"116,62 úhl.\"");
     const v = await views(doc);
     const [h, vv, dia, ang, al] = anns(doc);
     expect(h).toMatchObject({ type: "dim", kind: "horizontal", view: "front", a: [-50, -20], b: [50, -20], edge: true, offset: -8 });
@@ -171,7 +171,9 @@ describe("ruční kóty, úpravy a mazání", () => {
     expect(dia).toMatchObject({ kind: "diameter", view: "top", c: [0, 0], r: 20, ang: -45, offset: 8 });
     expect(annLabel(v, dia)).toBe("Ø40");
     expect(annLabel(v, ang)).toBe("90°");
-    expect(annLabel(v, al)).toBe("úhlopříčka");
+    // vlna 23, kolo 3 (D2): text kóty nese hodnotu (116,62 = úhlopříčka 100 × 60); slova místo hodnoty = ✗ (dřív „úhlopříčka“)
+    expect(annLabel(v, al)).toBe("116,62 úhl.");
+    await expect(run(doc, 'výkres kóta šikmo pohled horní -50 -30 50 30 text "úhlopříčka"')).rejects.toThrow(/nahrazuje měřenou hodnotu/);
     expect(log).toMatch(/✓ kóta 100 \(přední, vodorovně, hrana\) · a1/);
     expect(log).toMatch(/✓ kóta Ø40 \(horní, průměr\) · a3/);
     await expect(run(doc, "výkres kóta průměr pohled horní střed 10 10")).rejects.toThrow(/v pohledu horní není kružnice se středem \[10; 10\] – kružnice: střed \[0; 0\] R20/);

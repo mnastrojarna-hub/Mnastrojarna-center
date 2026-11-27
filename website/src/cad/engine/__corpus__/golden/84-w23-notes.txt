@@ -9,7 +9,8 @@
 → Chytré kóty (řetězově): 4 kót a popisů – horní 3, přední 1 · očekávaných rozměrů 4 – výsledek po vyhodnocení listu níže
 → nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
 → razítko: číslo „MN-1“, tepelné zpracování „kalit a popustit“, tvrdost „58-60 HRC“, povrchová úprava „černit“, hrany „ISO 13715 -0,3“, drsnost „Ra 3,2“ – výsledek po vyhodnocení listu níže
-ℹ řádek 11: list List 1: přesunuto do razítka – „Ra 1,6“ → drsnost „Ra 1,6“ (dřív „Ra 3,2“) (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 11: list List 1: přesunuto do razítka – „Ra 1,6“ → drsnost „Ra 3,2“ (rozpor – ponecháno) (údaje razítka se nepíšou jako poznámka)
+⚠ řádek 11: list List 1: rozpor v razítku – drsnost: v razítku „Ra 3,2“, poznámka „Ra 1,6“ – ponecháno „Ra 3,2“ (jednu hodnotu zvolte příkazem výkres razítko drsnost="…")
 → značka text Brousit → list [30; 55] · a7 – výsledek po vyhodnocení listu níže
 → značka text Odmastit, konzervovat → list [30; 50] · a8 – výsledek po vyhodnocení listu níže
 ✗ řádek 14: list List 1: údaj razítka mimo svou buňku razítka – „Tepelně zpracovat kalit a popustit na tvrdost 58 až 60 HRC podle předpisu výrobce oceli“ obsahuje údaj razítka (tvrdost, tepelné zpracování) – do poznámky nepatří; zapište ho do razítka: výkres razítko tvrdost="58 až 60 HRC" tepelné="…" – hodnota buňky razítka heslovitě, nejvýš 32 znaků (např. hrany="ISO 13715 -0,3")
@@ -20,14 +21,14 @@
 → značka text Oznacit → list [30; 45] · a9 – výsledek po vyhodnocení listu níže
 → značka text Balit → list [30; 40] · a10 – výsledek po vyhodnocení listu níže
 ✗ řádek 21: list List 1: poznámky nad razítkem – text „Expedovat“ – dokument by měl 6 řádků volného textu, nejvýš 5 (všechny výkresy a listy dohromady): a7 „Brousit“ (agent) · a8 „Odmastit, konzervovat“ (agent) · a9 „Oznacit“ (agent) · a10 „Balit“ (agent) · a11 „Expedovat“ (agent) · legenda „Z1 tepelná: 62+2 HRC“ (agent); zkraťte a slučte řádky; údaje razítka zapište do razítka (výkres razítko tepelné=… tvrdost=… povrch=… hrany=… drsnost=…, výkres nepředepsané ISO 2768-mK); popis plochy jako odkaz se šipkou v modelu (poznámka F7 "…"); oblastní úpravu jako čerchovanou čáru (úprava F7 tepelná "58+2 HRC"); nadbytečné smažte (výkres smazat a3)
-→ nový list 2 „Poznámky“ (Chytré kóty) – další příkazy výkresu pracují s ním – výsledek po vyhodnocení listu níže
-→ výkres: pohledy iso · list 2 „Poznámky“ – výsledek po vyhodnocení listu níže
-✗ řádek 24: list Poznámky: poznámky mimo hlavní list – text „Technicke pozadavky viz list 1“ – volný text patří jen na hlavní list „List 1“ (pohledy s kótami) nad razítko, nejvýš 5 řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii
-⚠ řádek 24: list Poznámky: vynecháno: Ø9 skrz: chybí pohled ve směru osy díry – zapněte pohled horní / spodní; celkový rozměr 60: žádný pohled ho neukazuje v pravé délce
-⚠ řádek 24: list Poznámky: kóty neúplné – chybí 4 (velikosti 2/4, polohy 0/2): 60 (Kvádr 1); Ø9 skrz (Díra 1); poloha Díra 1 – X 50; poloha Díra 1 – Y 30
+→ nový list 2 „Detail“ (Chytré kóty) – další příkazy výkresu pracují s ním – výsledek po vyhodnocení listu níže
+→ výkres: pohledy iso · list 2 „Detail“ – výsledek po vyhodnocení listu níže
+✗ řádek 24: list Detail: poznámky mimo hlavní list – text „Technicke pozadavky viz list 1“ – volný text patří jen na hlavní list „List 1“ (pohledy s kótami) nad razítko, nejvýš 5 řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii
+⚠ řádek 24: list Detail: vynecháno: Ø9 skrz: chybí pohled ve směru osy díry – zapněte pohled horní / spodní; celkový rozměr 60: žádný pohled ho neukazuje v pravé délce
+⚠ řádek 24: list Detail: kóty neúplné – chybí 4 (velikosti 2/4, polohy 0/2): 60 (Kvádr 1); Ø9 skrz (Díra 1); poloha Díra 1 – X 50; poloha Díra 1 – Y 30
 → list 1 „List 1“ – další příkazy výkresu pracují s ním – výsledek po vyhodnocení listu níže
 Výkres „List 1“ (list 1/2): list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
-Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Poznámky“ auto
+Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Detail“ auto
 Kóty a popisy (4, z toho vygenerovaných 4):
   horní: Ø9 skrz · 100 · 60
   přední: 12
@@ -40,8 +41,8 @@ U razítka: nepředepsané tolerance ISO 2768-mK · hrany ISO 13715 -0,3 · pozn
 Razítko: název Deska · číslo MN-1 · kreslil — · revize — · datum ?.?.???? · materiál 1.2379
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
-Další pole razítka: tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · drsnost „Ra 1,6“
-Údaje razítka (technické, v buňkách): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · hrany „ISO 13715 -0,3“ · nepředepsané „ISO 2768-mK“ · drsnost „Ra 1,6“ · technický pás razítka +10 mm (6 polí)
+Další pole razítka: tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · drsnost „Ra 3,2“
+Údaje razítka (technické, v buňkách): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · hrany „ISO 13715 -0,3“ · nepředepsané „ISO 2768-mK“ · drsnost „Ra 3,2“ · technický pás razítka +10 mm (6 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Poznámky nad razítkem: 5/5 řádků (agent 5) · místní popisy 1/8
@@ -51,11 +52,12 @@ Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty,
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…100, y 0…12 mm · 1:1 · na listu x 44…144, y 251…263
   horní (x = X, y = Y): x 0…100, y 0…60 mm · 1:1 · na listu x 44…144, y 157…217
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
+⚠ řádek 26: list List 1: rozpor v razítku – drsnost: v razítku „Ra 3,2“, poznámka „Ra 1,6“ – ponecháno „Ra 3,2“ (jednu hodnotu zvolte příkazem výkres razítko drsnost="…")
 ✓ Kvádr 1 (box) · přidáno 72000 mm³ · těleso platné
 ✓ Díra 1 (hole) · úběr 763,4 mm³ (5 % nástroje) · těleso platné
 
 Dokument: „Deska“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 2 (2 ✓, 0 ✗)
+Popisy ploch (2): F2 „Lapovat“ · F3 úprava tepelná „62+2 HRC“
 Rozměry: 100 × 60 × 12 mm (X 0…100, Y 0…60, Z 0…12) · objem 71,24 cm³ · ploch 7 · hran 15
 Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
@@ -64,7 +66,7 @@ Prvky:
 === run 2 ===
 → popis F2 „Brousit“ v modelu (nahrazuje „Lapovat“) – výkres ho přebírá jako odkaz se šipkou na plochu – výsledek po vyhodnocení listu níže
 Výkres „List 1“ (list 1/2): list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
-Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Poznámky“ auto
+Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Detail“ auto
 Kóty a popisy (4, z toho vygenerovaných 4):
   horní: Ø9 skrz · 100 · 60
   přední: 12
@@ -77,8 +79,8 @@ U razítka: nepředepsané tolerance ISO 2768-mK · hrany ISO 13715 -0,3 · pozn
 Razítko: název Deska · číslo MN-1 · kreslil — · revize — · datum ?.?.???? · materiál 1.2379
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
-Další pole razítka: tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · drsnost „Ra 1,6“
-Údaje razítka (technické, v buňkách): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · hrany „ISO 13715 -0,3“ · nepředepsané „ISO 2768-mK“ · drsnost „Ra 1,6“ · technický pás razítka +10 mm (6 polí)
+Další pole razítka: tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · drsnost „Ra 3,2“
+Údaje razítka (technické, v buňkách): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · hrany „ISO 13715 -0,3“ · nepředepsané „ISO 2768-mK“ · drsnost „Ra 3,2“ · technický pás razítka +10 mm (6 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Poznámky nad razítkem: 5/5 řádků (agent 5) · místní popisy 1/8
@@ -88,9 +90,10 @@ Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty,
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…100, y 0…12 mm · 1:1 · na listu x 44…144, y 251…263
   horní (x = X, y = Y): x 0…100, y 0…60 mm · 1:1 · na listu x 44…144, y 157…217
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
+⚠ řádek 2: list List 1: rozpor v razítku – drsnost: v razítku „Ra 3,2“, poznámka „Ra 1,6“ – ponecháno „Ra 3,2“ (jednu hodnotu zvolte příkazem výkres razítko drsnost="…")
 
 Dokument: „Deska“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 2 (2 ✓, 0 ✗)
+Popisy ploch (2): F3 úprava tepelná „62+2 HRC“ · F2 „Brousit“
 Rozměry: 100 × 60 × 12 mm (X 0…100, Y 0…60, Z 0…12) · objem 71,24 cm³ · ploch 7 · hran 15
 Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:

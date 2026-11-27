@@ -201,6 +201,10 @@ export const CODES = [
   { code: "drawing.note-not-model", level: "warn", key: "list {0}: popis jen na výkrese, ne v modelu – {1}" },
   { code: "drawing.note-free-leader", level: "error", key: "list {0}: poznámka bez cíle v geometrii – {1}" },
   { code: "drawing.note-to-title", level: "note", key: "list {0}: přesunuto do razítka – {1}" },
+  // D3: přesun do buňky razítka, která už nese jinou hodnotu – první zůstane, obě v hlášce
+  { code: "drawing.title-conflict", level: "warn", key: "list {0}: rozpor v razítku – {1}" },
+  // D1: text ze souboru otevřeného z disku (nezměněný tímto během) porušuje pravidla pro agenty – ne ✗, export povolen, ale ne ✓
+  { code: "drawing.notes-loaded", level: "warn", key: "list {0}: načtený výkres – {1}" },
   { code: "drawing.sheet-empty", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.sheet-duplicate", level: "warn", key: "list {0}: {1}" },
   // popis plochy / oblastní úprava z modelu (vlna 23, R2 / R3): plocha se změnila, nebo ji žádný pohled neukazuje

@@ -1593,6 +1593,9 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
   const matText = doc.materialName?.trim() ? tr("{0} (hustota podle: {1})", doc.materialName.trim(), matClass?.label ?? doc.material) : (matClass ? `${matClass.label} (${matClass.density} g/cm³)` : doc.material || "–");
   lines.push(tr("Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}", doc.name, doc.kind === "assembly" ? tr("sestava") : tr("díl"), matText, doc.features.length, okCount - warnCount - uncheckedCount - offCount, `${uncheckedCount ? `, ${uncheckedCount} ℹ ${tr("nezkontrolováno")}` : ""}${offCount ? `, ${offCount} ℹ ${tr("potlačeno")}` : ""}${warnCount ? `, ${warnCount} ⚠` : ""}`, doc.features.length - okCount, res?.bodies && res.bodies.length > 1 ? tr(" · těles {0}", res.bodies.length) : ""));
   if (res?.bodies && res.bodies.length > 1) lines.push(tr("Tělesa: {0}", res.bodies.map((b) => `${b.name}${b.active ? tr(" (aktivní)") : ""} ${fmt(b.volume / 1000, 2)} cm³`).join(" · ")));
+  // popisy a oblastní úpravy ploch v modelu (vlna 23, R2 / D7 – jeden zdroj s výkresem, jako ve stromu prvků)
+  const pmi = doc.kind === "assembly" ? [] : (doc.functional ?? []).filter((m) => (m.kind === "note" || m.kind === "treatment") && m.text);
+  if (pmi.length) lines.push(tr("Popisy ploch ({0}): {1}", pmi.length, pmi.map((m) => `F${(m.face?.index ?? 0) + 1} ${m.kind === "note" ? `„${m.text}“` : tr("úprava {0} „{1}“", m.what === "surface" ? tr("povrchová") : tr("tepelná"), m.text ?? "")}`).join(" · ")));
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     // bez objemového tělesa (jen plochy / skořepina – 22c) objem není: „–“, ne pseudoobjem ploch

@@ -12,7 +12,7 @@ import { emptyDraftDoc, isDraftDoc, normalizeDraftDoc } from "./doc";
 import { pruneSelection, sessionFor, type DraftCmdResult } from "./session";
 import { draftStatus, draftStatusText, type DraftStatus } from "./status";
 import { parseUnits } from "./units";
-import { draftNotesGuard } from "./agent-notes";
+import { draftExportGuard, draftNotesGuard, stampDraftAgent } from "./agent-notes";
 import type { DraftModel, DraftUnits } from "./model";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
@@ -61,7 +61,20 @@ export async function applyDraftText(doc: CadDoc, text: string): Promise<DraftAp
     }
     const model = cur.draft as DraftModel;
     const s = sessionFor(model);
-    const r = await runScriptAsync(model, s, line, { interactive: false });
+    // export textovou cestou (vlna 23): 2D výkres s porušením pravidel textu agenta se nezapíše; text ze souboru z disku = ⚠ (D1)
+    if (["export", "exportovat", "exportieren", "dxfout", "saveas"].includes(fold(t[0] ?? ""))) {
+      const g = draftExportGuard(model);
+      if (g.bad.length) {
+        const msg = tr("export odmítnut – {0}{1}", g.bad[0].text, g.bad.length > 1 ? tr(" (a dalších {0} nálezů – 2d stav)", g.bad.length - 1) : "");
+        log.push(`✗ ${t[0]}: ${tr("pravidla výkresu pro agenty – {0}", msg)}`);
+        results.push({ cmd: t[0] ?? "", input: line, ok: false, log: [], error: msg, created: [], changed: [], deleted: [] });
+        continue;
+      }
+      if (g.loaded.length) log.push(`⚠ ${tr("text 2D výkresu ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů) – agent ho nezměnil, export je povolen. První: {1}", g.loaded.length, g.loaded[0].text)}`);
+    }
+    const r0 = await runScriptAsync(model, s, line, { interactive: false });
+    // co příkaz agenta zapsal nebo změnil, je text agenta (D1)
+    const r = r0.model !== model ? { ...r0, model: stampDraftAgent(model, r0.model) } : r0;
     const res = r.results[0];
     // pravidla textu výkresu pro agenty (vlna 23 – cad/draft/agent-notes.ts): text, který by je porušil, se nepřijme
     if (res?.ok && r.model !== model) {

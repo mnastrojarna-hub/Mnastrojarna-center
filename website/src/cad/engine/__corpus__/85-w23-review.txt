@@ -20,7 +20,7 @@ výkres razítko název="Deska, kterou je nutné kalit na 58 HRC"
 výkres značka poznámka "Brousit" na Ø9
 výkres značka text "Odmastit" v 30 60 výška 7
 výkres značka text "Odmastit" v 30 60
-výkres nový "Poznámky"
+výkres nový "Detail"
 výkres pohledy iso
 výkres značka text "Konzervovat" v 30 60
 výkres výkresy 1

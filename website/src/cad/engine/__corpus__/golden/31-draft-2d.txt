@@ -9,6 +9,7 @@ Rozsah: 0.0000,0.0000 – 100.0000,50.0000 (100.0000 × 50.0000)
 Hladiny (2), aktuální: 0
   ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 3
   · OSY — barva 1 (červená), Continuous, Výchozí, zapnutá, entit 0
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
 
 2D výkres „Půdorys“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
 Entit: 3 (Úsečka 2, Kružnice 1)
@@ -16,3 +17,4 @@ Rozsah: 0.0000,0.0000 – 100.0000,50.0000 (100.0000 × 50.0000)
 Hladiny (2), aktuální: 0
   ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 3
   · OSY — barva 1 (červená), Continuous, Výchozí, zapnutá, entit 0
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8

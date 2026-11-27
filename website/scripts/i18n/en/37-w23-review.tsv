@@ -15,7 +15,6 @@
 {0} „{1}“: výška písma {2} mm – nejvýš {3} mm (vysoké písmo limit řádků neobejde)	{0} “{1}”: text height {2} mm – at most {3} mm (tall text does not get around the line limit)
 {0} {1} „{2}“ obsahuje údaj razítka ({3}) – patří do razítka: {4}	{0} {1} “{2}” contains title block data ({3}) – it belongs in the title block: {4}
 {0} {1} „{2}“: {3} – u značky jen krátký technický údaj, ne poznámka	{0} {1} “{2}”: {3} – a mark carries only a short technical value, not a note
-{0} místních popisů (odkazů se šipkou) – nejvýš {1} v celém dokumentu: {2} – sluč popisy stejné úpravy, údaje celého dílu dejte do razítka	{0} local notes (leaders with an arrow) – at most {1} in the whole document: {2} – merge notes of the same finish, put data of the whole part into the title block
 {0} řádků volného textu nad razítkem (nejvýš {1} v celém dokumentu – všechny výkresy a listy): {2} – {3}	{0} lines of free text above the title block (at most {1} in the whole document – all drawings and sheets): {2} – {3}
 2D výkres by měl {0} odkazů s popisem (nejvýš {1}) – slučte popisy stejné úpravy, údaje celého dílu dejte do razítka	the 2D drawing would have {0} leaders with text (at most {1}) – merge notes of the same finish, put data of the whole part into the title block
 2D výkres by měl {0} řádků volného textu (nejvýš {1}): {2} – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte	the 2D drawing would have {0} lines of free text (at most {1}): {2} – data of the whole part into the title block (technical row), a face note briefly with a leader, delete the rest
@@ -34,7 +33,6 @@ materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379�
 model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	model {0} “{1}” contains {2} – a treatment of this face only = treatment {0} heat|surface "…", a treatment of the whole part into the title block ({3})
 model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	model {0} “{1}”: {2} – a face note / specification briefly in keywords (at most {3} characters)
 model F{0}	model F{0}
-načtený dokument (textová cesta = agent): {0}{1}	loaded document (text path = agent): {0}{1}
 oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	local treatment {0} “{1}” (F{2}): range {3}–{4} mm exceeds the face of length {5} mm – clipped on the sheet; correct the range in the model (treatment F{2} … from a to b)
 odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	leader “{0}” is not in keyword style: {1} – a face note briefly (e.g. “Grind”)
 odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	leader “{0}” contains data of the whole part ({1}) – {2}

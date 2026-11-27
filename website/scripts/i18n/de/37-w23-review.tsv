@@ -15,7 +15,6 @@
 {0} „{1}“: výška písma {2} mm – nejvýš {3} mm (vysoké písmo limit řádků neobejde)	{0} „{1}“: Schrifthöhe {2} mm – höchstens {3} mm (hohe Schrift umgeht die Zeilengrenze nicht)
 {0} {1} „{2}“ obsahuje údaj razítka ({3}) – patří do razítka: {4}	{0} {1} „{2}“ enthält eine Schriftfeldangabe ({3}) – gehört ins Schriftfeld: {4}
 {0} {1} „{2}“: {3} – u značky jen krátký technický údaj, ne poznámka	{0} {1} „{2}“: {3} – ein Symbol trägt nur eine kurze technische Angabe, keinen Hinweis
-{0} místních popisů (odkazů se šipkou) – nejvýš {1} v celém dokumentu: {2} – sluč popisy stejné úpravy, údaje celého dílu dejte do razítka	{0} örtliche Hinweise (Hinweislinien mit Pfeil) – höchstens {1} im ganzen Dokument: {2} – Hinweise gleicher Bearbeitung zusammenfassen, Angaben des ganzen Teils ins Schriftfeld
 {0} řádků volného textu nad razítkem (nejvýš {1} v celém dokumentu – všechny výkresy a listy): {2} – {3}	{0} Zeilen freier Text über dem Schriftfeld (höchstens {1} im ganzen Dokument – alle Zeichnungen und Blätter): {2} – {3}
 2D výkres by měl {0} odkazů s popisem (nejvýš {1}) – slučte popisy stejné úpravy, údaje celého dílu dejte do razítka	die 2D-Zeichnung hätte {0} Hinweislinien mit Text (höchstens {1}) – Hinweise gleicher Bearbeitung zusammenfassen, Angaben des ganzen Teils ins Schriftfeld
 2D výkres by měl {0} řádků volného textu (nejvýš {1}): {2} – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte	die 2D-Zeichnung hätte {0} Zeilen freien Text (höchstens {1}): {2} – Angaben des ganzen Teils ins Schriftfeld (technische Zeile), Flächenhinweis kurz mit Hinweislinie, Überflüssiges löschen
@@ -34,7 +33,6 @@ materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379�
 model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	Modell {0} „{1}“ enthält {2} – Behandlung nur dieser Fläche = behandlung {0} wärme|oberfläche "…", Behandlung des ganzen Teils ins Schriftfeld ({3})
 model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	Modell {0} „{1}“: {2} – Flächenhinweis / Vorgabe kurz und stichwortartig (höchstens {3} Zeichen)
 model F{0}	Modell F{0}
-načtený dokument (textová cesta = agent): {0}{1}	geladenes Dokument (Textweg = Agent): {0}{1}
 oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	örtliche Behandlung {0} „{1}“ (F{2}): Bereich {3}–{4} mm überschreitet die {5} mm lange Fläche – auf dem Blatt abgeschnitten; Bereich im Modell korrigieren (behandlung F{2} … von a bis b)
 odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	Hinweislinie „{0}“ ist nicht stichwortartig: {1} – Flächenhinweis kurz (z. B. „Schleifen“)
 odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	Hinweislinie „{0}“ enthält eine Angabe des ganzen Teils ({1}) – {2}

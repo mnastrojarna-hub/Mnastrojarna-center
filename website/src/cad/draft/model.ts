@@ -42,6 +42,8 @@ export interface DraftBase {
   /** průhlednost 0–90 % (chybí = dle hladiny) */
   transparency?: number;
   ext?: DraftEntityExt;
+  /** původ textu (vlna 23, D1): agent = textová cesta v tomto běhu, loaded = ze souboru otevřeného z disku; chybí = ručně (GUI) */
+  by?: "agent" | "user" | "loaded";
 }
 
 export interface DPoint extends DraftBase { type: "point"; p: Vec2 }

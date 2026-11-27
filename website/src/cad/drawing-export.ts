@@ -213,7 +213,8 @@ export async function exportDrawing(doc: CadDoc, format: DrawingExportFormat, op
   if (!doc.features.length && !doc.components?.length) throw new Error(tr("Výkres: model je prázdný – nejdřív vymodelujte díl"));
   // textová cesta (výkres export, window.mncad.exportDrawing, CLI --formats): list s porušením pravidel textu agenta se
   // neexportuje (vlna 23, R4/R5/R7 – soubor s 10 větami nad razítkem ani „list poznámek“ nevznikne); export z GUI jde jinudy
-  if (doc.drawings?.length) (await import("./drawing-agent")).exportGuard(doc, exportSheets(doc, opts.sheet));
+  // i výchozí list dokumentu bez výkresu (D5: název dílu a materiál v razítku)
+  (await import("./drawing-agent")).exportGuard(doc, doc.drawings?.length ? exportSheets(doc, opts.sheet) : []);
   const sheets = await drawingSheetsOut(doc, opts.sheet, compute, extras);
   const meta = sheets[0].meta;
   const sheet0 = doc.drawings?.[exportSheets(doc, opts.sheet)[0]];

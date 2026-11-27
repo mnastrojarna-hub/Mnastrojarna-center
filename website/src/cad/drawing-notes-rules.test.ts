@@ -97,7 +97,9 @@ describe("R4/R5 – volný text celého dokumentu (všechny výkresy a listy)", 
     const d = doc(sheet("s1", [text("A", "agent"), text("B", "agent"), text("C", "agent")]), sheet("p1", [text("D", "agent"), text("E", "agent"), text("F", "agent")], {}, "Poznámky"));
     const f = notesRuleIssues(d);
     expect(f.find((x) => x.code === "drawing.notes-limit")?.level).toBe("error");
-    expect(f.filter((x) => x.code === "drawing.notes-sheet")).toHaveLength(3);
+    // 3 texty mimo hlavní list + kolo 3 (D4): výkres s názvem „Poznámky“ sám o sobě
+    expect(f.filter((x) => x.code === "drawing.notes-sheet")).toHaveLength(4);
+    expect(f.filter((x) => x.code === "drawing.notes-sheet" && x.text.includes("výkres poznámek"))).toHaveLength(1);
   });
   it("hlavní list = první list s pravoúhlým pohledem a kótami (list jen s izometrií a poznámkami jím není)", () => {
     const iso = { views: { front: false, top: false, left: false, iso: true } };

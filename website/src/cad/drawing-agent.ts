@@ -24,7 +24,7 @@ import { dimCheckIssues, sheetDimCheck, suggestionsFor, withGroupCount } from ".
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
 import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, getLang, tr } from "./i18n";
-import { applyGeneralTol, applyTitleFields, titleRevisionCheck, titleStatusLines, type TitleCmdField } from "./agent-title";
+import { applyGeneralTol, applyTitleFields, titleRevisionCheck, titleStatusLines, titleValueProblem, type TitleCmdField } from "./agent-title";
 import { inheritTitle } from "./title-block";
 import { loadSettings } from "./settings";
 import { MATERIALS } from "../lib/mesh-metrics";
@@ -34,8 +34,10 @@ import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 import { pmiMarksOf, zoneLegendLines } from "./pmi-marks";
-import { auditDoc, auditItems, classifyNote, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
+import { auditDoc, auditItems, classifyNote, TITLE_DATA_CMD, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
 import { formNotesOfDoc } from "./drawing-doc";
+import { draftNotesAudit } from "./draft/agent-notes";
+import type { DraftModel } from "./draft/model";
 import { CodedError } from "./engine/codes";
 import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
 
@@ -455,7 +457,7 @@ function checkStyle(doc: CadDoc, idx: number, text: string, max?: number, maxWor
  * R1: volný text, který je údajem razítka, se zapíše do razítka (meta listu, materiál do dokumentu) – vrací řádek ℹ;
  * smíšený text (údaj razítka ve větě) = ✗ drawing.note-title-data s radou, jak ho rozdělit. `null` = text údajem není.
  */
-function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: NoteClass, text: string): string {
+function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: NoteClass, text: string, conflicts: string[] = []): string {
   if (cls.mixed || !cls.parts.length) {
     throw new CodedError("drawing.note-title-data", [
       sheetTitle(doc, idx),
@@ -463,30 +465,63 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
         (cls.parts.some((p) => p.value.length > TITLE_VALUE_MAX) ? tr(" – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany=\"ISO 13715 -0,3\")", TITLE_VALUE_MAX) : ""),
     ]);
   }
+  // D3: hodnota se do razítka přesune jen v tvaru, který přijme i `výkres razítko …=` (tvrdost s jednotkou, drsnost s hodnotou)
+  for (const p of cls.parts) {
+    const bad = titleValueProblem(p.key, p.value);
+    if (bad) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: {1} – do razítka se nepřesune; zapište ho přímo: {2}", text, bad, titleHint([p]))]);
+  }
   const done: string[] = [];
   for (const p of cls.parts) {
     if (p.key === "material") {
-      const cur = materialLabel(doc);
-      if (cur.toLowerCase().includes(p.value.toLowerCase())) {
+      const cur = doc.materialName?.trim() ?? "";
+      if (cur && fold(cur).includes(fold(p.value))) {
         done.push(tr("materiál „{0}“ (už v razítku)", cur));
         continue;
       }
+      // D3: materiál je údaj MODELU – poznámka s jiným materiálem, než má model, model nepřepíše (✗, model je zdroj)
+      if (cur) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: materiál „{1}“ se liší od materiálu modelu „{2}“ – materiál razítka je materiál modelu; jiný materiál zadejte modelu (materiál {1}), poznámkou ne", text, p.value, cur)]);
       doc.materialName = p.value;
       (doc as { materialBy?: "agent" }).materialBy = "agent";
       done.push(tr("materiál „{0}“", p.value));
       continue;
     }
     if (p.key === "tolerance") {
+      const old = typeof m.tolerance === "string" ? m.tolerance.trim() : "";
+      if (old && fold(old) !== fold(p.value) && !fold(old).includes(fold(p.value))) {
+        conflicts.push(tr("nepředepsané: v razítku „{0}“, poznámka „{1}“ – ponecháno „{0}“", old, p.value));
+        keepConflict(m, "tolerance", old, p.value);
+        done.push(tr("nepředepsané „{0}“ (rozpor – ponecháno)", old));
+        continue;
+      }
       applyGeneralTol(m, p.value);
       done.push(tr("nepředepsané „{0}“", String(m.tolerance ?? p.value)));
       continue;
     }
     const old = typeof m[p.key] === "string" ? (m[p.key] as string).trim() : "";
+    // D3: buňka už nese JINOU hodnotu (dřívější poznámka, příkaz razítka, ruční zápis) – první hodnota zůstane, obě se ukážou ⚠
+    if (old && fold(old) !== fold(p.value)) {
+      conflicts.push(tr("{0}: v razítku „{1}“, poznámka „{2}“ – ponecháno „{1}“ (jednu hodnotu zvolte příkazem výkres razítko {3}=\"…\")", titleDataLabel(p.key), old, p.value, TITLE_DATA_CMD[p.key]));
+      keepConflict(m, p.key, old, p.value);
+      done.push(tr("{0} „{1}“ (rozpor – ponecháno)", titleDataLabel(p.key), old));
+      continue;
+    }
     m[p.key] = p.value;
-    done.push(`${titleDataLabel(p.key)} „${p.value}“${old && old !== p.value ? tr(" (dřív „{0}“)", old) : ""}`);
+    done.push(`${titleDataLabel(p.key)} „${p.value}“`);
   }
   return tr("„{0}“ → {1} (údaje razítka se nepíšou jako poznámka)", text, done.join(", "));
 }
+
+/** rozpor v buňce razítka zůstane v údajích listu, dokud ho agent nevyřeší příkazem `výkres razítko <pole>=` (⚠ při každém vyhodnocení) */
+type TitleConflict = { key: string; kept: string; other: string };
+function keepConflict(m: Record<string, unknown>, key: string, kept: string, other: string): void {
+  const list = ((m.titleConflicts as TitleConflict[] | undefined) ?? []).filter((c) => !(c.key === key && c.other === other));
+  m.titleConflicts = [...list, { key, kept, other }];
+}
+
+/** malá písmena bez diakritiky (porovnání hodnot razítka) */
+const fold = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+/** ⚠ drawing.title-conflict: přesun do buňky razítka, která už nese jinou hodnotu (D3 – první zůstane, obě v hlášce) */
+const conflictIssues = (conflicts: readonly string[], sheetId: string): DrawingIssue[] => conflicts.map((c) => ({ level: "warn", code: "drawing.title-conflict", kind: "other", text: c, sheetId }));
 
 /** zapnuté pohledy listu (bez zapnutého pohledu kreslí jádro přední – drawing.ts) */
 const viewsOnSheet = (o: DrawingOptions): string[] => {
@@ -510,9 +545,12 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
   const out: DrawingIssue[] = [];
   const main = mainSheet(doc);
   const carries = freeTextLines(doc, [idx]).length > 0;
-  for (const f of auditOf(doc)) {
-    if (f.sheet === idx || (f.sheet < 0 && (idx === main || carries))) out.push(issueOfFinding(f, s.id));
-  }
+  const mine = auditOf(doc).filter((f) => f.sheet === idx || (f.sheet < 0 && (idx === main || carries)));
+  for (const f of mine) out.push(issueOfFinding(f, s.id));
+  // D1: text ze souboru otevřeného z disku, který tento běh nezměnil – ne ✗ a export neblokuje, ale ✓ to není
+  for (const c of ((s.meta as { titleConflicts?: TitleConflict[] }).titleConflicts ?? [])) out.push({ level: "warn", code: "drawing.title-conflict", kind: "other", text: tr("{0}: v razítku „{1}“, poznámka „{2}“ – ponecháno „{1}“ (jednu hodnotu zvolte příkazem výkres razítko {3}=\"…\")", titleDataLabel(c.key as never), c.kept, c.other, TITLE_DATA_CMD[c.key as keyof typeof TITLE_DATA_CMD] ?? c.key), sheetId: s.id });
+  const loaded = mine.filter((f) => f.by === "loaded");
+  if (loaded.length) out.push({ level: "warn", code: "drawing.notes-loaded", kind: "other", text: loadedText(doc, loaded), sheetId: s.id, data: { count: loaded.length } });
   const set = setSheets(doc, idx);
   const pos = set.indexOf(idx);
   const o = sheetOptions(s);
@@ -535,7 +573,10 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
       const twinOwn = doc.drawings![j].annotations.some((a) => !a.auto && a.type !== "text" && !(a.type === "note" && isFreeAnn(a)));
       return same && (has.size > mine.length || twinOwn || orderedSheets(doc).indexOf(j) < orderedSheets(doc).indexOf(idx));
     });
-    if (twin !== undefined && !own) out.push({ level: "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše", sheetTitle(doc, idx), sheetTitle(doc, twin)), sheetId: s.id, data: { sheetPos: pos + 1 } });
+    // D4: list agenta, který jen opakuje pohledy jiného listu a nese text = ✗ (rozdělení „výkres + poznámky“); prázdná kopie
+    // (nový list s výchozími pohledy, který agent teprve nastaví) poznámkami není – ⚠ jako u člověka
+    const agentSheet = s.annotations.some((a) => a.by === "agent" && (a.type === "text" || (a.type === "note" && isFreeAnn(a))));
+    if (twin !== undefined && !own) out.push({ level: agentSheet ? "error" : "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše", sheetTitle(doc, idx), sheetTitle(doc, twin)), sheetId: s.id, data: { sheetPos: pos + 1 } });
   }
   return out;
 }
@@ -545,20 +586,51 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
  * pravidel textu po kódech (počet + první nález) pro řádek ✗ načtení. Načtený dokument zůstane otevřený (agent ho opraví
  * příkazy `výkres smazat …`), ale běh skončí chybou a export listu s porušením se odmítne.
  */
-export function ingestFindings(doc: CadDoc): { code: AuditFinding["code"]; args: [string, string] }[] {
-  const all = auditOf(doc).filter((f) => f.by === "agent" && findingLevel(f) === "error");
+export function ingestFindings(doc: CadDoc): { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] {
+  if (doc.kind === "draft") return draftIngest(doc);
+  const audit = auditOf(doc);
+  const all = audit.filter((f) => f.by === "agent" && findingLevel(f) === "error");
   const by = new Map<string, AuditFinding[]>();
   for (const f of all) by.set(f.code, [...(by.get(f.code) ?? []), f]);
-  return [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("načtený dokument (textová cesta = agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
+  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("dokument agenta (JSON / setDocument v tomto běhu): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
+  // D1: soubor otevřený z disku – jeho text agent nevytvořil: ⚠ (žádná zelená), export povolen
+  const loaded = audit.filter((f) => f.by === "loaded");
+  if (loaded.length) out.push({ code: "drawing.notes-loaded", args: [loaded[0].sheet >= 0 ? sheetTitle(doc, loaded[0].sheet) : tr("model"), loadedText(doc, loaded)] });
+  return out;
+}
+
+/** 2D výkres z JSON řádku (agent → ✗ po kódech) nebo ze souboru z disku (⚠ drawing.notes-loaded) – cad/draft/agent-notes.ts */
+function draftIngest(doc: CadDoc): { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] {
+  if (!doc.draft) return [];
+  const all = draftNotesAudit(doc.draft as DraftModel);
+  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [];
+  const by = new Map<string, typeof all>();
+  for (const f of all.filter((x) => x.by === "agent")) by.set(f.code, [...(by.get(f.code) ?? []), f]);
+  for (const [code, list] of by) out.push({ code: code as AuditFinding["code"], args: [doc.name, tr("dokument agenta (JSON / setDocument v tomto běhu): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] });
+  const loaded = all.filter((x) => x.by === "loaded");
+  if (loaded.length) out.push({ code: "drawing.notes-loaded", args: [doc.name, tr("text 2D výkresu ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů) – agent ho nezměnil, export je povolen. První: {1}", loaded.length, loaded[0].text)] });
+  return out;
+}
+
+/** původ buňky / názvu listu */
+const metaByOf = (s: DrawingDoc, k: string) => ((s.meta as { by?: Record<string, string> }).by ?? {})[k] ?? "user";
+
+/** text ⚠ drawing.notes-loaded: kolik nálezů, které pravidlo, že agent text nezměnil a export je povolen */
+export function loadedText(doc: CadDoc, loaded: readonly AuditFinding[]): string {
+  const codes = [...new Set(loaded.map((f) => f.code))];
+  const lim = loaded.find((f) => f.code === "drawing.notes-limit" && f.key === "doc");
+  return tr("text ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů: {1}{2}) – agent ho nezměnil, export je povolen; co agent změní, platí jako jeho text (✗). První: {3}", loaded.length, codes.join(", "), lim ? tr("; volný text {0}/{1} řádků", String(lim.data?.count ?? lim.item), NOTE_MAX_LINES) : "", loaded[0].text.split(" – ")[0]);
 }
 
 /**
  * Export výkresu textovou cestou (výkres export, window.mncad.exportDrawing, CLI --formats): list, na kterém agent porušil
  * pravidla textu, se neexportuje – výkres s 10 větami nad razítkem ani „list poznámek“ nevznikne ani jako soubor (R4, R5).
  */
-export function exportGuard(doc: CadDoc, sheets: number[]): void {
-  const bad = auditOf(doc).filter((f) => f.by === "agent" && findingLevel(f) === "error" && (f.sheet < 0 || sheets.includes(f.sheet)));
-  if (!bad.length) return;
+export function exportGuard(doc: CadDoc, sheets: number[]): AuditFinding[] {
+  const audit = auditOf(doc);
+  const bad = audit.filter((f) => f.by === "agent" && findingLevel(f) === "error" && (f.sheet < 0 || sheets.includes(f.sheet)));
+  // D1: nálezy textu načteného souboru export nezastaví – volající je ohlásí ⚠ drawing.notes-loaded
+  if (!bad.length) return audit.filter((f) => f.by === "loaded" && (f.sheet < 0 || sheets.includes(f.sheet)));
   const f = bad[0];
   throw new CodedError(f.code, [f.sheet >= 0 ? sheetTitle(doc, f.sheet) : sheetTitle(doc, sheets[0] ?? 0), tr("export odmítnut – {0}{1}", f.text, bad.length > 1 ? tr(" (a dalších {0} nálezů – výkres stav)", bad.length - 1) : "")]);
 }
@@ -640,25 +712,26 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
    * poznámka u razítka z textové cesty (vlna 23): údaj razítka se přesune do razítka (R1), jinak heslovitý řádek jen na
    * listu 1 (R4, R5) s razítkem původu „agent“; dosavadní poznámka se nahradí a protokol to řekne (žádné tiché přepsání)
    */
-  const agentNote = (m: Record<string, unknown>, value: string): string => {
+  const agentNote = (m: Record<string, unknown>, value: string): string[] => {
     const v = value.trim();
     if (!v) {
       delete m.note;
       delete m.noteBy;
-      return tr("✓ poznámka u razítka zrušena");
+      return [tr("✓ poznámka u razítka zrušena")];
     }
     const cls = classifyNote(v);
     if (cls) {
-      const text = moveToTitle(doc, idx, m, cls, v);
-      issues.push({ level: "note", code: "drawing.note-to-title", kind: "other", text, sheetId: sheet().id });
-      return `ℹ ${text}`;
+      const conflicts: string[] = [];
+      const text = moveToTitle(doc, idx, m, cls, v, conflicts);
+      issues.push({ level: "note", code: "drawing.note-to-title", kind: "other", text, sheetId: sheet().id }, ...conflictIssues(conflicts, sheet().id));
+      return [`ℹ ${text}`, ...conflicts.map((c) => `⚠ ${c}`)];
     }
     checkFirstSheet(doc, idx, tr("poznámka „{0}“", v));
     checkStyle(doc, idx, v);
     const old = typeof m.note === "string" ? m.note.trim() : "";
     m.note = v;
     m.noteBy = "agent";
-    return old && old !== v ? tr("✓ poznámka: {0} (nahrazuje „{1}“)", v, old) : tr("✓ poznámka: {0}", v);
+    return [old && old !== v ? tr("✓ poznámka: {0} (nahrazuje „{1}“)", v, old) : tr("✓ poznámka: {0}", v)];
   };
   const extras = env.extras?.(doc);
   /** výpočet listu (s kusovníkem a pozicemi) a sloučení dosud nevložených Chytrých kót – kóty a značky se váží na list */
@@ -717,10 +790,16 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         // ISO 2768 třída (mK, f H …), tabulka podle desetinných míst nebo text; „ne“ = zrušit (cad/title-block.ts)
         log.push(applyGeneralTol(m, cmd.value));
       } else if (cmd.field === "note") {
-        log.push(agentNote(m, cmd.value));
+        log.push(...agentNote(m, cmd.value));
       } else {
         m[cmd.field] = cmd.value;
         log.push(tr("✓ hrany: {0}", cmd.value));
+      }
+      // rozpor v buňce (D3) vyřeší výslovná hodnota té buňky (`výkres drsnost`, `výkres nepředepsané`, `výkres hrany`)
+      if (Array.isArray(m.titleConflicts)) {
+        const left = (m.titleConflicts as TitleConflict[]).filter((c) => c.key !== cmd.field);
+        if (left.length) m.titleConflicts = left;
+        else delete m.titleConflicts;
       }
       put({ ...sheet(), meta: m });
       if (cmd.field === "note" && m.noteBy === "agent") checkNotesBudget(doc, idx, tr("poznámka „{0}“", cmd.value));
@@ -1113,8 +1192,14 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       // pole, šablona, logo (připojený soubor / data URL / vstup hostitele) a nepředepsané tolerance – cad/agent-title.ts
       const tkeys = keys.filter((k) => k !== "note");
       const applied = tkeys.length ? await applyTitleFields(m, Object.fromEntries(tkeys.map((k) => [k, f[k]])), env.input) : { parts: [] as string[], warnings: [] as string[] };
+      // rozpor v buňce (D3) vyřeší výslovná hodnota té buňky
+      if (Array.isArray(m.titleConflicts)) {
+        const left = (m.titleConflicts as TitleConflict[]).filter((c) => !(tkeys as string[]).includes(c.key));
+        if (left.length) m.titleConflicts = left;
+        else delete m.titleConflicts;
+      }
       if (named) applied.parts.unshift(tr("šablona hlavičky {0}", templateText(named.rec)));
-      const noteLine = noteVal !== undefined ? agentNote(m, noteVal) : "";
+      const noteLines = noteVal !== undefined ? agentNote(m, noteVal) : [];
       put({ ...sheet(), meta: m });
       // číslo, autor a revize i do dokumentu (výchozí pro nové listy, sdílí se se souborem) – jako výkresové prostředí
       if (f.number !== undefined || f.author !== undefined || f.revision !== undefined) {
@@ -1124,7 +1209,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       // dosavadní pole se v protokolu jmenují jako dřív (TITLE_KEY), nová podle cad/agent-title.ts
       const off = named ? 1 : 0;
       if (applied.parts.length) log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (i >= off && tkeys[i - off] in TITLE_KEY && !["tolerance", "logo", "template"].includes(tkeys[i - off]) ? `${tr(TITLE_KEY[tkeys[i - off] as TitleField])} „${f[tkeys[i - off]]}“` : p)).join(", ")));
-      if (noteLine) log.push(noteLine);
+      log.push(...noteLines);
       if (noteVal !== undefined && m.noteBy === "agent" && m.note) checkNotesBudget(doc, idx, tr("poznámka „{0}“", noteVal));
       for (const w of applied.warnings) issue("other", tr("! {0}", w));
       // revize mimo tabulku revizí se ohlásí hned (razítko a tabulka by si odporovaly)
@@ -1190,10 +1275,11 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         const cls = classifyNote(v);
         if (cls) {
           const m = { ...(sheet().meta as Record<string, unknown>) };
-          const text = moveToTitle(doc, idx, m, cls, v);
-          log.push(`ℹ ${text}`);
+          const conflicts: string[] = [];
+          const text = moveToTitle(doc, idx, m, cls, v, conflicts);
+          log.push(`ℹ ${text}`, ...conflicts.map((c) => `⚠ ${c}`));
           put({ ...sheet(), meta: m });
-          issues.push({ level: "note", code: "drawing.note-to-title", kind: "other", text, sheetId: sheet().id });
+          issues.push({ level: "note", code: "drawing.note-to-title", kind: "other", text, sheetId: sheet().id }, ...conflictIssues(conflicts, sheet().id));
           return done({ changed: true, open: false });
         }
         checkFirstSheet(doc, idx, tr("text „{0}“", v));

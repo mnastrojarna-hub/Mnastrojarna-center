@@ -29,7 +29,7 @@ Bolt into a hole only after the dynamics (a free part would fall under gravity):
 
 ## Drawing (part tab)
 `tab "Plate"` · `drawing A3 scale 1:1 views front,top,iso` · `drawing section XZ offset -30` (plane Y = 30; without the offset it lies on the face) · `dimension smart functional 100` · `drawing tolerance 100 ±0.05` · `drawing tolerance Ø21 H7`
-`drawing titleblock template=iso7200` · `drawing general ISO 2768-mK` · `drawing titleblock hardness="58 HRC" roughness="Ra 3.2"` (data only in the title block, free text above it ≤ 5 short lines, face notes as leaders from the model) · `drawing sheet new "Detail"` · `dimension none` · `drawing detail front at 25 8 radius 6` · `drawing status all` · `drawing export pdf all`. Elsewhere (assembly drawing): `drawing bom yes`
+`drawing titleblock template=iso7200` · `drawing general ISO 2768-mK` · `drawing titleblock hardness="58 HRC" roughness="Ra 3.2"` (data only in the title block, free text above it ≤ 5 short lines over all channels, revision = change, face notes as leaders from the model) · `drawing sheet new "Detail"` · `dimension none` · `drawing detail front at 25 8 radius 6` · `drawing status all` · `drawing export pdf all`. Elsewhere (assembly drawing): `drawing bom yes`
 
 ## Outputs and links
 `save` · `export step` · `export script` · `share` · `link` (address again) · CLI `--formats step,pdf,dxf` and `--share`. Elsewhere (storage): `share days 30` · `export step link`

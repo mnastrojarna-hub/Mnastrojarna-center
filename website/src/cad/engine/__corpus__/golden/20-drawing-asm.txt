@@ -45,8 +45,8 @@ Pozice: 2 (přední 2) · přiřazené ručně 0 · posunuté 0 · zamčené 0 �
 Kusovník: 2 řádků · nad razítkem
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
-  přední (x = X, y = Z): x 0…60, y 0…50 mm · 2:1 · na listu x 40…160, y 167…267
-  horní (x = X, y = Y): x 0…60, y 0…40 mm · 2:1 · na listu x 40…160, y 63…143
+  přední (x = X, y = Z): x 0…60, y 0…50 mm · 2:1 · na listu x 46…166, y 161…261
+  horní (x = X, y = Y): x 0…60, y 0…40 mm · 2:1 · na listu x 46…166, y 57…137
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 
 Dokument: „Stojan“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)

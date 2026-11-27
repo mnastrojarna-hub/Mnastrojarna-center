@@ -5,7 +5,7 @@
  * Kontrola kót (cad/dim-complete.ts) pak u funkčního prvku chce velikost, polohu (od základny) a toleranci.
  */
 import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-functional";
-import { classifyNote, isFreeAnn, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
+import { classifyNote, leaderCount, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
 import { treatmentWord } from "../../pmi-marks";
 import { CodedError } from "../codes";
 import { acceptLine, sheetTail } from "../accept";
@@ -70,7 +70,8 @@ function checkPmiText(kind: "note" | "treatment", text: string): void {
 
 /** R2: nejvýš NOTE_MAX_LEADERS místních popisů v dokumentu (model + odkazy na výkrese) – jinak ✗ s radou */
 function checkLeaders(d: CadDoc, what: string): void {
-  const n = (d.functional ?? []).filter((m) => m.kind === "note" && m.text).length + (d.drawings ?? []).reduce((k, s) => k + s.annotations.filter((a) => a.type === "note" && !isFreeAnn(a)).length, 0);
+  // stejný počet jako kontrola výkresu (odkazy z modelu i z výkresu, popisy s volným textem, značky drsnosti se slovy – D2)
+  const n = leaderCount(d);
   if (n > NOTE_MAX_LEADERS) throw new CodedError("drawing.leaders-limit", [tr("model"), tr("{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)", what, n, NOTE_MAX_LEADERS)]);
 }
 

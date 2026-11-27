@@ -29,7 +29,7 @@ Kontrola dílu: `stav` · `měřit těleso` · `měřit díry` · `kontrola`
 
 ## Výkres (záložka dílu)
 `záložka "Deska"` · `výkres A3 měřítko 1:1 pohledy přední,horní,iso` · `výkres řez XZ odsazení -30` (rovina Y = 30; bez odsazení leží na stěně) · `kótovat chytře funkční 100` · `výkres tolerance 100 ±0,05` · `výkres tolerance Ø21 H7`
-`výkres razítko šablona=iso7200` · `výkres nepředepsané ISO 2768-mK` · `výkres razítko tvrdost="58 HRC" drsnost="Ra 3,2"` (údaje jen do razítka, volný text nad ním ≤ 5 krátkých řádků, popis plochy odkazem z modelu) · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
+`výkres razítko šablona=iso7200` · `výkres nepředepsané ISO 2768-mK` · `výkres razítko tvrdost="58 HRC" drsnost="Ra 3,2"` (údaje jen do razítka, volný text nad ním ≤ 5 krátkých řádků všemi kanály, revize = popis změny, popis plochy odkazem z modelu) · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
 
 ## Výstupy a odkazy
 `uložit` · `export step` · `export skript` · `sdílet` · `odkaz` (adresa znovu) · v CLI `--formats step,pdf,dxf` a `--share`. Jinde (úložiště): `sdílet dní 30` · `export step odkaz`

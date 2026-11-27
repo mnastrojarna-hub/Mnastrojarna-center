@@ -1,7 +1,6 @@
 # Vlna 23 – výkres strojařsky: razítko (tvrdost, drsnost, technický pás), popisy a oblastní úpravy z modelu, limit 5 řádků poznámek pro agenty
  · technický pás razítka +{0} mm ({1} polí)	 · technische Zeile im Schriftfeld +{0} mm ({1} Felder)
  (celá plocha)	 (ganze Fläche)
- (dřív „{0}“)	 (vorher „{0}“)
  (nahrazuje „{0}“)	 (ersetzt „{0}“)
  a zbytek zkraťte na samostatnou heslovitou poznámku („{0}“)	 und den Rest zu einem eigenen stichwortartigen Hinweis kürzen („{0}“)
 „{0}“ → {1} (údaje razítka se nepíšou jako poznámka)	„{0}“ → {1} (Schriftfeldangaben werden nicht als Hinweis geschrieben)

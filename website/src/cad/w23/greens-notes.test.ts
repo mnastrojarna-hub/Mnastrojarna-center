@@ -176,9 +176,61 @@ describe("w23 – popis a oblastní úprava z modelu (R2/R3)", () => {
     expect(dxf).toMatch(/UPRAVY\s+70\s+0\s+62\s+1\s+6\s+CENTER/);
   }, 180000);
   it("3+R4: vysvětlivka úpravy se počítá do limitu – 5 textů + úprava = ✗ drawing.notes-limit na řádku úpravy", async () => {
-    const r = await run(new MemoryWorkspace(), [...PART, ...["A1", "B2", "C3", "D4", "E5"].map((t, i) => `výkres značka text "${t}" v 30 ${120 - i * 5}`), 'úprava F3 tepelná "62+2 HRC"']);
+    // kolo 3 (D3): „C3“ je sražení 3×45° (údaj razítka, přesune se) – neutrální krátké texty místo něj
+    const r = await run(new MemoryWorkspace(), [...PART, ...["A1", "B2", "D3", "E4", "F5"].map((t, i) => `výkres značka text "${t}" v 30 ${120 - i * 5}`), 'úprava F3 tepelná "62+2 HRC"']);
     const lim = r.entries.find((e) => e.code === "drawing.notes-limit")!;
     expect(lim.level).toBe("error");
     expect(lim.line).toBe(PART.length + 6);
+  }, 120000);
+});
+
+// kolo 3 (D1–D7): každý zelený text, kterého se kolo týká, se NEUKÁŽE, když kontrola neproběhla, proběhla na jiném vstupu
+// nebo selhala
+describe("w23 kolo 3 – žádná falešná zelená (D1–D7)", () => {
+  const legacyDoc = async (n: number): Promise<CadDoc> => {
+    const ws = new MemoryWorkspace();
+    await run(ws, PART);
+    const d = docOf(ws, "Deska");
+    const s = d.drawings![0];
+    const notes = Array.from({ length: n }, (_, i) => ({ id: `n${i}`, view: "sheet", type: "text", at: [30, 120 - 5 * i], text: `Bod${i}`, size: 3.5 }));
+    return { ...d, drawings: [{ ...s, annotations: [...s.annotations.map((a) => ({ ...a, by: undefined })), ...notes] }] } as unknown as CadDoc;
+  };
+  it("✓ … bez nálezů: ne u souboru z disku, který porušuje limit (⚠ drawing.notes-loaded); ano u téhož souboru v limitu", async () => {
+    const r = await runScript(new MemoryWorkspace(), 'otevřít "a.mncad"\nvýkres stav', { ...host(), inputs: memoryFileSource({ "a.mncad": new TextEncoder().encode(JSON.stringify(await legacyDoc(7))) }) });
+    expect(codes(r, "warn")).toContain("drawing.notes-loaded");
+    expect(txt(r)).not.toMatch(OK_RE);
+    const ok = await runScript(new MemoryWorkspace(), 'otevřít "a.mncad"\nvýkres stav', { ...host(), inputs: memoryFileSource({ "a.mncad": new TextEncoder().encode(JSON.stringify(await legacyDoc(3))) }) });
+    expect(codes(ok, "warn")).not.toContain("drawing.notes-loaded");
+  }, 180000);
+  it("„dokument … postaven: … bez ⚠ a ✗“: ne vedle ✗ téhož dokumentu na řádku načtení (JSON agenta s 7 poznámkami)", async () => {
+    const r = await run(new MemoryWorkspace(), [JSON.stringify(await legacyDoc(7))]);
+    expect(codes(r, "error")).toContain("drawing.notes-limit");
+    expect(txt(r)).not.toMatch(/postaven: prvků \d+, bez ⚠ a ✗/);
+  }, 180000);
+  it("✓ … bez nálezů: ne, dokud v razítku trvá rozpor (⚠ drawing.title-conflict); po `výkres razítko povrch=` ano", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, [...PART, 'výkres značka text "RAL 9005" v 30 120', 'výkres značka text "Zinkovat" v 30 115', "výkres stav"]);
+    expect(codes(r, "warn")).toContain("drawing.title-conflict");
+    expect(txt(r)).not.toMatch(OK_RE);
+    const r2 = await run(ws, ['výkres razítko povrch="RAL 9005"', "výkres stav"]);
+    expect(codes(r2, "warn")).not.toContain("drawing.title-conflict");
+    expect(txt(r2)).toMatch(OK_RE);
+  }, 180000);
+  it("„Kontrola kót: velikosti n/n“: ne, když text kóty hodnotu nahradil (kóta ruční GUI = ručně, kontrola kót ji stejně nepočítá)", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, [...PART, "výkres stav"]);
+    const d = docOf(ws, "Deska");
+    const s = d.drawings![0];
+    const i = s.annotations.findIndex((a) => a.type === "dim" && (a as { kind?: string }).kind === "horizontal");
+    const anns = s.annotations.map((a, j) => (j === i ? { ...a, text: "Odmastit", by: "user" } : a));
+    const r = await run(new MemoryWorkspace(), [JSON.stringify({ ...d, drawings: [{ ...s, annotations: anns }] }), "výkres stav"]);
+    const t = txt(r);
+    const m = /Kontrola kót: velikosti (\d+)\/(\d+)/.exec(t)!;
+    expect(Number(m[1])).toBeLessThan(Number(m[2]));
+  }, 180000);
+  it("„Poznámky nad razítkem: 0/5“ neznamená prázdný kanál: revize bez popisu změny je ✗ i s 0/5", async () => {
+    const r = await run(new MemoryWorkspace(), [...PART, 'výkres revize A "Odmastit"', "výkres stav"]);
+    expect(txt(r)).toMatch(/Poznámky nad razítkem: 0\/5/);
+    expect(codes(r, "error")).toContain("drawing.note-style");
   }, 120000);
 });

@@ -5,7 +5,8 @@
 //    značkou Z1 a vysvětlivkou (R3), nad razítkem ≤ 5 řádků volného textu (R4); 6. řádek agenta = ✗ drawing.notes-limit,
 //    žádné „✓ … bez nálezů“ po něm; poznámka s HRC se přesune do razítka (ℹ);
 //  - člověk v GUI (R6): nástroj Text → dlouhá věta se vloží bez chyby a je na listu; panel Razítko ukáže jen nenápadnou
-//    radu (data-notes-hint), pole Tvrdost / Obecná drsnost (data-title-field) nesou hodnoty z textu.
+//    radu (data-notes-hint), pole Tvrdost / Obecná drsnost (data-title-field) nesou hodnoty z textu;
+//  - kolo 3 (D1): archivní soubor člověka otevřený agentem = ⚠ drawing.notes-loaded a export povolen, úprava agentem = ✗.
 // Spuštění: bin/e2e-run <worktree>/website 3640 <out> cad-w23-notes   (E2E_BASE nastaví e2e-run)
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -124,6 +125,21 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   }, 'Kalit a popouštět na 58-60 HRC, pokud není uvedeno jinak.');
   fs.writeFileSync(S + 'forged.txt', String(forged));
   ok(/✗/.test(forged) && /drawing\.notes-limit|poznámky nad razítkem/.test(forged) && /export odmítnut/.test(forged) && !/vyhodnocen bez nálezů/.test(forged), 'R6/R7: JSON s "by":"user" od agenta = ✗, export odmítnut, žádné ✓ – ' + line(String(forged), /export odmítnut|✗/));
+  // D1 (kolo 3): archivní výkres člověka ze souboru (otevřít připojeného .mncad) se 7 poznámkami – agent ho jen exportuje:
+  // ⚠ drawing.notes-loaded, export PDF proběhne, žádné ✓ „bez nálezů“ ani „postaven … bez ⚠ a ✗“; úprava agentem = ✗
+  const legacy = await p.evaluate(async () => {
+    const d = JSON.parse(JSON.stringify(window.mncad.getDocument()));
+    d.name = 'Deska archiv';
+    for (const s of d.drawings || []) s.annotations = s.annotations.filter((a) => a.type !== 'text').map((a) => { const x = { ...a }; delete x.by; return x; });
+    d.drawings[0].annotations.push(...[1, 2, 3, 4, 5, 6, 7].map((i) => ({ id: 'h' + i, view: 'sheet', type: 'text', at: [30, 30 + i * 5], text: 'Bod ' + i, size: 3.5 })));
+    window.mncad.attach({ name: 'archiv.mncad', text: JSON.stringify(d) });
+    const r1 = await window.mncad.run('otevřít "archiv.mncad"\nvýkres export pdf');
+    const r2 = await window.mncad.run('výkres značka text "Leštit" v 30 20');
+    return { r1: String(r1), r2: String(r2) };
+  });
+  fs.writeFileSync(S + 'legacy.txt', legacy.r1 + '\n----\n' + legacy.r2);
+  ok(/⚠ .*načtený výkres/.test(legacy.r1) && !/^✗/m.test(legacy.r1) && /výkres PDF/.test(legacy.r1) && !/vyhodnocen bez nálezů/.test(legacy.r1) && !/bez ⚠ a ✗/.test(legacy.r1), 'D1: soubor z disku se 7 poznámkami = ⚠ drawing.notes-loaded, PDF se zapíše, žádné ✓ – ' + line(legacy.r1, /načtený výkres/));
+  ok(/✗ .*poznámky nad razítkem/.test(legacy.r2), 'D1: text, který agent do načteného výkresu přidá nad limit = ✗ – ' + line(legacy.r2, /✗/));
   ok(errs.length === 0, `bez chyb stránky (${errs.slice(0, 2).join(' | ')})`);
   await b.close();
 })().catch((e) => {

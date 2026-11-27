@@ -12,7 +12,7 @@ export const docOp: OpHandler<"doc"> = async (op, ctx) => {
   await flush(ctx);
   // data importů z mapy `blobs` (.mncad této verze) do úložiště ještě před ověřovací stavbou; poznámky listů z JSON skriptu
   // agenta = text agenta, i když JSON tvrdí "by":"user" (vlna 23, R6 – rozhoduje cesta; pravidla nejdou obejít vloženým dokumentem)
-  const din = stampAgentNotes(internBlobs(op.doc));
+  const din = stampAgentNotes(internBlobs(op.doc), "agent");
   const incoming = din.features;
   // inPlace = nahradit dokument aktivní záložky jedním krokem historie; jinak nová záložka, při opakovaném běhu záložka téhož
   // dokumentu (JSON / setDocument / otevřít) z dřívějšího běhu (engine/runs.ts)
@@ -28,7 +28,7 @@ export const docOp: OpHandler<"doc"> = async (op, ctx) => {
   st?.report();
   // pravidla textu výkresu (vlna 23, R1–R5): načtený dokument agenta s porušením = ✗ na řádku načtení (dokument zůstane
   // otevřený k opravě, export listu s porušením se odmítne, vyhodnocení listu nálezy vypíše)
-  if (d.drawings?.length) for (const f of (await import("../../drawing-agent")).ingestFindings(d)) coded(ctx, f.code, { args: f.args });
+  for (const f of (await import("../../drawing-agent")).ingestFindings(d)) coded(ctx, f.code, { args: f.args });
   // pružiny: délka z dosedacích ploch, rozpor s uloženou délkou ⚠ spring.stale (vlna 22, bod 7)
   await freshenRunDoc(ctx, op.line);
 };

@@ -77,11 +77,17 @@ describe("A – R1: běžné zápisy klíčových údajů patří do razítka (b
     expect(String((s.meta as Record<string, unknown>)[key] ?? "")).not.toBe("");
     expect(txt(r)).toMatch(/Poznámky nad razítkem: 0\/5/);
   }, 120000);
+  // kolo 3 (D3): materiál je údaj MODELU – bez materiálu modelu se z poznámky zapíše do modelu; jiný materiál, než má model
+  // (BASE: 1.2379), = ✗ a model se nezmění (dřív poznámka materiál modelu tiše přepsala)
   it.each([["Ocel C45", "C45"], ["Ocel 19 436", "19 436"]])("materiál „%s“ → razítko (materiál dílu)", async (t, v) => {
     const ws = new MemoryWorkspace();
-    await run(ws, [...BASE, `výkres značka text "${t}" v 30 120`]);
+    await run(ws, [...BASE.filter((l) => !l.startsWith("materiál")), `výkres značka text "${t}" v 30 120`]);
     expect(docOf(ws, "Deska").materialName).toContain(v);
     expect(docOf(ws, "Deska").drawings![0].annotations.some((a) => a.type === "text")).toBe(false);
+    const ws2 = new MemoryWorkspace();
+    const r2 = await run(ws2, [...BASE, `výkres značka text "${t}" v 30 120`]);
+    expect(errs(r2)).toContain("drawing.note-title-data");
+    expect(docOf(ws2, "Deska").materialName).toBe("1.2379");
   }, 120000);
 });
 
@@ -112,8 +118,9 @@ describe("B – ostatní kanály textu (body 3, 17, 20)", () => {
     expect(errs(r).filter((c) => c === "drawing.note-style")).toHaveLength(6);
     expect(txt(r)).not.toMatch(OK_RE);
   }, 120000);
+  // kolo 3 (D2): řádek revize je popis změny – „změna: …“; samotné „tvrdost 58-60 HRC“ popisem změny není (✗, test K5)
   it("krátká revize s údajem, který razítko nese, projde", async () => {
-    const r = await run(new MemoryWorkspace(), [...BASE, 'výkres razítko tvrdost="58-60 HRC"', 'výkres revize A "tvrdost 58-60 HRC"']);
+    const r = await run(new MemoryWorkspace(), [...BASE, 'výkres razítko tvrdost="58-60 HRC"', 'výkres revize A "změna: tvrdost 58-60 HRC"']);
     expect(errs(r)).toEqual([]);
   }, 120000);
 });
@@ -123,7 +130,8 @@ describe("C – druhý výkres a obrácené pořadí listů (body 4, 5, 22)", ()
     const t = (n: number, i: number) => `výkres značka text "Bod${n}${i}" v 30 ${120 - i * 5}`;
     const r = await run(new MemoryWorkspace(), [...BASE, ...[0, 1, 2, 3, 4].map((i) => t(1, i)), 'výkres nový "Poznámky"', "výkres pohledy iso", ...[0, 1, 2, 3, 4].map((i) => t(2, i)), "výkres export pdf vše"]);
     expect(errs(r).filter((c) => c === "drawing.notes-sheet" || c === "drawing.notes-limit").length).toBeGreaterThanOrEqual(5);
-    expect(txt(r)).toMatch(/Poznámky nad razítkem|volný text patří jen na hlavní list/);
+    // kolo 3 (D4): výkres s názvem „Poznámky“ už nevznikne (✗ hned při založení), texty pak narazí na limit hlavního listu
+    expect(txt(r)).toMatch(/[Pp]oznámky nad razítkem|volný text patří jen na hlavní list|výkres poznámek/);
   }, 180000);
   it("r5b: list 1 jen izometrie + texty, list 2 skutečný výkres = ✗ drawing.notes-sheet při vyhodnocení, bez ✓", async () => {
     const r = await run(new MemoryWorkspace(), [
@@ -165,12 +173,14 @@ describe("E – dokument z textové cesty (body 7, 8, 16, 21, 23, 24c)", () => {
     expect(txt(r)).not.toMatch(OK_RE);
     expect(r.entries.filter((e) => e.code?.startsWith("drawing.note")).every((e) => e.level !== "note")).toBe(true);
   }, 180000);
-  it("otevřít \"soubor.mncad\" (CLI --open) s by=user = dokument agenta → ✗", async () => {
+  // kolo 3 (D1): soubor otevřený z disku = text „loaded“ – ne ✗ (archivní výkres člověka musí jít exportovat), ale ⚠
+  // drawing.notes-loaded místo ✓; padělané "by":"user" nekoupí víc než ⚠ (dřív ✗ „dokument agenta“)
+  it("otevřít \"soubor.mncad\" (CLI --open) s by=user = načtený soubor → ⚠ drawing.notes-loaded, žádné ✓", async () => {
     const d = await forged("user");
     inputs = { "forged.mncad": new TextEncoder().encode(JSON.stringify(d)) };
     const r = await run(new MemoryWorkspace(), ['otevřít "forged.mncad"', "výkres stav"]);
     inputs = {};
-    expect(errs(r).some((c) => c?.startsWith("drawing."))).toBe(true);
+    expect(r.entries.some((e) => e.code === "drawing.notes-loaded" && e.level === "warn")).toBe(true);
     expect(txt(r)).not.toMatch(OK_RE);
   }, 180000);
   it("popis plochy z JSON (113 znaků s HRC) = ✗ při vyhodnocení i načtení", async () => {

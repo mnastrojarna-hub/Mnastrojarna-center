@@ -9,23 +9,23 @@
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A3, měřítko 1:1, pohledy přední, horní, iso – výsledek po vyhodnocení listu níže
 → Chytré kóty (řetězově): 4 kót a popisů – horní 3, přední 1 · očekávaných rozměrů 4 – výsledek po vyhodnocení listu níže
-ℹ řádek 12: list List 1: přesunuto do razítka – „HRC 58-62“ → tvrdost „HRC 58-62“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 12: list List 1: přesunuto do razítka – „HRC 58-62“ → tvrdost „58-62 HRC“ (údaje razítka se nepíšou jako poznámka)
 ℹ řádek 13: list List 1: přesunuto do razítka – „Tolerance ±0,1“ → nepředepsané „±0,1“ (údaje razítka se nepíšou jako poznámka)
 ℹ řádek 14: list List 1: přesunuto do razítka – „0,5x45°“ → hrany „0,5x45°“ (údaje razítka se nepíšou jako poznámka)
 ℹ řádek 15: list List 1: přesunuto do razítka – „RAL 9005“ → povrchová úprava „RAL 9005“ (údaje razítka se nepíšou jako poznámka)
 ℹ řádek 16: list List 1: přesunuto do razítka – „N7“ → drsnost „N7“ (údaje razítka se nepíšou jako poznámka)
-✗ řádek 17: list List 1: text není strojařsky heslovitý – a4 text kóty „Kalit a popustit na 58-60 HRC, ostré hrany sraz…“: řádek má 49 znaků (nejvýš 24) – u značky jen krátký technický údaj, ne poznámka
+✗ řádek 17: list List 1: text není strojařsky heslovitý – a4 text kóty „Kalit a popustit na 58-60 HRC, ostré hrany sraz…“: řádek má 49 znaků (nejvýš 24) – u značky jen krátký technický údaj, ne poznámka (a dalších 1: a4 text kóty „Kalit a popustit na 58-60 HRC, ostré hrany sraz…“ nahrazuje měřenou hodnotu 100)
 ✗ řádek 18: list List 1: text není strojařsky heslovitý – revize A „Při jakékoli nejasnosti kontaktujte konstruktéra“: slovo věty „jakekoli“ – popis změny krátce (např. „Ø20 → Ø22“, „doplněna díra Ø9“)
 ✗ řádek 19: list List 1: text není strojařsky heslovitý – buňka razítka name „Deska, kterou je nutné kalit na 58 HRC“: slovo věty „kterou“ – hodnota buňky heslovitě (např. tepelné="kalit a popustit", tvrdost="58-60 HRC")
 ✗ řádek 20: list List 1: poznámka bez cíle v geometrii – „Brousit“ → poznámka Brousit → kóta Ø9 skrz (horní, a3): místní popis míří šipkou na plochu nebo hranu, ne na kótu – popis plochy zapište do modelu (poznámka F7 "Brousit"; výkres ho převezme se šipkou), údaj ke kótě patří do kóty (výkres upravit <kóta> přípona=…)
 ✗ řádek 21: list List 1: text není strojařsky heslovitý – a7 „Odmastit“: výška písma 7 mm – nejvýš 5 mm (vysoké písmo limit řádků neobejde)
 → značka text Odmastit → list [30; 60] · a7 – výsledek po vyhodnocení listu níže
-→ nový výkres „Poznámky“ – list 1 „List 1“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů 2 – výsledek po vyhodnocení listu níže
+→ nový výkres „Detail“ – list 1 „List 1“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů 2 – výsledek po vyhodnocení listu níže
 → výkres: pohledy iso – výsledek po vyhodnocení listu níže
-✗ řádek 25: list Poznámky / List 1: poznámky mimo hlavní list – text „Konzervovat“ – volný text patří jen na hlavní list „Výkres 1 / List 1“ (pohledy s kótami) nad razítko, nejvýš 5 řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii
+✗ řádek 25: list Detail / List 1: poznámky mimo hlavní list – text „Konzervovat“ – volný text patří jen na hlavní list „Výkres 1 / List 1“ (pohledy s kótami) nad razítko, nejvýš 5 řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii
 → výkres „Výkres 1“ (1 list) – další příkazy výkresu pracují s ním
 Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
-Výkresy (2): 1 „Výkres 1“ 1 list (aktivní) · 2 „Poznámky“ 1 list
+Výkresy (2): 1 „Výkres 1“ 1 list (aktivní) · 2 „Detail“ 1 list
 Výkres „Výkres 1“ – Listy (1): 1 „List 1“ A3 (aktivní)
 Kóty a popisy (4, z toho vygenerovaných 4):
   horní: Ø9 skrz · 100 · 60
@@ -39,8 +39,8 @@ U razítka: nepředepsané tolerance ±0,1 · hrany 0,5x45° · poznámka —
 Razítko: název Deska · číslo — · kreslil — · revize — · datum ?.?.???? · materiál 1.2379
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
-Další pole razítka: tvrdost „HRC 58-62“ · povrchová úprava „RAL 9005“ · drsnost „N7“
-Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost „HRC 58-62“ · povrchová úprava „RAL 9005“ · hrany „0,5x45°“ · nepředepsané „±0,1“ · drsnost „N7“ · technický pás razítka +10 mm (5 polí)
+Další pole razítka: tvrdost „58-62 HRC“ · povrchová úprava „RAL 9005“ · drsnost „N7“
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost „58-62 HRC“ · povrchová úprava „RAL 9005“ · hrany „0,5x45°“ · nepředepsané „±0,1“ · drsnost „N7“ · technický pás razítka +10 mm (5 polí)
 Nepředepsané tolerance: text „±0,1“
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Poznámky nad razítkem: 3/5 řádků (agent 3) · místní popisy 0/8
@@ -56,6 +56,7 @@ Varování výkresu: oblastní úprava Z2 „cernit“ (F4): rozsah 0–400 mm p
 ✓ Díra 1 (hole) · úběr 763,4 mm³ (5 % nástroje) · těleso platné
 
 Dokument: „Deska“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 2 (2 ✓, 0 ✗)
+Popisy ploch (2): F3 úprava tepelná „62+2 HRC“ · F4 úprava povrchová „cernit“
 Rozměry: 100 × 60 × 12 mm (X 0…100, Y 0…60, Z 0…12) · objem 71,24 cm³ · ploch 7 · hran 15
 Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
@@ -69,6 +70,7 @@ Entit: 0
 Rozsah: prázdný výkres
 Hladiny (1), aktuální: 0
   ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 0
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
 === run 3 ===
 ✗ MTEXT: pravidla výkresu pro agenty – „1. Kalit a popouštět na 58-60 HRC, pokud není uvedeno jinak.“ obsahuje údaj razítka (tvrdost, tepelné zpracování, hrany) – do razítka rozvržení: 2d upravit-atributy <razítko> TVRDOST="…" TEPELNE="…" HRANY="…" (nebo 2d rozvržení nové … TVRDOST="…" TEPELNE="…" HRANY="…")
 
@@ -77,3 +79,4 @@ Entit: 0
 Rozsah: prázdný výkres
 Hladiny (1), aktuální: 0
   ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 0
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8

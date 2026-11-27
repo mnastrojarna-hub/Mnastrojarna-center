@@ -2436,16 +2436,29 @@ má vlastní listy a \`výkres výkresy 1\` vrátí práci na první výkres.
 ### Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)
 
 Majitel: „Musí to být strojařský, ne slohové cvičení.“ Platí pro **každou textovou cestu** – jazyk mncad v konzoli, CLI,
-HTTP, \`window.mncad.run\`, JSON dokument ve skriptu / \`setDocument\`, \`otevřít\` a \`--open\` (dokument načtený textovou
-cestou je dokument agenta – \`"by":"user"\` v JSON se nebere), 2D výkres \`2d …\`. Člověk v GUI výkresu (nástroje Text /
-Poznámka / Kóta, panel Razítko, tabulka revizí, příkazový řádek 2D editoru) omezen není – dostane jen nenápadnou radu.
+HTTP, \`window.mncad.run\`, JSON dokument ve skriptu / \`setDocument\`, 2D výkres \`2d …\`, i výchozí list \`--formats\`.
+Člověk v GUI výkresu (nástroje Text / Poznámka / Kóta, panel Razítko, tabulka revizí, příkazový řádek 2D editoru) omezen
+není – dostane jen nenápadnou radu.
+
+**Původ textu:** co agent v tomto běhu vytvoří nebo změní (příkaz, JSON dokument na řádku, \`setDocument\`) = **agent** →
+porušení ✗ a export listu se odmítne. Text ze souboru otevřeného z disku (\`otevřít\` uloženého .mncad / .json, CLI
+\`--open\`, HTTP open), který běh nezměnil = **načtený** → nikdy ✗ a export neblokuje (archivní výkres člověka jde agentem
+exportovat), ale list dostane ⚠ \`drawing.notes-loaded\` místo ✓. Jakmile agent načtený text upraví, je jeho (✗).
+\`"by":"user"\` v souboru nekoupí víc než ⚠.
 
 1. **Klíčové údaje vždy v razítku:** materiál, tepelné zpracování, tvrdost, povrchová úprava, hrany (ISO 13715),
    nepředepsané tolerance (ISO 2768 / ISO 22081), obecná drsnost – \`výkres razítko tepelné="…" tvrdost="58–60 HRC"
    povrch="…" hrany="…" drsnost="Ra 3,2"\`, \`výkres nepředepsané ISO 2768-mK\`. Hodnota buňky heslovitě (≤ 32 znaků).
-   Poznámka, která je takovým údajem („Kalit 58 HRC“, „HRC 58-62“, „Ra 3,2“, „N7“, „0,5x45°“, „RAL 9005“, „Zn 8 µm“, „Ocel
-   C45“), se do razítka přesune sama (ℹ \`drawing.note-to-title\`); údaj uprostřed věty = ✗ \`drawing.note-title-data\`.
-   Totéž hlídají i ostatní texty: kóta (text, přípona), popis díry, značka drsnosti a tolerance, revize, název a buňky razítka.
+   Poznámka, která je takovým údajem („Kalit 58 HRC“, „HRC 58-62“, „Ra=1,6“, „N7“, „C0,5“, „Fazeta 0,5“, „RAL 9005“, „KTL“,
+   „Brunýrovat“, „Tol. ±0,1“, „Volné míry ±0,2“, „DIN ISO 2768 mittel“, „IT12“, „Mat. 11 523“, „Ck45“, „AISI 304“, „Hardox
+   450“, „PA6“, „CHT 0,8 mm“, „Rohy zaoblit R1“), se do razítka přesune sama (ℹ \`drawing.note-to-title\`) – ve stejném tvaru,
+   jaký přijme \`výkres razítko\` (tvrdost „58-62 HRC“); údaj uprostřed věty nebo neúplný („ISO 2768“ bez třídy) = ✗
+   \`drawing.note-title-data\`. Buňka, která už nese jinou hodnotu, se nepřepíše (⚠ \`drawing.title-conflict\`, ukáže obě);
+   materiál jiný než materiál modelu = ✗ (zdroj je model: \`materiál …\`). \`materiál 1.2379 kalený na 58-60 HRC\` se
+   rozdělí (materiál do modelu, tvrdost a tepelné zpracování do razítka listů; bez výkresu ✗ s radou).
+   Totéž hlídají **všechny kanály**: kóta (text, předpona, přípona – slovo „kalit“ / „černit“ stačí), popis díry, značka
+   drsnosti, revize, název dílu / listu / výkresu a volné buňky razítka (zákazník, projekt, kontroloval …: jméno / číslo,
+   ne pokyn „Odmastit“ / „Zabalit“).
 2. **Místní popis = odkaz se šipkou na plochu, text je v MODELU:** \`poznámka F7 "Brousit"\` (EN \`note\`, DE \`hinweis\`) –
    výkres ho sám kreslí odkazovou čarou (šipka na hranu plochy viděné z boku, tečka na ploše viděné zepředu); změna textu
    v modelu = změna na výkrese. Nejvýš 8 místních popisů v dokumentu (✗ \`drawing.leaders-limit\`). Odkaz jen na výkrese
@@ -2455,16 +2468,26 @@ Poznámka / Kóta, panel Razítko, tabulka revizí, příkazový řádek 2D edit
    plochou, kóta rozsahu, značka Z1 a vysvětlivka „Z1 tepelná: 58+2 HRC“ dole (počítá se do 5 řádků – i když výkres ještě
    není; stejný předpis = jedna vysvětlivka „Z1, Z2 …“). Rozsah mimo plochu = ⚠ \`drawing.pmi-range\`.
 4. **Nad razítkem nejvýš 5 řádků volného textu v celém dokumentu** (všechny výkresy a listy dohromady), řádek ≤ 60 znaků,
-   ≤ 8 slov, písmo ≤ 5 mm, heslovitě – žádné věty, souvětí ani „pokud není uvedeno jinak“. Víc = ✗ \`drawing.notes-limit\`
-   (zalomení, víc textů, vysoké písmo, další list ani další výkres limit neobejdou), věta = ✗ \`drawing.note-style\`.
-5. **Žádný list ani výkres jen s poznámkami** a žádné dělení „výkres + poznámky“ (v žádném pořadí): volný text agenta jen
-   na hlavním listu – první list s pravoúhlým pohledem a kótami (jinak ✗ \`drawing.notes-sheet\`); list, který jen opakuje
-   pohledy jiného listu = ⚠ \`drawing.sheet-duplicate\`.
+   ≤ 8 slov, písmo ≤ 5 mm, heslovitě – žádné věty, souvětí ani „pokud není uvedeno jinak“; věta rozdělená na řádky (řádek
+   končí čárkou / začíná spojkou) je věta. Víc = ✗ \`drawing.notes-limit\`, věta = ✗ \`drawing.note-style\`. Počítá se každý
+   kanál, který čtenář vidí: poznámky, texty, vysvětlivky úprav, řádky popisů s odkazem bez technického údaje („Brousit
+   jemně“), 2D TEXT / MTEXT / atributy / text v blocích × počet vložení. Krátké slovo není výjimka – štítkem je jen „A-A“,
+   „Řez A-A“, „Detail B“, pozice „12“, oblast „Z1“, měřítko. **Revize** = popis změny („Ø20 → Ø22“, „změna: doplněna díra Ø9“),
+   pokyn v revizi = ✗, nejvýš 5 řádků revize od agenta. **Kóta**, jejíž text nahradil hodnotu slovy, = ✗ a kontrola kót ji za
+   kótu velikosti nepočítá. **Značka drsnosti** nese hodnotu Ra / Rz (+ nejvýš 1 slovo způsobu výroby); slova bez hodnoty = ✗.
+   Popisy s odkazem a značky drsnosti se slovy se počítají do 8 místních popisů.
+5. **Žádný list ani výkres jen s poznámkami** a žádné dělení „výkres + poznámky“ (v žádném pořadí): hlavní list = list
+   s největší plochou pohledů dílu v rozumném měřítku (žeton 1:10 s jednou kótou hlavním listem není); volný text jinde
+   = ✗ \`drawing.notes-sheet\`. Výkres, jehož název / číslo odkazuje na poznámky nebo jiný díl („Technické požadavky“,
+   „Poznámky“, „MN-1/2“), a dokument jen s textem (zástupné těleso do 5 mm + poznámky) = ✗; list agenta, který jen opakuje
+   pohledy jiného listu a nese text = ✗ \`drawing.sheet-duplicate\` (prázdná kopie ⚠). Název dílu je údaj razítka: krátce, žádná věta ani pokyn (\`nový díl
+   "…"\` jinak ✗; výchozí list \`--formats\` jde stejnou kontrolou).
 6. **Kontrola:** \`výkres stav\` ukáže „Údaje razítka (technické, v buňkách) …“, „Poznámky nad razítkem: N/5 řádků (agent …,
-   ručně …) · místní popisy N/8“ a „Z modelu: …“. Vyhodnocení listu hlásí porušení agenta ✗ (i u textu z načteného JSON),
-   export listu s porušením agenta se odmítne; „✓ … bez nálezů (… poznámky a razítko)“ jen bez nich. 2D výkres: text, který
-   pravidla porušuje, příkaz \`2d …\` nepřijme; údaje celého dílu patří do technického pásu razítka rozvržení (atributy
-   TEPELNE, TVRDOST, POVRCH, HRANY, TOLERANCE, DRSNOST).
+   ručně …) · místní popisy N/8“ a „Z modelu: …“; \`stav\` dílu „Popisy ploch (N): F7 „Brousit“ …“ (i ve stromu prvků).
+   Vyhodnocení listu hlásí porušení agenta ✗ (i u textu z JSON na řádku), export listu s porušením agenta se odmítne;
+   načtený soubor ⚠ \`drawing.notes-loaded\`; „✓ … bez nálezů (… poznámky a razítko)“ jen bez nich. 2D výkres: text, který
+   pravidla porušuje, příkaz \`2d …\` nepřijme, export ho nezapíše, \`2d stav\` ukáže „Poznámky nad razítkem: N/5“; údaje celého
+   dílu patří do technického pásu razítka rozvržení (atributy TEPELNE, TVRDOST, POVRCH, HRANY, TOLERANCE, DRSNOST).
 
 \`\`\`
 nový díl "Deska"
