@@ -21,7 +21,7 @@ import { tr } from "./i18n";
 import type { MotionCollision, MotionResult, MotionStep } from "./motion";
 import type { MotionEvent } from "./motion-phases";
 import { condText } from "./motion-phases";
-import type { ProcReq, ProcRes, ProcStep } from "./process-types";
+import { PROC_MAX_SUB, type ProcReq, type ProcRes, type ProcStep } from "./process-types";
 import type { CadDoc, MotionCond, MotionStudy, Placement, ProcessOp, Vec3 } from "./types";
 
 /* ───────────────────────── výsledek ───────────────────────── */
@@ -70,6 +70,12 @@ export type ProcOpResult = {
    * řešič mezipolohu nenašel): od něj je výsledek procesu nezjištěn (⚠ motion.process-between, stav „nezjištěn“, nikdy „plný“)
    */
   unresolved?: number;
+  /**
+   * proč nezjištěn (kolo 6 oprava): `pose` = řešič mezipolohu nedal (výchozí), `cap` = úsek by potřeboval víc než PROC_MAX_SUB
+   * mezipoloh (tenký nástroj, dlouhý krok – 64 poloh by nástroj obrobkem stále „proskočil“), `clash` = spojitá kontrola kolizí
+   * našla průnik nástroj × obrobek mezi kroky, procesní vrstva v polohách žádný záběr
+   */
+  unresolvedWhy?: "pose" | "cap" | "clash";
   ms: number;
 };
 export type ProcessResult = {
@@ -368,9 +374,13 @@ export type ProcessPoseAt = (k: number, t: number) => { place: Record<string, Pl
  * pro každou operaci, mezipolohy z řešiče studie. `unresolved` = operace → první krok s úsekem, který potřeboval mezipolohy a
  * řešič je nedal (dynamika, řešič bez řešení) – výsledek procesu tam nezjištěn.
  */
-async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[], starts: Map<string, ProcAt | null>, env: Required<ProcessEnv>, poseAt: ProcessPoseAt | undefined): Promise<{ sub: SubPose[]; unresolved: Map<string, number> }> {
+type Unresolved = { k: number; why: NonNullable<ProcOpResult["unresolvedWhy"]> };
+async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[], starts: Map<string, ProcAt | null>, env: Required<ProcessEnv>, poseAt: ProcessPoseAt | undefined): Promise<{ sub: SubPose[]; unresolved: Map<string, Unresolved> }> {
   const need = new Map<number, number>(); // index kroku (do res.steps) → počet mezipoloh
   const byOp = new Map<string, number[]>();
+  // úseky, kde by i strop mezipoloh nestačil: výsledek tam nezjištěn (dřív se přidalo 64 poloh, nástroj obrobkem dál „proskočil“
+  // a vrstva tvrdila „nezasáhl, obrobek beze změny“ vedle pracovního kontaktu mezi kroky) – polohy se pro úsek nepočítají
+  const capped = new Set<number>();
   for (const op of ops) {
     let req: ProcReq;
     try {
@@ -386,12 +396,14 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
     }
     for (const g of plan.gaps ?? []) {
       need.set(g.i, Math.max(need.get(g.i) ?? 0, g.n));
+      if (g.capped) capped.add(g.i);
       byOp.set(op.id, [...(byOp.get(op.id) ?? []), g.i]);
     }
   }
   const sub: SubPose[] = [];
   const failed = new Set<number>();
   for (const [j, n] of [...need.entries()].sort((a, b) => a[0] - b[0])) {
+    if (capped.has(j)) continue;
     const s0 = res.steps[j - 1];
     const s1 = res.steps[j];
     if (!s0 || !s1) continue;
@@ -405,10 +417,12 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
     if (got.length < n) failed.add(j);
     else sub.push(...got);
   }
-  const unresolved = new Map<string, number>();
+  const unresolved = new Map<string, Unresolved>();
   for (const [id, js] of byOp) {
-    const bad = js.filter((j) => failed.has(j));
-    if (bad.length) unresolved.set(id, res.steps[Math.min(...bad)].i);
+    const bad = js.filter((j) => failed.has(j) || capped.has(j));
+    if (!bad.length) continue;
+    const j = Math.min(...bad);
+    unresolved.set(id, { k: res.steps[j].i, why: capped.has(j) ? "cap" : "pose" });
   }
   // jen umístění obrobků a nástrojů (výsledek se ukládá s mezipolohami – bez zbytečných komponent)
   const keep = new Set(ops.flatMap((o) => [o.tool, o.target]));
@@ -429,7 +443,7 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
   const out: ProcOpResult[] = [];
   let unavailable: string | undefined;
   const starts = new Map(ops.map((op) => [op.id, opStart(op, res, study)] as const));
-  const { sub, unresolved } = env.process ? await planSub(doc, res, ops, starts, env as Required<ProcessEnv>, opts.poseAt) : { sub: [] as SubPose[], unresolved: new Map<string, number>() };
+  const { sub, unresolved } = env.process ? await planSub(doc, res, ops, starts, env as Required<ProcessEnv>, opts.poseAt) : { sub: [] as SubPose[], unresolved: new Map<string, Unresolved>() };
   const pos = procPositions(res, sub);
   const idx = stepIndexes(pos);
   const posAt = (i: number): ProcAt => {
@@ -487,7 +501,7 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
       ...(k.error ? { error: k.error } : {}),
       // víc operací na obrobku: kombinovaný stav z jádra (bez něj jen dolní mez – productStates)
       ...(req.others?.length ? { combined: k.combined ? { steps: idx.map((i) => k.combined!.steps[i] ?? 0), states: k.combined.states.map((x) => ({ removed: x.removed, volume: x.volume, scrap: x.scrap })), ...(k.combined.error ? { error: k.combined.error } : {}) } : { missing: true as const } } : {}),
-      ...(un !== undefined ? { unresolved: un } : {}),
+      ...(un ? { unresolved: un.k, unresolvedWhy: un.why } : {}),
       ms: k.ms,
     });
   }
@@ -503,6 +517,19 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
   const steps2 = steps.map((s) => (s.clashes?.length ? { ...s, clashes: reclass(s.i, s.clashes)! } : s));
   const ext = res as R & { between?: { k0: number; k1: number; clashes: MotionCollision[] }[] };
   const between = ext.between?.map((h) => ({ ...h, clashes: reclass(h.k1, h.clashes)! }));
+  // pojistka (kolo 6 oprava): spojitá kontrola kolizí našla pracovní kontakt nástroj × obrobek MEZI kroky, procesní vrstva
+  // v žádné své poloze záběr nenašla → výsledek procesu nezjištěn, nikdy „nezasáhl, obrobek beze změny“ (ať plán úsek vynechal
+  // z jakéhokoli důvodu – obálka, natočení, strop)
+  for (const o of out) {
+    if (o.contact || o.error || !o.start || o.unresolved !== undefined) continue;
+    const pair = (c: MotionCollision) => {
+      const A = c.aPath?.[0] ?? c.a;
+      const B = c.bPath?.[0] ?? c.b;
+      return (A === o.tool && B === o.target) || (A === o.target && B === o.tool);
+    };
+    const h = between?.find((x) => x.k1 >= o.start!.step && x.clashes.some((c) => c.cls === "work" && pair(c)));
+    if (h) Object.assign(o, { unresolved: h.k1, unresolvedWhy: "clash" as const });
+  }
   let collision: MotionResult["collision"] = null;
   for (const s of steps2) {
     const hit = s.clashes?.find((c) => isFault(c.cls));
@@ -591,7 +618,7 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
       continue;
     }
     if (!o.contact && o.unresolved !== undefined) {
-      out.push(` ${head}: ${tr("záběr jen mezi kroky – výsledek procesu nezjištěn (mezipolohy od kroku {0} nešly spočítat)", o.unresolved)}`);
+      out.push(` ${head}: ${unresolvedText(o)}`);
       continue;
     }
     if (!o.contact) {
@@ -618,6 +645,12 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
   }
   out.push(...productTimeline(proc, res, doc));
   return out;
+}
+/** proč je výsledek operace nezjištěn (protokol): řešič bez mezipolohy / strop mezipoloh / průnik jen v kontrole kolizí */
+function unresolvedText(o: ProcOpResult): string {
+  if (o.unresolvedWhy === "cap") return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (úsek před krokem {0} by potřeboval víc než {1} mezipoloh)", o.unresolved, PROC_MAX_SUB);
+  if (o.unresolvedWhy === "clash") return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (kontrola kolizí našla průnik před krokem {0}, procesní vrstva v polohách ne)", o.unresolved);
+  return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (mezipolohy od kroku {0} nešly spočítat)", o.unresolved);
 }
 /** průběh stavu výrobku po krocích: „Stav výrobku „Plech“: plný (kroky 0–4) → v záběru (5) → děrovaný (6–36)“ */
 export function productTimeline(proc: ProcessResult, res: Pick<MotionResult, "steps">, doc: CadDoc): string[] {
@@ -665,7 +698,17 @@ export function processCodes(res: MotionResult, doc: CadDoc): ProcessCode[] {
       if (want !== undefined && o.depth < want - Math.max(1e-3, want * 0.01))
         out.push({ code: "motion.process-partial", args: [name, T, nf(o.depth, 3), nf(want, 3)], text: tr("procesní operace {0}: otisk do „{1}“ {2} mm z požadovaných {3} mm", name, T, nf(o.depth, 3), nf(want, 3)) });
     }
-    if (o.unresolved !== undefined && !o.error) out.push({ code: "motion.process-between", args: [name, P, T], text: tr("procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – mezipolohy nešly spočítat, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T) });
+    if (o.unresolved !== undefined && !o.error)
+      out.push({
+        code: "motion.process-between",
+        args: [name, P, T],
+        text:
+          o.unresolvedWhy === "cap"
+            ? tr("procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – úsek by potřeboval víc než {3} mezipoloh, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T, PROC_MAX_SUB)
+            : o.unresolvedWhy === "clash"
+              ? tr("procesní operace {0}: kontrola kolizí našla průnik nástroje „{1}“ s obrobkem „{2}“ mezi kroky, procesní vrstva v polohách ne – výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T)
+              : tr("procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – mezipolohy nešly spočítat, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T),
+      });
     const cmb = o.combined;
     if (cmb && "missing" in cmb) out.push({ code: "motion.process-failed", args: [name, tr("jádro nevrátilo stav obrobku po všech operacích")], text: tr("procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu", name, tr("jádro nevrátilo stav obrobku po všech operacích")) });
     else if (cmb?.error) out.push({ code: "motion.process-failed", args: [name, cmb.error], text: tr("procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu", name, cmb.error) });

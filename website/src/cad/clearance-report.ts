@@ -36,6 +36,8 @@ export function stepRanges(list: readonly number[], max = 6): string {
 function whereText(m: NonNullable<ClearancePair["min"]>): string {
   const t = nf(m.t, 3);
   // poloha minima na přímé dráze dohledaná (kolo 6): poloha, čas a motory pro panel, úsečku i protokol
+  // poloha v úseku jen interpolovaná podílem dráhy (řešič ji nepotvrdil – nerovnoměrný posuv, bez řešiče): „přibližně“
+  if (m.between && m.sweep && m.located && m.approxAt) return tr("mezi kroky {0} a {1} (po přímé dráze: přibližně poloha {2}, t = {3} s, motory {4} – interpolováno podílem dráhy)", m.between[0], m.between[1], nf(m.pos, 3), t, m.motors.map((v) => nf(v, 3)).join("; ") || "–");
   if (m.between && m.sweep && m.located) return tr("mezi kroky {0} a {1} (po přímé dráze: poloha {2}, t = {3} s, motory {4})", m.between[0], m.between[1], nf(m.pos, 3), t, m.motors.map((v) => nf(v, 3)).join("; ") || "–");
   if (m.between && m.sweep) return tr("mezi kroky {0} a {1} (po přímé dráze)", m.between[0], m.between[1]);
   if (m.between) return tr("mezi kroky {0} a {1} (zjemněno: poloha {2}, t = {3} s)", m.between[0], m.between[1], nf(m.pos, 3), t);

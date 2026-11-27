@@ -168,6 +168,25 @@ describe("vlna 22 C3: procesní vrstva – střih a otisk během pohybu (bod 4)"
     expect(short).not.toMatch(/v krocích mezi kroky/);
   }, 240_000);
 
+  it("kolo 6 · 74k: tenký střižník (0,2 mm) projde plechem během kroku, úsek nad strop mezipoloh – nezjištěn, ne „nezasáhl“ / „plný“", async () => {
+    // oponent kola 6: plán vrátil `capped`, procesní vrstva ho nečetla – 64 mezipoloh, nástroj plechem dál „proskočil“:
+    // proc=1 removed=0, „bez záběru – nástroj obrobek nezasáhl“, „plný (kroky 0–1)“, ⚠ process-miss vedle ℹ clash.work 9,817 mm³
+    const { ws, short, con } = await run("74k", corpus("74k-process-capped"));
+    expect(short).not.toMatch(/motion\.process-miss|nezasáhl/);
+    expect(short).toMatch(/motion\.process-between "Lis": procesní operace střih 1: nástroj „Střižník“ mohl obrobek „Plech“ zasáhnout jen mezi kroky – úsek by potřeboval víc než 64 mezipoloh/);
+    expect(con).toMatch(/střih 1 „Střižník“ → „Plech“: záběr jen mezi kroky – výsledek procesu nezjištěn \(úsek před krokem 1 by potřeboval víc než 64 mezipoloh\)/);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(krok 0\) → nezjištěn \(záběr jen mezi kroky\) \(krok 1\)/);
+    expect(con).toMatch(/na konci „Plech“ nezjištěn/);
+    expect(con).not.toMatch(/na konci „Plech“ plný/);
+    // plán jádra: úsek přes strop (61 mm posunu, nástroj 0,2 mm → polovina 0,1 mm → 609 mezipoloh) = capped
+    const asm = ws.listDocs().find((d) => d.doc.kind === "assembly")!.doc as CadDoc;
+    const P = asm.components!.find((c) => c.name === "Plech")!;
+    const R = asm.components!.find((c) => c.name === "Střižník")!;
+    const at = (z: number) => relMatrix(P.placement, { position: [50, 50, z], rotation: [0, 0, 0] });
+    const plan = await kernel.process({ target: { key: sourceKey(P.source), source: P.source }, tool: { key: sourceKey(R.source), source: R.source }, kind: "cut", rels: [at(20), at(-41)], plan: true });
+    expect(plan.gaps).toEqual([{ i: 1, n: 64, capped: true }]);
+  }, 240_000);
+
   it("kolo 6 · 74j: otisk 0,1 mm z požadovaných 0,3 mm = ℹ process-partial; otisk + prostřižený střih = „děrovaný + v záběru“", async () => {
     const { short, con } = await run("74j", corpus("74j-process-imprint-depth"));
     // dřív removed=31.416 a hloubka 0,1 mm bez upozornění

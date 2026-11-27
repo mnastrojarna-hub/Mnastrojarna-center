@@ -291,6 +291,51 @@ describe("vlna 22 C3: žádné falešné zelené v procesní vrstvě (bod 4)", (
     expect(processStatusText(seen, d0)).toMatch(/děrovaný/);
     expect(processCodes(seen, d0).map((c) => c.code)).not.toContain("motion.process-between");
   });
+
+  it("11b. úsek nad strop mezipoloh (tenký nástroj, dlouhý krok): nikdy „nezasáhl“ / „plný“ – ⚠ process-between „víc než 64 mezipoloh“", async () => {
+    // kolo 6 oprava (oponent): plán vrátil `capped`, planSub ho nečetl – přidal 64 poloh, nástroj obrobkem dál „proskočil“ a
+    // vrstva psala „bez záběru – nástroj obrobek nezasáhl“, „plný“ a ⚠ process-miss vedle ℹ clash.work mezi kroky
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })) } as unknown as MotionResult;
+    const calls: ProcReq[] = [];
+    const k3 = async (q: ProcReq): Promise<ProcRes> => {
+      calls.push(q);
+      const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as [number, number, number], thickness: null, volume0: 100, ms: 0 };
+      if (q.plan) return { ...base, steps: [], gaps: [{ i: 1, n: 64, capped: true }] };
+      return { ...base, steps: q.rels.map(() => ({ contact: false, depth: 0, through: false, state: 0 })) }; // ani 64 poloh nástroj nezachytí
+    };
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl" }] } } as unknown as CadDoc;
+    const out = await processRun(d0, jump, { process: k3 }, { poseAt: (_k, t) => ({ place: { pl: { position: [0, 0, 0], rotation: [0, 0, 0] }, r: { position: [0, 0, 20 - 20 * t], rotation: [0, 0, 0] } } }) });
+    const txt = [...processLines(out, d0), processStatusText(out, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(out, d0)).not.toMatch(/plný/);
+    expect(txt).toMatch(/záběr jen mezi kroky – výsledek procesu nezjištěn \(úsek před krokem 1 by potřeboval víc než 64 mezipoloh\)/);
+    const codes = processCodes(out, d0);
+    expect(codes.map((c) => c.code)).not.toContain("motion.process-miss");
+    expect(codes.find((c) => c.code === "motion.process-between")?.text).toMatch(/víc než 64 mezipoloh/);
+    expect(processOf(out)!.ops[0]).toMatchObject({ unresolved: 1, unresolvedWhy: "cap" });
+    // poloviční vzorek úseku se nepočítá (výsledek by byl jen zdánlivý): požadavek výpočtu jen s polohami kroků
+    expect(calls.filter((q) => !q.plan).every((q) => q.rels.length === 3)).toBe(true);
+  });
+
+  it("11c. spojitá kontrola kolizí našla nástroj × obrobek mezi kroky, procesní vrstva nic: nezjištěn, ne „nezasáhl“", async () => {
+    // pojistka: plán úsek nevybral (žádné mezery), jádro v polohách kroků záběr nenašlo, kontrola kolizí mezi kroky 0 a 1 ano
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })), between: [{ k0: 0, k1: 1, clashes: [det("pl", "r", "real", { volume: 9.817 })] }] } as unknown as MotionResult;
+    const k4 = async (q: ProcReq): Promise<ProcRes> => ({ states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1], thickness: null, volume0: 100, ms: 0, steps: q.plan ? [] : q.rels.map(() => ({ contact: false, depth: 0, through: false, state: 0 })) });
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl" }] } } as unknown as CadDoc;
+    const out = await processRun(d0, jump, { process: k4 });
+    const txt = [...processLines(out, d0), processStatusText(out, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(out, d0)).not.toMatch(/plný/);
+    expect(txt).toMatch(/kontrola kolizí našla průnik před krokem 1, procesní vrstva v polohách ne/);
+    const codes = processCodes(out, d0).map((c) => c.code);
+    expect(codes).not.toContain("motion.process-miss");
+    expect(codes).toContain("motion.process-between");
+    expect(processOf(out)!.ops[0]).toMatchObject({ unresolved: 1, unresolvedWhy: "clash" });
+    // stejná kolize mezi kroky, ale jiná dvojice (ne nástroj × obrobek operace): pojistka se nezapne, ⚠ process-miss zůstává
+    const other = { ...jump, between: [{ k0: 0, k1: 1, clashes: [det("d", "r", "real")] }] } as unknown as MotionResult;
+    const o2 = await processRun(d0, other, { process: k4 });
+    expect(processCodes(o2, d0).map((c) => c.code)).toContain("motion.process-miss");
+  });
 });
 
 describe("vlna 22 C2 kolo 6: spojitá vůle se skutečným jádrem není větší než jemné vzorkování téže dráhy (bod 6)", async () => {
