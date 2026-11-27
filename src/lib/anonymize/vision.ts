@@ -6,9 +6,10 @@ import {
 } from "./detect-ai";
 import { burnPolygons, cloneRaster, cropRaster, cropToJpeg, ringMedianColor, straighten, whitenOutside } from "./image";
 import { quadBox, substringQuad } from "./lines";
-import { areaCapWarning, mergeRegions, padRegion, protectKeep, type RawKeep, type RawRegion } from "./regions";
+import { areaCapWarning, mergeRegions, padRegion, protectKeep, shieldText, type RawKeep, type RawRegion } from "./regions";
 import { containsTerm, filterToggles, isTechnicalText, rulePage, type RuleContext } from "./rules";
-import { normalizeText } from "./text";
+import { looseRange, normalizeText } from "./text";
+import { expandCompanyRange } from "./company-names";
 import { checkTranscript, type VerifyTile } from "./verify";
 import { burnGraphic, burnRectKeepLines, type Raster } from "./pdf-raster";
 import type { AnonCategory, AnonWarning, Box, KeepField, Quad, TextItem, TextLine, Zone } from "./types";
@@ -323,11 +324,19 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
       // „custom" jen s termínem zakázky — jinak běžná kategorie s technickou výjimkou
       let category = (isCategory(ln.category) ? ln.category : "other") as AnonCategory;
       if (category === "custom" && !containsTerm(text, input.ctx.terms)) category = "other";
-      if (redact && category !== "custom" && isTechnicalText(text)) redact = false;
+      // jen samotný název (redactText), ne celý řádek — „Kalit 58 HRC · BOSCH" smaže jen BOSCH (28. 11.)
+      const sub = String(ln.redactText ?? "").trim();
+      const found = redact && sub ? looseRange(text, sub) : null;
+      // celý název firmy s právní formou, ne jeho kus (28. 11.)
+      const range = found && category === "company" ? expandCompanyRange(text, found, input.ctx.terms.filter((t) => !t.word).map((t) => t.raw)) : found;
+      const part = range && range[1] - range[0] < text.length ? range : null;
+      const redText = part ? text.slice(part[0], part[1]) : text;
+      if (redact && category !== "custom" && isTechnicalText(redText)) redact = false;
       if (redact && tl.zone === "body" && category === "other") aiBodyText = true;
-      pass2Texts.push({ id, text, redacted: redact });
+      pass2Texts.push({ id, text, redacted: redact && !part });
       if (redact) {
-        aiRegions.push({ page: input.page, box: quadBox(wq), quad: wq, category, source: cache ? "cache" : "ai", zone: tl.zone, textHeight: it.fontSize * 1.3, text });
+        const q = part ? substringQuad(it, part[0], part[1], 1) : wq;
+        aiRegions.push({ page: input.page, box: quadBox(q), quad: q, category, source: cache ? "cache" : "ai", zone: tl.zone, textHeight: it.fontSize * 1.3, text: redText });
       }
     });
     for (const g of asArray<LinesResult["tiles"][number]["graphics"][number]>(tile.graphics)) {
@@ -351,16 +360,20 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
   for (const h of pr.hits) {
     const it = items.get(h.lineId);
     if (!it) continue;
-    const q = h.wholeItem ? (it.quad as Quad) : substringQuad(it, h.start, h.end, 1);
-    ruleRegions.push({ page: input.page, box: quadBox(q), quad: q, category: h.category, source: "rule", zone: textLines.find((l) => l.id === h.lineId)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: it.str.slice(h.start, h.end) });
+    const [hs, he] = h.category === "company" && !h.wholeItem ? expandCompanyRange(it.str, [h.start, h.end], input.ctx.terms.filter((t) => !t.word).map((t) => t.raw)) : [h.start, h.end];
+    const q = h.wholeItem ? (it.quad as Quad) : substringQuad(it, hs, he, 1);
+    ruleRegions.push({ page: input.page, box: quadBox(q), quad: q, category: h.category, source: "rule", zone: textLines.find((l) => l.id === h.lineId)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: it.str.slice(hs, he) });
     const p2 = pass2Texts.find((t) => t.id === h.lineId);
     if (p2) p2.redacted = true;
   }
 
   let regions = [...ruleRegions, ...aiRegions].map((r) => padRegion(r, "photo", W, H));
   const prot = protectKeep(regions, keep, "photo");
-  regions = mergeRegions(prot.regions, keep);
-  warnings.push(...prot.warnings);
+  // štít: logo / grafika nesmí zakrýt žádný řádek, který zůstává (materiál, kalení, povrch…) — 28. 11.
+  const shield = shieldText(prot.regions, pass2Texts.filter((t) => !t.redacted && /[\p{L}\p{N}]{2,}/u.test(t.text))
+    .map((t) => ({ page: input.page, box: textLines.find((l) => l.id === t.id)?.box ?? { x: 0, y: 0, w: 0, h: 0 } })));
+  regions = mergeRegions(shield.regions, keep);
+  warnings.push(...prot.warnings, ...shield.warnings);
   const cap = areaCapWarning(regions, W, H, tbW, input.page);
   if (cap) warnings.push(cap);
 
@@ -435,8 +448,12 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
           if (tok && (n.includes(tok) || tok.includes(n))) {
             const it = items.get(p.id);
             if (!it?.quad) continue;
-            p.redacted = true;
-            extra.push(padRegion({ page: input.page, box: quadBox(it.quad), quad: it.quad, category: "other", source: "ai", zone: textLines.find((l) => l.id === p.id)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: p.text }, "photo", W, H));
+            // jen nalezený název, ne celý řádek (28. 11.)
+            const r = n.includes(tok) ? looseRange(p.text, tok) : null;
+            const part = r && r[1] - r[0] < p.text.length ? r : null;
+            if (!part) p.redacted = true;
+            const q = part ? substringQuad(it, part[0], part[1], 1) : (it.quad as Quad);
+            extra.push(padRegion({ page: input.page, box: quadBox(q), quad: q, category: "other", source: "ai", zone: textLines.find((l) => l.id === p.id)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: part ? p.text.slice(part[0], part[1]) : p.text }, "photo", W, H));
           }
         }
       }

@@ -11,6 +11,7 @@ import { docSig } from "./doc-sig";
 import { carryOutputs } from "../history-outputs";
 import { docStatusText, parseAgentText, type AgentOp } from "../agent";
 import { stripLineComment } from "../agent-comment";
+import { setNotesSiblings } from "../drawing-notes-rules";
 import { getLang, tr } from "../i18n";
 import { CadCancelled, isCancelled } from "../kernel-client";
 import type { CadDoc, Feature } from "../types";
@@ -92,6 +93,8 @@ export async function runScript(ws: Workspace, text: string, host: EngineHost, o
  */
 export async function runInto(ws: Workspace, text: string, host: EngineHost, rb: ReportBuilder, o: EngineRunOptions = {}): Promise<string> {
   ws.beginRun?.();
+  // vlna 23, kolo 5 (bypass-F5): pravidla textu výkresu vidí ostatní dokumenty běhu („druhý výkres téhož dílu“ MN-1-B)
+  setNotesSiblings(() => ws.listDocs().map((x) => x.doc));
   const hooks = o.hooks ?? {};
   const now = host.now ?? (() => Date.now());
   const log = new ConsoleLog(rb);

@@ -67,6 +67,19 @@ export function mapRangeBack(norm: NormText, original: string, start: number, en
   return [s, Math.max(s, e)];
 }
 
+/**
+ * Kde v textu leží `needle` (bez ohledu na velikost písmen, diakritiku a mezery) — rozsah v ORIGINÁLU [start, end),
+ * nebo null. Slouží k tomu, aby se smazal jen název firmy, ne celý řádek (majitel 28. 11.).
+ */
+export function looseRange(text: string, needle: string): [number, number] | null {
+  const nt = normalizeWithMap(text);
+  const nn = normalizeText(needle);
+  if (!nn) return null;
+  const at = nt.text.indexOf(nn);
+  if (at < 0) return null;
+  return mapRangeBack(nt, text, at, at + nn.length);
+}
+
 export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

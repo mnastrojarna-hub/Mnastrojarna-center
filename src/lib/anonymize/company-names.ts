@@ -9,7 +9,7 @@
  */
 
 import { firstLegalFormEnd, isTechnicalText, makeTerms, makeWordTerms, ruleLine, rulePage, stripLegalForm, stripOwnerPrefix, trailingLegalForm, type RuleContext, type Term } from "./rules";
-import { mapRangeBack, normalizeText, normalizeWithMap } from "./text";
+import { looseRange, mapRangeBack, normalizeText, normalizeWithMap } from "./text";
 import type { TextLine, Zone } from "./types";
 
 /** Pravidla, jejichž zásah je jméno firmy (ne hodnota pole „Projekt:", ne osoba). */
@@ -175,4 +175,25 @@ export function crossTextTermHits(texts: readonly string[], terms: readonly Term
     }
   }
   return out;
+}
+
+/**
+ * Celý název firmy, ne jeho kus (majitel 28. 11.: „někdy nezakryla celý název firmy"): rozsah [start, end) v řádku
+ * se rozšíří na celý známý název, který ho obsahuje („Brisk" → „Brisk Tábor"), a o právní formu hned za ním
+ * („a.s.", „s.r.o.", „GmbH"…). Jen rozšíření — nikdy nezmenší.
+ */
+export function expandCompanyRange(text: string, range: [number, number], names: readonly string[]): [number, number] {
+  let [s, e] = range;
+  for (const n of names) {
+    for (const cand of [n, stripLegalForm(n)]) {
+      const r = cand && cand.length >= 2 ? looseRange(text, cand) : null;
+      if (r && r[0] <= e && r[1] >= s) {
+        s = Math.min(s, r[0]);
+        e = Math.max(e, r[1]);
+      }
+    }
+  }
+  const tail = trailingLegalForm(text.slice(e));
+  if (tail > 0) e = Math.min(text.length, e + tail);
+  return [s, e];
 }

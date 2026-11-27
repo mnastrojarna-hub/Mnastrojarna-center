@@ -144,7 +144,7 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
     await runQueue([f.id as string]);
     const r = await row(f.id as string);
     expect(r.anon_status, String(r.anon_reason)).toBe("done");
-    expect((r.anon_summary as { detector?: string }).detector).toBe("anon-v2.0");
+    expect((r.anon_summary as { detector?: string }).detector).toBe("anon-v2.1");
     const d = share.pickShareFile(r as never);
     expect(d.ok && d.source).toBe("anon");
     const out = await download(String(r.anon_path));
@@ -248,6 +248,8 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
     await runQueue([newF.id as string]);
     const nr = await row(newF.id as string);
     expect(nr.anon_status, `${nr.anon_reason} ${nr.anon_attempts}`).toBe("done");
+    // kopie z doby migrace (detektor anon-v2.0) — migrace 20261103110000 ji nechá; novější detektor je anon-v2.1 (28. 11.)
+    await svc.from("job_files").update({ anon_summary: { ...((nr.anon_summary ?? {}) as Record<string, unknown>), detector: "anon-v2.0" } }).eq("id", newF.id as string);
     // „stará" kopie (detektor anon-v1.0): zdroj jako kopie — v razítku firma
     const oldPath = `zakazky/${jobId}/anon/${randomUUID()}-stara.pdf`;
     await svc.storage.from("job-files").upload(oldPath, fx.bytes, { contentType: "application/pdf" });
@@ -277,7 +279,7 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
     const r = await row(oldF.id as string);
     expect(r.anon_status, JSON.stringify(run.results) + String(r.anon_reason)).toBe("done");
     expect(r.anon_path).not.toBe(oldPath);
-    expect((r.anon_summary as { detector?: string }).detector).toBe("anon-v2.0");
+    expect((r.anon_summary as { detector?: string }).detector).toBe("anon-v2.1");
     const { gone } = await inks(await download(String(r.anon_path)), fx);
     for (const g of gone) expect(g.ink, g.label).toBeLessThan(0.003);
   });

@@ -150,7 +150,7 @@ describe("pravidla: firma z výkresu (ne z CRM)", () => {
     expect(isCompanyLeak({ role: "designer", text: "", form: "curves" }, KEEP, false)).toBe(true);
   });
   it("nová verze detektoru → staré kopie se přepočítají (config hash)", () => {
-    expect(DETECTOR_VERSION).toBe("anon-v2.0");
+    expect(DETECTOR_VERSION).toBe("anon-v2.1");
   });
 });
 

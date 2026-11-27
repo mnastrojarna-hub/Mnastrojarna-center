@@ -35,7 +35,7 @@ import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 import { pmiMarksOf, zoneLegendLines } from "./pmi-marks";
-import { auditDoc, auditItems, classifyNote, lostTokens, noteBody, TITLE_DATA_CMD, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
+import { auditDoc, auditItems, classifyNote, lostTokens, noteBody, withoutGenerated, TITLE_DATA_CMD, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
 import { formNotesOfDoc } from "./drawing-doc";
 import { draftNotesAudit } from "./draft/agent-notes";
 import type { DraftModel } from "./draft/model";
@@ -200,7 +200,9 @@ export const materialLabel = (doc: CadDoc) => (doc.kind === "assembly" ? tr("dle
  * kusovník (podle volby listu) a pozice komponent z `extras`.
  */
 export function sheetMeta(doc: CadDoc, s: DrawingDoc, idx = 0, extras?: DrawingExtras): DrawingMeta {
-  const m = s.meta as Partial<DrawingMeta>;
+  // kolo 5 (bypass-F2): údaje generátoru (poznámky k plechu, popisy ploch, kusovník, svary …) z uložených údajů listu se neberou –
+  // spočítá je jádro / tato funkce z modelu; jinak by je JSON dokument agenta podvrhl mimo kontrolu textu
+  const m = withoutGenerated(s.meta as Record<string, unknown>) as Partial<DrawingMeta>;
   const o = s.options as Partial<DrawingOptions>;
   return {
     ...m,
