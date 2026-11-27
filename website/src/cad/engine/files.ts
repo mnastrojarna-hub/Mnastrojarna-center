@@ -21,6 +21,7 @@ import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
 import { staleCopies, staleCopyText, staleHints } from "../asm-refresh";
 import type { PdfFonts } from "../pdf";
+import { CodedError } from "./codes";
 import { sketchToDxf } from "../sketch";
 import type { AsmComponent, CadDoc, ExportFormat, Feature } from "../types";
 import type { AsmEnvOptions } from "./asm-env";
@@ -486,7 +487,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.notes-limit" | "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet" | "drawing.leaders-limit" | "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
@@ -579,6 +580,16 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   }
   // dokument bez výkresu: výchozí list – jako `výkres export` (⚠ drawing.default-sheet, přísný režim ho zastaví)
   if (!hasDrawings(d)) note({ code: "drawing.default-sheet" });
+  // výstup výkresu z textové cesty (CLI --formats, HTTP): list s porušením pravidel textu agenta se nezapíše (vlna 23)
+  if (d.drawings?.length) {
+    try {
+      (await import("../drawing-agent")).exportGuard(d, d.drawings.map((_, i) => i));
+    } catch (e) {
+      if (!(e instanceof CodedError)) throw e;
+      note({ code: e.code as OutNote["code"], args: e.args, level: "error" });
+      return [];
+    }
+  }
   const sheets = await documentSheets(env, d);
   // kód podle textu jádra (sheet-eval.ts): rovina řezu mimo těleso = ✗ drawing.section-miss (B5), jinak ⚠ drawing.warning;
   // list jako vyhodnocení listu během běhu (engine/drawing-track.ts) – job.ts tutéž hlášku podruhé nepřidá

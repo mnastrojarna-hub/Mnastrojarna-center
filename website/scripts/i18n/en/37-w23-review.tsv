@@ -51,3 +51,7 @@ tolerance popisu	callout tolerance
 úpravy se stejným předpisem slučte do jedné vysvětlivky (stejný text = jeden řádek „Z1, Z2 …“), úpravu celého dílu dejte do razítka (výkres razítko tepelné=… tvrdost=…)	merge treatments with the same specification into one legend line (same text = one line “Z1, Z2 …”), put a treatment of the whole part into the title block (drawing titleblock heat=… hardness=…)
 výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, razítko) · ruční text: {1} rad ℹ (pravidla pro agenty, člověka neomezují)	drawing: sheet “{0}” evaluated without findings (views, sections, Smart dimensions, title block) · manual text: {1} hints ℹ (rules for agents, they do not restrict a person)
 základna tolerance	tolerance datum
+listu	of the sheet
+výkresu	of the drawing
+název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	name {0} “{1}” contains title block data ({2}) – it belongs in the title block: {3}
+název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)	name {0} “{1}”: {2} – keep a sheet / drawing name short (e.g. “Detail”, “Sections”)

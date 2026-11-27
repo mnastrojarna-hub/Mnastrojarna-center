@@ -357,6 +357,13 @@ export function stampOrigin(prev: DrawingDoc | undefined, next: DrawingDoc, by: 
     else map[k] = by;
     mChanged = true;
   }
+  // název listu a výkresu se tiskne v razítku / záložce – původ jako u buňky razítka
+  for (const [k, v, pv] of [["sheetName", next.name, prev?.name], ["drawingName", next.drawing, prev?.drawing]] as const) {
+    if ((v ?? "").trim() && (v ?? "").trim() !== (pv ?? "").trim() && map[k] !== by && !(k === "sheetName" && !prev && by === "agent" && /^(?:List|Sheet|Blatt) \d+$/.test(v ?? ""))) {
+      map[k] = by;
+      mChanged = true;
+    }
+  }
   const revs = nm.revisions as Rev[] | undefined;
   if (Array.isArray(revs)) {
     const prevRevs = (pm.revisions as Rev[] | undefined) ?? [];
@@ -389,6 +396,8 @@ export function stampAgentNotes<T extends Pick<CadDoc, "drawings"> & Partial<Pic
       const m = { ...(s.meta ?? {}) } as Record<string, unknown>;
       const map: Record<string, By> = {};
       for (const k of TEXT_FIELDS) if (str(m[k]).trim()) k === "note" ? (m.noteBy = "agent") : (map[k] = "agent");
+      if (s.name?.trim()) map.sheetName = "agent";
+      if (s.drawing?.trim()) map.drawingName = "agent";
       if (Object.keys(map).length) m.by = map;
       else delete m.by;
       if (!str(m.note).trim()) delete m.noteBy;
@@ -679,6 +688,15 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
         if (bad.length) push({ code: "drawing.note-title-data", by, sheet: si, key: `meta:${k}`, item: v, text: tr("buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}", k, cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) });
       }
     }
+    // název listu a výkresu (razítko „List …“, záložka) – krátce, bez vět a bez údajů razítka
+    for (const [k, v] of [["sheetName", s.name], ["drawingName", s.drawing ?? ""]] as const) {
+      const t = (v ?? "").trim();
+      if (!t) continue;
+      const by = metaBy(m, k);
+      const why = noteStyle(t, TITLE_FREE_MAX, 6);
+      const bad = why ? [] : titleDataIn(t);
+      if (why || bad.length) push({ code: why ? "drawing.note-style" : "drawing.note-title-data", by, sheet: si, key: `meta:${k}`, item: t, text: why ? tr("název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)", k === "sheetName" ? tr("listu") : tr("výkresu"), cut(t), why) : tr("název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}", k === "sheetName" ? tr("listu") : tr("výkresu"), cut(t), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) });
+    }
     for (const r of (m.revisions as Rev[] | undefined) ?? []) {
       const v = (r.note ?? "").trim();
       // popis revize, který napsal CAD sám při vydání listu (cad/doc-outputs.ts `issueSheet`), je údaj generátoru
@@ -714,6 +732,8 @@ export function auditItems(doc: AuditInput, gen: GenText = {}): Map<string, stri
     for (const a of s.annotations) out.set(`${si}|ann:${a.id}`, annSig(a));
     const m = s.meta as Record<string, unknown>;
     for (const k of TEXT_FIELDS) if (str(m[k]).trim()) out.set(`${si}|meta:${k}`, str(m[k]).trim());
+    out.set(`${si}|meta:sheetName`, s.name ?? "");
+    out.set(`${si}|meta:drawingName`, s.drawing ?? "");
     for (const r of (m.revisions as Rev[] | undefined) ?? []) out.set(`${si}|rev:${r.rev}`, r.note ?? "");
   });
   for (const m of pmiMarks(doc)) out.set(`-1|pmi:${m.id}`, m.text ?? "");

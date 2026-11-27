@@ -98,6 +98,7 @@ describe("B – ostatní kanály textu (body 3, 17, 20)", () => {
     ['výkres razítko tepelné="Tepelně zpracovat kalit a popustit na tvrdost 58 až 60 HRC podle předpisu výrobce oceli"', "drawing.note-style"],
     ['výkres hrany "Všechny ostré hrany srazit a zbavit otřepů, pokud není uvedeno jinak"', "drawing.note-style"],
     ["výkres značka drsnost Ra 3,2 kalit na 58 HRC a černit na Ø9", "drawing.note-style"],
+    ['výkres list přejmenovat 1 "Při nejasnosti kontaktujte konstruktéra, díl kalit na 58 HRC a černit"', "drawing.note-style"],
   ])("%s → ✗ %s, text se nezapíše", async (line, code) => {
     const ws = new MemoryWorkspace();
     const r = await run(ws, [...BASE, line, "výkres export svg"]);

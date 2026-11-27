@@ -51,3 +51,7 @@ tolerance popisu	Toleranz der Beschriftung
 úpravy se stejným předpisem slučte do jedné vysvětlivky (stejný text = jeden řádek „Z1, Z2 …“), úpravu celého dílu dejte do razítka (výkres razítko tepelné=… tvrdost=…)	Behandlungen mit gleicher Vorgabe in eine Legende zusammenfassen (gleicher Text = eine Zeile „Z1, Z2 …“), Behandlung des ganzen Teils ins Schriftfeld (zeichnung schriftfeld wärmebehandlung=… härte=…)
 výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, razítko) · ruční text: {1} rad ℹ (pravidla pro agenty, člověka neomezují)	Zeichnung: Blatt „{0}“ ohne Befunde ausgewertet (Ansichten, Schnitte, Smarte Maße, Schriftfeld) · manueller Text: {1} Hinweise ℹ (Regeln für Agenten, sie schränken Menschen nicht ein)
 základna tolerance	Toleranzbezug
+listu	des Blatts
+výkresu	der Zeichnung
+název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	Name {0} „{1}“ enthält eine Schriftfeldangabe ({2}) – gehört ins Schriftfeld: {3}
+název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)	Name {0} „{1}“: {2} – Blatt- / Zeichnungsname kurz (z. B. „Einzelheit“, „Schnitte“)
