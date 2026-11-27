@@ -1,0 +1,6 @@
+# Vlna 22, kolo 7, balík C (body 4, 5, 6): začátek operace mezi kroky, strop mezipoloh po operacích, vůle a kolize
+ „{0}“: {1} operací, odebráno nejméně {2} mm³ – výsledek některé operace nezjištěn (sjednocení spočítaných operací; jejich součet {3} mm³)	 “{0}”: {1} operations, at least {2} mm³ removed – the result of some operation is undetermined (union of the computed operations; their sum {3} mm³)
+šroub v závitu: {0} dvojic v kroku {1}	screw in thread: {0} pairs at step {1}
+{0} dvojic dílů v kroku {1}	{0} part pairs at step {1}
+pracovní kontakt „{0}“ × „{1}“ v kroku {2} (pravidlo {3}), největší průnik {4} mm³	working contact “{0}” × “{1}” in step {2} (rule {3}), largest overlap {4} mm³
+Vybrat a přiblížit na místo průniku	Select and zoom to the overlap location

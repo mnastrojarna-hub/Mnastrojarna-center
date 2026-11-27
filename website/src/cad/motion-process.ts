@@ -220,13 +220,15 @@ export function productStates(proc: ProcessResult | null, k: number): ProductSta
     const unknown = !done && !eng && ops.some((o) => o.unresolved !== undefined && k >= o.unresolved);
     const phase: ProductState["phase"] = done ?? (eng ? "engaged" : unknown ? "unknown" : "full");
     const flag = done && eng ? { engaged: true as const } : {};
+    // kolo 7: jiná operace obrobku má výsledek nezjištěn (strop mezipoloh, poloha nešla spočítat) – odebraný objem je jen dolní mez
+    const lower = phase !== "unknown" && ops.some((o) => o.unresolved !== undefined && k >= o.unresolved) ? { exact: false as const } : {};
     const comb = ops.length > 1 ? combinedFor(ops) : null;
     if (ops.length === 1) {
       const o = ops[0];
-      out.push({ target, phase, scrap: ph[0] === "cut" ? Math.max(1, stOf(o)?.scrap.length ?? 0) : 0, removed: stOf(o)?.removed ?? 0, depth, ops: 1 });
+      out.push({ target, phase, scrap: ph[0] === "cut" ? Math.max(1, stOf(o)?.scrap.length ?? 0) : 0, removed: stOf(o)?.removed ?? 0, depth, ops: 1, ...lower });
     } else if (comb) {
       const st = comb.states[comb.steps[k] ?? 0] ?? comb.states[0];
-      out.push({ target, phase, scrap: cut ? Math.max(1, st.scrap.length) : 0, removed: st.removed, depth, ops: ops.length, ...(comb.error ? { exact: false as const } : {}), ...flag });
+      out.push({ target, phase, scrap: cut ? Math.max(1, st.scrap.length) : 0, removed: st.removed, depth, ops: ops.length, ...(comb.error ? { exact: false as const } : lower), ...flag });
     } else {
       // bez kombinace z jádra: jen dolní mez (největší operace), odpad nejméně 1 – nikdy součet
       out.push({ target, phase, scrap: cut ? 1 : 0, removed: Math.max(0, ...ops.map((o) => stOf(o)?.removed ?? 0)), depth, ops: ops.length, exact: false, ...flag });
@@ -373,18 +375,38 @@ export type ProcessPoseAt = (k: number, t: number) => { place: Record<string, Pl
  * Mezipolohy procesní vrstvy (kolo 6): plán z jádra (`ProcReq.plan` – úseky, kde by nástroj obrobkem mezi polohami „proskočil“)
  * pro každou operaci, mezipolohy z řešiče studie. `unresolved` = operace → první krok s úsekem, který potřeboval mezipolohy a
  * řešič je nedal (dynamika, řešič bez řešení) – výsledek procesu tam nezjištěn.
+ *
+ * Kolo 7: (a) začátek operace MEZI kroky (podmínka `při motor 1 <= 5` splněná uprostřed kroku) – první činný úsek začíná polohou
+ * v okamžiku začátku (kotva z řešiče), plán i mezipolohy jsou z úseku kotva → krok (dřív plán úsek přeskočil, protože poloha
+ * předchozího kroku je před začátkem neaktivní, a vrstva tvrdila „nezasáhl“, „plný“ – razník přitom plech prorazil); bez kotvy
+ * (dynamika, řešič bez řešení) a s dráhou nástroje přes obrobek je výsledek bez záběru „nezjištěn“, nikdy „nezasáhl“.
+ * (b) strop mezipoloh platí pro operaci, ne pro úsek: jiná operace v témže úseku dostane své mezipolohy i výsledek.
  */
-type Unresolved = { k: number; why: NonNullable<ProcOpResult["unresolvedWhy"]> };
+type Unresolved = { k: number; why: NonNullable<ProcOpResult["unresolvedWhy"]>; ifMiss?: true };
+type Seg = { j: number; ta: number; tb: number; n: number };
 async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[], starts: Map<string, ProcAt | null>, env: Required<ProcessEnv>, poseAt: ProcessPoseAt | undefined): Promise<{ sub: SubPose[]; unresolved: Map<string, Unresolved> }> {
-  const need = new Map<number, number>(); // index kroku (do res.steps) → počet mezipoloh
-  const byOp = new Map<string, number[]>();
-  // úseky, kde by i strop mezipoloh nestačil: výsledek tam nezjištěn (dřív se přidalo 64 poloh, nástroj obrobkem dál „proskočil“
-  // a vrstva tvrdila „nezasáhl, obrobek beze změny“ vedle pracovního kontaktu mezi kroky) – polohy se pro úsek nepočítají
-  const capped = new Set<number>();
+  const S = res.steps;
+  const jOf = new Map(S.map((s, j) => [s.i, j] as const));
+  const sub: SubPose[] = [];
+  const unresolved = new Map<string, Unresolved>();
+  const segs = new Map<string, Seg>(); // úsek (index kroku + začátek) → nejvíc potřebných mezipoloh
+  const opSegs = new Map<string, { key: string; j: number; capped: boolean }[]>();
   for (const op of ops) {
+    const start = starts.get(op.id) ?? null;
+    // začátek uprostřed úseku j−1 → j: kotva = poloha v okamžiku začátku
+    const js = start ? (jOf.get(start.step) ?? -1) : -1;
+    const mid = !!start && js > 0 && start.t > S[js - 1].t + 1e-9 && start.t < S[js].t - 1e-9;
+    let anchor: SubPose[] = [];
+    let planStart = start;
+    if (mid) {
+      const m = poseAt?.(S[js].i, start!.t);
+      if (m) anchor = [{ k: S[js].i, t: start!.t, place: m.place }];
+      // bez kotvy: plán z polohy předchozího kroku (nadmnožina dráhy) – zda nástroj v úseku obrobek vůbec může zasáhnout
+      else planStart = { step: S[js - 1].i, t: S[js - 1].t };
+    }
     let req: ProcReq;
     try {
-      req = processRequest(doc, res, op, starts.get(op.id) ?? null, undefined, []);
+      req = processRequest(doc, res, op, planStart, undefined, anchor);
     } catch {
       continue; // chybu požadavku ohlásí výpočet operace
     }
@@ -394,39 +416,57 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
     } catch {
       continue;
     }
+    const pos = procPositions(res, anchor);
+    // kotva jen tam, kde dráha nástroje v úseku začátku zasahuje obrobek (jinak poloha v okamžiku začátku na výsledku nic nemění)
+    const nearStart = (plan.near ?? []).some((i) => jOf.get(pos[i]?.k ?? -1) === js);
+    if (anchor.length && nearStart) sub.push(...anchor);
+    const list: { key: string; j: number; capped: boolean }[] = [];
     for (const g of plan.gaps ?? []) {
-      need.set(g.i, Math.max(need.get(g.i) ?? 0, g.n));
-      if (g.capped) capped.add(g.i);
-      byOp.set(op.id, [...(byOp.get(op.id) ?? []), g.i]);
+      const p0 = pos[g.i - 1];
+      const p1 = pos[g.i];
+      const j = p1 ? jOf.get(p1.k) : undefined;
+      if (!p0 || !p1 || j === undefined || j < 1) continue;
+      if (mid && !anchor.length && j === js) {
+        // úsek začátku bez kotvy: mezipolohy z celého úseku by počítaly i dobu před začátkem – nezjištěn
+        list.push({ key: "", j, capped: false });
+        continue;
+      }
+      const key = `${j}|${p0.t}`;
+      if (!g.capped) segs.set(key, { j, ta: p0.t, tb: p1.t, n: Math.max(segs.get(key)?.n ?? 0, g.n) });
+      list.push({ key, j, capped: !!g.capped });
     }
+    opSegs.set(op.id, list);
+    // bez kotvy a bez potřeby mezipoloh: dráha úseku začátku přes obrobek – bez záběru v polohách výsledek nezjištěn (ne „nezasáhl“)
+    if (mid && !anchor.length && !list.some((x) => x.j === js) && nearStart) unresolved.set(op.id, { k: S[js].i, why: "pose", ifMiss: true });
   }
-  const sub: SubPose[] = [];
-  const failed = new Set<number>();
-  for (const [j, n] of [...need.entries()].sort((a, b) => a[0] - b[0])) {
-    if (capped.has(j)) continue;
-    const s0 = res.steps[j - 1];
-    const s1 = res.steps[j];
-    if (!s0 || !s1) continue;
+  const failed = new Set<string>([""]);
+  for (const [key, g] of [...segs.entries()].sort((a, b) => a[1].j - b[1].j || a[1].ta - b[1].ta)) {
     const got: SubPose[] = [];
-    for (let q = 1; q <= n && poseAt; q++) {
-      const t = s0.t + ((s1.t - s0.t) * q) / (n + 1);
-      const m = poseAt(s1.i, t);
+    for (let q = 1; q <= g.n && poseAt; q++) {
+      const t = g.ta + ((g.tb - g.ta) * q) / (g.n + 1);
+      const m = poseAt(S[g.j].i, t);
       if (!m) break;
-      got.push({ k: s1.i, t, place: m.place });
+      got.push({ k: S[g.j].i, t, place: m.place });
     }
-    if (got.length < n) failed.add(j);
+    if (got.length < g.n) failed.add(key);
     else sub.push(...got);
   }
-  const unresolved = new Map<string, Unresolved>();
-  for (const [id, js] of byOp) {
-    const bad = js.filter((j) => failed.has(j) || capped.has(j));
+  for (const [id, list] of opSegs) {
+    const bad = list.filter((x) => x.capped || failed.has(x.key));
     if (!bad.length) continue;
-    const j = Math.min(...bad);
-    unresolved.set(id, { k: res.steps[j].i, why: capped.has(j) ? "cap" : "pose" });
+    const first = bad.reduce((a, b) => (b.j < a.j ? b : a));
+    unresolved.set(id, { k: S[first.j].i, why: first.capped ? "cap" : "pose" });
   }
-  // jen umístění obrobků a nástrojů (výsledek se ukládá s mezipolohami – bez zbytečných komponent)
+  // jen umístění obrobků a nástrojů (výsledek se ukládá s mezipolohami – bez zbytečných komponent); stejný čas jen jednou
   const keep = new Set(ops.flatMap((o) => [o.tool, o.target]));
-  return { sub: sub.map((x) => ({ ...x, place: Object.fromEntries(Object.entries(x.place).filter(([id]) => keep.has(id))) })), unresolved };
+  const seen = new Set<string>();
+  const uniq = sub.filter((x) => {
+    const k = `${x.k}|${Math.round(x.t * 1e9)}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return { sub: uniq.map((x) => ({ ...x, place: Object.fromEntries(Object.entries(x.place).filter(([id]) => keep.has(id))) })), unresolved };
 }
 
 /**
@@ -501,7 +541,8 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
       ...(k.error ? { error: k.error } : {}),
       // víc operací na obrobku: kombinovaný stav z jádra (bez něj jen dolní mez – productStates)
       ...(req.others?.length ? { combined: k.combined ? { steps: idx.map((i) => k.combined!.steps[i] ?? 0), states: k.combined.states.map((x) => ({ removed: x.removed, volume: x.volume, scrap: x.scrap })), ...(k.combined.error ? { error: k.combined.error } : {}) } : { missing: true as const } } : {}),
-      ...(un ? { unresolved: un.k, unresolvedWhy: un.why } : {}),
+      // bez kotvy začátku (kolo 7): nezjištěn jen tehdy, když vrstva v polohách záběr nenašla
+      ...(un && !(un.ifMiss && k.steps.some((s) => s.contact)) ? { unresolved: un.k, unresolvedWhy: un.why } : {}),
       ms: k.ms,
     });
   }
@@ -637,8 +678,13 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
   for (const p of productStates(proc, last)) {
     if (p.ops < 2) continue;
     const sum = proc.ops.filter((o) => o.target === p.target).reduce((s, o) => s + o.removed, 0);
+    // kolo 7: dolní mez kvůli operaci s nezjištěným výsledkem (ne kvůli chybějícímu sjednocení)
+    const unk = proc.ops.some((o) => o.target === p.target && o.unresolved !== undefined && last >= o.unresolved);
+    const comb = combinedFor(proc.ops.filter((o) => o.target === p.target));
     out.push(
-      p.exact === false
+      p.exact === false && unk && comb && !comb.error
+        ? tr(" „{0}“: {1} operací, odebráno nejméně {2} mm³ – výsledek některé operace nezjištěn (sjednocení spočítaných operací; jejich součet {3} mm³)", cname(doc, p.target), p.ops, nf(p.removed, 3), nf(sum, 3))
+        : p.exact === false
         ? tr(" „{0}“: {1} operací, odebráno nejméně {2} mm³ – sjednocení operací nespočítáno (součet {3} mm³ by společný objem počítal dvakrát)", cname(doc, p.target), p.ops, nf(p.removed, 3), nf(sum, 3))
         : tr(" „{0}“: {1} operací, celkem odebráno {2} mm³ (sjednocení – společný objem operací jen jednou; součet operací {3} mm³)", cname(doc, p.target), p.ops, nf(p.removed, 3), nf(sum, 3)),
     );

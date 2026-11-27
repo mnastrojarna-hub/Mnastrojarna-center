@@ -22,7 +22,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −25 mm
  stojí: 1 („Deska A“)
-Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v kroku 5
  kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
 Vazby splněny ve všech krocích
 ⚠ řádek 5: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5

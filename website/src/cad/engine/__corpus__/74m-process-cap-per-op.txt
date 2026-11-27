@@ -1,0 +1,30 @@
+# vlna 22, bod 4 (kolo 7, NIT oponenta kola 6): strop mezipoloh platí pro OPERACI, ne pro úsek. Razník Ø20 × 40 a tenký
+# střižník Ø10 × 0,2 projdou plechem v témže kroku (zdvih 61 mm). Střižník by potřeboval víc než 64 mezipoloh → jen jeho
+# výsledek je „nezjištěn“; razník potřebuje 3 mezipolohy a jeho střih se spočítá (dřív i razník „nezjištěn … víc než 64
+# mezipoloh“, ač pro jeho nástroj to neplatí, a jeho spočitatelný výsledek se ztratil)
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 30 50
+díra 10,2 skrz v 70 50
+nový díl Plech
+kvádr 80 80 0,5
+nový díl Razník
+válec 20 40
+nový díl Střižník
+válec 10 0,2
+#--- run
+nová sestava Lis
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Razník" v 30 50 20
+vložit "Střižník" v 70 50 20
+sestava vazba souosost "Razník" válcová "Deska A" Ø20,2
+sestava vazba vzdálenost "Razník" spodní "Deska A" horní hodnota 10 název "ZDVIH"
+sestava vazba souosost "Střižník" válcová "Deska A" Ø10,2
+sestava vazba vzdálenost "Střižník" spodní "Deska A" horní hodnota 10 název "ZDVIH B"
+pohyb motor lineární vazba "ZDVIH" 10..-51 kroky 1
+pohyb motor lineární vazba "ZDVIH B" 10..-51
+pohyb proces střih "Razník" "Plech"
+pohyb proces střih "Střižník" "Plech"
+pohyb krok 1
+stav

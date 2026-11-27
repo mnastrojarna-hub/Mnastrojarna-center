@@ -312,7 +312,8 @@ export function ruleText(doc: CadDoc, r: ClashRule): string {
   const kind = r.kind === "work" ? tr("pracovní kontakt") : tr("závit bez prvku");
   const w = r.when;
   let when = tr("vždy");
-  if (w?.steps) when = tr("v krocích {0}–{1}", w.steps[0], w.steps[1]);
+  // jeden krok 6. pádem „v kroku 6“ (kolo 7 – dřív „v krocích 6–6“)
+  if (w?.steps) when = w.steps[0] === w.steps[1] ? tr("v kroku {0}", w.steps[0]) : tr("v krocích {0}–{1}", w.steps[0], w.steps[1]);
   else if (w?.mate !== undefined) {
     const m = doc.mates?.find((x) => x.id === w.mate);
     when = tr("při hodnotě vazby „{0}“ {1}–{2}", m?.name ?? w.mate, nf(w.from ?? -Infinity, 3), nf(w.to ?? Infinity, 3));
@@ -453,12 +454,12 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
   const extra = [quiet.work.size ? tr(" · pracovní kontakt {0} dvojic", quiet.work.size) : "", quiet.touch.size ? tr(" · dotyk {0} dvojic", quiet.touch.size) : "", betweenFaults ? tr(" · mezi kroky (zjemněno) {0}×", betweenFaults) : ""].join("");
   const lines = [
     // „kroků s kolizí“ = kroky se SKUTEČNOU (nebo nevyhodnotitelnou) kolizí; šrouby v závitu jsou v textu zvlášť (vlna 22, bod 5)
-    `${tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", faultSteps.size, of, threadPairs.size, range ? tr(" (kroky {0})", range) : "", faults.length ? (first ? tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", faults.length, faultSteps.size, first.step) : tr("{0} dvojic dílů jen mezi kroky (nalezeno zjemněním)", faults.length)) : tr("žádné"))}${extra}`,
+    `${tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", faultSteps.size, of, threadPairs.size, range ? tr(" (kroky {0})", range) : "", faults.length ? (first ? (faultSteps.size === 1 ? tr("{0} dvojic dílů v kroku {1}", faults.length, first.step) : tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", faults.length, faultSteps.size, first.step)) : tr("{0} dvojic dílů jen mezi kroky (nalezeno zjemněním)", faults.length)) : tr("žádné"))}${extra}`,
     ...(sample ? [sample] : []),
     how,
   ];
   const codes: ClashCode[] = [];
-  if (threadPairs.size) codes.push({ code: "clash.thread", text: tr("šroub v závitu: {0} dvojic v krocích {1}", threadPairs.size, range) });
+  if (threadPairs.size) codes.push({ code: "clash.thread", text: threadSteps.length === 1 ? tr("šroub v závitu: {0} dvojic v kroku {1}", threadPairs.size, range) : tr("šroub v závitu: {0} dvojic v krocích {1}", threadPairs.size, range) });
   const pairText = (g: G) => {
     const ps = [...g.pairs.values()];
     if (ps.length === 1) return { a: ps[0].la, b: ps[0].lb };
@@ -484,6 +485,8 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
     const steps = [...g.steps].sort((x, y) => x - y);
     // kontakt jen mezi kroky (zjemnění): „mezi kroky 0 a 1“ – dřív „v krocích mezi kroky“
     if (!steps.length && g.between) codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ mezi kroky {2} a {3} (pravidlo {4}), největší průnik {5} mm³", g.na, g.nb, g.between[0], g.between[1], g.rule ?? "?", n3(g.volume)) });
+    // jeden krok 6. pádem „v kroku 6“ (kolo 7 – dřív „v krocích 6“)
+    else if (steps.length === 1) codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v kroku {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, steps[0], g.rule ?? "?", n3(g.volume)) });
     else codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, span(steps) || tr("mezi kroky"), g.rule ?? "?", n3(g.volume)) });
   }
   if (quiet.touch.size) codes.push({ code: "clash.touch", text: tr("dotyk pod tolerancí {0} mm: {1} dvojic", nf(touchTol(d), 6), quiet.touch.size) });
