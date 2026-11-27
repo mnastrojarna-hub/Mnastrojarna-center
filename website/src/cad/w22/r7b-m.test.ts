@@ -54,9 +54,10 @@ describe("kolo 7b – dynamika za mezí, popis instancí", () => {
     expect(pk.tv).toBeLessThan(t0);
     expect(pk.a).toBeLessThan(1000); // < 1 m/s²: ráz zastavení motoru v t = 1 s (15 m/s²) je za mezí
     expect(res.dynamic.energy.endT).toBeLessThan(t0);
-    // CSV: sloupce dynamiky v neplatných řádcích prázdné; graf: mezera (NaN)
+    // CSV: sloupce dynamiky v neplatných řádcích prázdné; graf: mezera (NaN). Poslední sloupec CSV je „Revize modelu“
+    // (stopa a, kolo 7, bod 12) – sloupce dynamiky jsou tři před ním.
     const rows = studyCsv(res, a.doc).replace(/^﻿/, "").trim().split("\r\n").slice(1);
-    for (const s of bad) expect(rows[s.i].split(";").slice(-3), `CSV krok ${s.i}`).toEqual(["", "", ""]);
+    for (const s of bad) expect(rows[s.i].split(";").slice(-4, -1), `CSV krok ${s.i}`).toEqual(["", "", ""]);
     const pos = dynCharts(res, a.doc).find((c) => c.key === "pos")!;
     expect(pos.series.length).toBeGreaterThan(0);
     for (const s of bad) for (const ser of pos.series) expect(ser.values[s.i], `graf krok ${s.i}`).toBeNaN();

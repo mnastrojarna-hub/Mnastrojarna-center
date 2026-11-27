@@ -3,7 +3,7 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A4 – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ℹ výkres PDF: Deska_A_vykres.pdf · 76 kB · výkres PDF – staženo (bez dialogu) · nálezy níže
   ⚠ Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)
 ✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
@@ -17,7 +17,7 @@ Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 → nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ funkční F2 · tolerance ±0,02 (rovina, normála 1; 0; 0, bod 60; 20; 5) – kontrola kót chce velikost, polohu a toleranci
 ℹ výkres PDF: Deska A funkční.pdf · 76 kB · výkres PDF – staženo (bez dialogu) · nálezy níže
   ⚠ funkční poloha F2 – X 60: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
@@ -35,7 +35,7 @@ Prvky:
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A4 – výsledek po vyhodnocení listu níže
 → nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ výkres PDF: Deska_B_vykres.pdf · 76 kB · výkres PDF – staženo (bez dialogu)
 ✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
 

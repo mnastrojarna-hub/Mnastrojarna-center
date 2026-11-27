@@ -74,7 +74,9 @@ describe("tahák pro agenty ve skutečném jádře", async () => {
         /** jen tyto tři délkové údaje se nahradí – vše ostatní na řádku (mode, exp, view, pw, content, comp, parts, sheets, files, features) se porovnává */
         const linkNorm = (l: string) => (/ link /.test(l) ? l.replace(/ url=\S+/, " url=…").replace(/ bytes=\d+/, " bytes=…").replace(/ chars=\d+/, " chars=…") : l);
         // souhrn nezávislý na jazyce: strojové řádky výpisů bez názvů a bez nápovědy, soubory, počet ✓
-        summary[lang] = [...eq.filter((l) => !/ help /.test(l)).map((l) => linkNorm(l.replace(/"[^"]*"/g, '"…"'))), files.join(","), `ok=${r.entries.filter((e) => e.level === "ok").length}`].join("\n");
+        // `groups=<n>:<osy>:<jméno>` (kolo 7, bod 15) nese jméno vedoucí komponenty – v taháku je jazykové (Čep / Pin / Stift)
+        const groupsNorm = (l: string) => l.replace(/ groups=\S+/, (g) => g.replace(/:[^:,]+(?=,|$)/g, ":…"));
+        summary[lang] = [...eq.filter((l) => !/ help /.test(l)).map((l) => groupsNorm(linkNorm(l.replace(/"[^"]*"/g, '"…"')))), files.join(","), `ok=${r.entries.filter((e) => e.level === "ok").length}`].join("\n");
       } finally {
         setLang(lang0);
       }

@@ -1066,7 +1066,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
     return () => {
       if (softView.current === handle) setSoftView(null);
     };
-  }, [fit, draw, schedule, hintsNow]);
+  }, [fit, draw, schedule, hintsNow, pickIndex]);
 
   const views: { v: SoftViewName; label: string }[] = [
     { v: "iso", label: tr("Izometrie") },

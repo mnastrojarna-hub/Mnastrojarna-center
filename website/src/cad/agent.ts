@@ -86,7 +86,7 @@ function commandWords(): string[] {
       for (const w of (lang === "en" ? c.en : c.de).split(/, | \/ /)) add(w.trim());
       continue;
     }
-    for (const part of c.cmd.split(/ · | \/ |, /)) add(part.trim().match(/^(nov[ýá] (díl|sestava)|smazat poslední|pole kruhové|přepočítat vše|[^\s[<|{(,]+)/)?.[0]);
+    for (const part of c.cmd.split(/ · | \/ |, /)) add(part.trim().match(/^(nov[ýá] (díl|sestava)|smazat poslední|pole kruhové|přepočítat vše|výkresy dílů|[^\s[<|{(,]+)/)?.[0]);
   }
   return out;
 }

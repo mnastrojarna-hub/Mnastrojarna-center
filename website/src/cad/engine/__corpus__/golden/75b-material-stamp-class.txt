@@ -6,7 +6,7 @@
 → výkres: A4 – výsledek po vyhodnocení listu níže
 → razítko: materiál „ČSN 11 523“ – výsledek po vyhodnocení listu níže
 ℹ řádek 8: materiál „ČSN 11 523“ zařazen jako Ocel (7.85 g/cm³)
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál ČSN 11 523 (hustota podle: Ocel) · prvků 1 (1 ✓, 0 ✗)

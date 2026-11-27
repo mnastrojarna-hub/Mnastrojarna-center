@@ -72,7 +72,7 @@ describe("sdílení odkazem – dokument v odkazu", () => {
   it("heslo: bez hesla se neotevře, špatné heslo odmítne, správné otevře", async () => {
     const r = await createShareLink(sample(), { days: 1, base: BASE, password: "tajné-123" });
     expect(r.password).toBe(true);
-    expect(r.url).toContain("#s=1dp.");
+    expect(r.url).toContain("#s=1dpk.");
     const parsed = parseShareHash(hashOf(r.url))!;
     expect(parsed.kind === "link" && parsed.salt).toBeTruthy();
     expect((await openShareLink(parsed)).ok).toBe(false);
