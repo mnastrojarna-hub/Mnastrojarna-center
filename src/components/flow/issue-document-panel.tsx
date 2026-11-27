@@ -234,14 +234,14 @@ export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob
           </ul>
           <p className="text-xs text-muted-foreground">
             DL na zbývající položky vystavíš v kartě zakázky:{" "}
-            <Link href={`/orders/${job.id}?tab=vyroba&akce=delivery.record`} className="font-medium text-foreground underline underline-offset-2">Zapsat dodání a dodací list</Link>.
+            <Link href={`/orders/${job.id}?tab=dodani&akce=delivery.record`} className="font-medium text-foreground underline underline-offset-2">Zapsat dodání a dodací list</Link>.
           </p>
         </div>
       )}
       <ErrorBox error={error} />
       {needsDelivery && job && (
         <p className="text-sm">
-          <Link href={`/orders/${job.id}?tab=vyroba&akce=delivery.record`} className="font-medium underline underline-offset-2">Otevřít kartu zakázky → Zapsat dodání a dodací list</Link>
+          <Link href={`/orders/${job.id}?tab=dodani&akce=delivery.record`} className="font-medium underline underline-offset-2">Otevřít kartu zakázky → Zapsat dodání a dodací list</Link>
         </p>
       )}
       {kind === "faktura" && job && (

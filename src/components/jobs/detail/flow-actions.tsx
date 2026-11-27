@@ -62,6 +62,8 @@ export interface FlowAccess {
 type Next = { key: FlowActionKey; label: string } | null;
 
 interface FlowActionsValue {
+  /** Přepnout záložku karty (např. z Technologie na „Dodání & faktura"). */
+  goTab: (tab: DetailTab) => void;
   facts: FlowFacts | null;
   snapshot: FlowSnapshot | null;
   quotes: QuoteFacts[];
@@ -278,9 +280,9 @@ export function FlowActionsProvider({
   const approveToast = approvedToastOf(job.quotes.find((q) => q.id === activeQuoteId) ?? null);
   const drawingChanges = job.drawingChanges;
   const value = React.useMemo<FlowActionsValue>(() => ({
-    facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, newQuoteSeen,
+    goTab: setTab, facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, newQuoteSeen,
     approveToast, drawingChanges,
-  }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast, drawingChanges]);
+  }), [setTab, facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast, drawingChanges]);
 
   const close = (o: boolean) => !o && setDialog(null);
   const quoteOf = (id?: string | null): JobQuote | null => job.quotes.find((q) => q.id === (id ?? activeQuoteId)) ?? null;

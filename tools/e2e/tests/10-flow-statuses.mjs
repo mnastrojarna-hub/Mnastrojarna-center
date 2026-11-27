@@ -2,7 +2,7 @@
 // Jedna zakázka projde z UI všemi fázemi: poptávka (Převzít, Čeká na podklady, Podklady máme) →
 // nacenění (/pricing) → nabídka (Odeslat e-mailem, návrh zaměstnance ✕, Zákazník objednal) →
 // objednávka (Potvrdit, Zákazník změnil = Aktualizovaná rev 2, Potvrdit změnu, Korekce stavu
-// s náhledem) → dodání 1/2 a zbytek → faktura → úhrada částečná a vyrovnání → objednávka
+// s náhledem) → dodání 1/2 a zbytek (stav zůstává) → podepsaný DL → Dodáno zákazníkovi → faktura → úhrada částečná a vyrovnání → objednávka
 // dodavateli (potvrzení, převzetí 1/2, zbytek). U každého kroku ověří DB (dílčí stavy, job_stage
 // jen dopředu, job_events s actor_id + actor_name, sloupce *_by) a jméno účtu v UI (hlavička,
 // chipy, historie, mobil 390 px). Dál role (zaměstnanec jen navrhne, obchodník rozhodne), počty
@@ -409,10 +409,10 @@ await T("korekce stavu na Ve výrobě = předání do výroby (kdo + termín) + 
 });
 
 // ═════════════════════════ 5. DODÁNÍ ═════════════════════════
-await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → zbytek → Dodáno zákazníkovi automaticky · autor", async (context) => {
+await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → zbytek (stav zůstává, další krok Nahrát potvrzený DL) → Potvrdit bez souboru → Dodáno zákazníkovi · autor", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
-  await openJob(page, J, "?tab=vyroba");
+  await openJob(page, J, "?tab=dodani");
   const card = page.getByRole("region", { name: "Dodání zákazníkovi" });
   await card.getByRole("button", { name: "Zapsat dodání" }).click();
   let dlg = page.getByRole("dialog");
@@ -436,7 +436,7 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   const bt = norm(await bookRow.innerText());
   expect(bt.includes("Částečně dodáno") && bt.includes("1/2 položek"), `Kniha: Částečně dodáno 1/2 položek (${bt.slice(0, 200)})`);
   // zbytek
-  await openJob(page, J, "?tab=vyroba");
+  await openJob(page, J, "?tab=dodani");
   // A2 (sk. 2): hlavička ukazuje „Dodat zbytek" → karta Dodání stejné tlačítko podruhé nenabízí (jen odkáže nahoru)
   await nextBtn(page, "Dodat zbytek").click();
   dlg = page.getByRole("dialog");
@@ -445,9 +445,19 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   await dlg.getByRole("button", { name: "Zapsat dodání" }).click();
   await eventually(() => {
     const o = row(J);
-    expect(Number(o.items_delivered) === 2 && o.status === "dodano_zakaznikovi", `DB: vše dodáno → Dodáno zákazníkovi (${o.items_delivered}, ${o.status})`);
+    expect(Number(o.items_delivered) === 2 && o.status === "ve_vyrobe", `DB: vše dodáno, DL nepodepsaný → stav zůstává Ve výrobě (${o.items_delivered}, ${o.status})`);
   });
-  expectEvent(lastEvent(J, "type = 'stage'"), { actor: "obchod", startsWith: "Stav: Ve výrobě → Dodáno zákazníkovi", via: "automaticky" });
+  // 27. 11.: Dodáno zákazníkovi až s podepsaným DL; faktura do té doby ne
+  await openJob(page, J, "?tab=dodani");
+  await nextBtn(page, "Nahrát potvrzený DL").waitFor({ timeout: 20_000 });
+  expect(await nextBtn(page, "Vystavit fakturu").count() === 0, "bez potvrzeného DL žádné „Vystavit fakturu“");
+  const box = page.locator('section#konec-toku [data-testid="confirmed-dl-optional"]');
+  await box.getByRole("button", { name: /Potvrdit bez souboru/ }).click();
+  await eventually(() => {
+    const o = row(J);
+    expect(o.status === "dodano_zakaznikovi" && o.delivery_note_confirmed_at, `DB: potvrzený DL → Dodáno zákazníkovi (${o.status}, ${o.delivery_note_confirmed_at})`);
+  }, { timeout: 20_000 });
+  expectEvent(lastEvent(J, "type = 'stage'"), { actor: "obchod", startsWith: "Stav: Ve výrobě → Dodáno zákazníkovi" });
   await shot(page, S("05-delivered"));
 });
 
@@ -456,7 +466,7 @@ await T("faktura → Vyfakturováno · autor; úhrada částečná (bez posunu, 
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, J);
-  // A2 (sk. 1): faktura = hlavní tlačítko „Vystavit fakturu" hned po dodání (potvrzený DL není podmínka)
+  // faktura = hlavní tlačítko „Vystavit fakturu" po potvrzeném DL (27. 11.)
   // → PDF + dialog odeslání jako u nabídky; tady „Vystavit, neposílat" (odeslání testuje E2E 23)
   await nextBtn(page, "Vystavit fakturu").click();
   const inv = page.getByRole("dialog");
