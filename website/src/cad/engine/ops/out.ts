@@ -11,6 +11,7 @@
  */
 import { fileLogLine, fmtBytes, formatLabel, FORMAT_EXT, outFileName, type ExportCheck, type OutCmd, type OutDelivery } from "../../agent-out";
 import { cadLocale, tr } from "../../i18n";
+import { materialConflictLines } from "../../material-designation";
 import { groupShareCode, SHARE_DEFAULT_DAYS } from "../../share";
 import type { CadDoc } from "../../types";
 import { drawExtras } from "../asm-status";
@@ -266,6 +267,8 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   // 22g (kolo 6): výkres sestavy z kopie dílu starší než díl v záložce – řádek exportu to řekne sám (jako `--formats`),
   // ne jen dřívější řádek změny dílu / listu; ✓ zápisu souboru zůstává, údaje v souboru jsou z vložení
   if (f && d.kind === "assembly") for (const sc of staleCopies(d, (n) => ctx.ws.findPart(n))) e.code("asm.stale-copy", { text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", FMT, staleCopyText(sc)), indent: "  " });
+  // 22g (kolo 7b): označení materiálu jiné třídy než hustota (hmotnost v razítku / kusovníku) – i u výkresu dílu
+  if (f) for (const x of materialConflictLines(d)) e.code("material.class-conflict", { text: tr("{0}: {1}", FMT, x.text), indent: "  " });
   // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
   // řez mimo těleso (22i kolo 6): ✗ drawing.section-miss jako u příkazu výkresu – a když ho protokol pro týž list už má
   // (příkaz `výkres řez …`, konec bloku), podruhé se nehlásí (dřív navíc ⚠ drawing.warning s odznakem bez kódu řezu)

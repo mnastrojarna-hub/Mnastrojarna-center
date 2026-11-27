@@ -79,13 +79,15 @@ Prvky:
 === run 4 ===
 ⚠ vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. B z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat C
 → Kvádr 1: size [60; 40; 10] → [50; 40; 10] – výsledek po výpočtu níže
-Kontrola kót: velikosti 3/3 · polohy 0/0 · tolerance neověřeny (funkční prvky označené na starší revizi modelu – označte je znovu) · nezkontrolováno: základna A: plocha F1 označena na modelu r·?, model je teď r·? – označte ji znovu (základna A F1); funkční F2: plocha F2 označena na modelu r·?, model je teď r·? – označte ji znovu (funkční F2 ±0,02)
+⚠ řádek 3: funkční F2: plochu F2 po změně modelu nejde jednoznačně dohledat (na původní rovině / ose plocha není – posunula se nebo zmizela) – nekontroluje se; označte ji znovu
+ℹ řádek 3: základna A: plocha po změně modelu dohledána podle geometrie – F1 → F1 (táž plocha)
+Kontrola kót: velikosti 3/3 · polohy 0/0 · tolerance neověřeny (funkční prvky označené na starší revizi modelu – označte je znovu) · nezkontrolováno: funkční F2: plocha F2 označena na modelu r·?, model je teď r·? – označte ji znovu (funkční F2 ±0,02)
 Velikosti:
   → 1. 50 (délka X) (celkové rozměry)
   → 2. 40 (šířka Y) (celkové rozměry)
   → 3. 10 (výška Z) (celkové rozměry)
 Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
-⚠ řádek 3: funkční prvky a základny označené na starší revizi modelu (2) se nekontrolují – označte je znovu (funkční F… / základna A F…)
+⚠ řádek 3: funkční prvky a základny označené na starší revizi modelu (1) se nekontrolují – označte je znovu (funkční F… / základna A F…)
 ✓ Kvádr 1 (box) · přidáno 20000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 1 (1 ✓, 0 ✗)

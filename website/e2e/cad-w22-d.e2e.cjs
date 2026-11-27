@@ -3,6 +3,8 @@
 //    (data-copy-stale), Kusovník upozornění (data-bom-note="stale"); tlačítko „Obnovit z dílu“ (data-refresh-btn) = týž
 //    příkaz `sestava obnovit` – pak kusovník i CSV nesou DA-001 / 1.2379 a upozornění zmizí;
 //  - kolo 7: přepočítat vše s kolizí (⚠, ne ✓), materiál po označení jiné třídy (⚠), Kusovník → Výrobní dokumentace (data-part-drawings)
+//  - kolo 7b: zastaralá pohybová studie v panelu Výstupy (data-outputs-item), strom → Označit profil jako funkční, kontrola kót →
+//    Dohledat podle geometrie (data-dim-refind)
 //  - 19: výběr „Druh v kusovníku“ (data-supply-select) → nakupovaný; Katalogové číslo; Kusovník v oddílech
 //    (data-bom-section make/standard/buy), normálie s třídou 12.9 a kolík s m6; text v konzoli dává totéž.
 //  - D2 (bod 20, výkresy a výstupy): vydaný list nese revizi modelu (odznak rev. A na záložce listu, data-sheet-issued),
@@ -439,6 +441,53 @@ async function scenario(args, label) {
   log = await run('záložka "Deska V"\nvýkres výkresy\nzáložka "Nástroj V"\nvýkresy dílů');
   ok(/List 1/.test(log) && /Výkres už mají \(1\)/.test(log) && !/Založeno/.test(log.split('Výkresy dílů sestavy').pop() || ''), `${label}: kolo 7 – díl má list, opakování nic nezaloží – ` + line(log, /Výkres už mají/));
   await closeConsole();
+
+  // ── kolo 7b: pohybová studie v zastaralých výstupech (bod 20), funkční profil a dohledání plochy v GUI (bod 18) ──
+  await openConsole();
+  log = await run('nový díl "Deska Q"\nkvádr 60 40 10\nnový díl "Přidržovač Q"\nkvádr 10 10 10\nnová sestava "Sestava Q"\nvložit "Deska Q" ukotvit\nvložit "Přidržovač Q" v 40 10 30\nsestava vazba vzdálenost "Přidržovač Q" spodní "Deska Q" horní hodnota 20\npohyb motor lineární vazba 1 20..5 kroky 5 kolize\npohyb spustit\nzáložka "Deska Q"\nupravit "Kvádr 1" size=70;40;10\nzáložka "Sestava Q"\nsestava obnovit vše\nvýstupy');
+  ok(!/Zastaralé výstupy: žádné/.test(log) && /⚠ pohybová studie – výsledek neplatí – od výpočtu se změnilo/.test(log), `${label}: kolo 7b – výstupy: pohybová studie po změně dílu zastaralá – ` + line(log, /pohybová studie –/));
+  await closeConsole();
+  const och = p.locator('[data-outputs-chip]').first();
+  await och.waitFor({ timeout: 30000 }).catch(() => {});
+  ok(Number(await och.getAttribute('data-outputs-chip').catch(() => '0')) >= 1, `${label}: kolo 7b – odznak Zastaralé výstupy u sestavy se zastaralou studií`);
+  // panel může být otevřený z dřívějšího kroku (stav komponenty přežije přepnutí záložky) – klik by ho zavřel
+  if ((await p.locator('[data-outputs-panel]').count()) === 0) await och.click().catch(() => {});
+  const oMot = p.locator('[data-outputs-item="analysis"]', { hasText: /pohybová studie/ }).first();
+  await oMot.waitFor({ timeout: 20000 }).catch(() => {});
+  ok((await oMot.count()) === 1, `${label}: kolo 7b – panel Výstupy: položka „pohybová studie“ (A1 staleResults + sonda pohybu)`);
+  await openConsole();
+  log = await run('pohyb spustit');
+  await closeConsole();
+  await p.waitForFunction(() => ![...document.querySelectorAll('[data-outputs-item="analysis"]')].some((e) => /pohybová studie/.test(e.textContent || '')), null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-outputs-item="analysis"]', { hasText: /pohybová studie/ }).count()) === 0, `${label}: kolo 7b – po „pohyb spustit“ položka zmizí (panel sleduje úložiště studií)`);
+  await openConsole();
+  await run('nový díl "Deska R"\nkvádr 100 60 20\nskica XY 20\nobdélník 30 20 v 50 30\nvysunout 5 odebrat');
+  await closeConsole();
+  const skRow = p.locator('[data-feature-name="Skica 1"]').first();
+  await skRow.waitFor({ timeout: 30000 }).catch(() => {});
+  await skRow.click({ button: 'right' }).catch(() => {});
+  const profItem = p.getByText('Označit profil jako funkční', { exact: true }).first();
+  await profItem.waitFor({ timeout: 10000 }).catch(() => {});
+  ok((await profItem.count()) === 1, `${label}: kolo 7b – strom prvků: pravé tlačítko na skicu → „Označit profil jako funkční“`);
+  await profItem.click().catch(() => {});
+  await p.waitForTimeout(1500);
+  await openConsole();
+  log = await run('záložka "Deska R"\nfunkční');
+  ok(/f1 funkční profil Skica 1/.test(log), `${label}: kolo 7b – profil označen jako celek (stejný příkaz jako text) – ` + line(log, /profil Skica 1/));
+  log = await run('funkční F2 ±0,02\nvýkres A4\nupravit "Kvádr 1" position=5;0;0');
+  await run('výkres');
+  await closeConsole();
+  const chk2 = p.getByRole('button', { name: /Kontrola kót/ }).first();
+  await chk2.waitFor({ timeout: 60000 }).catch(() => {});
+  await chk2.click().catch(() => {});
+  const refBtn = p.locator('[data-dim-refind]').first();
+  await refBtn.waitFor({ timeout: 30000 }).catch(() => {});
+  ok(Number(await p.locator('[data-dim-marks-stale]').first().getAttribute('data-dim-marks-stale').catch(() => '0')) >= 1 && (await refBtn.count()) === 1, `${label}: kolo 7b – kontrola kót: označená plocha ze starší revize + tlačítko „Dohledat podle geometrie“`);
+  await refBtn.click().catch(() => {});
+  await p.waitForFunction(() => /dohledáno \d+, nedohledáno \d+|nic k dohledání/.test(document.body.innerText), null, { timeout: 60000 }).catch(() => {});
+  const ft = await p.evaluate(() => document.body.innerText);
+  ok(/dohledáno \d+, nedohledáno \d+|nic k dohledání/.test(ft), `${label}: kolo 7b – Dohledat podle geometrie spustí funkční dohledat – ` + line(ft, /dohledáno|nic k dohledání/));
+  await p.keyboard.press('Escape').catch(() => {});
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

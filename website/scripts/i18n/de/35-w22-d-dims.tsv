@@ -34,7 +34,6 @@ funkční {0}: plochu nejde zkontrolovat (tvar)	funktional {0}: die Fläche kann
 funkční {0}: prvek nemá rozměry, které kontrola zná	funktional {0}: das Element hat keine Maße, die die Prüfung kennt
 funkční {0}: šikmá plocha	funktional {0}: schräge Fläche
 funkční {0}: tolerance {1} se liší od předepsané {2}	funktional {0}: Toleranz {1} weicht von der vorgeschriebenen {2} ab
-funkční F7 [H7] · funkční "Díra 1" [±0,02] · základna A F3 · funkční [seznam] · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	funktional F7 [H7] · funktional "Bohrung 1" [±0,02] · bezug A F3 · funktional [liste] · funktional entfernen F7|"Bohrung 1"|alle · bezug entfernen A|alle
 funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu	Funktionselement {0} des Teils „{1}“ lässt sich nicht als Skriptzeile schreiben
 Funkční prvky a základny ({0}):	Funktionselemente und Bezüge ({0}):
 funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)	Funktionselemente und Bezüge werden im Teil markiert – öffnen Sie das Teil (Teil-Register)
@@ -64,8 +63,6 @@ plochu F{0} se nepodařilo změřit	Fläche F{0} konnte nicht gemessen werden
 poloha {0} – {1} {2}	Lage {0} – {1} {2}
 poloha {0} (body zadané odkazem na geometrii)	Lage {0} (Punkte per Geometriebezug)
 poloha {0} (kvádr natočený nebo zadaný odkazem)	Lage {0} (Quader gedreht oder per Bezug)
-poloha {0} (skica v obecné rovině)	Lage {0} (Skizze auf allgemeiner Ebene)
-poloha {0} (šikmá osa díry)	Lage {0} (schräge Bohrungsachse)
 poloha {0} (šikmá osa nebo odkaz)	Lage {0} (schräge Achse oder Bezug)
 poloha obecného obrysu {0} (lomená čára, oblouk, spline)	Lage der allgemeinen Kontur {0} (Polylinie, Bogen, Spline)
 Polohy	Lagen

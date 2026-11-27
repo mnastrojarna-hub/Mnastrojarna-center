@@ -29,10 +29,10 @@ export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
     // jedno pravidlo s komponentou sestavy a polem označení v GUI (material-designation.ts): rozpoznaná třída = ℹ, jinak ⚠
     const cls = MATERIALS.find((x) => x.id === d.material) ?? MATERIALS[0];
     const note = designationNote(op.patch.materialName, d.material);
-    if (note?.code === "material.class") {
+    if (note?.code === "material.class" || note?.code === "material.class-family") {
       // označení s rozpoznanou třídou: hustota podle třídy (EN AW-6082 → hliník) – ℹ material.class (5.2 č. 37)
       say(ctx, tr("✓ materiál „{0}“ = označení do razítka, třída „{1}“ ({2} g/cm³)", op.patch.materialName, cls.label, cls.density));
-      coded(ctx, "material.class", { args: note.args });
+      coded(ctx, note.code, { args: note.args });
     } else if (note) {
       // jen označení: hustota zůstane podle dosavadní třídy – PŘEDPOKLAD, ne ověřený výsledek: → (ℹ msg.note) + ⚠ (nikdy ✓ vedle ⚠,
       // vlna 22 kolo 6); hmotnost v měření, kusovníku i razítku z ní (5.2 č. 37)
@@ -47,6 +47,10 @@ export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
     const note = d.materialName ? designationNote(d.materialName, d.material) : null;
     if (note?.code === "material.class-conflict") {
       say(ctx, tr("→ materiál = {0} · označení „{1}“ v razítku zůstává", label, d.materialName!));
+      coded(ctx, note.code, { args: note.args });
+    } else if (note?.code === "material.class-family") {
+      // označení oceli u podtřídy oceli (ČSN 11 523 → 1.2311): stejná skupina – ✓ s ℹ, ne rozpor (kolo 7b)
+      say(ctx, tr("✓ materiál = {0} · označení „{1}“ v razítku zůstává", label, d.materialName!));
       coded(ctx, note.code, { args: note.args });
     } else if (note?.code === "material.density-assumed") {
       // neznámé označení (Hardox 400) + zadaná třída: hustota podle výslovně zadané třídy, označení zůstává

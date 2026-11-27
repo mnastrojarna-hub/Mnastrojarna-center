@@ -1,0 +1,32 @@
+# vlna 22, fáze 2, kolo 7b (stopa D): pohyb v zastaralých výstupech, rozpor třídy materiálu, funkční profil a dohledání ploch, šikmé díry
+→ dohledáno {0}, nedohledáno {1} (nedohledané se nekontrolují – označte je znovu)	→ wiedergefunden {0}, nicht wiedergefunden {1} (nicht wiedergefundene werden nicht geprüft – erneut kennzeichnen)
+→ nic k dohledání – žádná označená plocha není ze starší revize modelu	→ nichts wiederzufinden – keine gekennzeichnete Fläche stammt aus einer älteren Modellrevision
+✓ funkční {0}{1}{2} – kontrola kót chce velikost, polohu{3} a toleranci všech rozměrů profilu	✓ funktional {0}{1}{2} – die Maßprüfung verlangt Größe, Lage{3} und Toleranz aller Maße des Profils
+bez otisku plochy	ohne Flächenabdruck
+díl „{0}“: {1}	Teil „{0}“: {1}
+Dohledat podle geometrie	Nach Geometrie wiederfinden
+funkční {0}: profil nemá rozměry, které kontrola zná	funktional {0}: das Profil hat keine Maße, die die Prüfung kennt
+funkční {0}: skica už v dílu není	funktional {0}: die Skizze ist nicht mehr im Teil
+funkční F7 [H7] · funkční "Díra 1" [±0,02] · funkční profil "Skica 1" [±0,02] · základna A F3 · funkční [seznam] · funkční dohledat · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	funktional F7 [H7] · funktional "Bohrung 1" [±0,02] · funktional profil "Skizze 1" [±0,02] · bezug A F3 · funktional [liste] · funktional suchen · funktional entfernen F7|"Bohrung 1"|alle · bezug entfernen A|alle
+funkční profil: „{0}“ není skica ani prvek dílu – skici: {1}	funktional profil: „{0}“ ist weder eine Skizze noch ein Element des Teils – Skizzen: {1}
+funkční profil: „{0}“ není skica ani prvek ze skici – skici: {1}	funktional profil: „{0}“ ist weder eine Skizze noch ein Element aus einer Skizze – Skizzen: {1}
+funkční profil: název skici nebo prvku ze skici, např. funkční profil "Skica 1" ±0,02 – {0}	funktional profil: Name einer Skizze oder eines Elements aus einer Skizze, z. B. funktional profil "Skizze 1" ±0,02 – {0}
+na původní rovině / ose plocha není – posunula se nebo zmizela	keine Fläche auf der ursprünglichen Ebene / Achse – sie hat sich verschoben oder ist verschwunden
+Označené plochy ze starší revize modelu ({0}) se nekontrolují.	Gekennzeichnete Flächen aus einer älteren Modellrevision ({0}) werden nicht geprüft.
+Označit profil jako funkční	Profil als funktional kennzeichnen
+plochu se nepodařilo změřit	die Fläche konnte nicht gemessen werden
+poloha {0} – {1} {2} (vstup šikmé díry)	Lage {0} – {1} {2} (Eintritt einer schrägen Bohrung)
+poloha {0} (osa díry zadaná odkazem)	Lage {0} (Bohrungsachse per Referenz)
+poloha {0} (skica v šikmé rovině – kontrola poloh je jen v osách modelu)	Lage {0} (Skizze in schräger Ebene – Lagen werden nur in Modellachsen geprüft)
+profil {0}	Profil {0}
+seznam ploch dílu se nepodařilo načíst	die Flächenliste des Teils konnte nicht geladen werden
+táž plocha	dieselbe Fläche
+táž rovina / osa, jiná velikost	dieselbe Ebene / Achse, andere Größe
+úhel osy {0} ({1}° od osy {2}) – kóty úhlů kontrola nečte	Achswinkel von {0} ({1}° von Achse {2}) – Winkelmaße liest die Prüfung nicht
+víc ploch na téže rovině / ose	mehrere Flächen auf derselben Ebene / Achse
+výsledek neplatí – od výpočtu se změnilo: {0}	das Ergebnis gilt nicht – seit der Berechnung geändert: {0}
+výsledek neplatí pro nynější stav sestavy (díly, polohy, vazby nebo studie)	das Ergebnis gilt nicht für den aktuellen Zustand der Baugruppe (Teile, Lagen, Verknüpfungen oder Studie)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+materiál „{0}“ je třídy {1} – hustota podle zvolené třídy {2} ({3} g/cm³) ze stejné skupiny	Werkstoff „{0}“ gehört zur Klasse {1} – Dichte nach der gewählten Klasse {2} ({3} g/cm³) derselben Gruppe
+{0}: plocha po změně modelu dohledána podle geometrie – {1} → {2} ({3})	{0}: Fläche nach der Modelländerung per Geometrie wiedergefunden – {1} → {2} ({3})
+{0}: plochu {1} po změně modelu nejde jednoznačně dohledat ({2}) – nekontroluje se; označte ji znovu	{0}: Fläche {1} ist nach der Modelländerung nicht eindeutig wiederzufinden ({2}) – nicht geprüft; erneut kennzeichnen

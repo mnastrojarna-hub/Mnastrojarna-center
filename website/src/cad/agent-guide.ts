@@ -2176,6 +2176,13 @@ pixely v 3D okně:
   Kontrola kót u funkčního prvku chce velikost, polohu **od základny** na téže ose a toleranci na kótě (předepsaná musí
   sedět) – bez tolerance ⚠ \`drawing.tolerance-missing\`; přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na rozměru, který funkční
   není = ℹ \`drawing.tol-nonfunctional\` (přetolerování). Bez vyznačení: „tolerance neověřeny (funkční prvky nevyznačeny)“.
+  \`funkční profil "Skica 1" ±0,02\` (EN \`functional profile\`, DE \`funktional profil\`; GUI: pravé tlačítko na skicu / prvek ve
+  stromu → Označit profil jako funkční) označí profil jako celek – funkční jsou všechny velikosti a polohy obrysů skici.
+  Plocha / základna označená na starší revizi modelu se před výpočtem listu (a příkazem \`funkční dohledat\`, GUI „Dohledat
+  podle geometrie“ v kontrole kót) najde znovu jen při geometrické shodě (táž plocha, nebo táž rovina / osa s překryvem) –
+  ℹ \`functional.refound\`; plocha, která se posunula nebo není jednoznačná, ⚠ \`functional.lost\` a zůstává „nezkontrolováno“.
+  Poloha šikmé díry se kontroluje v bodě vstupu (úhel osy „nezkontrolováno“), skica na ploše rovnoběžné se základní rovinou
+  jako na základní rovině; skica v šikmé rovině „nezkontrolováno“.
 - Ukládání a export z **konzole** (\`uložit\`, \`export step\`, \`výkres export pdf\`, \`sdílet\`) se nikdy neptají – soubor se
   rovnou stáhne. Tlačítka se člověka ptají na místo a název (systémový dialog), v prohlížeči ovládaném automatizací
   (\`navigator.webdriver\`, \`?agent=1\`) stahují rovnou; trvale to zapne Nastavení → Soubory (přímé stažení). Pro skripty

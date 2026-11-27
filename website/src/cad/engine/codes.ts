@@ -176,6 +176,8 @@ export const CODES = [
   { code: "compare.inexact", level: "note", key: "rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek" },
   { code: "material.density-assumed", level: "warn", key: "materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})" },
   { code: "material.class", level: "note", key: "materiál „{0}“ zařazen jako {1}" },
+  /** označení oceli u podtřídy oceli (ČSN 11 523 × 1.2311) – stejná skupina, hustota podle zvolené podtřídy (kolo 7b) */
+  { code: "material.class-family", level: "note", key: "materiál „{0}“ je třídy {1} – hustota podle zvolené třídy {2} ({3} g/cm³) ze stejné skupiny" },
   /** označení materiálu patří jiné třídě, než podle které se počítá hustota (vlna 22, bod 22g – kolo 7) */
   { code: "material.class-conflict", level: "warn", key: "materiál „{0}“ je třídy {1}, hustota se ale počítá podle třídy {2} ({3} g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu {1}" },
   // ── výkresy a předloha (5.2 č. 32, 33; kap. 8) ──
@@ -187,6 +189,10 @@ export const CODES = [
   // kusovník se na list nevejde ani ve sloupcích (vlna 22, bod 17) – rada: větší formát / kusovník na samostatném listu
   { code: "drawing.bom-overflow", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
+  /** označená plocha / základna ze starší revize modelu znovu nalezena podle geometrie (`funkční dohledat`, výkres – kolo 7b) */
+  { code: "functional.refound", level: "note", key: "{0}: plocha po změně modelu dohledána podle geometrie – {1} → {2} ({3})" },
+  /** označenou plochu po změně modelu nejde jednoznačně dohledat – kontrola ji vynechá (nezkontrolováno) */
+  { code: "functional.lost", level: "warn", key: "{0}: plochu {1} po změně modelu nejde jednoznačně dohledat ({2}) – nekontroluje se; označte ji znovu" },
   // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
   { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
   // ruční kóta po změně modelu neleží na geometrii / přichytila se ke změněné geometrii (vlna 22, bod 20 – cad/drawing-dim-attach.ts)

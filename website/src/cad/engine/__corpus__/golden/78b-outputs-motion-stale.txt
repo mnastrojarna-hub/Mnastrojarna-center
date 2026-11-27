@@ -1,0 +1,112 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Sestava A“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+ pohání: „Přidržovač“ · směr −Z
+Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
+Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
+Vazby splněny ve všech krocích
+⚠ řádek 11: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
+ 1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
+Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
+Vazby splněny ve všech krocích
+⚠ řádek 12: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1000 mm³ · těleso platné
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 1 krocích (podrobně pohyb stav)
+=== run 2 ===
+✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
+→ Kvádr 1: size [60; 40; 10] → [70; 40; 10] – výsledek po výpočtu níže
+⚠ řádek 2: díl „Deska A“ je v sestavě „Sestava A“ jako kopie – v sestavě: sestava obnovit "Deska A"; změna (geometrie) se do sestavy sama nepromítne
+✓ záložka „Sestava A“ (sestava) je aktivní – další příkazy pracují s ní
+✓ komponenta „Deska A“ obnovena z dílu (geometrie)
+✓ komponenta „Přidržovač“ už odpovídá dílu v záložce
+Výstupy dokumentu „Sestava A“ · revize modelu r·?
+Listy: žádné
+Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model r·?
+Zastaralé výstupy (1) · model je teď r·?:
+  1. ⚠ pohybová studie – výsledek neplatí – od výpočtu se změnilo: geometrie dílu „Deska A“ → pohyb spustit (přepočítat vše)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
+ 1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
+Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
+Vazby splněny ve všech krocích
+ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: geometrie dílu „Deska A“
+⚠ řádek 6: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5
+Přepočítat vše – dokument „Sestava A“, revize modelu r·?:
+Přepočteno (1):
+  ⚠ pohybová studie znovu (pohyb spustit) – s varováním: clash.real
+Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu r·?
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize · r·?
+ 1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
+Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
+Vazby splněny ve všech krocích
+⚠ řádek 7: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5
+Výstupy dokumentu „Sestava A“ · revize modelu r·?
+Listy: žádné
+Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model r·?
+Zastaralé výstupy: žádné – vydané listy, exporty a uložené analýzy odpovídají modelu r·?
+ℹ Kvádr 1 (box) · přidáno 28000 mm³ · těleso platné
+
+Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 70 × 40 × 40 mm · objem Σ 29 cm³ · hmotnost Σ 0,228 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 1 krocích (podrobně pohyb stav)
+=== run 3 ===
+⚠ vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
+✓ nový díl „Deska F“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+→ list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+Výstupy dokumentu „Deska F“ · revize modelu r·?
+Listy (1):
+  List 1: ⚠ Vydání: rev. A z modelu r·? (?.?.????) – model je teď r·?: list je ZASTARALÝ – vydejte novou revizi: výkres vydat B
+Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model r·?
+Zastaralé výstupy (1) · model je teď r·?:
+  1. ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? → výkres vydat B
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 282,7 mm³ (6 % nástroje) · těleso platné
+
+Dokument: „Deska F“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 23,72 cm³ · ploch 7 · hran 15
+Geometrie: platná · 1 těleso · rychlá kontrola
+Revize modelu: r·?
+⚠ Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 282,7 mm³ (6 % nástroje) · těleso platné – Ø6 skrz v [20; 20; 10], osa Z

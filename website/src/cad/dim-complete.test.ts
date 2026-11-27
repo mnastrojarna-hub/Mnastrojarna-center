@@ -326,3 +326,59 @@ describe("bod 18 – kruhové pole: roztečná kružnice jako poloha výchozí d
     expect(seedPos.every((q) => q.status === "missing")).toBe(true);
   });
 });
+
+describe("bod 18, kolo 7b – profil jako celek, šikmá díra, skica v obecné rovině", () => {
+  // kapsa: skica „Skica 1“ (obdélník 30 × 20 se středem [50; 30] na horní ploše) vysunutá odebráním 5 mm
+  const pocket = (plane: Record<string, unknown>) => {
+    const sk = F({ name: "Skica 1", type: "sketch", plane, entities: [{ id: "e1", type: "rect", cx: 50, cy: 30, w: 30, h: 20, r: 0 }], constraints: [], dims: [] });
+    const ex = F({ name: "Vysunutí 1", type: "extrude", sketchId: sk.id, distance: 5, mode: "cut", reverse: true });
+    return { sk, ex };
+  };
+  it("funkční profil: všechny velikosti a polohy obrysu skici jsou funkční s tolerancí; bez kót poloh nikdy „tolerance n/n“", () => {
+    const { sk, ex } = pocket({ kind: "base", name: "XY", offset: 20 });
+    const d = doc([plate(), sk, ex], [{ id: "f1", kind: "functional", profile: sk.id, tol: "±0,02" }]);
+    const r = checkSheet({ doc: d, views: VIEWS, annotations: overall(), dimensions: "smart" });
+    const own = r.items.filter((q) => q.featureId === sk.id || q.featureId === ex.id);
+    expect(own.length).toBeGreaterThan(2);
+    expect(own.every((q) => q.functional)).toBe(true);
+    expect(own.filter((q) => q.kind === "pos").map((q) => q.label)).toEqual(["poloha Vysunutí 1 – X 35", "poloha Vysunutí 1 – Y 20"]);
+    expect(r.tol.missing.length).toBeGreaterThan(0);
+    expect(dimCheckLine(r)).not.toMatch(/tolerance (\d+)\/\1(?!\d)/);
+    expect(dimCheckLine(r)).toMatch(/Funkční|funkční/);
+    // bez značky profilu: tytéž položky NEJSOU funkční (profil nic netvrdí sám od sebe)
+    const plain = checkSheet({ doc: doc([plate(), sk, ex]), views: VIEWS, annotations: overall(), dimensions: "smart" });
+    expect(plain.items.filter((q) => q.featureId === sk.id || q.featureId === ex.id).some((q) => q.functional)).toBe(false);
+    // smazaná skica: profil „nezkontrolováno“, ne ✓
+    const gone = checkSheet({ doc: doc([plate()], [{ id: "f1", kind: "functional", profile: "x" }]), views: VIEWS, annotations: overall(), dimensions: "smart" });
+    expect(gone.unchecked.join("; ")).toMatch(/skica už v dílu není/);
+  });
+  it("skica na ploše rovnoběžné se základní rovinou (obecná rovina): polohy kapsy se kontrolují; šikmá rovina dál nezkontrolováno", () => {
+    // skica na horní ploše: počátek [0; 0; 20], normála +Z, osa X – jako `skica na ploše` (dřív vždy „skica v obecné rovině“)
+    const flat = pocket({ kind: "custom", origin: [0, 0, 20], normal: [0, 0, 1], xDir: [1, 0, 0] });
+    const r = requirements(doc([plate(), flat.sk, flat.ex]), viewsBbox(VIEWS));
+    expect(r.reqs.filter((q) => q.kind === "pos" && q.featureId === flat.ex.id).map((q) => [q.axis, q.value])).toEqual([[0, 35], [1, 20]]);
+    expect(r.unchecked.join("; ")).not.toMatch(/Vysunutí 1/);
+    // šikmá rovina (normála 0 1 1): nikdy ✓, jen nezkontrolováno s důvodem
+    const tilt = pocket({ kind: "custom", origin: [0, 0, 20], normal: [0, 1, 1], xDir: [1, 0, 0] });
+    const t = requirements(doc([plate(), tilt.sk, tilt.ex]), viewsBbox(VIEWS));
+    expect(t.reqs.some((q) => q.kind === "pos" && q.featureId === tilt.ex.id)).toBe(false);
+    expect(t.unchecked.join("; ")).toMatch(/poloha Vysunutí 1 \(skica v šikmé rovině/);
+  });
+  it("šikmá díra: poloha bodu vstupu X / Y se kontroluje (kóta s pomocnou čárou na vstup), úhel osy nezkontrolováno", () => {
+    const slant = F({ name: "Díra 1", type: "hole", position: [30, 20, 20], axis: "Z", dirDef: { kind: "vector", v: [0, 0.5, -0.866] }, flip: false, diameter: 8, depth: 15, cbDiameter: 0, cbDepth: 0, kind: "simple" });
+    const d = doc([plate(), slant]);
+    const r0 = requirements(d, viewsBbox(VIEWS));
+    const pos = r0.reqs.filter((q) => q.kind === "pos" && q.featureId === slant.id);
+    expect(pos.map((q) => q.label)).toEqual(["poloha Díra 1 – X 30 (vstup šikmé díry)", "poloha Díra 1 – Y 20 (vstup šikmé díry)"]);
+    expect(r0.unchecked.join("; ")).toMatch(/úhel osy Díra 1 \(30° od osy Z\)/);
+    expect(r0.unchecked.join("; ")).not.toMatch(/šikmá osa díry/);
+    // bez kót polohy: chybí (dřív „nezkontrolováno“ – kontrola nic neříkala); s kótami od hran na vstup: splněno
+    const miss = checkSheet({ doc: d, views: VIEWS, annotations: overall(), dimensions: "smart" });
+    expect(miss.items.filter((q) => q.featureId === slant.id && q.kind === "pos").map((q) => q.status)).toEqual(["missing", "missing"]);
+    const ok = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(0, 20), top(30, 20)), vdim("top", top(30, 0), top(30, 20))], dimensions: "smart" });
+    expect(ok.items.filter((q) => q.featureId === slant.id && q.kind === "pos").map((q) => q.status)).toEqual(["ok", "ok"]);
+    // kóta se shodnou souřadnicí, ale mimo vstup (pomocná čára 25 mm vedle): nesplní
+    const off = checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(0, 45), top(30, 45))], dimensions: "smart" });
+    expect(off.items.find((q) => q.featureId === slant.id && q.axis === 0)!.status).toBe("missing");
+  });
+});

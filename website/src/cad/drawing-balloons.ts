@@ -54,6 +54,8 @@ export type BalloonInput = {
   R?: number;
   /** čáry kót listu (kótovací a pomocné čáry) – odkaz je nemá křížit (kolo 6) */
   lines?: [Vec2, Vec2][];
+  /** krok 3b (přesun na volný slot) – false jen pro testy: poloha pozice před přesunem */
+  relocate?: boolean;
 };
 
 /** odkaz nesmí vést blíž než toto ke kotvě jiné pozice (kontrola listu hlásí pod 1 mm – drawing-overlaps.ts) [mm] */
@@ -439,10 +441,12 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
   //     křížení nezvýší a odkaz nezdlouží – výsledek je vždy aspoň tak dobrý jako před tímto krokem.
   const crossesAny = (p: Vec2, a: Vec2, self: PlacedBalloon) => placed.some((o) => o !== self && segmentsCross(p, a, [o.x, o.y], o.a));
   const freeFor = (p: Vec2, self: PlacedBalloon) => inRect(box(p), inp.bounds) && !occ.hit(box(p)) && placed.every((b) => b === self || dist([b.x, b.y], p) >= 2 * R + 1);
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < (inp.relocate === false ? 0 : 3); pass++) {
     let moved = false;
     for (const b of results) {
-      if (b.lost) continue;
+      // ručně posunutá pozice (`GenEdit.move` je relativní k automatické poloze) se nepřesouvá: přesun by po nesouvisející změně
+      // listu posunul i místo, kam ji uživatel odtáhl (kolo 7b – nález oponenta)
+      if (b.lost || edit.move?.[b.id]) continue;
       const v = vmap.get(b.view);
       const it = itemOf.get(b.id);
       if (!v || !it) continue;

@@ -151,15 +151,64 @@ describe("bod 18 (kontrola kót pro výrobu) – engine se skutečným jádrem",
     const r1 = await runScript(ws, 'záložka "Deska F"\nupravit "Kvádr 1" size=30;40;10\nvýkres kontrola kót', host);
     const t1 = formatConsole(r1);
     expect(t1).toMatch(/funkční F2: plocha F2 označena na modelu r·\w{6}, model je teď r·\w{6} – označte ji znovu \(funkční F2 ±0,02\)/);
-    expect(t1).toMatch(/základna A: plocha F1 označena na modelu r·\w{6}, model je teď r·\w{6} – označte ji znovu \(základna A F1\)/);
+    // kolo 7b (vědomá změna testu): základna A (rovina X = 0) po zkrácení desky leží na téže rovině a překrývá se s původní
+    // plochou → dohledána podle geometrie (ℹ functional.refound) a kontroluje se dál; F2 se posunula (X 60 → 30) → ⚠ functional.lost
+    // a zůstává „nezkontrolováno“ (dřív obě „označte ji znovu“ – i základna, která se nezměnila)
+    expect(t1).not.toMatch(/základna A: plocha F1 označena na modelu/);
+    expect(codes(r1, "functional.refound").map((e) => e.text)).toEqual(["základna A: plocha po změně modelu dohledána podle geometrie – F1 → F1 (táž plocha)"]);
+    expect(codes(r1, "functional.lost").map((e) => e.text)).toEqual(["funkční F2: plochu F2 po změně modelu nejde jednoznačně dohledat (na původní rovině / ose plocha není – posunula se nebo zmizela) – nekontroluje se; označte ji znovu"]);
     // požadavek uživatele se neověřil: ne „funkční prvky nevyznačeny“ a ne „✓ … bez nálezů“, ale ⚠
     expect(t1).not.toMatch(/funkční prvky nevyznačeny/);
     expect(t1).toMatch(/tolerance neověřeny \(funkční prvky označené na starší revizi modelu – označte je znovu\)/);
-    expect(codes(r1, "drawing.tolerance-missing").map((e) => e.text)).toContain("funkční prvky a základny označené na starší revizi modelu (2) se nekontrolují – označte je znovu (funkční F… / základna A F…)");
+    expect(codes(r1, "drawing.tolerance-missing").map((e) => e.text)).toContain("funkční prvky a základny označené na starší revizi modelu (1) se nekontrolují – označte je znovu (funkční F… / základna A F…)");
     expect(t1).not.toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
     // po novém označení zase kontrolováno
     const r2 = await runScript(ws, 'záložka "Deska F"\nfunkční F2 ±0,02\nzákladna A F1\nvýkres kontrola kót', host);
     expect(formatConsole(r2)).not.toMatch(/označena na modelu/);
+  }, 240_000);
+
+  it("kolo 7b: nesouvisející změna modelu – funkční plocha dohledána (táž plocha), kontrola s ní počítá; jiná rovina nikdy", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf();
+    await runScript(ws, 'nový díl "Deska F"\nkvádr 60 40 10\nvýkres A4\nfunkční F2 ±0,02\nvýkres kontrola kót', host);
+    // díra jinde: revize modelu se změní, plocha F2 (X = 60) zůstává táž
+    const r1 = await runScript(ws, 'záložka "Deska F"\ndíra 6 v 20 20 10 skrz\nvýkres kontrola kót', host);
+    const t1 = formatConsole(r1);
+    expect(t1).not.toMatch(/označena na modelu/);
+    // díra přidala plochy – plocha X = 60 má teď jiné číslo (F2 → F6), je to táž plocha a kontrola s ní dál počítá
+    expect(codes(r1, "functional.refound").map((e) => e.text)).toEqual(["funkční F2: plocha po změně modelu dohledána podle geometrie – F2 → F6 (táž plocha)"]);
+    expect(t1).toMatch(/poloha F6 – X 60 · funkční, bez tolerance/);
+    const d1 = docOf(ws, "Deska F");
+    expect(d1.functional?.[0].rev).toMatch(/^r·[0-9a-f]{6}$/);
+    expect(d1.functional?.[0].print?.kind).toBe("plane");
+    // výslovný příkaz: nic k dohledání
+    const r2 = await runScript(ws, 'záložka "Deska F"\nfunkční dohledat', host);
+    expect(formatConsole(r2)).toMatch(/nic k dohledání/);
+    // posun plochy (deska delší) → nedohledáno, nezkontrolováno, žádné „dohledána“
+    const r3 = await runScript(ws, 'záložka "Deska F"\nupravit "Kvádr 1" size=70;40;10\nfunkční dohledat\nvýkres kontrola kót', host);
+    expect(codes(r3, "functional.refound").length).toBe(0);
+    expect(codes(r3, "functional.lost").length).toBe(1); // jednou za běh, i když dohledání zkusí příkaz i výkres
+    expect(formatConsole(r3)).toMatch(/funkční F6: plocha F6 označena na modelu r·\w{6}, model je teď r·\w{6} – označte ji znovu/);
+  }, 240_000);
+
+  it("kolo 7b: funkční profil jako celek – textem, výpis, zrušení, skript dokumentu tam a zpět", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf();
+    const r = await runScript(ws, 'nový díl "Deska P"\nkvádr 100 60 20\nskica XY 20\nobdélník 50 30 30 20\nvysunout 5 odebrat\nfunkční profil "Vysunutí 1" ±0,02\nvýkres A4\nvýkres kontrola kót\nfunkční', host);
+    const t = formatConsole(r);
+    expect(t).toMatch(/✓ funkční profil Skica 1 \(Vysunutí 1\) · tolerance ±0,02/);
+    expect(t).toMatch(/Funkční prvky a základny \(1\):\n  f1 funkční profil Skica 1 · tolerance ±0,02/);
+    const d = docOf(ws, "Deska P");
+    expect(d.functional).toEqual([expect.objectContaining({ kind: "functional", profile: d.features.find((f) => f.type === "sketch")!.id, tol: "±0,02" })]);
+    // kótovaný list (Chytré kóty) bez tolerancí: funkční rozměry profilu bez tolerance → ⚠, nikdy „tolerance n/n“
+    expect(t).not.toMatch(/funkční prvky: tolerance (\d+)\/\1(?!\d)/);
+    expect(codes(r, "drawing.tolerance-missing").length).toBeGreaterThan(0);
+    expect(docToScript(d).text).toMatch(/funkční profil "Skica 1" ±0,02/);
+    const z = await runScript(ws, 'záložka "Deska P"\nfunkční zrušit profil "Skica 1"', host);
+    expect(formatConsole(z)).toMatch(/✓ zrušeno 1 – zbývá 0/);
+    // prvek, který ze skici nevzniká → ✗ s výčtem skic (žádné tiché nic)
+    const bad = await runScript(ws, 'záložka "Deska P"\nfunkční profil "Kvádr 1"', host);
+    expect(bad.entries.some((e) => e.level === "error" && /není skica ani prvek ze skici/.test(e.text ?? ""))).toBe(true);
   }, 240_000);
 
   it("EN / DE: functional datum, drawing check dims / zeichnung prüfen maße", async () => {

@@ -45,7 +45,13 @@
  * 28. `✓ materiál = Nerez` – nikdy, když označení v razítku patří jiné třídě (⚠ material.class-conflict); razítko textem
  *     `materiál="ČSN 11 523"` na hliníkovém dílu nikdy bez ℹ/⚠ a nikdy s hustotou hliníku
  * 30. „křížení odkazů 0“ – jen když se žádné dva odkazy pozic nekříží (bod 17: A1, 100 dílů – dřív 2 křížení, přesun kolo 7)
+ * 28b. třída 1.2311 po označení ČSN 11 523 – nikdy ⚠ „si odporují“ (stejná skupina oceli, ℹ material.class-family); rozpor tříd
+ *     nikdy jen na řádku příkazu – ⚠ i ve `stav`, kusovníku a exportu výkresu
  * 29. `výkresy dílů`: „list vyhodnocen bez nálezů“ jen u listu, který vznikl; díl mimo záložku nikdy tiše (⚠ bom.make-incomplete)
+ * 32. „odpovídá modelu“ / „Zastaralé výstupy: žádné“ – nikdy po změně prvků dokumentu, který engine mění na místě (revize podle
+ *     objektu i tvaru dokumentu, doc-shape.ts)
+ * 31. „Zastaralé výstupy: žádné“ / „Zbývá: nic“ / `✓ pohybová studie znovu` – nikdy s výsledkem pohybové studie, který pro
+ *     nynější stav sestavy neplatí (motion.stale), ani se studií, která při přepočtu našla kolizi
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
@@ -454,6 +460,42 @@ describe("greens kolo 7 – přepočítat vše, materiál razítka, výkresy dí
     expect(formatShort(ok)).toMatch(/warned=0/);
   }, 240_000);
 
+  it("31 (kolo 7b, bod 20): pohybová studie po změně dílu – výstupy ji vypíší, přepočítat vše nikdy „Zbývá: nic“ bez přepočtu, ⚠ s nálezem", async () => {
+    // repro S/rev-w22d-r7/e2.txt (oponent): dřív „Zastaralé výstupy: žádné“ a warned=0, přestože `pohyb stav` hlásil motion.stale
+    const ws = new MemoryWorkspace();
+    await run(ws, 'nový díl "Deska A"\nkvádr 60 40 10\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 40 10 30\nsestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20\npohyb motor lineární vazba 1 20..-5 kroky 5 kolize\npohyb spustit');
+    const ch = await run(ws, 'záložka "Deska A"\nupravit "Kvádr 1" size=70;40;10\nzáložka "Sestava A"\nsestava obnovit vše\nvýstupy');
+    const t1 = txt(ch);
+    expect(t1).not.toMatch(/Zastaralé výstupy: žádné/);
+    expect(t1).toMatch(/⚠ pohybová studie – výsledek neplatí – od výpočtu se změnilo: geometrie dílu „Deska A“ → pohyb spustit/);
+    expect(formatShort(ch)).toMatch(/stale=1 .*analysis=1/);
+    const r = await run(ws, "přepočítat vše\nvýstupy");
+    const t = txt(r);
+    expect(t).not.toMatch(/✓ pohybová studie znovu/); // studie našla kolizi (clash.real) – ne „✓“
+    expect(t).toMatch(/⚠ pohybová studie znovu \(pohyb spustit\) – s varováním: clash\.real/);
+    expect(formatShort(r)).toMatch(/warned=1/);
+    expect(t).toMatch(/Zastaralé výstupy: žádné/); // po přepočtu výsledek platí – a teprve teď
+    // protipříklad: studie bez kolize (přidržovač nedojede do desky) → ✓ a warned=0
+    const ws2 = new MemoryWorkspace();
+    await run(ws2, 'nový díl "Deska A"\nkvádr 60 40 10\nnový díl "Přidržovač"\nkvádr 10 10 10\nnová sestava "Sestava A"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 40 10 30\nsestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20\npohyb motor lineární vazba 1 20..5 kroky 5 kolize\npohyb spustit');
+    const ok = await run(ws2, 'záložka "Deska A"\nupravit "Kvádr 1" size=70;40;10\nzáložka "Sestava A"\npřepočítat vše');
+    expect(txt(ok)).toMatch(/✓ pohybová studie znovu \(pohyb spustit\)\n/);
+    expect(formatShort(ok)).toMatch(/warned=0/);
+  }, 240_000);
+
+  it("32 (kolo 7b, bod 20): vydaný list a pak prvek v témže běhu (dokument měněný na místě) – nikdy „odpovídá modelu“", async () => {
+    // repro S/w22/p2/fixr7d2/rv2.txt: dřív revize r·4273fb i po díře (mezipaměť podle objektu dokumentu) → „Zastaralé výstupy: žádné“
+    const r = await run(new MemoryWorkspace(), 'nový díl "Deska F"\nkvádr 60 40 10\nvýkres A4\nvýkres vydat\ndíra 6 v 20 20 10 skrz\nvýstupy');
+    const t = txt(r);
+    expect(t).not.toMatch(/Zastaralé výstupy: žádné/);
+    expect(t).not.toMatch(/List 1: Vydání: rev\. A z modelu r·\w+ \([^)]*\) – odpovídá modelu/);
+    expect(t).toMatch(/1\. ⚠ list „List 1“ rev\. A – vydán z modelu (r·\w{6}), model je teď (?!\1)r·\w{6} → výkres vydat B/);
+    expect(has(r, "drawing.stale")).toBe(true);
+    // protipříklad: bez změny modelu po vydání list odpovídá
+    const ok = await run(new MemoryWorkspace(), 'nový díl "Deska F"\nkvádr 60 40 10\ndíra 6 v 20 20 10 skrz\nvýkres A4\nvýkres vydat\nvýstupy');
+    expect(txt(ok)).toMatch(/Zastaralé výstupy: žádné/);
+  }, 240_000);
+
   it("27 (kolo 7, bod 20): obnova kopie ztratí referenci vazby – „Zbývá“ ji vypíše, žádné „Zbývá: nic“ ani ✓ obnovy", async () => {
     // repro S/w22/p2/fixr7d/p20/b.txt
     const ws = new MemoryWorkspace();
@@ -484,6 +526,24 @@ describe("greens kolo 7 – přepočítat vše, materiál razítka, výkresy dí
     // neznámé označení v razítku = ⚠ density-assumed (jako příkaz materiál)
     const st2 = await run(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 100 60 20\nvýkres A4\nvýkres razítko materiál="Hardox 400"');
     expect(st2.entries.some((e) => e.code === "material.density-assumed" && e.line === 4)).toBe(true);
+  }, 240_000);
+
+  it("28b (kolo 7b, 22g): podtřída oceli není rozpor; rozpor tříd hlásí i stav, kusovník a export (ne jen řádek příkazu)", async () => {
+    // repro S/rev-w22d-r7/a.txt: dřív ⚠ „ČSN 11 523 je třídy Ocel, hustota … podle třídy 1.2311 … si odporují“
+    const sub = await run(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 100 60 20\nmateriál ČSN 11 523\nmateriál 1.2311\nstav');
+    expect(has(sub, "material.class-conflict")).toBe(false);
+    expect(txt(sub)).not.toMatch(/si odporují/);
+    expect(sub.entries.find((e) => e.code === "material.class-family")?.text).toMatch(/„ČSN 11 523“ je třídy Ocel – hustota podle zvolené třídy 1\.2311 .*7\.85 g\/cm³\) ze stejné skupiny/);
+    // skutečný rozpor (ocel × nerez): ⚠ i na řádku `stav`, `kusovník` sestavy a exportu výkresu – dřív jen na řádku `materiál`
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, 'nový díl "Přidržovač"\nkvádr 40 30 10\nmateriál ČSN 11 423\nmateriál nerez\nstav\nvýkres A4\nvýkres export pdf\nnová sestava "Nástroj"\nvložit "Přidržovač" ukotvit\nkusovník');
+    const lines = r.entries.filter((e) => e.code === "material.class-conflict").map((e) => e.line);
+    expect(lines).toEqual(expect.arrayContaining([4, 5, 7, 10]));
+    expect(r.entries.find((e) => e.code === "material.class-conflict" && e.line === 10)?.text).toMatch(/díl „Přidržovač“: materiál „ČSN 11 423“ je třídy Ocel, hustota se ale počítá podle třídy Nerez/);
+    expect(r.entries.find((e) => e.code === "material.class-conflict" && e.line === 7)?.text).toMatch(/^PDF: materiál „ČSN 11 423“/);
+    // protipříklad: bez rozporu nic z toho
+    const ok = await run(new MemoryWorkspace(), 'nový díl "Přidržovač"\nkvádr 40 30 10\nmateriál ČSN 11 423\nstav\nvýkres A4\nvýkres export pdf\nnová sestava "Nástroj"\nvložit "Přidržovač" ukotvit\nkusovník');
+    expect(has(ok, "material.class-conflict")).toBe(false);
   }, 240_000);
 
   it("29 (kolo 7, bod 19): výkresy dílů – list jen vyráběnému dílu bez výkresu; díl mimo záložku ⚠, nikdy tiše", async () => {
@@ -529,5 +589,17 @@ describe("greens kolo 7 – přepočítat vše, materiál razítka, výkresy dí
     expect(t).toMatch(/Překryvy na listu: 0 \(zkontrolováno/);
     // „0“ musí být skutečný stav čar: bez kontroly by test prošel i s křížícím se rozmístěním
     expect(countCrossings([{ x: 0, y: 0, a: [10, 10] }, { x: 10, y: 0, a: [0, 10] }])).toBe(1);
+    // nejdelší odkaz (kolo 7b – tvrzení „162 → 139 mm“ bez testu): spočítaný list téže sestavy, délka od středu kroužku ke kotvě;
+    // před krokem 3b 162 mm, po něm 139 mm (mez 145 mm nechává rezervu na drobné změny rozvržení, 162 by neprošlo)
+    const { renderSheet } = await import("../drawing-export");
+    const { drawingMemo } = await import("../engine/sheet-eval");
+    const { drawExtras } = await import("../engine/asm-status");
+    const asm = ws.present();
+    const sh = await renderSheet(asm, 0, drawingMemo(real as unknown as KernelApi), await drawExtras(ws, real as unknown as KernelApi, asm, { flat: true }));
+    const bs = (sh.out.balloons ?? []).map((b) => ({ x: b.x, y: b.y, a: b.a ?? ([b.x, b.y] as [number, number]) }));
+    expect(bs.length).toBe(100);
+    const longest = Math.max(...bs.map((b) => Math.hypot(b.a[0] - b.x, b.a[1] - b.y)));
+    expect(longest).toBeLessThan(145);
+    expect(countCrossings(bs)).toBe(0);
   }, 240_000);
 });

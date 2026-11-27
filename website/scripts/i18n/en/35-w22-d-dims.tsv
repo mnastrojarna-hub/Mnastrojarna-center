@@ -34,7 +34,6 @@ funkční {0}: plochu nejde zkontrolovat (tvar)	functional {0}: the face cannot 
 funkční {0}: prvek nemá rozměry, které kontrola zná	functional {0}: the feature has no sizes the check knows
 funkční {0}: šikmá plocha	functional {0}: inclined face
 funkční {0}: tolerance {1} se liší od předepsané {2}	functional {0}: tolerance {1} differs from the required {2}
-funkční F7 [H7] · funkční "Díra 1" [±0,02] · základna A F3 · funkční [seznam] · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	functional F7 [H7] · functional "Hole 1" [±0.02] · functional datum A F3 · functional [list] · functional clear F7|"Hole 1"|all · functional datum clear A|all
 funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu	functional feature {0} of part “{1}” cannot be written as a script line
 Funkční prvky a základny ({0}):	Functional features and datums ({0}):
 funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)	functional features and datums are marked in a part – open the part (part tab)
@@ -64,8 +63,6 @@ plochu F{0} se nepodařilo změřit	face F{0} could not be measured
 poloha {0} – {1} {2}	position {0} – {1} {2}
 poloha {0} (body zadané odkazem na geometrii)	position {0} (points given by reference to geometry)
 poloha {0} (kvádr natočený nebo zadaný odkazem)	position {0} (box rotated or given by reference)
-poloha {0} (skica v obecné rovině)	position {0} (sketch on a general plane)
-poloha {0} (šikmá osa díry)	position {0} (inclined hole axis)
 poloha {0} (šikmá osa nebo odkaz)	position {0} (inclined axis or reference)
 poloha obecného obrysu {0} (lomená čára, oblouk, spline)	position of the general profile {0} (polyline, arc, spline)
 Polohy	Positions

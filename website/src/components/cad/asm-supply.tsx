@@ -12,6 +12,7 @@ import type { BomRow } from "@/cad/assembly";
 import { copyFieldsText, copyState, originName, staleCopies, staleCopyText, staleHints } from "@/cad/asm-refresh";
 import { defaultSupply, supplyOf, supplyOptions, supplyWord } from "@/cad/bom-model";
 import { tr } from "@/cad/i18n";
+import { materialConflictLines } from "@/cad/material-designation";
 import type { AsmComponent, CadDoc, SupplyInfo, SupplyKind } from "@/cad/types";
 
 const label = "mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55";
@@ -25,7 +26,8 @@ export type PartLookup = (name: string) => CadDoc | null;
  */
 export function bomNotesOf(doc: CadDoc, rows: BomRow[], partOf: PartLookup): { text: string; stale?: boolean }[] {
   if (doc.kind !== "assembly") return [];
-  return [...staleCopies(doc, partOf).map((s) => ({ text: staleCopyText(s), stale: true })), ...bomWarnings(rows, staleHints(doc, partOf)).map((text) => ({ text }))];
+  // + díly s označením materiálu jiné třídy, než podle které je hmotnost v tabulce (22g, kolo 7b – stejný text jako `kusovník`)
+  return [...staleCopies(doc, partOf).map((s) => ({ text: staleCopyText(s), stale: true })), ...bomWarnings(rows, staleHints(doc, partOf)).map((text) => ({ text })), ...materialConflictLines(doc).map((x) => ({ text: x.text }))];
 }
 
 /**

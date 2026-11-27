@@ -13,6 +13,8 @@
  */
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { materialClass } from "./agent-strict";
+import { codeText } from "./engine/codes";
+import { tr } from "./i18n";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ß/g, "ss");
 
@@ -52,7 +54,13 @@ export function designationPatch(text: string, known: string | null = knownMater
   return cls ? { materialName: q, material: cls } : { materialName: q };
 }
 
-export type MaterialNote = { code: "material.class" | "material.density-assumed" | "material.class-conflict"; args: (string | number)[] };
+export type MaterialNote = { code: "material.class" | "material.class-family" | "material.density-assumed" | "material.class-conflict"; args: (string | number)[] };
+
+/**
+ * skupina třídy hustoty: podtřídy oceli v `MATERIALS` (1.2311, 1.2343, 1.1730 …) patří do skupiny „ocel“ – označení jiné
+ * oceli proti nim NENÍ rozpor tříd (kolo 7b: dřív „ČSN 11 523 je třídy Ocel, hustota podle třídy 1.2311 … si odporují“)
+ */
+export const materialFamily = (id: string): string => (MATERIALS.some((x) => x.id === id) ? (materialClass(id) ?? id) : id);
 
 /**
  * Hláška k označení materiálu dokumentu: třída rozpoznaná z označení = třída dokumentu → ℹ `material.class`; jinak ⚠
@@ -64,6 +72,8 @@ export function designationNote(materialName: string | undefined, material: stri
   const cls = MATERIALS.find((x) => x.id === material) ?? MATERIALS[0];
   const of = materialClass(n);
   if (of === cls.id) return { code: "material.class", args: [n, `${cls.label} (${cls.density} g/cm³)`] };
+  // označení oceli u podtřídy oceli (ČSN 11 523 × 1.2311): stejná skupina – hustota podle zvolené podtřídy, žádný rozpor (ℹ)
+  if (of && of === materialFamily(cls.id)) return { code: "material.class-family", args: [n, MATERIALS.find((x) => x.id === of)?.label ?? of, cls.label, cls.density] };
   // označení JINÉ rozpoznané třídy (ČSN 11 423 = ocel, třída dokumentu nerez – `materiál nerez` po označení, nabídka Materiál
   // v GUI): hustota podle třídy dokumentu odporuje označení v razítku – ⚠, nikdy tiše (vlna 22, bod 22g – kolo 7)
   const ofCls = of ? MATERIALS.find((x) => x.id === of) : undefined;
@@ -86,4 +96,33 @@ export function withDesignation<T extends { material: string; materialName?: str
   if (p.materialName) next.materialName = p.materialName;
   else delete next.materialName;
   return next;
+}
+
+/**
+ * Díly dokumentu, jejichž označení v razítku patří jiné třídě, než podle které se počítá hustota (⚠ material.class-conflict):
+ * díl sám, u sestavy díly komponent (i v podsestavách, každý díl jednou). Pro `stav`, kusovník (text i panel GUI) a export
+ * výkresu / kusovníku – konflikt se dřív hlásil jen na řádku příkazu `materiál` a pod polem GUI (kolo 7b, bod 22g).
+ */
+export function materialConflicts(doc: { kind?: string; name: string; material?: string; materialName?: string; components?: readonly { source: { kind: string; doc?: unknown } }[] }): { part: string; note: MaterialNote }[] {
+  const out: { part: string; note: MaterialNote }[] = [];
+  const seen = new Set<string>();
+  const visit = (d: typeof doc, depth: number) => {
+    if (depth > 16) return;
+    if (d.kind === "assembly") {
+      for (const c of d.components ?? []) if ((c.source.kind === "part" || c.source.kind === "asm") && c.source.doc) visit(c.source.doc as typeof doc, depth + 1);
+      return;
+    }
+    const note = designationNote(d.materialName, d.material);
+    const key = `${d.name}|${d.materialName}|${d.material}`;
+    if (note?.code !== "material.class-conflict" || seen.has(key)) return;
+    seen.add(key);
+    out.push({ part: d.name, note });
+  }
+  visit(doc, 0);
+  return out;
+}
+
+/** texty ⚠ material.class-conflict dokumentu: u sestavy s názvem dílu („díl „Deska A“: …“), u dílu text kódu */
+export function materialConflictLines(doc: Parameters<typeof materialConflicts>[0]): { part: string; text: string }[] {
+  return materialConflicts(doc).map((x) => ({ part: x.part, text: doc.kind === "assembly" ? tr("díl „{0}“: {1}", x.part, codeText("material.class-conflict", ...x.note.args)) : codeText("material.class-conflict", ...x.note.args) }));
 }

@@ -68,8 +68,11 @@ export function Manager({
   selectedIds,
   bodyHidden,
   onToggleBody,
+  onMarkProfile,
 }: {
   doc: CadDoc;
+  /** „Označit profil jako funkční“ u skici / prvku ze skici (vlna 22, bod 18 – kolo 7b): text `funkční profil "…"` přes engine */
+  onMarkProfile?: (f: Feature) => void;
   /** řízená záložka (bez ní si ji správce drží sám) */
   tab?: Tab;
   onTab?: (t: Tab) => void;
@@ -111,6 +114,7 @@ export function Manager({
     { id: "edit", label: f.type === "sketch" ? tr("Upravit skicu") : tr("Upravit parametry"), icon: "edit", onClick: () => onSelect(f) },
     { id: "rename", label: tr("Přejmenovat"), icon: "text", onClick: () => setRenaming(f.id) },
     { id: "supp", label: f.suppressed ? tr("Zapnout prvek") : tr("Potlačit prvek"), icon: "eye", onClick: () => setFeatures(doc.features.map((x) => (x.id === f.id ? ({ ...x, suppressed: !x.suppressed } as Feature) : x))) },
+    ...(onMarkProfile && (f.type === "sketch" || ("sketchId" in f && typeof (f as { sketchId?: unknown }).sketchId === "string")) ? [{ id: "fnprof", label: tr("Označit profil jako funkční"), icon: "check" as const, onClick: () => onMarkProfile(f) }] : []),
     { id: "dup", label: tr("Duplikovat"), icon: "copy", onClick: () => {
       const i = doc.features.findIndex((x) => x.id === f.id);
       const copy = { ...structuredClone(f), id: uid(), name: `${f.name} (kopie)` } as Feature;

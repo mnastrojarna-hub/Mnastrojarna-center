@@ -1,0 +1,30 @@
+# vlna 22, bod 18 (kolo 7b): profil jako celek (funkční profil), dohledání označené plochy po změně modelu podle geometrie,
+# poloha šikmé díry v bodě vstupu a skica na ploše rovnoběžné se základní rovinou
+nový díl "Deska P"
+kvádr 100 60 20
+skica XY 20
+obdélník 30 20 v 50 30
+vysunout 5 odebrat
+funkční profil "Vysunutí 1" ±0,02
+funkční F2 ±0,02
+základna A F1
+výkres A4
+výkres kontrola kót
+#--- run
+# díra jinde: F2 je táž plocha (dohledána); deska delší v X: F2 (rovina Y = 0) je na téže rovině, jen větší (dohledána);
+# deska posunutá v Y: F2 je jinde (nedohledána – ⚠ functional.lost, „nezkontrolováno“, nikdy jiná plocha)
+# (bez „záložka“: výkres na konci běhu otevře v prohlížeči výkresové prostředí – výpis přepnutí by se lišil od Node)
+díra 6 v 80 50 20 skrz
+výkres kontrola kót
+upravit "Kvádr 1" size=110;60;20
+funkční dohledat
+výkres kontrola kót
+upravit "Kvádr 1" position=0;5;0
+výkres kontrola kót
+funkční
+#--- run
+nový díl "Deska S"
+kvádr 100 60 20
+díra 8 v 30 20 20 hloubka 15 směr 0 0,5 -0,866
+výkres A4
+výkres kontrola kót

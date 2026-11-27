@@ -96,7 +96,7 @@ import {
   type PartFace,
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
-import { designationNote, withDesignation } from "./material-designation";
+import { designationNote, materialConflictLines, withDesignation } from "./material-designation";
 import type { ClashDetail, ClashPair } from "./clash-class";
 import type { ClrReq, ClrRes } from "./clearance-types";
 import type { ProcReq, ProcRes } from "./process-types";
@@ -1110,6 +1110,8 @@ export function bomCodes(d: CadDoc, rows: BomRow[], env: Pick<AsmEnv, "partOf">)
   const out: { code: string; text: string }[] = [];
   for (const s of staleCopies(d, env.partOf)) out.push({ code: "asm.stale-copy", text: staleCopyText(s) });
   for (const w of bomWarnings(rows, staleHints(d, env.partOf))) out.push({ code: "bom.make-incomplete", text: w });
+  // díl s označením materiálu jiné třídy, než podle které se počítá hmotnost v kusovníku (22g, kolo 7b)
+  for (const x of materialConflictLines(d)) out.push({ code: "material.class-conflict", text: x.text });
   return out;
 }
 

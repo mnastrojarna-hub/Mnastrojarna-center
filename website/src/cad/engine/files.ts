@@ -19,6 +19,7 @@ import { embedBlobs, missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
+import { materialConflictLines } from "../material-designation";
 import { staleCopies, staleCopyText, staleHints } from "../asm-refresh";
 import type { PdfFonts } from "../pdf";
 import { sketchToDxf } from "../sketch";
@@ -484,7 +485,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.dims-incomplete" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.reload-invalid" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "out.no-solid" | "out.free-surfaces" | "bom.docs" | "bom.make-incomplete" | "asm.stale-copy" | "drawing.dim-detached" | "material.class-conflict"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
@@ -566,6 +567,8 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   // 22g (kolo 3): kusovník / výkres sestavy z kopie dílu starší než díl v záložce – export to řekne vždy (dřív jen řádek změny
   // dílu nebo `kusovník`; CSV s prázdným číslem a „— (třída Ocel)“ se zapsal bez ⚠)
   if (d.kind === "assembly") for (const sc of staleCopies(d, (n) => ws.findPart(n))) note({ code: "asm.stale-copy", text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", fmt.toUpperCase(), staleCopyText(sc)), level: "warn" });
+  // 22g (kolo 7b): razítko / kusovník s označením materiálu jiné třídy, než podle které je hmotnost – soubor to řekne
+  for (const x of materialConflictLines(d)) note({ code: "material.class-conflict", text: tr("{0}: {1}", fmt.toUpperCase(), x.text), level: "warn" });
   if (fmt === "csv") {
     const csv = await bomCsv(env, d);
     if (!csv) {

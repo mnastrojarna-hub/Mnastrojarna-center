@@ -11,7 +11,11 @@ import { tr } from "../../i18n";
 import type { CadDoc, Feature, FunctionalMark, Vec3 } from "../../types";
 import { modelRev } from "../result-key";
 import { runOf } from "../run-doc";
-import { say, type OpHandler } from "./util";
+import { asmHooks, coded, say, type OpCtx, type OpHandler } from "./util";
+import { makeAsmEnv } from "../asm-env";
+import { partFaces } from "../../asm-agent";
+import { sourceKey } from "../../assembly";
+import { facePrint, matchFace, type FaceCand, type RefPrint } from "../../mate-remap";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
@@ -65,6 +69,78 @@ async function faceGeom(ctx: Parameters<OpHandler<"functional">>[1], d: CadDoc, 
   return { t: "other", c: e.center ?? [0, 0, 0] };
 }
 
+/** plochy dílu (číslo, geometrie, plocha mm², obálka) – stejný seznam jako u vazeb sestavy (asm-agent.ts `partFaces`) */
+async function faceCands(ctx: OpCtx, d: CadDoc): Promise<FaceCand[]> {
+  const env = makeAsmEnv(ctx.ws, ctx.host.kernel, asmHooks(ctx));
+  const source = { kind: "part" as const, doc: { ...d, kind: "part" as const } };
+  const key = sourceKey(source);
+  const [r] = await env.parts([{ key, source }]);
+  return (await partFaces(env, key, r?.result)).faces;
+}
+/** otisk plochy `index` dílu pro pozdější dohledání (null = plocha není v seznamu – volné plochy, nad 400 ploch) */
+async function printOf(ctx: OpCtx, d: CadDoc, index: number): Promise<RefPrint | null> {
+  const row = (await faceCands(ctx, d).catch(() => [])).find((f) => f.face === index);
+  return row ? facePrint(row.info, row.area, row.box) : null;
+}
+
+/**
+ * Dohledání označených ploch a základen po změně modelu (vlna 22, bod 18 – kolo 7b): plocha označená na starší revizi
+ * (`rev` ≠ nynější) se najde znovu podle otisku jen při geometrické shodě (cad/mate-remap.ts `matchFace` – přesná shoda, nebo
+ * jediná plocha na téže rovině / ose, která se s původní překrývá); pak se uloží nové číslo, geometrie a revize (ℹ
+ * functional.refound). Žádná nebo víc možností → zůstává „nezkontrolováno“ (⚠ functional.lost) – nikdy „nejbližší“ jiná plocha.
+ * Vrací dokument s obnovenými značkami (beze změny, když nebylo co dohledat).
+ */
+/** ⚠ functional.lost jen jednou za běh a plochu (každý příkaz výkresu po změně modelu dohledání zkusí znovu) */
+const lostSaid = new WeakMap<object, Set<string>>();
+export async function refindMarks(ctx: OpCtx, d: CadDoc): Promise<{ doc: CadDoc; refound: number; lost: number }> {
+  const ms = d.functional ?? [];
+  const rev = modelRev(d);
+  const stale = ms.filter((m) => !m.feature && !m.profile && m.face && m.rev && m.rev !== rev);
+  if (!stale.length || d.kind === "assembly" || d.kind === "draft") return { doc: d, refound: 0, lost: 0 };
+  let faces: FaceCand[] | null = null;
+  try {
+    faces = await faceCands(ctx, d);
+  } catch {
+    faces = null;
+  }
+  let refound = 0;
+  let lost = 0;
+  const next: FunctionalMark[] = [];
+  for (const m of ms) {
+    if (!stale.includes(m)) {
+      next.push(m);
+      continue;
+    }
+    const what = m.kind === "datum" ? tr("základna {0}", m.label ?? "?") : tr("funkční F{0}", m.face!.index + 1);
+    // otisk z doby označení; starší značka bez otisku: jen nosná plocha ze snímku geometrie (bez velikosti a obálky – překryv
+    // pak nejde ověřit a jediný kandidát na téže rovině se NEbere; přesná shoda středu ano)
+    const print: RefPrint | null = m.print ?? (m.geom?.t === "plane" ? { kind: "plane", origin: m.geom.c, normal: m.geom.n } : m.geom?.t === "cyl" ? { kind: "cylinder", origin: m.geom.c, normal: m.geom.axis, radius: m.geom.r } : null);
+    const hit = print && faces ? matchFace(print, faces, m.face!.index) : null;
+    if (!hit || hit.state === "lost") {
+      lost++;
+      next.push(m);
+      const said = lostSaid.get(ctx.report) ?? new Set<string>();
+      lostSaid.set(ctx.report, said);
+      if (said.has(`${m.id}|${rev}`)) continue;
+      said.add(`${m.id}|${rev}`);
+      coded(ctx, "functional.lost", { args: [what, `F${m.face!.index + 1}`, !faces ? tr("seznam ploch dílu se nepodařilo načíst") : !print ? tr("bez otisku plochy") : hit?.state === "lost" && hit.why === "ambiguous" ? tr("víc ploch na téže rovině / ose") : tr("na původní rovině / ose plocha není – posunula se nebo zmizela")] });
+      continue;
+    }
+    const geom = await faceGeom(ctx, d, hit.face).catch(() => undefined);
+    if (!geom || (m.kind === "datum" && geom.t !== "plane")) {
+      lost++;
+      next.push(m);
+      coded(ctx, "functional.lost", { args: [what, `F${m.face!.index + 1}`, tr("plochu se nepodařilo změřit")] });
+      continue;
+    }
+    const row = faces!.find((f) => f.face === hit.face);
+    next.push({ ...m, face: { index: hit.face }, geom, rev, ...(row ? { print: facePrint(row.info, row.area, row.box) } : {}) });
+    refound++;
+    coded(ctx, "functional.refound", { args: [what, `F${m.face!.index + 1}`, `F${hit.face + 1}`, hit.how === "exact" ? tr("táž plocha") : tr("táž rovina / osa, jiná velikost")] });
+  }
+  return refound ? { doc: { ...d, functional: next }, refound, lost } : { doc: d, refound, lost };
+}
+
 /** díra (prvek historie) se stejnou osou a poloměrem jako válcová plocha */
 function holeOfCylinder(d: CadDoc, g: Extract<NonNullable<FunctionalMark["geom"]>, { t: "cyl" }>): Feature | undefined {
   const l = Math.hypot(...g.axis) || 1;
@@ -86,6 +162,16 @@ function holeOfCylinder(d: CadDoc, g: Extract<NonNullable<FunctionalMark["geom"]
 
 export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
   const r = runOf(ctx);
+  if (op.cmd.kind === "refind") {
+    if (r.doc.kind === "assembly" || r.doc.kind === "draft") throw new Error(tr("funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)"));
+    const res = await refindMarks(ctx, r.doc);
+    if (res.refound) {
+      r.doc = res.doc;
+      r.changed = true;
+    }
+    say(ctx, res.refound || res.lost ? tr("→ dohledáno {0}, nedohledáno {1} (nedohledané se nekontrolují – označte je znovu)", res.refound, res.lost) : tr("→ nic k dohledání – žádná označená plocha není ze starší revize modelu"));
+    return;
+  }
   const d = r.doc;
   if (d.kind === "assembly" || d.kind === "draft") throw new Error(tr("funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)"));
   const cmd: FunctionalCmd = op.cmd;
@@ -117,8 +203,31 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
       const geom = await faceGeom(ctx, d, index);
       if (geom?.t !== "plane") throw new Error(tr("základna {0}: plocha F{1} není rovinná – základnou může být jen rovinná plocha", cmd.label, index + 1));
       const next = ms.filter((m) => !(m.kind === "datum" && m.label === cmd.label));
-      next.push({ id: nextId(next), kind: "datum", label: cmd.label, face: { index }, geom, rev: modelRev(d) });
+      const pr = await printOf(ctx, d, index);
+      next.push({ id: nextId(next), kind: "datum", label: cmd.label, face: { index }, geom, rev: modelRev(d), ...(pr ? { print: pr } : {}) });
       commit(next, tr("✓ základna {0} = F{1} ({2}) – polohy funkčních prvků se kontrolují od ní", cmd.label, index + 1, geomText(next[next.length - 1])));
+      return;
+    }
+    case "profile": {
+      // profil jako celek: skica podle názvu, nebo prvek, který ze skici vzniká (vysunutí, rotace, odebrání) → jeho skica
+      const words = cmd.target;
+      let sk: Feature | undefined;
+      let tol = "";
+      for (let n = words.length; n >= 1 && !sk; n--) {
+        const name = fold(words.slice(0, n).join(" "));
+        const f = d.features.find((x) => fold(x.name) === name);
+        if (!f) continue;
+        const sid = f.type === "sketch" ? f.id : "sketchId" in f ? (f as { sketchId?: string }).sketchId : undefined;
+        sk = sid ? d.features.find((x) => x.id === sid && x.type === "sketch") : undefined;
+        if (!sk) throw new Error(tr("funkční profil: „{0}“ není skica ani prvek ze skici – skici: {1}", f.name, d.features.filter((x) => x.type === "sketch").map((x) => x.name).join(", ") || "—"));
+        tol = words.slice(n).join(" ");
+      }
+      if (!sk) throw new Error(tr("funkční profil: „{0}“ není skica ani prvek dílu – skici: {1}", words.join(" "), d.features.filter((x) => x.type === "sketch").map((x) => x.name).join(", ") || "—"));
+      const users = d.features.filter((f) => "sketchId" in f && (f as { sketchId?: string }).sketchId === sk!.id).map((f) => f.name);
+      const next = ms.filter((m) => !(m.kind === "functional" && m.profile === sk!.id));
+      const mark: FunctionalMark = { id: nextId(next), kind: "functional", profile: sk.id, ...(tol ? { tol } : {}) };
+      next.push(mark);
+      commit(next, tr("✓ funkční {0}{1}{2} – kontrola kót chce velikost, polohu{3} a toleranci všech rozměrů profilu", markLabel(d, mark), users.length ? ` (${users.join(", ")})` : "", tol ? tr(" · tolerance {0}", tol) : "", ms.some((m) => m.kind === "datum") ? tr(" od základny") : ""));
       return;
     }
     case "mark": {
@@ -135,6 +244,10 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
         mark = hole
           ? { id: "", kind: "functional", feature: hole.id, ...(t.tol ? { tol: t.tol } : {}) }
           : { id: "", kind: "functional", face: { index: t.face! }, ...(geom ? { geom } : {}), ...(t.tol ? { tol: t.tol } : {}), rev: modelRev(d) };
+        if (!hole) {
+          const pr = await printOf(ctx, d, t.face!);
+          if (pr) mark.print = pr;
+        }
       }
       const same = (m: FunctionalMark) => m.kind === "functional" && ((mark.feature && m.feature === mark.feature) || (mark.face && m.face?.index === mark.face.index));
       const next = ms.filter((m) => !same(m));

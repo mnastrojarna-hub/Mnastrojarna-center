@@ -24,6 +24,7 @@ import { clashSig } from "../clash-class";
 import type { MateStatus } from "../mates";
 import type { CadDoc } from "../types";
 import type { DocKey, Workspace } from "./workspace";
+import { shapeMemo } from "../doc-shape";
 
 /** druh uloženého výsledku */
 export type ResultKind = "clash" | "mates" | "measure" | "compare" | "motion" | "inspect" | "overlay";
@@ -105,7 +106,8 @@ function canonJson(v: unknown, ids: Map<string, string>): string {
   const s = JSON.stringify(v) ?? "";
   return ids.size ? s.replace(/[A-Za-z0-9_-]+/g, (m) => ids.get(m) ?? m) : s;
 }
-const partRevMemo = new WeakMap<object, string>();
+/** podle objektu dokumentu A jeho tvaru (doc-shape.ts) – engine mění dokument běhu na místě (kolo 7b: dřív stará revize) */
+const partRevMemo = shapeMemo<string>();
 /** otisk obsahu dílu pro revizi (prvky, proměnné, vazby parametrů, konfigurace – jako `sourceKey`, bez náhodných id) */
 function partRevSig(d: CadDoc): string {
   let r = partRevMemo.get(d);

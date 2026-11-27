@@ -9,7 +9,8 @@ import { geometryText, treeStatus } from "@/cad/feature-levels";
 import { ValidityChip } from "./validity-chip";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { motionStoreVersion, subscribeMotionStore } from "@/cad/motion-cache";
 import { flushSync } from "react-dom";
 import { classifyClashes, clashSig } from "@/cad/clash-class";
 import { countsText, entryClashes, entryCounts, faultLeafIds } from "@/cad/clash-report";
@@ -1415,10 +1416,13 @@ export function CadApp() {
   /** zastaralé výstupy pro panel „Zastaralé výstupy“ (vlna 22, bod 20): uložené analýzy (A1 `staleResults`) a kopie dílů (D1) */
   // výsledky a díly čte z pracovního prostoru (měnitelný ref) – přepočet spouští změna uloženého výsledku kolizí / vazeb
   // (`clashEntry`, `mateRec`), čítač výsledků `resVer` a verze sestavy `asmVer`, proto jsou v závislostech i v těle
+  // + verze úložiště pohybových studií (kolo 7): výsledek studie vstupuje do seznamu sondou motion-cache.ts – po `pohyb spustit`
+  //   (panel, konzole) se doc nemění, panel by jinak dál ukazoval „pohybová studie neplatí“
+  const motionVer = useSyncExternalStore(subscribeMotionStore, motionStoreVersion, motionStoreVersion);
   const staleNow = useMemo(() => {
-    void [clashEntry, mateRec, resVer];
+    void [clashEntry, mateRec, resVer, motionVer];
     return doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc);
-  }, [doc, docKeyNow, clashEntry, mateRec, resVer]);
+  }, [doc, docKeyNow, clashEntry, mateRec, resVer, motionVer]);
   const copiesNow = useMemo(() => {
     void asmVer;
     return isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : [];
@@ -4040,7 +4044,7 @@ export function CadApp() {
               <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))} />
               </>
             ) : (
-              <Manager doc={doc} status={treeSt} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />
+              <Manager doc={doc} status={treeSt} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} onMarkProfile={doc.kind !== "assembly" && doc.kind !== "draft" ? (f) => void runAgentRef.current(`funkční profil "${f.name.replace(/"/g, "")}"`).then((t) => flash(t.split("\n").find((l) => /^[✓✗]/.test(l.trim())) ?? t.split("\n")[0])) : undefined} />
             )}
           </aside>
 
@@ -4760,6 +4764,7 @@ export function CadApp() {
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
             onExported={(e) => recordOutput((cur) => recordExport(cur, e).doc)}
             onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
+            onRefindMarks={doc.kind !== "assembly" && doc.kind !== "draft" ? () => void runAgentRef.current("funkční dohledat").then((t) => flash(t.split("\n").find((l) => /^\s*(→|✗)/.test(l)) ?? t.split("\n")[0])) : undefined}
             staleCopies={copiesNow}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onTitleTemplates={(t) => commitWith((cur) => ({ ...cur, titleTemplates: t?.length ? t : undefined }))}

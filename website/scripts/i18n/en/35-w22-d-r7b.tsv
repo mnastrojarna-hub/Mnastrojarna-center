@@ -1,0 +1,32 @@
+# vlna 22, fáze 2, kolo 7b (stopa D): pohyb v zastaralých výstupech, rozpor třídy materiálu, funkční profil a dohledání ploch, šikmé díry
+→ dohledáno {0}, nedohledáno {1} (nedohledané se nekontrolují – označte je znovu)	→ re-found {0}, not re-found {1} (faces not re-found are not checked – mark them again)
+→ nic k dohledání – žádná označená plocha není ze starší revize modelu	→ nothing to re-find – no marked face is from an older model revision
+✓ funkční {0}{1}{2} – kontrola kót chce velikost, polohu{3} a toleranci všech rozměrů profilu	✓ functional {0}{1}{2} – the dimension check requires size, position{3} and tolerance of all dimensions of the profile
+bez otisku plochy	no face fingerprint
+díl „{0}“: {1}	part “{0}”: {1}
+Dohledat podle geometrie	Re-find by geometry
+funkční {0}: profil nemá rozměry, které kontrola zná	functional {0}: the profile has no dimensions the check knows
+funkční {0}: skica už v dílu není	functional {0}: the sketch is no longer in the part
+funkční F7 [H7] · funkční "Díra 1" [±0,02] · funkční profil "Skica 1" [±0,02] · základna A F3 · funkční [seznam] · funkční dohledat · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	functional F7 [H7] · functional "Hole 1" [±0.02] · functional profile "Sketch 1" [±0.02] · functional datum A F3 · functional [list] · functional refind · functional clear F7|"Hole 1"|all · datum clear A|all
+funkční profil: „{0}“ není skica ani prvek dílu – skici: {1}	functional profile: “{0}” is neither a sketch nor a feature of the part – sketches: {1}
+funkční profil: „{0}“ není skica ani prvek ze skici – skici: {1}	functional profile: “{0}” is neither a sketch nor a feature made from a sketch – sketches: {1}
+funkční profil: název skici nebo prvku ze skici, např. funkční profil "Skica 1" ±0,02 – {0}	functional profile: name of a sketch or of a feature made from a sketch, e.g. functional profile "Sketch 1" ±0.02 – {0}
+na původní rovině / ose plocha není – posunula se nebo zmizela	no face on the original plane / axis – it moved or disappeared
+Označené plochy ze starší revize modelu ({0}) se nekontrolují.	Marked faces from an older model revision ({0}) are not checked.
+Označit profil jako funkční	Mark profile as functional
+plochu se nepodařilo změřit	the face could not be measured
+poloha {0} – {1} {2} (vstup šikmé díry)	position {0} – {1} {2} (entry of an inclined hole)
+poloha {0} (osa díry zadaná odkazem)	position {0} (hole axis given by reference)
+poloha {0} (skica v šikmé rovině – kontrola poloh je jen v osách modelu)	position {0} (sketch in an inclined plane – positions are checked only in model axes)
+profil {0}	profile {0}
+seznam ploch dílu se nepodařilo načíst	the face list of the part could not be loaded
+táž plocha	same face
+táž rovina / osa, jiná velikost	same plane / axis, different size
+úhel osy {0} ({1}° od osy {2}) – kóty úhlů kontrola nečte	axis angle of {0} ({1}° from axis {2}) – the check does not read angle dimensions
+víc ploch na téže rovině / ose	several faces on the same plane / axis
+výsledek neplatí – od výpočtu se změnilo: {0}	the result is not valid – since the computation changed: {0}
+výsledek neplatí pro nynější stav sestavy (díly, polohy, vazby nebo studie)	the result is not valid for the current state of the assembly (parts, positions, mates or study)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+materiál „{0}“ je třídy {1} – hustota podle zvolené třídy {2} ({3} g/cm³) ze stejné skupiny	material “{0}” is of class {1} – density according to the chosen class {2} ({3} g/cm³) from the same group
+{0}: plocha po změně modelu dohledána podle geometrie – {1} → {2} ({3})	{0}: face re-found by geometry after the model change – {1} → {2} ({3})
+{0}: plochu {1} po změně modelu nejde jednoznačně dohledat ({2}) – nekontroluje se; označte ji znovu	{0}: face {1} cannot be re-found unambiguously after the model change ({2}) – not checked; mark it again

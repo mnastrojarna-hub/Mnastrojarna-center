@@ -27,11 +27,13 @@ type Props = {
   flash?: (text: string) => void;
   /** kontrola tolerancí funkčních rozměrů listu (dosavadní blok) */
   children?: ReactNode;
+  /** dohledat označené plochy ze starší revize modelu (`funkční dohledat`, kolo 7b) */
+  onRefind?: () => void;
 };
 
 const MARK: Record<DimReq["status"], string> = { ok: "✓", partial: "◐", missing: "✗", unchecked: "–" };
 
-export function DimCheckPanel({ doc, out, ann, opts, onAdd, flash, children }: Props) {
+export function DimCheckPanel({ doc, out, ann, opts, onAdd, flash, children, onRefind }: Props) {
   const r = useMemo(() => (out ? sheetDimCheck(doc, out, ann, opts) : null), [doc, out, ann, opts]);
   if (!out) return null;
   if (!r)
@@ -117,6 +119,16 @@ export function DimCheckPanel({ doc, out, ann, opts, onAdd, flash, children }: P
           </p>
         ) : (
           <p className="text-ink-700/55">{tr("Tolerance neověřeny – funkční prvky nejsou vyznačené (pravým tlačítkem na plochu v modelu: Označit jako funkční / základnu; textem funkční F7 H7, základna A F3).")}</p>
+        )}
+        {(r.tol.stale ?? 0) > 0 && (
+          <p data-dim-marks-stale={r.tol.stale} className="text-amber-800">
+            {tr("Označené plochy ze starší revize modelu ({0}) se nekontrolují.", r.tol.stale ?? 0)}
+            {onRefind ? (
+              <button type="button" data-dim-refind className="ml-1 rounded border border-amber-300 bg-white px-1.5 py-0.5 text-[10.5px] hover:bg-amber-50" onClick={onRefind}>
+                {tr("Dohledat podle geometrie")}
+              </button>
+            ) : null}
+          </p>
         )}
         {r.tol.over.length > 0 && (
           <p data-dim-over className="text-sky-800">

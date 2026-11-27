@@ -46,6 +46,9 @@ const REQUIRED: Record<string, "error" | "warn" | "note"> = {
   "material.density-assumed": "warn", // 37
   "material.class-conflict": "warn", // 37 (vlna 22 kolo 7: označení jiné třídy, než podle které se počítá hustota)
   "material.class": "note", // 37
+  "functional.refound": "note", // bod 18 (kolo 7b: označená plocha dohledána podle geometrie)
+  "functional.lost": "warn", // bod 18 (kolo 7b: plochu nejde dohledat – nezkontrolováno)
+  "material.class-family": "note", // 37 (kolo 7b: označení oceli u podtřídy oceli – stejná skupina, žádný rozpor)
   "hole.tap-diameter": "warn", // 38
   "host.app-only": "error", // 39
   "asm.kernel-restarted": "note", // 40

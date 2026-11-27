@@ -23,6 +23,7 @@ import { drawExtras, ensureMateStatus } from "./asm-status";
 import { asmHooks, coded, sayKv, type OpCtx } from "./ops/util";
 import { runEngineOp } from "./ops/registry";
 import { clashState, mateStatusState, staleResults } from "./result-key";
+import { motionStateOf, motionStoreOf } from "../motion-cache";
 import { docKeyOf, runOf } from "./run-doc";
 import { drawingMemo, sheetWarningCode } from "./sheet-eval";
 
@@ -94,7 +95,10 @@ export function staleItems(ctx: OpCtx, d: CadDoc): StaleItem[] {
     d.kind === "assembly"
       ? staleCopies(d, (n) => ctx.ws.findPart(n)).map((s) => ({ name: s.comp.alias ?? s.comp.name, why: staleCopyText(s), fix: `sestava obnovit ${s.comp.alias ? `"${s.comp.alias}"` : `#${s.index + 1}`}` }))
       : [];
-  return staleOutputs(d, { analyses, copies });
+  // pohybová studie: co se od výpočtu změnilo (stejný text jako ⚠ motion.stale u `pohyb stav`)
+  const mo = analyses.includes("motion") ? motionStateOf(motionStoreOf(ctx.ws.asm), docKeyOf(ctx), d) : null;
+  const why = mo?.state === "stale" ? { motion: tr("výsledek neplatí – od výpočtu se změnilo: {0}", mo.changed.join("; ")) } : undefined;
+  return staleOutputs(d, { analyses, copies, why });
 }
 
 const kvOf = (d: CadDoc, items: readonly StaleItem[]): string => {

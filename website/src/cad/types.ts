@@ -511,6 +511,8 @@ export type FunctionalMark = {
   kind: "functional" | "datum";
   label?: string;
   feature?: string;
+  /** profil jako celek (vlna 22, bod 18 – kolo 7b): id skici – všechny rozměry a polohy jejích obrysů jsou funkční */
+  profile?: string;
   face?: { index: number; sig?: Sig };
   geom?: { t: "plane"; n: Vec3; c: Vec3 } | { t: "cyl"; axis: Vec3; c: Vec3; r: number } | { t: "other"; c: Vec3 };
   tol?: string;
@@ -519,6 +521,11 @@ export type FunctionalMark = {
    * po změně modelu se plocha nekontroluje (nezkontrolováno, označit znovu), ne podle starého snímku (vlna 22, bod 18 – kolo 3)
    */
   rev?: string;
+  /**
+   * otisk označené plochy (nosná plocha, střed, velikost, obálka – cad/mate-remap.ts `facePrint`) pro `funkční dohledat`: po změně
+   * modelu se plocha najde znovu jen při geometrické shodě, jinak zůstane „nezkontrolováno“ (kolo 7b)
+   */
+  print?: Omit<LostRef, "why">;
 };
 
 /** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */

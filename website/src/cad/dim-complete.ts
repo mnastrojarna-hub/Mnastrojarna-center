@@ -21,7 +21,7 @@
 import { tr } from "./i18n";
 import { auxInfo, countOf, expectedDims, presentDims, type DimKind } from "./dim-check";
 import { placementOf } from "./placements";
-import { threadByName, threadLabel } from "./defaults";
+import { planeBasis, threadByName, threadLabel, toWorld } from "./defaults";
 import { modelRev } from "./engine/result-key";
 import type { CadDoc, DrawingAnnotation, Feature, FunctionalMark, Vec2, Vec3 } from "./types";
 
@@ -260,14 +260,24 @@ function addReq(c: Ctx, r: Omit<DimReq, "status">): DimReq | null {
   return x;
 }
 
-/** bod skici (u; v) ve 3D na základní rovině (jako replicad makePlane / drawing-dims `sketchPoint`); obecná rovina → null */
+/** bod skici (u; v) ve 3D (jako replicad makePlane / drawing-dims `sketchPoint`) – i obecná rovina (skica na ploše, počátek + normála) */
 function sketchPt(pl: Extract<Feature, { type: "sketch" }>["plane"], u: number, v: number): Vec3 | null {
-  if (pl.kind === "custom") return null;
+  if (pl.kind === "custom") return toWorld(pl, [u, v]);
   if (pl.name === "XY") return [u, v, pl.offset];
   if (pl.name === "XZ") return [u, -pl.offset, v];
   return [pl.offset, u, v];
 }
-const planeAxes = (pl: Extract<Feature, { type: "sketch" }>["plane"]): [0 | 1 | 2, 0 | 1 | 2] | null => (pl.kind === "custom" ? null : pl.name === "XY" ? [0, 1] : pl.name === "XZ" ? [0, 2] : [1, 2]);
+/**
+ * osy modelu, ve kterých leží osy skici (u, v); obecná rovina (skica na ploše, `skica počátek … normála …`) jen když její osy
+ * leží v osách modelu (rovina rovnoběžná se základní, kolo 7b – dřív každá obecná rovina „nezkontrolováno“); šikmá → null
+ */
+const planeAxes = (pl: Extract<Feature, { type: "sketch" }>["plane"]): [0 | 1 | 2, 0 | 1 | 2] | null => {
+  if (pl.kind !== "custom") return pl.name === "XY" ? [0, 1] : pl.name === "XZ" ? [0, 2] : [1, 2];
+  const b = planeBasis(pl);
+  const ax = axisOf(b.x);
+  const ay = axisOf(b.y);
+  return ax && ay && ax.k !== ay.k ? [ax.k, ay.k] : null;
+};
 
 /** interval [lo, hi] na ose k leží uvnitř obálky (neprochází, nedotýká se hrany) */
 const interior = (bbox: [Vec3, Vec3] | null, k: number, lo: number, hi: number) => !!bbox && lo > bbox[0][k] + tolOf(lo) && hi < bbox[1][k] - tolOf(hi);
@@ -422,18 +432,25 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
         if (g.dir && dir && Math.abs(dot(g.dir, dir)) < 0.999) g.dir = null;
         groups.set(key, g);
         const ax = dir ? axisOf(dir) : null;
-        if (!ax) {
-          c.unchecked.push(tr("poloha {0} (šikmá osa díry)", f.name));
+        if (!dir) {
+          c.unchecked.push(tr("poloha {0} (osa díry zadaná odkazem)", f.name));
           break;
         }
-        const ring = circularOf(doc, f, ax.k);
+        // šikmá díra (směr vektorem, kolo 7b – dřív celá „nezkontrolováno“): poloha BODU VSTUPU v osách kolmých na převládající
+        // složku směru (vrtá se z plochy kolmé na ni); úhel osy kontrola kót nečte – vypíše se jako nezkontrolovaný
+        const ka: 0 | 1 | 2 = ax ? ax.k : ([0, 1, 2] as const).reduce((m, k) => (Math.abs(dir[k]) > Math.abs(dir[m]) ? k : m), 0 as 0 | 1 | 2);
+        if (!ax) c.unchecked.push(tr("úhel osy {0} ({1}° od osy {2}) – kóty úhlů kontrola nečte", f.name, fmt((Math.acos(Math.min(1, Math.abs(dir[ka]))) * 180) / Math.PI), AXN[ka]));
+        const ring = ax ? circularOf(doc, f, ax.k) : null;
         seeds.forEach((p, si) => {
           for (const k of [0, 1, 2] as const) {
-            if (k === ax.k) continue;
-            const pcd = ring ? pcdFor(ring, p, k, ax.k) : null;
-            const r = (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.d ?? f.diameter) : f.diameter) / 2;
-            const hole = { ka: ax.k, r, lo: bbox ? bbox[0][ax.k] : -Infinity, hi: bbox ? bbox[1][ax.k] : Infinity };
-            addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label: tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])), source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p, hole, ...(pcd ? { pcd } : {}) });
+            if (k === ka) continue;
+            const pcd = ring ? pcdFor(ring, p, k, ka) : null;
+            const r0 = (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.d ?? f.diameter) : f.diameter) / 2;
+            // vstup šikmé díry je v pohledu podél převládající osy elipsa – poloosa r / cos(úhlu)
+            const r = ax ? r0 : r0 / Math.max(0.2, Math.abs(dir[ka]));
+            const hole = { ka, r, lo: bbox ? bbox[0][ka] : -Infinity, hi: bbox ? bbox[1][ka] : Infinity };
+            const label = ax ? tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])) : tr("poloha {0} – {1} {2} (vstup šikmé díry)", f.name, AXN[k], fmt(p[k]));
+            addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label, source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p, hole, ...(pcd ? { pcd } : {}) });
           }
         });
         break;
@@ -443,7 +460,7 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
         if (!sk) break;
         const axes = planeAxes(sk.plane);
         if (!axes) {
-          if (f.mode === "cut" || cutTool) c.unchecked.push(tr("poloha {0} (skica v obecné rovině)", f.name));
+          if (f.mode === "cut" || cutTool) c.unchecked.push(tr("poloha {0} (skica v šikmé rovině – kontrola poloh je jen v osách modelu)", f.name));
           break;
         }
         let general = false;
@@ -743,6 +760,24 @@ function applyMarks(doc: CadDoc, reqs: DimReq[], unchecked: string[]): { n: numb
       stale++;
       continue;
     }
+    if (m.profile) {
+      // profil jako celek (kolo 7b): všechny velikosti a polohy obrysů skici – i u prvků, které z ní vznikají (vysunutí, rotace)
+      const sk = m.profile;
+      const users = new Set([sk, ...doc.features.filter((f) => "sketchId" in f && (f as { sketchId?: string }).sketchId === sk).map((f) => f.id)]);
+      const own = reqs.filter((q) => q.featureId !== undefined && users.has(q.featureId));
+      if (!doc.features.some((f) => f.id === sk)) unchecked.push(tr("funkční {0}: skica už v dílu není", label));
+      else if (!own.length) unchecked.push(tr("funkční {0}: profil nemá rozměry, které kontrola zná", label));
+      else {
+        for (const q of own) {
+          q.functional = true;
+          if (m.tol && q.kind === "size") q.tol = m.tol;
+          const d = q.kind === "pos" ? datums.find((x) => x.k === q.axis) : undefined;
+          if (d && !(q.at ?? []).some((a) => eq(a, d.c))) q.datum = { label: d.label, c: d.c };
+        }
+        n++;
+      }
+      continue;
+    }
     let fid = m.feature;
     if (!fid && m.geom?.t === "cyl") {
       // válcová plocha = díra / odebraný válec se stejnou osou a poloměrem
@@ -790,6 +825,7 @@ function applyMarks(doc: CadDoc, reqs: DimReq[], unchecked: string[]): { n: numb
 
 /** popisek značky: „F7“, „Díra 1“, „základna A (F3)“ */
 export function markLabel(doc: Pick<CadDoc, "features">, m: FunctionalMark): string {
+  if (m.profile) return tr("profil {0}", doc.features.find((f) => f.id === m.profile)?.name ?? m.profile);
   const what = m.feature ? (doc.features.find((f) => f.id === m.feature)?.name ?? m.feature) : m.face ? `F${m.face.index + 1}` : "?";
   return m.kind === "datum" ? tr("základna {0} ({1})", m.label ?? "?", what) : what;
 }

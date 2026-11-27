@@ -5,7 +5,7 @@ import { buildDoc, docKeyOf, runOf } from "../run-doc";
 import { statusKv } from "../kv";
 import { asmHooks, sayKv, type OpHandler } from "./util";
 import { withValidity } from "../validity-store";
-import { reportStaleCopies } from "../bom-notes";
+import { reportMaterialConflicts, reportStaleCopies } from "../bom-notes";
 import { reportStaleSheets } from "../outputs-ops";
 import { reportLostSprings } from "../spring-fresh";
 import { reportLostRefs } from "../lost-refs";
@@ -21,6 +21,7 @@ export const statusOp: OpHandler<"status"> = async (op, ctx) => {
   const shown = withValidity(ctx.ws, docKeyOf(ctx), r.doc, res); // přesná kontrola téže geometrie (kontrola přesně / export)
   sayKv(ctx, statusKv(r.doc, shown, asm, stale), docStatusText(r.doc, shown, asm, stale));
   reportStaleCopies(ctx, r.doc); // kopie dílu starší než díl v záložce – ⚠ s příkazem obnovy (bod 22g)
+  reportMaterialConflicts(ctx, r.doc); // označení v razítku jiné třídy než hustota – ⚠ material.class-conflict (22g, kolo 7b)
   reportStaleSheets(ctx, r.doc); // vydaný list ze starší revize modelu – ⚠ drawing.stale (bod 20)
   reportLostSprings(ctx, r.doc, op.line); // ztracená dosedací plocha pružiny – ⚠ spring.lost, ne čistý stav (bod 7, kolo 6)
   reportLostRefs(ctx, r.doc); // vazba / pružina se ztracenou referencí – ⚠ mate.lost (bod 20, kolo 6)

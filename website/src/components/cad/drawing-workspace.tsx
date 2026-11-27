@@ -72,6 +72,8 @@ type Props = {
   onExported?: (e: ExportInput) => void;
   /** „Přepočítat“ u zastaralého vydaného listu = text `přepočítat vše` (engine/outputs-ops.ts) */
   onRecomputeAll?: () => void;
+  /** „Dohledat funkční plochy“ v kontrole kót = text `funkční dohledat` (označené plochy ze starší revize modelu – bod 18, kolo 7b) */
+  onRefindMarks?: () => void;
   /** komponenty sestavy, jejichž kopie dílu je starší než díl v záložce (asm-refresh.ts) – kusovník a razítko listu ukazují údaje z vložení (22g) */
   staleCopies?: { name: string; why: string }[];
 };
@@ -173,7 +175,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll, staleCopies }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll, onRefindMarks, staleCopies }: Props) {
   /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
   const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
@@ -1301,6 +1303,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   ann={ann}
                   opts={opts}
                   flash={flash}
+                  onRefind={onRefindMarks}
                   onAdd={(made) => {
                     setAnn((l) => [...l, ...made]);
                     markDirty();

@@ -16,6 +16,7 @@
  *
  * Čisté funkce bez jádra a Reactu – stejné v prohlížeči i v CLI.
  */
+import { shapeMemo } from "./doc-shape";
 import { hashPair } from "./assembly";
 import { geometrySig, modelRev } from "./engine/result-key";
 import { cadLocale, tr } from "./i18n";
@@ -54,7 +55,9 @@ export const nowRev = (rec: { sig: string; data?: string }, id: ModelId): string
 /** export nese údaje razítka / kusovníku (výkres, CSV kusovníku) – jen ten po změně čísla / materiálu zastará */
 const carriesData = (e: { what: string; format: string }): boolean => e.what === "drawing" || e.format.toLowerCase() === "csv";
 
-const idMemo = new WeakMap<CadDoc, ModelId>();
+/** podle objektu dokumentu A jeho tvaru (doc-shape.ts): engine mění dokument běhu na místě – po `díra …` za `výkres vydat`
+ *  dřív zůstala stará revize a list „odpovídal modelu“ (kolo 7b, falešná zelená) */
+const idMemo = shapeMemo<ModelId>();
 /** revize modelu dokumentu (v mezipaměti podle objektu dokumentu – GUI ji čte při každém překreslení) */
 export function modelId(doc: CadDoc): ModelId {
   let id = idMemo.get(doc);
@@ -318,10 +321,11 @@ export type StaleItem = {
 };
 
 /** druhy analýz A1 (`staleResults`) lidsky a příkaz, který je přepočítá */
-export const ANALYSIS: Record<string, { label: () => string; fix: string; auto: boolean }> = {
+export const ANALYSIS: Record<string, { label: () => string; fix: string; auto: boolean; why?: () => string }> = {
   clash: { label: () => tr("kontrola kolizí"), fix: "kolize", auto: true },
   mates: { label: () => tr("stav vazeb"), fix: "sestava vazby", auto: true },
-  motion: { label: () => tr("pohybová studie"), fix: "pohyb spustit", auto: true },
+  // pohyb neplatí i po změně poloh, vazeb nebo definice studie – „ze starší revize modelu“ by nebyla pravda (kolo 7)
+  motion: { label: () => tr("pohybová studie"), fix: "pohyb spustit", auto: true, why: () => tr("výsledek neplatí pro nynější stav sestavy (díly, polohy, vazby nebo studie)") },
   measure: { label: () => tr("měření"), fix: "měřit …", auto: false },
   compare: { label: () => tr("porovnání s referencí"), fix: "porovnat …", auto: false },
   inspect: { label: () => tr("kontrola"), fix: "kontrola", auto: false },
@@ -333,13 +337,14 @@ export const ANALYSIS: Record<string, { label: () => string; fix: string; auto: 
  * které pro nynější stav neplatí (`analyses` = A1 `staleResults`), a kopie dílů v sestavě starší než díl (`copies` = popisy
  * D1 `staleCopies`).
  */
-export function staleOutputs(doc: CadDoc, o: { analyses?: readonly string[]; copies?: readonly { name: string; why: string; fix?: string }[] } = {}): StaleItem[] {
+export function staleOutputs(doc: CadDoc, o: { analyses?: readonly string[]; copies?: readonly { name: string; why: string; fix?: string }[]; why?: Readonly<Partial<Record<string, string>>> } = {}): StaleItem[] {
   const id = modelId(doc);
   const out: StaleItem[] = [];
   for (const c of o.copies ?? []) out.push({ kind: "copy", label: c.name, why: c.why, fix: c.fix ?? "sestava obnovit vše", auto: true });
   for (const a of o.analyses ?? []) {
     const d = ANALYSIS[a];
-    out.push({ kind: "analysis", label: d ? d.label() : a, why: tr("výsledek je ze starší revize modelu"), fix: d?.fix ?? a, auto: d?.auto ?? false });
+    // `o.why` = přesný důvod od volajícího (pohyb: co se od výpočtu změnilo), jinak výchozí text druhu
+    out.push({ kind: "analysis", label: d ? d.label() : a, why: o.why?.[a] ?? d?.why?.() ?? tr("výsledek je ze starší revize modelu"), fix: d?.fix ?? a, auto: d?.auto ?? false });
   }
   for (const x of staleSheets(doc, id)) out.push({ kind: "sheet", label: tr("list „{0}“ rev. {1}", x.sheet.name, x.issued.rev), why: tr("vydán z modelu {0}, model je teď {1}", x.issued.modelRev, nowRev(x.issued, id)), fix: `výkres vydat ${nextRev(x.issued.rev)}`, auto: false, ref: x.sheet.id });
   for (const r of staleExports(doc, id)) out.push({ kind: "export", label: tr("{0} „{1}“", formatName(r.format), r.file), why: exportWhy(r, id), fix: reexportCmd(doc, r), auto: false, ref: r.id });

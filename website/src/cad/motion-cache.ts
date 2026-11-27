@@ -23,6 +23,7 @@ import { motionMotorNotes, type MotionResult } from "./motion";
 import { clearanceOf } from "./motion-clearance";
 import { massMaterialId } from "./motion-mass";
 import { processStatusText, processWarnCount } from "./motion-process";
+import { registerStaleProbe } from "./engine/result-key";
 import type { CadDoc, MotionStudy } from "./types";
 
 /**
@@ -178,6 +179,14 @@ export function motionStateOf(store: MotionStore, key: string, d: CadDoc): Motio
   if (e.sig === motionSig(d)) return { state: "ok", entry: e };
   return { state: "stale", entry: e, changed: motionChanges(e.parts, d) };
 }
+/**
+ * Sonda platnosti pro společný seznam zastaralých výsledků (engine/result-key.ts `staleResults` → řádek D `stale=motion`,
+ * `výstupy`, `přepočítat vše`, panel Zastaralé výstupy – vlna 22, bod 20, kolo 7): dřív ji nikdo nezaregistroval, a tak
+ * `přepočítat vše` psalo „Zbývá: nic“ i s výsledkem studie, který `pohyb stav` hlásil jako motion.stale. Úložiště i klíč
+ * dokumentu jsou tytéž jako u `pohyb stav` / `stav` (`motionStoreOf(ws.asm)`, `Workspace.docKey`); výsledek bez tohoto
+ * modulu nevznikne, registrace při jeho načtení proto stačí.
+ */
+registerStaleProbe("motion", (ws, key, doc) => doc.kind === "assembly" && motionStateOf(motionStoreOf(ws.asm), key, doc).state === "stale");
 export const motionState = (d: CadDoc, env: { motion?: MotionSlot; geo: object }): MotionState => {
   const { store, key } = motionSlot(env);
   return motionStateOf(store, key, d);

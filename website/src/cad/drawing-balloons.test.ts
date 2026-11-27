@@ -142,3 +142,24 @@ describe("kotva a délka odkazu (bod 17, kolo 6)", () => {
   });
 });
 
+describe("přesun na volný slot a ručně posunutá pozice (bod 17, kolo 7b)", () => {
+  // nález oponenta: krok 3b přesouval i pozici s uloženým `GenEdit.move` (posun relativně k automatické poloze) – po nesouvisející
+  // změně listu se tak posunula i pozice, kterou uživatel odtáhl
+  const items: BItem[] = Array.from({ length: 30 }, (_, i) => ({ pos: i + 1, boxes: [[[(i % 10) * 25, 0, Math.floor(i / 10) * 9], [(i % 10) * 25 + 20, 10, Math.floor(i / 10) * 9 + 5]]] }));
+  const front: BView = { key: "front", rect: { x: 40, y: 30, w: 245, h: 26 }, project: (p: Vec3) => [40 + p[0], 56 - p[2]] };
+  const base = { items, views: [front], obstacles: [{ x: 0, y: 0, w: 420, h: 22 }, { x: 22, y: 22, w: 14, h: 40 }], bounds: { x: 22, y: 12, w: 386, h: 273 }, R };
+  it("posunutá pozice = poloha PŘED přesunem + posun uživatele (krok 3b ji nepřesouvá)", () => {
+    const before = layoutBalloons({ ...base, relocate: false });
+    const after = layoutBalloons(base);
+    // krok 3b v tomto rozvržení opravdu některé pozice přesouvá (jinak by test nic neověřil)
+    const relocated = after.placed.filter((b) => { const o = before.placed.find((x) => x.id === b.id)!; return Math.hypot(o.x - b.x, o.y - b.y) > 0.5; });
+    expect(relocated.length).toBeGreaterThan(0);
+    for (const b of relocated) {
+      const pre = before.placed.find((x) => x.id === b.id)!;
+      const moved = layoutBalloons({ ...base, edit: { move: { [b.id]: [3, -2] } } }).placed.find((x) => x.id === b.id)!;
+      expect(moved.mode).toBe("moved");
+      expect(moved.x).toBeCloseTo(pre.x + 3, 6);
+      expect(moved.y).toBeCloseTo(pre.y - 2, 6);
+    }
+  });
+});

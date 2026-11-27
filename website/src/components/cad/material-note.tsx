@@ -11,7 +11,8 @@ import { designationNote } from "@/cad/material-designation";
 export function MaterialNoteLine({ doc }: { doc: { material: string; materialName?: string } }) {
   const note = designationNote(doc.materialName, doc.material);
   if (!note) return null;
-  const warn = note.code !== "material.class"; // ⚠ density-assumed i class-conflict (označení jiné třídy – kolo 7)
+  // ⚠ density-assumed i class-conflict (označení jiné třídy – kolo 7); ℹ třída z označení i podtřída téže skupiny (kolo 7b)
+  const warn = note.code !== "material.class" && note.code !== "material.class-family";
   return (
     <span data-material-note={note.code} className={`mt-1 block text-[11px] leading-snug ${warn ? "text-[#9a5b00]" : "text-[#5b6875]"}`}>
       {warn ? "⚠ " : "ℹ "}

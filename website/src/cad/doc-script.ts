@@ -222,6 +222,7 @@ const WORDS = {
   // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
   functionalMark: ["funkční", "functional", "funktional"],
   datumMark: ["základna", "datum", "bezug"],
+  profileMark: ["profil", "profile", "profil"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
   sBuy: ["nakupovaný", "buy", "kauf"],
@@ -1878,6 +1879,14 @@ function emitFunctional(c: Ctx, doc: CadDoc) {
     if (m.kind === "datum") {
       if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
       else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    // profil jako celek (kolo 7b): `funkční profil "Skica 1" ±0,02`
+    const sk = m.profile ? doc.features.find((x) => x.id === m.profile) : undefined;
+    const sq = sk ? scriptQuote(sk.name, true) : null;
+    if (m.profile) {
+      if (sq && !/[\r\n]/.test(tol)) c.line(`${c.w("functionalMark")} ${c.w("profileMark")} ${sq}${tol}`);
+      else c.note(tr("funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
       continue;
     }
     const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;

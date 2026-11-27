@@ -1,0 +1,159 @@
+=== run 1 ===
+✓ nový díl „Deska P“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Skica 1 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 1“ (e1)
+→ Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
+✓ funkční profil Skica 1 (Vysunutí 1) · tolerance ±0,02 – kontrola kót chce velikost, polohu a toleranci všech rozměrů profilu
+✓ funkční F2 · tolerance ±0,02 (rovina, normála 0; -1; 0, bod 50; 0; 10) – kontrola kót chce velikost, polohu a toleranci
+✓ základna A = F1 (rovina, normála -1; 0; 0, bod 0; 30; 10) – polohy funkčních prvků se kontrolují od ní
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+Kontrola kót: velikosti 5/5 · polohy 3/3 · funkční prvky: tolerance 0/5
+Velikosti:
+  → 1. 100 (délka X) (celkové rozměry)
+  → 2. 60 (šířka Y) (celkové rozměry)
+  → 3. 20 (výška Z) (celkové rozměry)
+  → 4. 30 (Skica 1) · funkční, bez tolerance
+  → 5. 5 (hloubka odebrání) (Vysunutí 1) · funkční, bez tolerance
+Polohy:
+  → 6. poloha Vysunutí 1 – X 35 – osa souměrnosti · funkční, bez tolerance
+  → 7. poloha Vysunutí 1 – Y 20 – osa souměrnosti · funkční, bez tolerance
+  → 8. poloha F2 – Y 0 · funkční, bez tolerance
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 12: funkční 30 (Skica 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 12: funkční 5 (hloubka odebrání) (Vysunutí 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 12: funkční poloha Vysunutí 1 – X 35 – osa souměrnosti: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 12: funkční poloha Vysunutí 1 – Y 20 – osa souměrnosti: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 12: funkční poloha F2 – Y 0: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Skica 1 (sketch)
+✓ Vysunutí 1 (extrude) · úběr 3000 mm³ (celý nástroj) · těleso platné
+
+Dokument: „Deska P“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 117 cm³ · ploch 11 · hran 24
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 120000 mm³ · těleso platné – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 30×20
+    entity: e1 obdélník 30×20 [50; 30]
+    profil: 1 uzavřený obrys (e1) ✓
+ 3. Vysunutí 1 [extrude, id #] ✓ úběr 3000 mm³ (celý nástroj) · těleso platné – 5 mm, cut
+=== run 2 ===
+✓ záložka „Deska P“ (díl) je aktivní – další příkazy pracují s ní
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+ℹ řádek 5: funkční F2: plocha po změně modelu dohledána podle geometrie – F2 → F2 (táž plocha)
+ℹ řádek 5: základna A: plocha po změně modelu dohledána podle geometrie – F1 → F1 (táž plocha)
+Kontrola kót: velikosti 6/6 · polohy 5/5 · funkční prvky: tolerance 0/5
+Velikosti:
+  → 1. 100 (délka X) (celkové rozměry)
+  → 2. 60 (šířka Y) (celkové rozměry)
+  → 3. 20 (výška Z) (celkové rozměry)
+  → 4. 30 (Skica 1) · funkční, bez tolerance
+  → 5. 5 (hloubka odebrání) (Vysunutí 1) · funkční, bez tolerance
+  → 10. Ø6 skrz (Díra 1)
+Polohy:
+  → 6. poloha Vysunutí 1 – X 35 – osa souměrnosti · funkční, bez tolerance
+  → 7. poloha Vysunutí 1 – Y 20 – osa souměrnosti · funkční, bez tolerance
+  → 8. poloha Díra 1 – X 80
+  → 9. poloha Díra 1 – Y 50
+  → 11. poloha F2 – Y 0 · funkční, bez tolerance
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 5: funkční 30 (Skica 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční 5 (hloubka odebrání) (Vysunutí 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční poloha Vysunutí 1 – X 35 – osa souměrnosti: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční poloha Vysunutí 1 – Y 20 – osa souměrnosti: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční poloha F2 – Y 0: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+→ Kvádr 1: size [100; 60; 20] → [110; 60; 20] – výsledek po výpočtu níže
+ℹ řádek 6: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 9
+ℹ řádek 7: funkční F2: plocha po změně modelu dohledána podle geometrie – F2 → F2 (táž rovina / osa, jiná velikost)
+ℹ řádek 7: základna A: plocha po změně modelu dohledána podle geometrie – F1 → F1 (táž plocha)
+→ dohledáno 2, nedohledáno 0 (nedohledané se nekontrolují – označte je znovu)
+Kontrola kót: velikosti 6/6 · polohy 5/5 · funkční prvky: tolerance 0/5
+Velikosti:
+  → 1. 110 (délka X) (celkové rozměry)
+  → 2. 60 (šířka Y) (celkové rozměry)
+  → 3. 20 (výška Z) (celkové rozměry)
+  → 4. 30 (Skica 1) · funkční, bez tolerance
+  → 5. 5 (hloubka odebrání) (Vysunutí 1) · funkční, bez tolerance
+  → 10. Ø6 skrz (Díra 1)
+Polohy:
+  → 6. poloha Vysunutí 1 – X 35 · funkční, bez tolerance
+  → 7. poloha Vysunutí 1 – Y 20 – osa souměrnosti · funkční, bez tolerance
+  → 8. poloha Díra 1 – X 80
+  → 9. poloha Díra 1 – Y 50
+  → 11. poloha F2 – Y 0 · funkční, bez tolerance
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 8: funkční 30 (Skica 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 8: funkční 5 (hloubka odebrání) (Vysunutí 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 8: funkční poloha Vysunutí 1 – X 35: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 8: funkční poloha Vysunutí 1 – Y 20 – osa souměrnosti: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 8: funkční poloha F2 – Y 0: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+→ Kvádr 1: position [0; 0; 0] → [0; 5; 0] – výsledek po výpočtu níže
+⚠ řádek 10: funkční F2: plochu F2 po změně modelu nejde jednoznačně dohledat (na původní rovině / ose plocha není – posunula se nebo zmizela) – nekontroluje se; označte ji znovu
+ℹ řádek 10: základna A: plocha po změně modelu dohledána podle geometrie – F1 → F1 (táž rovina / osa, jiná velikost)
+Kontrola kót: velikosti 6/6 · polohy 4/4 · funkční prvky: tolerance 0/4 · nezkontrolováno: funkční F2: plocha F2 označena na modelu r·?, model je teď r·? – označte ji znovu (funkční F2 ±0,02)
+Velikosti:
+  → 1. 110 (délka X) (celkové rozměry)
+  → 2. 60 (šířka Y) (celkové rozměry)
+  → 3. 20 (výška Z) (celkové rozměry)
+  → 4. 30 (Skica 1) · funkční, bez tolerance
+  → 5. 5 (hloubka odebrání) (Vysunutí 1) · funkční, bez tolerance
+  → 10. Ø6 skrz (Díra 1)
+Polohy:
+  → 6. poloha Vysunutí 1 – X 35 · funkční, bez tolerance
+  → 7. poloha Vysunutí 1 – Y 20 · funkční, bez tolerance
+  → 8. poloha Díra 1 – X 80
+  → 9. poloha Díra 1 – Y 50
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 10: funkční 30 (Skica 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 10: funkční 5 (hloubka odebrání) (Vysunutí 1): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 10: funkční poloha Vysunutí 1 – X 35: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 10: funkční poloha Vysunutí 1 – Y 20: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 10: funkční prvky a základny označené na starší revizi modelu (1) se nekontrolují – označte je znovu (funkční F… / základna A F…)
+Funkční prvky a základny (3):
+  f1 funkční profil Skica 1 · tolerance ±0,02
+  f2 funkční F2 · tolerance ±0,02 · rovina, normála 0; -1; 0, bod 55; 0; 10
+  f3 základna A (F1) · rovina, normála -1; 0; 0, bod 0; 35; 10
+  (geometrie plochy je z doby označení – po změně modelu plochu označte znovu)
+✓ Kvádr 1 (box) · přidáno 132000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 565,5 mm³ (6 % nástroje) · těleso platné
+
+Dokument: „Deska P“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗)
+Rozměry: 110 × 60 × 20 mm (X 0…110, Y 5…65, Z 0…20) · objem 128,43 cm³ · ploch 12 · hran 27
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 132000 mm³ · těleso platné – 110 × 60 × 20 mm, new, roh [0; 5; 0]
+ 2. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 30×20
+    entity: e1 obdélník 30×20 [50; 30]
+    profil: 1 uzavřený obrys (e1) ✓
+ 3. Vysunutí 1 [extrude, id #] ✓ úběr 3000 mm³ (celý nástroj) · těleso platné – 5 mm, cut
+ 4. Díra 1 [hole, id #] ✓ úběr 565,5 mm³ (6 % nástroje) · těleso platné – Ø6 skrz v [80; 50; 20], osa Z
+=== run 3 ===
+✓ nový díl „Deska S“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+Kontrola kót: velikosti 3/5 · polohy 0/2 – chybí: Ø8 hl. 15 (Díra 1); 15 (hloubka díry) (Díra 1); poloha Díra 1 – X 30 (vstup šikmé díry); poloha Díra 1 – Y 20 (vstup šikmé díry) · tolerance neověřeny (funkční prvky nevyznačeny) · nezkontrolováno: úhel osy Díra 1 (30° od osy Z) – kóty úhlů kontrola nečte
+Velikosti:
+  → 1. 100 (délka X) (celkové rozměry)
+  → 2. 60 (šířka Y) (celkové rozměry)
+  → 3. 20 (výška Z) (celkové rozměry)
+  ✗ 6. Ø8 hl. 15 (Díra 1)
+  ✗ 7. 15 (hloubka díry) (Díra 1)
+Polohy:
+  ✗ 4. poloha Díra 1 – X 30 (vstup šikmé díry)
+  ✗ 5. poloha Díra 1 – Y 20 (vstup šikmé díry)
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 5: list List 1: kóty neúplné – chybí 4 (velikosti 3/5, polohy 0/2): Ø8 hl. 15 (Díra 1); 15 (hloubka díry) (Díra 1); poloha Díra 1 – X 30 (vstup šikmé díry); poloha Díra 1 – Y 20 (vstup šikmé díry)
+⚠ řádek 5: list List 1: vynecháno: Ø8 ↧15: šikmá díra – osa není ve směru žádného pohledu; kótujte ji v pomocném pohledu kolmém na osu (výkres pohled pomocný směr 0 -0,5 0,866) ručně
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 794,3 mm³ (80 % nástroje) · těleso platné
+
+Dokument: „Deska S“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 119,21 cm³ · ploch 8 · hran 17
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 120000 mm³ · těleso platné – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 794,3 mm³ (80 % nástroje) · těleso platné – Ø8 hloubka 15 v [30; 20; 20], osa Z, směr vrtání [0; 0,5; -0,866]

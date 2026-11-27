@@ -21,7 +21,7 @@ import { drawingKv } from "../kv";
 import { drawingMemo, sheetIssue, sheetIssueText, sheetLabel } from "../sheet-eval";
 import { acceptLine, noteLine, sheetTail } from "../accept";
 import { asmHooks, coded, sayKv, type OpHandler } from "./util";
-import { reportStaleCopies } from "../bom-notes";
+import { reportMaterialConflicts, reportStaleCopies } from "../bom-notes";
 import { modelId } from "../../doc-outputs";
 import { staleData } from "../outputs-ops";
 import { inputFile } from "./reference";
@@ -29,6 +29,16 @@ import { designationNote } from "../../material-designation";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const r = runOf(ctx);
+  // označené plochy / základny ze starší revize modelu: před výpočtem listu se zkusí dohledat podle geometrie (bod 18, kolo 7b)
+  // – nalezené ℹ functional.refound a kontrola kót s nimi počítá; nenalezené ⚠ functional.lost a zůstávají „nezkontrolováno“
+  if (r.doc.kind !== "assembly" && r.doc.kind !== "draft" && r.doc.functional?.some((m) => m.face && m.rev)) {
+    const { refindMarks } = await import("./functional");
+    const rf = await refindMarks(ctx, r.doc);
+    if (rf.refound) {
+      r.doc = rf.doc;
+      r.changed = true;
+    }
+  }
   const { applyDrawingCmd, activeSheetIndex } = await import("../../drawing-agent");
   const kernel = ctx.host.kernel;
   const extras = await drawExtras(ctx.ws, kernel, r.doc, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
@@ -39,6 +49,9 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   r.openDrawingAfter = r.openDrawingAfter || res.open;
   // list sestavy s kusovníkem: kopie dílu starší než díl v záložce = ⚠ s příkazem obnovy (bod 22g, jednou za běh)
   if (r.doc.kind === "assembly") reportStaleCopies(ctx, r.doc);
+  // razítko / kusovník listu s označením materiálu jiné třídy než hustota (hmotnost v razítku z ní) – ⚠, jednou za běh (22g,
+  // kolo 7b); `výkres razítko materiál=…` má hlášku vlastní (níže)
+  if (!(op.cmd.k === "title" && op.cmd.fields.material !== undefined)) reportMaterialConflicts(ctx, r.doc);
   const issues = res.issues ?? [];
   // řádky hlášení (✗ / ⚠ výpočtu listu, ⚠ kontroly tolerancí po rozměrech) – v konzoli je nahradí řádek s kódem níže / na konci bloku
   const issueLines = new Set(issues.map(issueLine));
