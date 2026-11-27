@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { LayoutDashboard, Factory, Package, FileText, ShoppingBag, Paperclip, History, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Factory, Package, FileText, ShoppingBag, Paperclip, History, Truck, type LucideIcon } from "lucide-react";
+import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
+import { stageRank } from "@/lib/jobs/stages";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { JobDetail, JobFormOptions } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +19,7 @@ import { DETAIL_TABS_ID, detailTabOf, isDetailTab, type DetailTab } from "./deta
 import { FlowActionsProvider, type FlowAccess } from "./flow-actions";
 import type { JobProductionData } from "@/components/jobs/production/production-tab";
 // záložky mimo Přehled a Položky se načítají až při otevření; odkaz s ?tab= je vykreslí hned (viz lazy-tabs)
-import { CommunicationTab, DocumentsTab, HistoryTab, ProductionTab, PurchasingTab, QuotesTab } from "./lazy-tabs";
+import { CommunicationTab, DeliveryTab, DocumentsTab, HistoryTab, ProductionTab, PurchasingTab, QuotesTab } from "./lazy-tabs";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { sortOperations, stepLabel } from "@/lib/jobs/production";
 import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
@@ -41,6 +43,8 @@ export interface JobFlowData {
 
 const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; count: string }[] = [
   { key: "prehled", label: "Přehled", icon: LayoutDashboard, tone: "text-sky-600 dark:text-sky-400", count: "" },
+  // dodací list zákazníkovi, podepsaný DL, faktura a platba — samostatně, ne dole v Technologii (28. 11.)
+  { key: "dodani", label: "Dodání & faktura", icon: Truck, tone: "text-emerald-600 dark:text-emerald-400", count: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300" },
   // „Výrobu bych přejmenoval na technologii" (majitel 29. 10.) — klíč záložky zůstává „vyroba" (odkazy ?tab=vyroba)
   { key: "vyroba", label: "Technologie", icon: Factory, tone: "text-yellow-600 dark:text-yellow-400", count: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300" },
   { key: "polozky", label: "Položky", icon: Package, tone: "text-blue-600 dark:text-blue-400", count: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300" },
@@ -74,7 +78,9 @@ export function JobDetailView({
   initialAction?: string | null;
 }) {
   // Nákup & marže jen s maržemi; zaměstnanec se „Smí poptávat dodavatele" má místo něj záložku „Poptávky" (bez marží)
-  const tabs = TABS.filter((t) => t.key !== "nakup" || Boolean(purchasing) || canRfq)
+  // „Dodání & faktura" od objednávky dál (nebo když už nějaký dodací list / faktura je)
+  const hasDelivery = stageRank(job.stage) >= 3 || currentDeliveryNotes(job.files).length > 0 || Boolean(job.invoiceNumber);
+  const tabs = TABS.filter((t) => (t.key !== "nakup" || Boolean(purchasing) || canRfq) && (t.key !== "dodani" || hasDelivery))
     .map((t) => (t.key === "nakup" && !purchasing ? { ...t, label: "Poptávky dodavatelům" } : t));
   const fromUrl = detailTabOf(initialTab);
   const [tab, setTab] = React.useState<DetailTab>(fromUrl && tabs.some((t) => t.key === fromUrl) ? fromUrl : "prehled");
@@ -138,6 +144,7 @@ export function JobDetailView({
   const counts: Record<DetailTab, number> = {
     komunikace: mailCount,
     prehled: 0,
+    dodani: currentDeliveryNotes(job.files).length,
     vyroba: production?.summary.total ?? 0,
     polozky: job.items.length,
     nabidky: job.quotes.filter((q) => !q.archived).length,
@@ -188,6 +195,9 @@ export function JobDetailView({
 
             <TabsContent value="prehled">
               <OverviewTab job={job} fieldStamps={flow?.fieldStamps} production={production ?? null} purchasing={purchasing ?? null} />
+            </TabsContent>
+            <TabsContent value="dodani">
+              <DeliveryTab job={job} data={production ?? null} flow={flow ?? null} />
             </TabsContent>
             <TabsContent value="vyroba">
               <ProductionTab job={job} data={production ?? null} flow={flow ?? null} />

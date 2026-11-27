@@ -116,7 +116,7 @@ const TAB_OF: Partial<Record<FlowActionKey, DetailTab>> = {
   "quote.edit": "nabidky",
   "production.plan": "vyroba",
   "production.sendPo": "vyroba",
-  "delivery.confirmNote": "vyroba",
+  "delivery.confirmNote": "dodani",
 };
 
 const DIRECT_OK: Partial<Record<FlowActionKey, string>> = {

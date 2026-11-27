@@ -112,12 +112,13 @@ function render(j: JobDetail, node: React.ReactNode, access: FlowAccess = SALES,
 const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 describe("karta „Dodání, faktura a platba“ (A2)", () => {
-  it("po dodání (DL vystaven, nepotvrzen): krok DL hotový s číslem DL, faktura na řadě — potvrzený DL je nepovinný", () => {
+  it("po dodání (DL vystaven, nepotvrzen): krok DL hotový s číslem DL, výzva k podepsanému DL (27. 11.)", () => {
     const j = job();
     const html = render(j, <ClosingCard job={j} closing={closing()} margins />);
     const t = text(html);
     expect(t).toContain("Dodáno — DL-2026-071");
-    expect(t).toContain("Potvrzený DL od zákazníka · nepovinné");
+    expect(t).toContain("Podepsaný dodací list od zákazníka");
+    expect(t).toContain("půjde fakturovat");
     expect(t).toContain("Nahrát potvrzený DL");
     expect(t).toContain("Potvrdit bez souboru");
     // hlavní tlačítko „Vystavit fakturu" je v hlavičce → karta na něj jen odkáže (žádné druhé stejné tlačítko)
@@ -201,10 +202,10 @@ describe("karta „Dodání, faktura a platba“ (A2)", () => {
   });
 
   // review A2 #12: po faktuře je nepovinný potvrzený DL jen malý odkaz (ne velký blok na mobilu)
-  it("po faktuře: potvrzený DL jen jako odkaz „Nahrát potvrzený DL (nepovinné)“", () => {
+  it("po faktuře: podepsaný DL jen jako odkaz „Nahrát podepsaný DL“", () => {
     const j = job({ stage: "dokonceno", invoiceNumber: "FV-1", flow: facts({ stage: "dokonceno", invoiceNumber: "FV-1", paidAt: "2026-11-01" }) });
     const t = text(render(j, <ClosingCard job={j} closing={closing({ stage: "dokonceno", invoiceNumber: "FV-1", invoiceDate: "2026-10-28", paidAt: "2026-11-01" })} margins />));
-    expect(t).toContain("Nahrát potvrzený DL (nepovinné)");
+    expect(t).toContain("Nahrát podepsaný DL");
     expect(t).not.toContain("Potvrdit bez souboru");
     expect(t).not.toContain("Převzato dne");
   });
