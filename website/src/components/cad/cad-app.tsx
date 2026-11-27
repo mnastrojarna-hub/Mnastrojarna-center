@@ -2768,6 +2768,7 @@ export function CadApp() {
     flash(`${savedText(t.name)} · ${tr("model")} ${p.modelRev}`);
   };
   const saveProject = async () => {
+    flushPending("save"); // rozepsané pole / list výkresu patří do ukládaného souboru (i Ctrl+S, tlačítko Uložit)
     const t = projectTarget.current;
     if (t?.handle) {
       if (!(await waitOutputs(tr("uložení")))) return flash(tr("Uložení zrušeno."));
@@ -2957,12 +2958,19 @@ export function CadApp() {
     const onKey = (e: KeyboardEvent) => {
       if (askBusy() || gearWizardBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
-      if (field) {
-        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
-        return;
-      }
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (field) {
+        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
+        // Ctrl/Cmd+S i s fokusem v poli (vlna 22 kolo 6, bod 22e): rozepsaná hodnota se zapíše (flush) a projekt se uloží –
+        // dřív zkratka v poli skončila tady a prohlížeč nabídl „Uložit stránku“, soubor zůstal bez změny
+        if (mod && !e.shiftKey && !e.altKey && k === "s") {
+          e.preventDefault();
+          flushPending("save");
+          void saveProject();
+        }
+        return;
+      }
       if (mod && e.shiftKey && k === "k") {
         e.preventDefault();
         setAgentOpen(true);
@@ -2986,7 +2994,8 @@ export function CadApp() {
       }
       if (mod && k === "s") {
         e.preventDefault();
-        saveProject();
+        flushPending("save");
+        void saveProject();
         return;
       }
       if (mod && k === "o") {
@@ -4503,7 +4512,8 @@ export function CadApp() {
           )}
           {selection.length > 0 && <span className="rounded bg-brand/10 px-1.5 font-mono text-[10.5px] text-brand-600">{tr("vybráno")}{" "}{selection.length}</span>}
           {cursor && !sketch && <span className="hidden font-mono text-[10.5px] text-[#5b6776] md:inline">X {fmtNum(cursor[0], 2)} {tr("· Y")}{" "}{fmtNum(cursor[1], 2)} {tr("· Z")}{" "}{fmtNum(cursor[2], 2)}</span>}
-          <span className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{prefs.ortho ? tr("pravoúhlá") : tr("perspektiva")}</span>
+          {/* skutečná projekce: softwarový náhled (bez WebGL) kreslí VŽDY pravoúhle – nastavená perspektiva platí jen ve WebGL (vlna 22 kolo 6, bod 21) */}
+          <span data-projection={glError || prefs.ortho ? "ortho" : "persp"} className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{glError && !prefs.ortho ? tr("pravoúhlá (perspektiva jen ve WebGL)") : prefs.ortho || glError ? tr("pravoúhlá") : tr("perspektiva")}</span>
           <span className="hidden text-[10.5px] text-[#5b6776] lg:inline" data-mouse-hint title={boxHelpText()}>{mouseHint(prefs.mouse, prefs.leftDrag)}</span>
         </footer>
 

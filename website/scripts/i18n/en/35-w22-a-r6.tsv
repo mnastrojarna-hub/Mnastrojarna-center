@@ -1,0 +1,5 @@
+# Vlna 22, fáze 2, kolo 6 (track a): body 16, 20, 21, 22h
+úložiště krátkých odkazů ({0}) nefunguje – {1}	the short-link store ({0}) does not work – {1}
+{0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	{0}, wheel zooms. A click selects a face, edge or vertex (Ctrl/Shift adds), by text “select F3 E2” or window.mncad.select([…]). Full 3D: Chrome with --enable-unsafe-swiftshader without --disable-software-rasterizer.
+pravoúhlá (perspektiva jen ve WebGL)	orthographic (perspective only with WebGL)
+ (ve fázi: {0})	 (in phase: {0})

@@ -127,6 +127,14 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   const d = runOf(ctx).doc;
   const fmt = cmd.format;
   const FMT = fmt.toUpperCase();
+  // fáze úlohy pro hostitele (CLI --progress, hlídač – vlna 22 kolo 6, bod 22h): „přestavba modelu“ PŘED stavbou, kterou
+  // spustí složení modelu a kontrola níže (dřív se fáze ohlásila až po řádcích build i/n); opakovaná fáze se nehlásí znovu
+  let lastPhase = "";
+  const phase = (p: string) => {
+    if (p !== lastPhase) ctx.host.phase?.(`export:${fmt}`, p);
+    lastPhase = p;
+  };
+  if (d.kind !== "draft") phase("model");
   // objemový formát (STEP, BREP, STL, 3MF – 22c): složení modelu – bez tělesa je export ✗ out.no-solid, ne ✓
   const ms = isVolumeFormat(fmt) ? await modelSolids(ctx.host.kernel, ctx.ws, d, asmHooks(ctx)) : null;
   const noSolid = ms?.solids === 0;
@@ -141,7 +149,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     fmt,
     {
       kernel: ctx.host.kernel,
-      phase: (p) => ctx.host.phase?.(`export:${fmt}`, p),
+      phase,
       write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", noSolid),
     },
     { check: cmd.check !== false, verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) },

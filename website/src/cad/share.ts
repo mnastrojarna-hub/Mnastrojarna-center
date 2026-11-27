@@ -292,8 +292,12 @@ export type SelfStoreInfo = { base: string; maxBytes: number; chunkBytes: number
 let probeCache: { base: string; until: number; p: Promise<SelfStoreInfo | null> } | null = null;
 /** proč poslední `?ping` selhal (text pro uživatele – stav HTTP a chyba hlášená serverem), `""` = neselhal */
 let probeError = "";
+/** stav HTTP neúspěšného posledního `?ping` (0 = server neodpověděl vůbec – síť, časový limit) */
+let probeStatus = 0;
 /** Důvod poslední nedostupnosti vlastního úložiště (pro hlášku „krátký odkaz není k dispozici“), `""` = žádný. */
 export const selfStoreProbeError = (): string => probeError;
+/** Odpověděl server na poslední neúspěšný `?ping` (HTTP stav ≠ 0)? Pak úložiště „nefunguje“, ne „neodpovídá“. */
+export const selfStoreAnswered = (): boolean => !!probeError && probeStatus > 0;
 /** „… neodpovídá.“ + důvod z posledního `?ping` → „… neodpovídá (HTTP 500: …).“ */
 const withReason = (msg: string): string => (probeError ? `${msg.replace(/\.$/, "")} (${probeError}).` : msg);
 /** Text chyby z odpovědi úložiště (zavaděč index.php vrací JSON i při chybě PHP – stará verze, zakázané funkce, pád). */
@@ -323,6 +327,7 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
   entry.p = (async () => {
     const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => ctl.abort(), 6000) : null;
+    let status = 0;
     try {
       let res: Response;
       try {
@@ -330,6 +335,7 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
       } catch {
         throw new Error(storeErrorText(0, null));
       }
+      status = res.status;
       const json = /json/i.test(res.headers.get("content-type") ?? "");
       if (!json) {
         await drain(res); // např. stránka 404 hostingu bez PHP nebo prázdná chyba 500
@@ -340,9 +346,11 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
       if (!res.ok || !j || j.ok !== true || !(max > 0)) throw new Error(storeErrorText(res.status, j));
       const chunk = Number(j.chunk_bytes);
       probeError = "";
+      probeStatus = 0;
       return { base, maxBytes: max, chunkBytes: chunk >= 65_536 ? chunk : max, maxDays: Number(j.max_days) > 0 ? Number(j.max_days) : 90, clientId: Number(j.v) >= 2 };
     } catch (e) {
       probeError = e instanceof Error && e.message ? e.message : storeErrorText(0, null);
+      probeStatus = status;
       entry.until = Date.now() + 30_000;
       return null;
     } finally {
@@ -356,6 +364,7 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
 export function resetShareProbe() {
   probeCache = null;
   probeError = "";
+  probeStatus = 0;
   selfCache.clear();
   kdfCache.clear();
 }

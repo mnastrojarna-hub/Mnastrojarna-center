@@ -475,7 +475,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** další výkres dílu („Výkres 2“…) s jedním listem – jako tlačítko Nový výkres na kartě Výkres */
   const addDrawing = () => {
     if (!onDrawingsChange) return;
-    // rozpracovaný list se uloží zvlášť (bez kroku historie); založení výkresu je jeden krok – Ctrl+Z vrátí jen nový výkres
+    // rozpracovaný list se uloží zvlášť (persistNow: úprava uživatele = vlastní krok Zpět, nezměněný list a samotné sloučení
+    // Chytrých kót bez kroku); založení výkresu je další, samostatný krok – Ctrl+Z hned potom vrátí jen nový výkres
     const base = persistNow() ?? all;
     const name = nextDrawingName({ drawings: base } as CadDoc);
     const first: DrawingDoc = inDrawing({ id: uid(), name: tr("List {0}", 1), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { ...inheritTitle(meta), name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance } as Record<string, unknown>, annotations: [] }, name);

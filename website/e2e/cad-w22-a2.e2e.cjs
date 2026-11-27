@@ -141,6 +141,53 @@ async function edgeFlow(p, tag) {
   const list = await run('sestava vazby');
   ok(/Vazby sestavy „Sestava B“: 1 \(1 ok\)/.test(list), `[${tag}] hrana: text sestava vazby = 1 ok (GUI = text)`);
   await p.screenshot({ path: `${S}w22a2-${tag}-3-edge.png` });
+  if (tag === 'nowebgl') await edgeClick(p, tag, run, idle);
+}
+
+/**
+ * Kolo 6 (bod 20, nález oponenta kola 4): ztracenou HRANU vybrat znovu KLIKNUTÍM v modelu (ne ze seznamu) – režim výběru
+ * „select“ + filtr hran (cad-app pickMode / selFilter) → repick.chooseEnt. Softwarový náhled: pohled shora, levý okraj desky
+ * najde čtení pixelů plátna, skutečný klik myší kousek uvnitř okraje vybere hranu desky.
+ */
+async function edgeClick(p, tag, run, idle) {
+  const lostFace = (await p.evaluate(() => window.mncad.getDocument().mates[0].b)).face;
+  // nový schod přes levou hranu: hrana E2 (x = 0, z = 10) zmizí → vazba zase ztracená
+  const edit = await run(['sestava upravit "Deska B"', 'kvádr 5 40 5 v 0 0 5 odebrat', 'sestava hotovo'].join('\n'));
+  ok(/ztracená reference B E\d+[^\n]*vyberte hranu znovu/.test(edit), `[${tag}] klik: po novém schodu je hrana vazby znovu ztracená`);
+  await idle();
+  const lostOk = await p.waitForFunction(() => document.querySelector('[data-mates-list]')?.getAttribute('data-mates-lost') === '1', null, { timeout: 60000 }).then(() => true, () => false);
+  if (!lostOk) return ok(false, `[${tag}] klik: seznam vazeb nehlásí ztracenou referenci`);
+  await p.locator('[data-mate-repick-ent="edge"]').first().click();
+  await p.locator('[data-repick-panel]').waitFor({ timeout: 15000 });
+  const mode = await p.locator('[data-soft-viewport]').getAttribute('data-soft-pick');
+  ok(mode === 'select', `[${tag}] klik: náhled je v režimu výběru (data-soft-pick=${mode}) s filtrem hran`);
+  await p.locator('[data-soft-view="top"]').click(); await p.waitForTimeout(700);
+  // levý okraj modelu na řádku středu plátna (pozadí = pixel u levého okraje plátna)
+  const edgeX = await p.evaluate(() => {
+    const c = document.querySelector('[data-soft-canvas]');
+    const r = c.getBoundingClientRect();
+    const g = c.getContext('2d');
+    const sx = c.width / r.width;
+    const y = Math.round(c.height / 2);
+    const row = g.getImageData(0, y, c.width, 1).data;
+    const bg = [row[8], row[9], row[10]];
+    for (let x = 2; x < c.width; x++) {
+      const d = Math.abs(row[x * 4] - bg[0]) + Math.abs(row[x * 4 + 1] - bg[1]) + Math.abs(row[x * 4 + 2] - bg[2]);
+      if (d > 40) return { x: x / sx, y: y / (c.height / r.height) };
+    }
+    return null;
+  });
+  ok(!!edgeX, `[${tag}] klik: levý okraj desky v pohledu shora nalezen (${edgeX && Math.round(edgeX.x)} px)`);
+  if (!edgeX) return;
+  const bb = await p.locator('[data-soft-canvas]').boundingBox();
+  await p.mouse.click(Math.round(bb.x + edgeX.x + 2), Math.round(bb.y + edgeX.y));
+  const done = await p.waitForFunction(() => document.querySelector('[data-mate]')?.getAttribute('data-mate-status') === 'ok', null, { timeout: 60000 }).then(() => true, () => false);
+  const ref = await p.evaluate(() => window.mncad.getDocument().mates[0].b);
+  ok(done && ref.ent === 'edge' && !ref.lost && ref.face !== lostFace, `[${tag}] klik: hrana vybraná KLIKNUTÍM v modelu převzata – vazba splněna, odkaz B = hrana E${ref.face + 1} bez ztráty (${JSON.stringify(ref).slice(0, 140)})`);
+  ok(!(await p.locator('[data-repick-panel]').count()), `[${tag}] klik: panel nového výběru se po výběru zavřel`);
+  const list = await run('sestava vazby');
+  ok(/Vazby sestavy „Sestava B“: 1 \(1 ok\)/.test(list), `[${tag}] klik: text sestava vazby = 1 ok (GUI = text)`);
+  await p.screenshot({ path: `${S}w22a2-${tag}-4-edge-click.png` });
 }
 
 const browsers = [];

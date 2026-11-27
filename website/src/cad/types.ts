@@ -568,7 +568,8 @@ export type MateRef = { compId: string; leaf?: string; face: number; radius?: nu
  * není známa, gone = díl v podsestavě zmizel). Vazba s ní se neřeší (komponenta se nehýbe, stav „lost“), dokud uživatel entitu
  * nevybere znovu (`sestava vazba N plocha …`, panel Vazby); `face` drží původní číslo jen pro text. cad/mate-remap.ts
  */
-export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: number; area?: number; length?: number; pts?: Vec3[]; why: "none" | "ambiguous" | "unknown" | "gone" };
+/** `box` = obálka roviny (min, max) v souřadnicích dílu – překryv při přečíslování (cad/mate-remap.ts, vlna 22 kolo 6) */
+export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: number; area?: number; length?: number; pts?: Vec3[]; box?: [Vec3, Vec3]; why: "none" | "ambiguous" | "unknown" | "gone" };
 /**
  * Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl.
  * `c`, `d` = další odkazy (Symetricky: rovina souměrnosti; Šířka: druhá plocha jazýčku / drážky; Drážka: druhý konec; Závěs: dosedací roviny).
