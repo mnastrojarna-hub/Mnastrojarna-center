@@ -485,6 +485,7 @@ export const outOp: OpHandler<"out"> = async (op, ctx) => {
     case "exports":
     case "outputs":
     case "recompute":
+    case "partDrawings": // výkresy dílů (bod 19, kolo 7)
       return outputsCmd(ctx, cmd);
     case "save":
       return saveProject(ctx, e, cmd, tr("uloženo"));

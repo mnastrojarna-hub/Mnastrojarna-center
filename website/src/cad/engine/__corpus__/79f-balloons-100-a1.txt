@@ -1,0 +1,307 @@
+# vlna 22, bod 17 (kolo 7): 100 různých dílů, A1, balónky + kusovník – po výměnách proti křížení se pozice, jejíž odkaz pořád
+# kříží jiný odkaz (i jiného pohledu) nebo je delší než mez pohledu, přesune na volný slot bez křížení (dřív „křížení odkazů 2“)
+nový díl Deska 1
+kvádr 20 10 5
+nový díl Deska 2
+kvádr 20 10 6
+nový díl Deska 3
+kvádr 20 10 7
+nový díl Deska 4
+kvádr 20 10 8
+nový díl Deska 5
+kvádr 20 10 4
+nový díl Deska 6
+kvádr 20 10 5
+nový díl Deska 7
+kvádr 20 10 6
+nový díl Deska 8
+kvádr 20 10 7
+nový díl Deska 9
+kvádr 20 10 8
+nový díl Deska 10
+kvádr 20 10 4
+nový díl Deska 11
+kvádr 20 10 5
+nový díl Deska 12
+kvádr 20 10 6
+nový díl Deska 13
+kvádr 20 10 7
+nový díl Deska 14
+kvádr 20 10 8
+nový díl Deska 15
+kvádr 20 10 4
+nový díl Deska 16
+kvádr 20 10 5
+nový díl Deska 17
+kvádr 20 10 6
+nový díl Deska 18
+kvádr 20 10 7
+nový díl Deska 19
+kvádr 20 10 8
+nový díl Deska 20
+kvádr 20 10 4
+nový díl Deska 21
+kvádr 20 10 5
+nový díl Deska 22
+kvádr 20 10 6
+nový díl Deska 23
+kvádr 20 10 7
+nový díl Deska 24
+kvádr 20 10 8
+nový díl Deska 25
+kvádr 20 10 4
+nový díl Deska 26
+kvádr 20 10 5
+nový díl Deska 27
+kvádr 20 10 6
+nový díl Deska 28
+kvádr 20 10 7
+nový díl Deska 29
+kvádr 20 10 8
+nový díl Deska 30
+kvádr 20 10 4
+nový díl Deska 31
+kvádr 20 10 5
+nový díl Deska 32
+kvádr 20 10 6
+nový díl Deska 33
+kvádr 20 10 7
+nový díl Deska 34
+kvádr 20 10 8
+nový díl Deska 35
+kvádr 20 10 4
+nový díl Deska 36
+kvádr 20 10 5
+nový díl Deska 37
+kvádr 20 10 6
+nový díl Deska 38
+kvádr 20 10 7
+nový díl Deska 39
+kvádr 20 10 8
+nový díl Deska 40
+kvádr 20 10 4
+nový díl Deska 41
+kvádr 20 10 5
+nový díl Deska 42
+kvádr 20 10 6
+nový díl Deska 43
+kvádr 20 10 7
+nový díl Deska 44
+kvádr 20 10 8
+nový díl Deska 45
+kvádr 20 10 4
+nový díl Deska 46
+kvádr 20 10 5
+nový díl Deska 47
+kvádr 20 10 6
+nový díl Deska 48
+kvádr 20 10 7
+nový díl Deska 49
+kvádr 20 10 8
+nový díl Deska 50
+kvádr 20 10 4
+nový díl Deska 51
+kvádr 20 10 5
+nový díl Deska 52
+kvádr 20 10 6
+nový díl Deska 53
+kvádr 20 10 7
+nový díl Deska 54
+kvádr 20 10 8
+nový díl Deska 55
+kvádr 20 10 4
+nový díl Deska 56
+kvádr 20 10 5
+nový díl Deska 57
+kvádr 20 10 6
+nový díl Deska 58
+kvádr 20 10 7
+nový díl Deska 59
+kvádr 20 10 8
+nový díl Deska 60
+kvádr 20 10 4
+nový díl Deska 61
+kvádr 20 10 5
+nový díl Deska 62
+kvádr 20 10 6
+nový díl Deska 63
+kvádr 20 10 7
+nový díl Deska 64
+kvádr 20 10 8
+nový díl Deska 65
+kvádr 20 10 4
+nový díl Deska 66
+kvádr 20 10 5
+nový díl Deska 67
+kvádr 20 10 6
+nový díl Deska 68
+kvádr 20 10 7
+nový díl Deska 69
+kvádr 20 10 8
+nový díl Deska 70
+kvádr 20 10 4
+nový díl Deska 71
+kvádr 20 10 5
+nový díl Deska 72
+kvádr 20 10 6
+nový díl Deska 73
+kvádr 20 10 7
+nový díl Deska 74
+kvádr 20 10 8
+nový díl Deska 75
+kvádr 20 10 4
+nový díl Deska 76
+kvádr 20 10 5
+nový díl Deska 77
+kvádr 20 10 6
+nový díl Deska 78
+kvádr 20 10 7
+nový díl Deska 79
+kvádr 20 10 8
+nový díl Deska 80
+kvádr 20 10 4
+nový díl Deska 81
+kvádr 20 10 5
+nový díl Deska 82
+kvádr 20 10 6
+nový díl Deska 83
+kvádr 20 10 7
+nový díl Deska 84
+kvádr 20 10 8
+nový díl Deska 85
+kvádr 20 10 4
+nový díl Deska 86
+kvádr 20 10 5
+nový díl Deska 87
+kvádr 20 10 6
+nový díl Deska 88
+kvádr 20 10 7
+nový díl Deska 89
+kvádr 20 10 8
+nový díl Deska 90
+kvádr 20 10 4
+nový díl Deska 91
+kvádr 20 10 5
+nový díl Deska 92
+kvádr 20 10 6
+nový díl Deska 93
+kvádr 20 10 7
+nový díl Deska 94
+kvádr 20 10 8
+nový díl Deska 95
+kvádr 20 10 4
+nový díl Deska 96
+kvádr 20 10 5
+nový díl Deska 97
+kvádr 20 10 6
+nový díl Deska 98
+kvádr 20 10 7
+nový díl Deska 99
+kvádr 20 10 8
+nový díl Deska 100
+kvádr 20 10 4
+nová sestava Nástroj
+vložit "Deska 1" ukotvit
+vložit "Deska 2" v 25 0 12
+vložit "Deska 3" v 50 0 24
+vložit "Deska 4" v 75 0 0
+vložit "Deska 5" v 100 0 12
+vložit "Deska 6" v 125 0 24
+vložit "Deska 7" v 150 0 0
+vložit "Deska 8" v 175 0 12
+vložit "Deska 9" v 200 0 24
+vložit "Deska 10" v 225 0 0
+vložit "Deska 11" v 0 15 12
+vložit "Deska 12" v 25 15 24
+vložit "Deska 13" v 50 15 0
+vložit "Deska 14" v 75 15 12
+vložit "Deska 15" v 100 15 24
+vložit "Deska 16" v 125 15 0
+vložit "Deska 17" v 150 15 12
+vložit "Deska 18" v 175 15 24
+vložit "Deska 19" v 200 15 0
+vložit "Deska 20" v 225 15 12
+vložit "Deska 21" v 0 30 24
+vložit "Deska 22" v 25 30 0
+vložit "Deska 23" v 50 30 12
+vložit "Deska 24" v 75 30 24
+vložit "Deska 25" v 100 30 0
+vložit "Deska 26" v 125 30 12
+vložit "Deska 27" v 150 30 24
+vložit "Deska 28" v 175 30 0
+vložit "Deska 29" v 200 30 12
+vložit "Deska 30" v 225 30 24
+vložit "Deska 31" v 0 45 0
+vložit "Deska 32" v 25 45 12
+vložit "Deska 33" v 50 45 24
+vložit "Deska 34" v 75 45 0
+vložit "Deska 35" v 100 45 12
+vložit "Deska 36" v 125 45 24
+vložit "Deska 37" v 150 45 0
+vložit "Deska 38" v 175 45 12
+vložit "Deska 39" v 200 45 24
+vložit "Deska 40" v 225 45 0
+vložit "Deska 41" v 0 60 12
+vložit "Deska 42" v 25 60 24
+vložit "Deska 43" v 50 60 0
+vložit "Deska 44" v 75 60 12
+vložit "Deska 45" v 100 60 24
+vložit "Deska 46" v 125 60 0
+vložit "Deska 47" v 150 60 12
+vložit "Deska 48" v 175 60 24
+vložit "Deska 49" v 200 60 0
+vložit "Deska 50" v 225 60 12
+vložit "Deska 51" v 0 75 24
+vložit "Deska 52" v 25 75 0
+vložit "Deska 53" v 50 75 12
+vložit "Deska 54" v 75 75 24
+vložit "Deska 55" v 100 75 0
+vložit "Deska 56" v 125 75 12
+vložit "Deska 57" v 150 75 24
+vložit "Deska 58" v 175 75 0
+vložit "Deska 59" v 200 75 12
+vložit "Deska 60" v 225 75 24
+vložit "Deska 61" v 0 90 0
+vložit "Deska 62" v 25 90 12
+vložit "Deska 63" v 50 90 24
+vložit "Deska 64" v 75 90 0
+vložit "Deska 65" v 100 90 12
+vložit "Deska 66" v 125 90 24
+vložit "Deska 67" v 150 90 0
+vložit "Deska 68" v 175 90 12
+vložit "Deska 69" v 200 90 24
+vložit "Deska 70" v 225 90 0
+vložit "Deska 71" v 0 105 12
+vložit "Deska 72" v 25 105 24
+vložit "Deska 73" v 50 105 0
+vložit "Deska 74" v 75 105 12
+vložit "Deska 75" v 100 105 24
+vložit "Deska 76" v 125 105 0
+vložit "Deska 77" v 150 105 12
+vložit "Deska 78" v 175 105 24
+vložit "Deska 79" v 200 105 0
+vložit "Deska 80" v 225 105 12
+vložit "Deska 81" v 0 120 24
+vložit "Deska 82" v 25 120 0
+vložit "Deska 83" v 50 120 12
+vložit "Deska 84" v 75 120 24
+vložit "Deska 85" v 100 120 0
+vložit "Deska 86" v 125 120 12
+vložit "Deska 87" v 150 120 24
+vložit "Deska 88" v 175 120 0
+vložit "Deska 89" v 200 120 12
+vložit "Deska 90" v 225 120 24
+vložit "Deska 91" v 0 135 0
+vložit "Deska 92" v 25 135 12
+vložit "Deska 93" v 50 135 24
+vložit "Deska 94" v 75 135 0
+vložit "Deska 95" v 100 135 12
+vložit "Deska 96" v 125 135 24
+vložit "Deska 97" v 150 135 0
+vložit "Deska 98" v 175 135 12
+vložit "Deska 99" v 200 135 24
+vložit "Deska 100" v 225 135 0
+výkres A1 na šířku pohledy přední,horní,iso
+výkres kusovník ano
+výkres balónky ano
+výkres stav

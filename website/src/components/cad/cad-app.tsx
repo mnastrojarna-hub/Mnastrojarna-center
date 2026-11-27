@@ -92,7 +92,7 @@ import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect"
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4, subassemblyPick, treeSelAfterPick } from "./asm-flatten";
 import { measureApi } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
-import { bomNotesOf } from "./asm-supply";
+import { bomNotesOf, partDrawingsNote } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
@@ -4624,6 +4624,7 @@ export function CadApp() {
               rows={bom}
               notes={bomNotesOf(doc, bom, (n) => engineRef.current?.ws.findPart(n) ?? null)}
               onRefresh={() => void runAgentRef.current(`sestava obnovit vše`).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
+              onPartDrawings={() => void runAgentRef.current("výkresy dílů").then((out) => flash(partDrawingsNote(out)), (e) => flash((e as Error).message))}
               onCsv={() => download(`${safeName(doc.name)}_kusovnik.csv`, bomCsv(bom), "text/csv;charset=utf-8")}
               onDrawing={() => {
                 setBomOpen(false);

@@ -6,7 +6,8 @@
  * - každá pozice patří pohledu: ručně (`DrawingOptions.balloonViews`, `výkres pozice pohled horní 1-12`), jinak hlavnímu
  *   pohledu; co se k hlavnímu pohledu nevejde, přeteče do dalších pohledů, kde je komponenta vidět (auto);
  * - sloty po obvodu pohledu (4 strany, víc řad ven), pořadí podle úhlu kotvy ke středu pohledu, nejbližší volný slot,
- *   výměny dvojic proti křížení odkazových čar (2-opt);
+ *   výměny dvojic proti křížení odkazových čar (2-opt); co pořád kříží nebo je delší než mez pohledu, se přesune na jiný volný
+ *   slot bez křížení s kratším odkazem (kolo 7);
  * - balónek se nepoloží přes text, kótu, tabulku, razítko, jiný pohled, rám ani jiný balónek; co se nevejde nikam, zůstane
  *   na nejlepším místě a označí se `lost` (kontrola překryvů listu ho započte – nikdy tichý překryv);
  * - zamčená pozice (`GenEdit.lock`, absolutní střed na listu) a posunutá (`GenEdit.move`, relativně k automatické poloze)
@@ -430,6 +431,46 @@ export function layoutBalloons(inp: BalloonInput): BalloonLayout {
         swapped = true;
       }
     if (!swapped) break;
+  }
+
+  // 3b) přesun na jiné volné místo (vlna 22, bod 17 – kolo 7): pozice, jejíž odkaz po výměnách pořád kříží jiný odkaz (i odkaz
+  //     jiného pohledu – výměny jsou jen v pohledu), nebo je delší než mez pohledu, se zkusí přesunout na volný slot (s kotvou
+  //     uvnitř průmětu), odkud odkaz nekříží žádný jiný, nevede přes balónek / kotvu / kótu a je kratší. Každý přesun počet
+  //     křížení nezvýší a odkaz nezdlouží – výsledek je vždy aspoň tak dobrý jako před tímto krokem.
+  const crossesAny = (p: Vec2, a: Vec2, self: PlacedBalloon) => placed.some((o) => o !== self && segmentsCross(p, a, [o.x, o.y], o.a));
+  const freeFor = (p: Vec2, self: PlacedBalloon) => inRect(box(p), inp.bounds) && !occ.hit(box(p)) && placed.every((b) => b === self || dist([b.x, b.y], p) >= 2 * R + 1);
+  for (let pass = 0; pass < 3; pass++) {
+    let moved = false;
+    for (const b of results) {
+      if (b.lost) continue;
+      const v = vmap.get(b.view);
+      const it = itemOf.get(b.id);
+      if (!v || !it) continue;
+      const L0 = dist([b.x, b.y], b.a);
+      const c0 = crossesAny([b.x, b.y], b.a, b);
+      const Lmax = maxLead(v);
+      if (!c0 && L0 <= Lmax + 1e-6) continue;
+      const others = placed.filter((o) => o !== b && o.view === b.view);
+      const anchors = [b.a, ...anchorsOf(it, v).slice(0, 9)].filter((c, i, all) => all.findIndex((d) => dist(c, d) < 1e-6) === i && (i === 0 || others.every((o) => dist(o.a, c) >= ANCHOR_GAP)));
+      // s křížením: kratší než 2× mez pohledu (jako výměny); bez křížení: jen kratší odkaz. Kandidáti od nejkratšího odkazu,
+      // první vyhovující je nejlepší (levné testy první – přepočet listu v okně výkresu nesmí zdržet)
+      const bound = (c0 ? Math.max(L0, 2 * Lmax) : L0) - 1e-6;
+      const cands: { p: Vec2; a: Vec2; L: number }[] = [];
+      for (const a of anchors)
+        for (const sl of slotsAll.get(v.key)!) {
+          const L = dist(sl.p, a);
+          if (L < bound) cands.push({ p: sl.p, a, L });
+        }
+      cands.sort((x, y) => x.L - y.L);
+      const best = cands.find((c) => freeFor(c.p, b) && !crossesAny(c.p, c.a, b) && leaderClear(c.p, c.a, b)) ?? null;
+      if (best) {
+        b.x = best.p[0];
+        b.y = best.p[1];
+        b.a = best.a;
+        moved = true;
+      }
+    }
+    if (!moved) break;
   }
 
   // 4) ručně posunuté (relativně k automatické poloze)

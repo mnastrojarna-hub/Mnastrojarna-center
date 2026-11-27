@@ -622,9 +622,9 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     desc: tr("„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠"),
   },
   {
-    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše",
-    en: "exports [clear] · outputs [stale] · recompute all",
-    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen",
-    desc: tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)"),
+    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše · výkresy dílů [A4|A3|A2|A1|A0]",
+    en: "exports [clear] · outputs [stale] · recompute all · part drawings [A4|A3|A2|A1|A0]",
+    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen · teilezeichnungen [A4|A3|A2|A1|A0]",
+    desc: `${tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)")}; ${tr("v sestavě založí list výkresu (Chytré kóty, výchozí A4) každému vyráběnému dílu otevřenému v záložce, který výkres nemá; díly s výkresem nemění, normálie a nakupované díly vynechá, díl mimo záložku jen vypíše s ⚠ – kopie v sestavě pak obnoví sestava obnovit vše; GUI: Kusovník → Výrobní dokumentace")}`,
   },
 ];

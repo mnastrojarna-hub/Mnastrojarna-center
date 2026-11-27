@@ -1882,7 +1882,8 @@ je na jejich řádku.
 | `odkaz` (`link`) | vypíše poslední sdílený odkaz znovu |
 | `exporty [vymazat]` (`exports [clear]` · `exporte [löschen]`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý `export …`, `výkres export …`, `skica export dxf` i export tlačítkem zapíše formát, soubor, revizi modelu `r·a1b2c3` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení); `zpět` / Ctrl+Z záznam nesmaže (soubor existuje) – k vrácenému modelu je ZASTARALÝ, `exporty vymazat` Zpět vrátí |
 | `výstupy [zastaralé]` (`outputs [stale]` · `ausgaben [veraltet]`) · `zastaralé` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
-| `přepočítat vše` (`recompute all` · `alles neu berechnen`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (`sestava obnovit vše` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, `kolize`, `pohyb spustit`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (`výkres vydat B`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz) |
+| `přepočítat vše` (`recompute all` · `alles neu berechnen`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (`sestava obnovit vše` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, `kolize`, `pohyb spustit`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (`výkres vydat B`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz). **✓ jen s platným výsledkem bez nálezu**: nalezená kolize (`⚠ kontrola kolizí znovu (kolize) – nalezeno kolizí: N`), nesplněné vazby, studie, která nedoběhla, a podpříkaz s ⚠/✗ jsou ⚠ s důvodem; vazby se ztracenou referencí jsou v „Zbývá udělat ručně“; strojová část končí `warned=N` |
+| `výkresy dílů [A4|A3|A2|A1|A0]` (`part drawings` · `teilezeichnungen`) | **výrobní dokumentace sestavy** (vlna 22, bod 19): každému vyráběnému dílu (druh z kusovníku) otevřenému v záložce, který výkres nemá, založí list (`záložka "díl"` + `výkres A4`, Chytré kóty) a hned ho vyhodnotí (⚠ `drawing.warning` listu); díly s výkresem nemění, normálie a nakupované vynechá; díl mimo záložku (jen kopie, import) = ⚠ `bom.make-incomplete` – výkres mu založit nejde. Kopie v sestavě se sama neobnoví (`sestava obnovit vše`). `= L<n> out make=N created=N existing=N missing=N`. GUI: okno Kusovník → „Výrobní dokumentace“ |
 
 ```
 uložit
@@ -2208,7 +2209,10 @@ pixely v 3D okně:
   `material.class`). Nepozná-li se (`materiál XY-123`), hustota zůstává podle dosavadní třídy a protokol to napíše
   (`→ materiál „XY-123“ uložen jako označení do razítka …` + ⚠ `material.density-assumed` – nikdy ✓). Totéž pravidlo a tytéž
   kódy platí pro `sestava komponenta "X" materiál "…"` (`→ komponenta „X“: materiál „XY-123“ uložen jako označení …` + ⚠; ✓ jen
-  pro ostatní změny téhož příkazu) i pro pole „Označení materiálu (razítko)“ a pole Materiál v razítku výkresu (ℹ / ⚠ pod polem). V JSON jsou to pole `material` (id třídy) a `materialName`.
+  pro ostatní změny téhož příkazu), pro `výkres razítko materiál="…"` (ČSN 11 523 na hliníkovém dílu → třída ocel + ℹ) i pro pole
+  „Označení materiálu (razítko)“ a pole Materiál v razítku výkresu (ℹ / ⚠ pod polem). Třída zadaná PO označení
+  (`materiál nerez` po `materiál ČSN 11 423`) označení nechá, ale odporuje-li mu, je to `→ …` + ⚠ `material.class-conflict`
+  (nikdy ✓). V JSON jsou to pole `material` (id třídy) a `materialName`.
 - Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
   (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
   jen „Rozměry v mm“.
@@ -2653,6 +2657,7 @@ třídí. Nejčastější:
 | `hole.no-surface` ⚠ | díra `v x y` bez z mimo povrch tělesa – začíná na obálce | zadat z |
 | `select.fallback` ⚠ / `select.ambiguous` ⚠ | pravidlo plochy nenašlo plochu na obálce / našlo víc ploch | plochu číslem F3 |
 | `name.renamed` ⚠ / `name.renamed-auto` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
+| `material.class-conflict` ⚠ | označení materiálu patří jiné třídě, než podle které se počítá hustota (`materiál nerez` po `materiál ČSN 11 423`, nabídka Materiál v GUI); označení se samo nemaže | opravit označení, nebo `materiál <třída označení>` |
 | `material.density-assumed` ⚠ / `material.class` ℹ | `materiál X` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | `materiál hlinik` + označení |
 | `asm.stale-copy` ⚠ | díl změněný po `vložit` (prvek, číslo, materiál, druh, výkres) – komponenta je kopie, změna se do sestavy sama nepromítne; hlásí se na řádku změny i u `kusovník`, listu sestavy a `stav` | `sestava obnovit "X"` (`vše`, `údaje`) |
 | `mate.lost` ✗ / ⚠ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí (✗ u kroku, který ji ztratil; ⚠ při `stav` a na konci běhu nad otevřeným dokumentem se ztracenou referencí – přísný režim zastaví) | `sestava vazba N plocha b <plocha>` / `sestava vazba N smazat` |
