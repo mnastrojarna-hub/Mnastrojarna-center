@@ -1,0 +1,79 @@
+=== run 1 ===
+✓ nový díl „Deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ materiál „1.2379“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 7: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
+✓ úprava tepelná F3 „62+2 HRC“ od 10 do 40 v modelu – výkres ji přebírá jako tlustou čerchovanou čáru s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek
+✓ úprava povrchová F4 „cernit“ od 0 do 400 v modelu – výkres ji přebírá jako tlustou čerchovanou čáru s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3, měřítko 1:1, pohledy přední, horní, iso – výsledek po vyhodnocení listu níže
+→ Chytré kóty (řetězově): 4 kót a popisů – horní 3, přední 1 · očekávaných rozměrů 4 – výsledek po vyhodnocení listu níže
+ℹ řádek 12: list List 1: přesunuto do razítka – „HRC 58-62“ → tvrdost „HRC 58-62“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 13: list List 1: přesunuto do razítka – „Tolerance ±0,1“ → nepředepsané „±0,1“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 14: list List 1: přesunuto do razítka – „0,5x45°“ → hrany „0,5x45°“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 15: list List 1: přesunuto do razítka – „RAL 9005“ → povrchová úprava „RAL 9005“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 16: list List 1: přesunuto do razítka – „N7“ → drsnost „N7“ (údaje razítka se nepíšou jako poznámka)
+✗ řádek 17: list List 1: text není strojařsky heslovitý – a4 text kóty „Kalit a popustit na 58-60 HRC, ostré hrany sraz…“: řádek má 49 znaků (nejvýš 24) – u značky jen krátký technický údaj, ne poznámka
+✗ řádek 18: list List 1: text není strojařsky heslovitý – revize A „Při jakékoli nejasnosti kontaktujte konstruktéra“: slovo věty „jakekoli“ – popis změny krátce (např. „Ø20 → Ø22“, „doplněna díra Ø9“)
+✗ řádek 19: list List 1: text není strojařsky heslovitý – buňka razítka name „Deska, kterou je nutné kalit na 58 HRC“: slovo věty „kterou“ – hodnota buňky heslovitě (např. tepelné="kalit a popustit", tvrdost="58-60 HRC")
+✗ řádek 20: list List 1: poznámka bez cíle v geometrii – „Brousit“ → poznámka Brousit → kóta Ø9 skrz (horní, a3): místní popis míří šipkou na plochu nebo hranu, ne na kótu – popis plochy zapište do modelu (poznámka F7 "Brousit"; výkres ho převezme se šipkou), údaj ke kótě patří do kóty (výkres upravit <kóta> přípona=…)
+✗ řádek 21: list List 1: text není strojařsky heslovitý – a7 „Odmastit“: výška písma 7 mm – nejvýš 5 mm (vysoké písmo limit řádků neobejde)
+→ značka text Odmastit → list [30; 60] · a7 – výsledek po vyhodnocení listu níže
+→ nový výkres „Poznámky“ – list 1 „List 1“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů 2 – výsledek po vyhodnocení listu níže
+→ výkres: pohledy iso – výsledek po vyhodnocení listu níže
+✗ řádek 25: list Poznámky / List 1: poznámky mimo hlavní list – text „Konzervovat“ – volný text patří jen na hlavní list „Výkres 1 / List 1“ (pohledy s kótami) nad razítko, nejvýš 5 řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii
+→ výkres „Výkres 1“ (1 list) – další příkazy výkresu pracují s ním
+Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
+Výkresy (2): 1 „Výkres 1“ 1 list (aktivní) · 2 „Poznámky“ 1 list
+Výkres „Výkres 1“ – Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (4, z toho vygenerovaných 4):
+  horní: Ø9 skrz · 100 · 60
+  přední: 12
+Poznámky a značky: osa souměrnosti · osa souměrnosti · Odmastit
+Id (výkres upravit / smazat / značka na <id>): a1 osa souměrnosti (horní) · a2 osa souměrnosti (horní) · a3 Ø9 skrz (horní) · a4 100 (horní) · a5 60 (horní) · a6 12 (přední) · a7 Odmastit (list)
+Duplicity: žádné
+Kontrola kót: velikosti 4/4 · polohy 2/2 · tolerance neověřeny (funkční prvky nevyznačeny)
+Polohy děr: kóty od hran (horní) – na listu 2/2
+U razítka: nepředepsané tolerance ±0,1 · hrany 0,5x45° · poznámka —
+Razítko: název Deska · číslo — · kreslil — · revize — · datum ?.?.???? · materiál 1.2379
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: tvrdost „HRC 58-62“ · povrchová úprava „RAL 9005“ · drsnost „N7“
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost „HRC 58-62“ · povrchová úprava „RAL 9005“ · hrany „0,5x45°“ · nepředepsané „±0,1“ · drsnost „N7“ · technický pás razítka +10 mm (5 polí)
+Nepředepsané tolerance: text „±0,1“
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 3/5 řádků (agent 3) · místní popisy 0/8
+Z modelu: Z1 F3 „62+2 HRC“ → přední (tlustá čerchovaná 04.2 + kóta rozsahu) · Z2 F4 „cernit“ → horní (tlustá čerchovaná 04.2 + kóta rozsahu) ⚠ rozsah 0–400 přesahuje plochu 100 mm
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…100, y 0…12 mm · 1:1 · na listu x 44…144, y 251…263
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 1:1 · na listu x 44…144, y 157…217
+Varování výkresu: oblastní úprava Z2 „cernit“ (F4): rozsah 0–400 mm přesahuje plochu dlouhou 100 mm – na listu oříznuto; opravte rozsah v modelu (úprava F4 … od a do b)
+⚠ řádek 27: list List 1: oblastní úprava Z2 „cernit“ (F4): rozsah 0–400 mm přesahuje plochu dlouhou 100 mm – na listu oříznuto; opravte rozsah v modelu (úprava F4 … od a do b)
+✓ Kvádr 1 (box) · přidáno 72000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 763,4 mm³ (5 % nástroje) · těleso platné
+
+Dokument: „Deska“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 100 × 60 × 12 mm (X 0…100, Y 0…60, Z 0…12) · objem 71,24 cm³ · ploch 7 · hran 15
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 72000 mm³ · těleso platné – 100 × 60 × 12 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 763,4 mm³ (5 % nástroje) · těleso platné – Ø9 skrz v [50; 30; 12], osa Z
+=== run 2 ===
+✓ nový 2D výkres „Deska2D“ (mm) – nová záložka
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 0
+Rozsah: prázdný výkres
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 0
+=== run 3 ===
+✗ MTEXT: pravidla výkresu pro agenty – „1. Kalit a popouštět na 58-60 HRC, pokud není uvedeno jinak.“ obsahuje údaj razítka (tvrdost, tepelné zpracování, hrany) – do razítka rozvržení: 2d upravit-atributy <razítko> TVRDOST="…" TEPELNE="…" HRANY="…" (nebo 2d rozvržení nové … TVRDOST="…" TEPELNE="…" HRANY="…")
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 0
+Rozsah: prázdný výkres
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 0

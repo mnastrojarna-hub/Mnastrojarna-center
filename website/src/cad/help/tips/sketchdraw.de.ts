@@ -550,8 +550,8 @@ export default {
     what: "Anmerkung mit Hinweislinie: der Pfeil zeigt auf das Element, der Text steht daneben.",
     when: "Kurzer Hinweis an Fläche oder Kante (Schleifen, Läppen). Wärmebehandlung, Härte, Oberfläche und Kanten des Teils ins Schriftfeld.",
     steps: ["Klicken, wohin der Pfeil zeigen soll.", "Position des Textes anklicken.", "Anmerkungstext eingeben und mit OK bestätigen."],
-    cmd: 'zeichnung symbol hinweis "Läppen" an Ø40',
-    note: "Ein Agent schreibt den Flächenhinweis ins Modell (hinweis F7 \"Schleifen\") – die Zeichnung übernimmt ihn mit Pfeil.",
+    cmd: 'hinweis F7 "Läppen"',
+    note: "Agent per Text: Flächenhinweis ins Modell (Zeichnung übernimmt ihn mit Pfeil); Hinweis auf ein Maß = ✗. Von Hand ohne Grenzen.",
   },
   "drawing-ws/ann-roughness": {
     what: "Setzt ein Oberflächensymbol nach ISO 1302 (Ra, Rz).",

@@ -71,7 +71,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
-Poznámky nad razítkem: 0/5 řádků
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Vygenerované kóty a pozice upravené: posunuté pos:7 [0; 6] · zamčené pos:6 – výkres vygenerované obnovit
 Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 1 · zamčené 1 · nevešlo se 0 · křížení odkazů 0
@@ -176,7 +176,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
-Poznámky nad razítkem: 0/5 řádků
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 1 (text × geometrie 1) – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):

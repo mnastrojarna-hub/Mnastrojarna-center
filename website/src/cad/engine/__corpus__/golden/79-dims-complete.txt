@@ -27,7 +27,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané „ISO 2768-mK“ · drsnost — · technický pás razítka +10 mm (1 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
-Poznámky nad razítkem: 0/5 řádků
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 1 (text × rám 1) – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
@@ -74,7 +74,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané „ISO 2768-mK“ · drsnost — · technický pás razítka +10 mm (1 polí)
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
-Poznámky nad razítkem: 0/5 řádků
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 1 (text × rám 1) – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):

@@ -50,6 +50,10 @@ function sheetCanon(d: CadDoc, i = 0): Rec {
   const m = { ...(s.meta as Rec) };
   // prázdné pole razítka = pole bez hodnoty (vyprázdněné `zákazník=""` × nikdy nezadané)
   for (const k of Object.keys(m)) if (m[k] === "") delete m[k];
+  // razítko původu (vlna 23 – agent × člověk) není obsah listu; skript ho nenese, textová cesta ho dá znovu
+  delete m.by;
+  delete m.noteBy;
+  if (Array.isArray(m.revisions)) m.revisions = (m.revisions as Rec[]).map(({ by: _b, ...r }) => (void _b, r));
   const logo = m.logo as Rec | undefined;
   if (logo) m.logo = { w: logo.w, h: logo.h, name: logo.name, trace: logo.trace };
   return round({ name: s.name, options: o, meta: m }) as Rec;

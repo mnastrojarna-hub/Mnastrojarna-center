@@ -10,6 +10,7 @@
  */
 import type { PmiMark } from "./drawing";
 import { tr } from "./i18n";
+import type { GenLine } from "./drawing-notes-rules";
 import type { CadDoc } from "./types";
 
 /** popisy a úpravy modelu pro výkres; úpravy dostanou značky Z1, Z2 … v pořadí modelu */
@@ -43,4 +44,23 @@ export function zoneLegendOf(pmi: readonly PmiMark[] | undefined): string[] {
     rows.set(key, [...(rows.get(key) ?? []), m.ref]);
   }
   return [...rows.entries()].map(([k, refs]) => `${refs.join(", ")} ${k}`);
+}
+
+/**
+ * Vysvětlivky oblastních úprav modelu s původem (vlna 23, R4/R6): řádek je od agenta, když aspoň jednu jeho úpravu zapsal
+ * agent (textová cesta) – vysvětlivka agenta se počítá do limitu 5 řádků stejně tvrdě jako jeho text.
+ */
+export function zoneLegendLines(doc: Pick<CadDoc, "functional" | "kind">): GenLine[] {
+  const marks = pmiMarksOf(doc);
+  const byId = new Map((doc.functional ?? []).map((m) => [m.id, m.by ?? "user"]));
+  const rows = new Map<string, { refs: string[]; agent: boolean }>();
+  for (const m of marks) {
+    if (m.kind !== "treatment" || !m.ref) continue;
+    const key = `${treatmentWord(m.what)}: ${m.text}`;
+    const r = rows.get(key) ?? { refs: [], agent: false };
+    r.refs.push(m.ref);
+    r.agent ||= byId.get(m.id) === "agent";
+    rows.set(key, r);
+  }
+  return [...rows.entries()].map(([k, r]) => ({ text: `${r.refs.join(", ")} ${k}`, by: r.agent ? "agent" : "user" }));
 }

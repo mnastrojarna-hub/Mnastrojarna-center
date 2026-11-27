@@ -29,12 +29,12 @@ import { inheritTitle } from "./title-block";
 import { loadSettings } from "./settings";
 import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
-import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
+import { drawingKey, drawingLabel, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
 import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
-import { pmiMarksOf, zoneLegendOf } from "./pmi-marks";
-import { classifyNote, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, linesOf, NOTE_MAX_LINES, notesBudgetLine, notesRuleIssues, noteStyle, titleDataLabel, TITLE_VALUE_MAX, titleHint, type NoteClass } from "./drawing-notes-rules";
+import { pmiMarksOf, zoneLegendLines } from "./pmi-marks";
+import { auditDoc, auditItems, classifyNote, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
 import { formNotesOfDoc } from "./drawing-doc";
 import { CodedError } from "./engine/codes";
 import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
@@ -403,42 +403,50 @@ function titleLines(doc: CadDoc, s: DrawingDoc): string[] {
 
 // ---------------------------------------------------------------- poznámky agenta (vlna 23, R1–R6 – cad/drawing-notes-rules.ts)
 
-/** generované řádky nad razítkem: legenda oblastních úprav z modelu a poznámka k plechu (jeden řádek) */
-export function generatedFreeText(doc: CadDoc): { legend: string[]; form: string[] } {
+/** generované řádky nad razítkem: legenda oblastních úprav z modelu (původ = původ úpravy) a poznámka k plechu (jeden řádek) */
+export function generatedFreeText(doc: CadDoc): { legend: GenLine[]; form: string[] } {
   const form = doc.kind === "assembly" || doc.kind === "draft" ? [] : formNotesOfDoc(doc);
-  return { legend: zoneLegendOf(pmiMarksOf(doc)), form: form.length ? [form.join(", ")] : [] };
+  return { legend: zoneLegendLines(doc), form: form.length ? [form.join(", ")] : [] };
 }
 
-/** název listu do hlášky */
-const sheetTitle = (doc: CadDoc, idx: number) => doc.drawings?.[idx]?.name || tr("list {0}", idx + 1);
+/** název listu do hlášky (u více výkresů s názvem výkresu) */
+const sheetTitle = (doc: CadDoc, idx: number) => {
+  const s = doc.drawings?.[idx];
+  const n = s?.name || tr("list {0}", idx + 1);
+  return drawingSets(doc).length > 1 ? `${drawingLabel(drawingKey(s ?? {}))} / ${n}` : n;
+};
+
+/** nálezy pravidel textu celého dokumentu (všechny kanály – cad/drawing-notes-rules.ts `auditDoc`) */
+export const auditOf = (doc: CadDoc): AuditFinding[] => auditDoc(doc as AuditInput, generatedFreeText(doc), (i) => sheetTitle(doc, i));
 
 /**
- * R4 / R5: po změně listu příkazem agenta – volný text celého výkresu (všechny listy sady) nejvýš NOTE_MAX_LINES řádků;
+ * R4: po změně listu příkazem agenta – volný text celého dokumentu (všechny výkresy a listy) nejvýš NOTE_MAX_LINES řádků;
  * jinak ✗ drawing.notes-limit s výpisem řádků (agent / ručně) a radou. `what` = co příkaz přidal (do hlášky).
  */
 function checkNotesBudget(doc: CadDoc, idx: number, what: string) {
-  const set = setSheets(doc, idx);
-  const items = freeTextLines(doc, set, generatedFreeText(doc));
+  const items = freeTextLines(doc, undefined, generatedFreeText(doc));
   const total = linesOf(items);
-  if (total > NOTE_MAX_LINES) throw new CodedError("drawing.notes-limit", [sheetTitle(doc, idx), tr("{0} – výkres by měl {1} řádků volného textu, nejvýš {2}: {3}; {4}", what, total, NOTE_MAX_LINES, freeTextList(items), limitHint())]);
+  if (total > NOTE_MAX_LINES) throw new CodedError("drawing.notes-limit", [sheetTitle(doc, idx), tr("{0} – dokument by měl {1} řádků volného textu, nejvýš {2} (všechny výkresy a listy dohromady): {3}; {4}", what, total, NOTE_MAX_LINES, freeTextList(items, 8, drawingSets(doc).length > 1 || (doc.drawings?.length ?? 0) > 1 ? (i) => sheetTitle(doc, i) : undefined), limitHint())]);
 }
 
-/** limit řádků volného textu výkresu aktivního listu dokumentu (vysvětlivka oblastní úpravy z modelu – engine/ops/functional.ts) */
+/** limit řádků volného textu dokumentu (vysvětlivka oblastní úpravy z modelu – engine/ops/functional.ts); i bez výkresu */
 export function checkDocNotesBudget(doc: CadDoc, what: string): void {
-  if (!doc.drawings?.length) return;
-  checkNotesBudget(doc, activeSheetIndex(doc), what);
+  const items = doc.drawings?.length ? freeTextLines(doc, undefined, generatedFreeText(doc)) : [];
+  const legend = doc.drawings?.length ? [] : generatedFreeText(doc).legend;
+  const total = linesOf(items) + legend.reduce((n, l) => n + lineCount(l.text), 0);
+  if (total > NOTE_MAX_LINES) throw new CodedError("drawing.notes-limit", [doc.drawings?.length ? sheetTitle(doc, activeSheetIndex(doc)) : tr("model"), tr("{0} – výkres by měl {1} řádků volného textu nad razítkem (vysvětlivky úprav se počítají), nejvýš {2}: {3}; {4}", what, total, NOTE_MAX_LINES, items.length ? freeTextList(items) : legend.map((l) => `„${l.text}“`).join(" · "), tr("úpravy se stejným předpisem slučte do jedné vysvětlivky (stejný text = jeden řádek „Z1, Z2 …“), úpravu celého dílu dejte do razítka (výkres razítko tepelné=… tvrdost=…)"))]);
 }
 
-/** R5: volný text agenta jen na listu 1 výkresu (list jen s poznámkami / rozdělení výkres + poznámky nevznikne) */
+/** R5: volný text agenta jen na hlavním listu (pohledy s kótami) – list jen s poznámkami / „výkres + list poznámek“ nevznikne */
 function checkFirstSheet(doc: CadDoc, idx: number, what: string) {
-  const pos = sheetPos(doc, idx).pos;
-  if (pos > 0) throw new CodedError("drawing.notes-sheet", [sheetTitle(doc, idx), tr("{0} – volný text patří na list 1 nad razítko (nejvýš {1} řádků); na dalších listech jen pohledy, řezy, detaily, kóty a odkazy na geometrii – výkres list 1", what, NOTE_MAX_LINES)]);
+  const main = mainSheet(doc);
+  if (idx !== main) throw new CodedError("drawing.notes-sheet", [sheetTitle(doc, idx), tr("{0} – volný text patří jen na hlavní list „{1}“ (pohledy s kótami) nad razítko, nejvýš {2} řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii", what, sheetTitle(doc, main), NOTE_MAX_LINES)]);
 }
 
 /** R4: heslovitý řádek (každý řádek textu), jinak ✗ drawing.note-style s důvodem */
-function checkStyle(doc: CadDoc, idx: number, text: string, max?: number) {
+function checkStyle(doc: CadDoc, idx: number, text: string, max?: number, maxWords?: number) {
   for (const l of text.split(/\r?\n/)) {
-    const why = noteStyle(l, max);
+    const why = noteStyle(l, max, maxWords);
     if (why) throw new CodedError("drawing.note-style", [sheetTitle(doc, idx), tr("„{0}“: {1} – pište strojařsky heslovitě (např. „Hrany srazit 0,5×45°“ patří do razítka, „Brousit“ k ploše odkazem), ne větou", l.trim(), why)]);
   }
 }
@@ -464,6 +472,7 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
         continue;
       }
       doc.materialName = p.value;
+      (doc as { materialBy?: "agent" }).materialBy = "agent";
       done.push(tr("materiál „{0}“", p.value));
       continue;
     }
@@ -487,49 +496,71 @@ const viewsOnSheet = (o: DrawingOptions): string[] => {
 /** list nemá vlastní pohledy navíc: žádný řez, detail, další model, pomocný pohled ani řez lomenou čarou */
 const plainViews = (o: DrawingOptions): boolean => !o.section && !o.details?.length && !o.models?.length && !(o as { aux?: unknown[] }).aux?.length && !(o as { cuts?: unknown[] }).cuts?.length && !(o as { brokenOut?: unknown[] }).brokenOut?.length;
 
+/** nález pravidel jako hlášení listu (úroveň podle původu: agent ✗, člověk ℹ) */
+const issueOfFinding = (f: AuditFinding, sheetId: string): DrawingIssue => ({ level: findingLevel(f), code: f.code, kind: "other", text: f.text, sheetId, ...(f.data ? { data: f.data } : {}) });
+
 /**
- * R7 (vlna 23): nálezy pravidel poznámek pro list `idx` – limit řádků celého výkresu (na listu 1 a na listu, kde text je),
- * údaj razítka v poznámce, neheslovitý řádek, text agenta mimo list 1, list bez pohledu (R5) a list, který jen opakuje
- * pohledy jiného listu. Text agenta = ⚠, ruční text (GUI / starší dokument) = ℹ rada.
+ * R7 (vlna 23): nálezy pravidel textu pro list `idx` – položky listu (volný text, místní popisy, kóty, razítko, revize),
+ * nálezy celého dokumentu (limit řádků a popisů, popisy / úpravy v modelu, materiál) na hlavním listu a na listu, který
+ * volný text nese; list bez pohledu (R5) a list, který jen opakuje pohledy jiného listu. Agent = ✗, ruční text = ℹ rada.
  */
 export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingResult, "views">): DrawingIssue[] {
   const s = doc.drawings?.[idx];
   if (!s || doc.kind === "draft") return [];
+  const out: DrawingIssue[] = [];
+  const main = mainSheet(doc);
+  const carries = freeTextLines(doc, [idx]).length > 0;
+  for (const f of auditOf(doc)) {
+    if (f.sheet === idx || (f.sheet < 0 && (idx === main || carries))) out.push(issueOfFinding(f, s.id));
+  }
   const set = setSheets(doc, idx);
   const pos = set.indexOf(idx);
-  const out: DrawingIssue[] = [];
-  for (const f of notesRuleIssues(doc, set, generatedFreeText(doc))) {
-    const ref = f.data?.ref as string | undefined;
-    const sheetPos = f.data?.sheetPos as number | undefined;
-    if (f.code === "drawing.notes-limit") {
-      const here = freeTextLines(doc, [idx]).length > 0;
-      if (pos !== 0 && !here) continue;
-    } else if (ref !== undefined) {
-      // nález řádku: jen na listu, kde řádek je
-      const item = freeTextLines(doc, set, generatedFreeText(doc)).find((x) => x.ref === ref && x.sheet === idx);
-      if (!item && !(sheetPos !== undefined && sheetPos === pos + 1)) continue;
-      if (!item) continue;
-    }
-    out.push({ level: f.level, code: f.code, kind: "other", text: f.text, sheetId: s.id, ...(f.data ? { data: f.data } : {}) });
-  }
   const o = sheetOptions(s);
   // R5: list dílu bez pohledu (ne list jen s kusovníkem sestavy) – „list jen s poznámkami“
   const noViews = res ? !res.views.length && !o.views.iso && !o.models?.length && !o.details?.length : false;
   if (noViews && !o.bomOnly) out.push({ level: "warn", code: "drawing.sheet-empty", kind: "other", text: tr("list nemá žádný pohled – list jen s poznámkami nebo prázdný list výkres nemá; přidejte pohledy (výkres pohledy přední,horní) nebo list smažte (výkres list smazat {0})", pos + 1), sheetId: s.id, data: { sheetPos: pos + 1 } });
-  // R5: další list, který jen opakuje pohledy dřívějšího listu výkresu (rozdělení „výkres + poznámky“): jeho pohledy jsou
-  // podmnožinou pohledů dřívějšího listu, nemá řez / detail / model navíc a kromě vygenerovaných kót nese jen volný text
-  if (pos > 0 && !noViews && !o.bomOnly && plainViews(o)) {
+  // R5: list, který jen opakuje pohledy jiného listu dokumentu (rozdělení „výkres + poznámky“ v jakémkoli pořadí i přes další
+  // výkres): jeho pohledy jsou podmnožinou pohledů jiného listu ve stejném měřítku, nemá řez / detail / model navíc a kromě
+  // vygenerovaných kót nese jen volný text
+  if (!noViews && !o.bomOnly && plainViews(o) && (doc.drawings?.length ?? 0) > 1) {
     const mine = res ? [...res.views.map((v) => v.key), ...(o.views.iso ? ["iso"] : [])] : viewsOnSheet(o);
-    // stejné měřítko (list s pohledem ve větším měřítku je detailní list, ne kopie)
-    const twin = set.slice(0, pos).find((j) => {
-      const tw = sheetOptions(doc.drawings![j]);
-      const has = new Set(viewsOnSheet(tw));
-      return String(tw.scale) === String(o.scale) && mine.every((k) => has.has(k));
-    });
     const own = s.annotations.some((a) => !a.auto && a.type !== "text" && !(a.type === "note" && isFreeAnn(a)));
-    if (twin !== undefined && !own) out.push({ level: "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list {0} opakuje pohledy listu {1} a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho (výkres list smazat {0}) a údaje dejte do razítka / k ploše", pos + 1, set.indexOf(twin) + 1), sheetId: s.id, data: { sheetPos: pos + 1, twin: set.indexOf(twin) + 1 } });
+    const twin = orderedSheets(doc).find((j) => {
+      if (j === idx) return false;
+      const tw = sheetOptions(doc.drawings![j]);
+      if (tw.bomOnly) return false; // list jen s kusovníkem pohledy nemá – kopií pohledů být nemůže
+      const has = new Set(viewsOnSheet(tw));
+      // stejné měřítko (list s pohledem ve větším měřítku je detailní list, ne kopie); ze dvou shodných listů je kopií ten další
+      const same = mine.every((k) => has.has(k)) && String(tw.scale) === String(o.scale);
+      const twinOwn = doc.drawings![j].annotations.some((a) => !a.auto && a.type !== "text" && !(a.type === "note" && isFreeAnn(a)));
+      return same && (has.size > mine.length || twinOwn || orderedSheets(doc).indexOf(j) < orderedSheets(doc).indexOf(idx));
+    });
+    if (twin !== undefined && !own) out.push({ level: "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše", sheetTitle(doc, idx), sheetTitle(doc, twin)), sheetId: s.id, data: { sheetPos: pos + 1 } });
   }
   return out;
+}
+
+/**
+ * Dokument načtený textovou cestou (JSON řádek, setDocument, `otevřít`, CLI `--open`) – přerazítkovaný na agenta: porušení
+ * pravidel textu po kódech (počet + první nález) pro řádek ✗ načtení. Načtený dokument zůstane otevřený (agent ho opraví
+ * příkazy `výkres smazat …`), ale běh skončí chybou a export listu s porušením se odmítne.
+ */
+export function ingestFindings(doc: CadDoc): { code: AuditFinding["code"]; args: [string, string] }[] {
+  const all = auditOf(doc).filter((f) => f.by === "agent" && findingLevel(f) === "error");
+  const by = new Map<string, AuditFinding[]>();
+  for (const f of all) by.set(f.code, [...(by.get(f.code) ?? []), f]);
+  return [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("načtený dokument (textová cesta = agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
+}
+
+/**
+ * Export výkresu textovou cestou (výkres export, window.mncad.exportDrawing, CLI --formats): list, na kterém agent porušil
+ * pravidla textu, se neexportuje – výkres s 10 větami nad razítkem ani „list poznámek“ nevznikne ani jako soubor (R4, R5).
+ */
+export function exportGuard(doc: CadDoc, sheets: number[]): void {
+  const bad = auditOf(doc).filter((f) => f.by === "agent" && findingLevel(f) === "error" && (f.sheet < 0 || sheets.includes(f.sheet)));
+  if (!bad.length) return;
+  const f = bad[0];
+  throw new CodedError(f.code, [f.sheet >= 0 ? sheetTitle(doc, f.sheet) : sheetTitle(doc, sheets[0] ?? 0), tr("export odmítnut – {0}{1}", f.text, bad.length > 1 ? tr(" (a dalších {0} nálezů – výkres stav)", bad.length - 1) : "")]);
 }
 
 /** příkazy, u kterých protokol ukáže hlášení výpočtu listu řádkem ✗ / ⚠ (ostatní je vrací jen v `issues`) */
@@ -546,7 +577,11 @@ const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-lega
 export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute0: DrawingCompute, env: DrawingEnv = {}): Promise<DrawingCmdResult> {
   let last: SmartResult | null = null;
   const compute: DrawingCompute = async (d, m, o) => (last = await compute0(d, m, o));
-  const r = await applyCmd(doc0, cmd, compute, env);
+  const r0 = await applyCmd(doc0, cmd, compute, env);
+  // R6: co zapsal příkaz textové cesty, je od agenta (razítko původu na jediném místě zápisu); R1/R2/R4/R5: nový porušený
+  // kanál textu (kóta, razítko, revize, odkaz, text …), který žádná cílená kontrola příkazu nezachytila, příkaz odmítne
+  const r = r0.changed || r0.doc !== doc0 ? { ...r0, doc: stampDoc(doc0, r0.doc) } : r0;
+  if (r.doc !== doc0 && r.doc.drawings?.length) guardAgentText(doc0, r.doc);
   const res = last as SmartResult | null;
   // stav výkresu sbírá hlášení všech vypsaných listů sám, export hlásí varování všech exportovaných listů sám
   if (!res || cmd.k === "status" || cmd.k === "export") return r;
@@ -559,6 +594,30 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute0: D
   const issues = [...computed, ...own];
   const lines = ISSUE_LINES.has(cmd.k) || (cmd.k === "sheet" && "then" in cmd && !!cmd.then) ? issues.filter((i) => i.level === "error" || ISSUE_KINDS.has(i.kind)).map(issueLine) : [];
   return { ...r, log: [...r.log, ...lines.filter((l) => !r.log.includes(l))], ...(issues.length ? { issues } : {}) };
+}
+
+/** listy dokumentu po příkazu textové cesty s razítkem původu „agent“ u všeho, co příkaz zapsal nebo změnil */
+function stampDoc(doc0: CadDoc, doc: CadDoc): CadDoc {
+  if (!doc.drawings?.length) return doc;
+  const prev = new Map((doc0.drawings ?? []).map((s) => [s.id, s]));
+  let changed = false;
+  const drawings = doc.drawings.map((s) => {
+    const n = stampOrigin(prev.get(s.id), s, "agent");
+    if (n !== s) changed = true;
+    return n;
+  });
+  const mat = doc.materialName !== doc0.materialName && doc.materialName?.trim() ? { materialBy: "agent" as const } : {};
+  return changed || Object.keys(mat).length ? { ...doc, drawings, ...mat } : doc;
+}
+
+/** nové porušení pravidel textu, které příkaz agenta způsobil → ✗ (dokument se nezmění) */
+function guardAgentText(doc0: CadDoc, doc: CadDoc): void {
+  const gen0 = generatedFreeText(doc0);
+  const gen1 = generatedFreeText(doc);
+  const fresh = newAgentFindings(auditDoc(doc0 as AuditInput, gen0), auditOf(doc), auditItems(doc0 as AuditInput, gen0), auditItems(doc as AuditInput, gen1));
+  if (!fresh.length) return;
+  const f = fresh[0];
+  throw new CodedError(f.code, [f.sheet >= 0 ? sheetTitle(doc, f.sheet) : sheetTitle(doc, activeSheetIndex(doc)), fresh.length > 1 ? `${f.text} ${tr("(a dalších {0}: {1})", fresh.length - 1, fresh.slice(1, 3).map((x) => x.text.split(" – ")[0]).join(" · "))}` : f.text]);
 }
 
 async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, env: DrawingEnv): Promise<DrawingCmdResult> {
@@ -1149,7 +1208,9 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       if (cmd.mark.type === "note") {
         const v = cmd.mark.text.trim();
         // R2: místní popis = odkaz na geometrii (kóta / popis, bod, hrana, kružnice pohledu); volný bod ani místo na listu ne
-        if (!made.attached) throw new CodedError("drawing.note-free-leader", [sheetTitle(doc, idx), tr("„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 \"{0}\"; výkres ho převezme se šipkou), nebo cílem zvolte hranu / kótu (pohled přední v x y na hraně, na Ø40)", v, where)]);
+        // odkaz na kótu není místní popis plochy – šipka míří na plochu nebo hranu (R2)
+        if ("on" in cmd.target) throw new CodedError("drawing.note-free-leader", [sheetTitle(doc, idx), tr("„{0}“ → {1}: místní popis míří šipkou na plochu nebo hranu, ne na kótu – popis plochy zapište do modelu (poznámka F7 \"{0}\"; výkres ho převezme se šipkou), údaj ke kótě patří do kóty (výkres upravit <kóta> přípona=…)", v, where)]);
+        if (!made.attached) throw new CodedError("drawing.note-free-leader", [sheetTitle(doc, idx), tr("„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 \"{0}\"; výkres ho převezme se šipkou), nebo cílem zvolte hranu (pohled přední v x y na hraně)", v, where)]);
         const cls = classifyNote(v);
         const bad = cls?.parts.filter((p) => p.key !== "edges") ?? [];
         if (bad.length) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: {1} u odkazu – údaje celého dílu patří do razítka ({2}), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná \"58+2 HRC\" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)", v, bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad))]);
@@ -1405,7 +1466,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(...titleLines(doc, doc.drawings![idx]));
   // volný text nad razítkem celého výkresu (vlna 23, R4) a popisy / oblastní úpravy z modelu (R2 / R3)
   L.push(notesBudgetLine(doc, setSheets(doc, idx), generatedFreeText(doc)));
-  if (res.pmi?.length) L.push(tr("Z modelu: {0}", res.pmi.map((x) => `${x.kind === "treatment" ? `${x.ref ?? ""} ` : ""}F${x.face + 1} „${x.text}“ → ${x.state === "ok" ? `${VIEW_NAME(x.view ?? "", o)} (${x.how === "chain" ? tr("tlustá čerchovaná 04.2 + kóta rozsahu") : x.how === "dot" ? tr("odkaz s tečkou na ploše") : tr("odkaz se šipkou")})` : x.state === "lost" ? tr("⚠ plocha se změnila – nekreslí se") : tr("⚠ nevidět v žádném pohledu")}`).join(" · ")));
+  if (res.pmi?.length) L.push(tr("Z modelu: {0}", res.pmi.map((x) => `${x.kind === "treatment" ? `${x.ref ?? ""} ` : ""}F${x.face + 1} „${x.text}“ → ${x.state === "ok" ? `${VIEW_NAME(x.view ?? "", o)} (${x.how === "chain" ? tr("tlustá čerchovaná 04.2 + kóta rozsahu") : x.how === "dot" ? tr("odkaz s tečkou na ploše") : tr("odkaz se šipkou")})${x.range ? tr(" ⚠ rozsah {0}–{1} přesahuje plochu {2} mm", fmtN(x.range.from), fmtN(x.range.to), fmtN(x.range.len)) : ""}` : x.state === "lost" ? tr("⚠ plocha se změnila – nekreslí se") : tr("⚠ nevidět v žádném pohledu")}`).join(" · ")));
   // vydání listu a revize modelu, ze které list vznikl (vlna 22, bod 20 – cad/doc-outputs.ts)
   L.push(sheetIssueLine(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));

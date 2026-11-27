@@ -11,7 +11,8 @@
  *  4. popis plochy v modelu → výkres ho kreslí (odkaz) a změna textu v modelu = změna na výkrese; změněná plocha = ⚠ (R2)
  *  5. oblastní úprava → tlustá čerchovaná čára (vrstva chain, SVG 0,7 mm s čárkováním, DXF vrstva UPRAVY / CENTER), kóta
  *     rozsahu, značka Z1, vysvětlivka v patičce (R3)
- *  6. přísný režim zastaví běh na ⚠ pravidel poznámek (R7); dokument otevřený člověkem (ruční poznámky) = jen ℹ (R6)
+ *  6. přísný režim zastaví běh na porušení pravidel poznámek (R7); dokument otevřený člověkem (ruční poznámky) = jen ℹ (R6);
+ *     JSON dokument z textové cesty = dokument agenta (✗ na řádku JSON, i s "by":"user" – S/w23/review)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -90,7 +91,7 @@ describe("w23 greens – poznámky výkresu (R4/R5/R7)", () => {
     expect(txt(r)).toMatch(/Údaje razítka \(technické, v buňkách\): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“/);
     expect(txt(r)).toMatch(OK_RE);
   }, 120000);
-  it("1+6: 10 poznámek vložených hotovým JSON dokumentem = ⚠ drawing.notes-limit, bez ✓; přísný režim zastaví běh", async () => {
+  it("1+6: 10 poznámek vložených hotovým JSON dokumentem = ✗ drawing.notes-limit na řádku JSON, bez ✓; přísný režim zastaví běh", async () => {
     const ws0 = new MemoryWorkspace();
     await run(ws0, PART);
     const d = structuredClone(docOf(ws0, "Deska"));
@@ -98,7 +99,8 @@ describe("w23 greens – poznámky výkresu (R4/R5/R7)", () => {
     d.drawings![0].annotations.push(...Array.from({ length: 10 }, (_, i) => ({ id: `t${i}`, view: "sheet", type: "text" as const, at: [30, 228 + i * 4.5] as [number, number], text: `Poznamka ${i + 1}`, size: 3.5 })));
     const r = await run(new MemoryWorkspace(), [JSON.stringify(d)]);
     const lim = r.entries.find((e) => e.code === "drawing.notes-limit")!;
-    expect(lim.level).toBe("warn");
+    expect(lim.level).toBe("error");
+    expect(lim.line).toBe(1);
     expect(txt(r)).not.toMatch(OK_RE);
     const rs = await run(new MemoryWorkspace(), [JSON.stringify(d)], { strict: true });
     expect(rs.stopped?.code).toBe("drawing.notes-limit");
@@ -159,7 +161,7 @@ describe("w23 – popis a oblastní úprava z modelu (R2/R3)", () => {
     const r = await run(ws, [...PART, 'úprava F3 tepelná "62+2 HRC" od 10 do 40', "výkres stav", "výkres export svg", "výkres export dxf"]);
     expect(codes(r, "error")).toEqual([]);
     expect(txt(r)).toMatch(/Z modelu: Z1 F3 „62\+2 HRC“ → přední \(tlustá čerchovaná 04\.2 \+ kóta rozsahu\)/);
-    expect(txt(r)).toMatch(/Poznámky nad razítkem: 1\/5 řádků \(generátor 1\)/);
+    expect(txt(r)).toMatch(/Poznámky nad razítkem: 1\/5 řádků \(agent 1\) · místní popisy 0\/8/);
     const res = await sheetRes(docOf(ws, "Deska"));
     const chain = res.polys.filter((p) => p.layer === "chain");
     expect(chain).toHaveLength(1);

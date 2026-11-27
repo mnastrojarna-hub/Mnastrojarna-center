@@ -5,19 +5,14 @@
  (nahrazuje „{0}“)	 (replaces “{0}”)
  a zbytek zkraťte na samostatnou heslovitou poznámku („{0}“)	 and shorten the rest into a separate keyword note (“{0}”)
 „{0}“ → {1} (údaje razítka se nepíšou jako poznámka)	“{0}” → {1} (title block data is not written as a note)
-„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 "{0}"; výkres ho převezme se šipkou), nebo cílem zvolte hranu / kótu (pohled přední v x y na hraně, na Ø40)	“{0}” → {1}: the leader must point at a face or an edge – write the note into the model at the face (note F7 "{0}"; the drawing takes it over with an arrow), or target an edge / dimension (view front at x y on an edge, on Ø40)
 „{0}“ obsahuje {1} – {2}	“{0}” contains {1} – {2}
 „{0}“ obsahuje údaj razítka ({1}) – do poznámky nepatří; zapište ho do razítka: {2}{3}	“{0}” contains title block data ({1}) – it does not belong in a note; write it into the title block: {2}{3}
 „{0}“ obsahuje údaj razítka ({1}) – zapište ho do razítka: {2} a poznámku smažte (výkres smazat {3})	“{0}” contains title block data ({1}) – write it into the title block: {2} and delete the note (drawing delete {3})
 „{0}“: {1} – pište strojařsky heslovitě (např. „Hrany srazit 0,5×45°“ patří do razítka, „Brousit“ k ploše odkazem), ne větou	“{0}”: {1} – write like an engineer, in keywords (e.g. “Chamfer edges 0.5×45°” belongs in the title block, “Grind” at the face with a leader), not as a sentence
 „{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“	“{0}”: {1} – a face note short and in keywords (at most {2} characters), e.g. “Grind”, “Polish Ra 0.4”
 „{0}“: {1} u odkazu – údaje celého dílu patří do razítka ({2}), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná "58+2 HRC" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)	“{0}”: {1} at a leader – data of the whole part belongs in the title block ({2}), a local treatment of a face into the model as a chain line (treatment F7 heat "58+2 HRC" [from 0 to 25]), face roughness as a symbol (drawing mark roughness Ra 0.8 on …)
-{0} – volný text patří na list 1 nad razítko (nejvýš {1} řádků); na dalších listech jen pohledy, řezy, detaily, kóty a odkazy na geometrii – výkres list 1	{0} – free text belongs on sheet 1 above the title block (at most {1} lines); other sheets carry only views, sections, details, dimensions and leaders to geometry – drawing sheet 1
-{0} – výkres by měl {1} řádků volného textu, nejvýš {2}: {3}; {4}	{0} – the drawing would have {1} lines of free text, at most {2}: {3}; {4}
-{0} „{1}“ je na listu {2} – poznámky patří na list 1 nad razítko (nejvýš {3} řádků)	{0} “{1}” is on sheet {2} – notes belong on sheet 1 above the title block (at most {3} lines)
 {0} „{1}“ není heslovitý: {2} – zkraťte (strojařsky, bez vět)	{0} “{1}” is not in keywords: {2} – shorten it (engineering style, no sentences)
 {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	{0} “{1}” contains title block data ({2}) – it belongs in the title block: {3}
-{0} řádků volného textu nad razítkem (nejvýš {1}): {2} – {3}	{0} lines of free text above the title block (at most {1}): {2} – {3}
 {0} slov – heslovitě nejvýš {1}	{0} words – at most {1} in keyword style
 {0}: plocha modelu se změnila – na listu se nekreslí; označte plochu znovu (výkres stav ukáže plochy)	{0}: the model face has changed – not drawn on the sheet; mark the face again (drawing status shows the faces)
 {0}: plocha není vidět v žádném pohledu – přidejte pohled	{0}: the face is not visible in any view – add a view
@@ -36,7 +31,6 @@ generátor	generator
 generátor {0}	generator {0}
 legenda	legend
 list {0} 	sheet {0} 
-list {0} opakuje pohledy listu {1} a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho (výkres list smazat {0}) a údaje dejte do razítka / k ploše	sheet {0} repeats the views of sheet {1} and adds nothing but text – a drawing is not split into “drawing sheet + notes sheet”; delete it (drawing sheet delete {0}) and put the data into the title block / at the face
 list nemá žádný pohled – list jen s poznámkami nebo prázdný list výkres nemá; přidejte pohledy (výkres pohledy přední,horní) nebo list smažte (výkres list smazat {0})	the sheet has no view – a drawing has no notes-only or empty sheet; add views (drawing views front,top) or delete the sheet (drawing sheet delete {0})
 materiál „{0}“	material “{0}”
 materiál „{0}“ (už v razítku)	material “{0}” (already in the title block)
@@ -61,7 +55,6 @@ poznámka F7 "Brousit" · úprava F7 tepelná "58+2 HRC" [od 0 do 25] · úprava
 poznámka potřebuje krátký text: výkres značka poznámka "Lapovat" na Ø40 (popis plochy patří do modelu: poznámka F7 "…")	a note needs a short text: drawing mark note "Lap" on Ø40 (a face note belongs in the model: note F7 "…")
 poznámka: za plochou zadejte krátký popis v uvozovkách – {0}	note: after the face give a short text in quotes – {0}
 poznámku u razítka listu „{0}“ („{1}“) skript nepřenese – textová cesta agenta přijme jen krátký heslovitý řádek na listu 1 bez údajů razítka (vlna 23); přeneste dokument jako JSON	the title block note of sheet “{0}” (“{1}”) is not carried over by the script – the agent text path accepts only a short keyword line on sheet 1 without title block data; transfer the document as JSON
-Poznámky nad razítkem: {0}/{1} řádků{2}	Notes above the title block: {0}/{1} lines{2}
 Rada: nad razítkem je {0} řádků textu – strojařsky stačí {1} krátkých; údaje (tepelné zpracování, tvrdost, povrch, hrany, tolerance, drsnost) patří do razítka, popis plochy k ploše odkazem.	Tip: there are {0} lines of text above the title block – {1} short ones are enough; data (heat treatment, hardness, surface, edges, tolerances, roughness) belongs in the title block, a face note at the face with a leader.
 ručně {0}	manual {0}
 řádek má {0} znaků (nejvýš {1})	the line has {0} characters (at most {1})
@@ -92,10 +85,12 @@ zkraťte a slučte řádky; údaje razítka zapište do razítka (výkres razít
 např. Odmastit	e.g. Degrease
 #!dynamic – texty kódů protokolu (src/cad/engine/codes.ts), překládají se za běhu tr(def.key)
 list {0}: poznámky nad razítkem – {1}	sheet {0}: notes above the title block – {1}
-list {0}: poznámka není strojařsky heslovitá – {1}	sheet {0}: note not in engineering keyword style – {1}
-list {0}: údaj razítka v poznámce – {1}	sheet {0}: title block data in a note – {1}
-list {0}: poznámky mimo list 1 – {1}	sheet {0}: notes outside sheet 1 – {1}
+list {0}: text není strojařsky heslovitý – {1}	sheet {0}: text not in engineering keyword style – {1}
+list {0}: údaj razítka mimo svou buňku razítka – {1}	sheet {0}: title block data outside its title block cell – {1}
+list {0}: poznámky mimo hlavní list – {1}	sheet {0}: notes outside the main sheet – {1}
 list {0}: poznámka bez cíle v geometrii – {1}	sheet {0}: note without a target in the geometry – {1}
 list {0}: přesunuto do razítka – {1}	sheet {0}: moved into the title block – {1}
+list {0}: místních popisů je moc – {1}	sheet {0}: too many local notes – {1}
+list {0}: popis jen na výkrese, ne v modelu – {1}	sheet {0}: note only on the drawing, not in the model – {1}
 Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)	Engineering-style drawing – title block, leaders, at most 5 lines (rule for every agent)
  – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany="ISO 13715 -0,3")	 – a title block cell value in keywords, at most {0} characters (e.g. edges="ISO 13715 -0,3")

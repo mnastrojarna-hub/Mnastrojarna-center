@@ -103,7 +103,9 @@ describe("Chytré kóty se vyhnou celému razítku podle šablony (dřív jen 18
 describe("Razítko bez zkracování textu – i materiál z dokumentu", () => {
   const LONG = "1.2379 (X153CrMoV12) kalené a popuštěné na 58–60 HRC, nitridováno 0,1 mm";
   it("ISO 7200: materiál zalomený a zmenšený se ohlásí (dřív „všechna pole v nominální velikosti“)", async () => {
-    const { doc, log } = await run(plateDoc(), `výkres A3\nvýkres razítko šablona=iso7200 materiál="${LONG}"\nvýkres razítko`);
+    // dlouhé označení materiálu smí jen člověk (GUI) – agent ho textem nezapíše (vlna 23, R1/R4: buňka heslovitě)
+    await expect(run(plateDoc(), `výkres A3\nvýkres razítko materiál="${LONG}"`)).rejects.toThrow(/označení materiálu heslovitě/);
+    const { doc, log } = await run({ ...plateDoc(), materialName: LONG }, `výkres A3\nvýkres razítko šablona=iso7200\nvýkres razítko`);
     expect(doc.materialName).toBe(LONG);
     expect(log).toMatch(/Razítko bez zkracování textu: .*Materiál 3 řádky 2,2 mm/);
     expect(log).not.toMatch(/všechna pole v nominální velikosti/);
@@ -112,9 +114,9 @@ describe("Razítko bez zkracování textu – i materiál z dokumentu", () => {
     expect(info.fields.find((f) => f.key === "material")).toMatchObject({ lines: 3, shrunk: true, size: 2.15 });
   });
   it("kompaktní šablona: materiál se ohlásí; extrémně dlouhý materiál dá ⚠ pod 2 mm", async () => {
-    let { doc, log } = await run(plateDoc(), `výkres razítko šablona=kompaktní materiál="${LONG}"\nvýkres stav`);
+    let { doc, log } = await run({ ...plateDoc(), materialName: LONG }, `výkres razítko šablona=kompaktní\nvýkres stav`);
     expect(log).toMatch(/Razítko bez zkracování textu: .*Materiál \d řádky 2,4 mm/);
-    ({ doc, log } = await run(doc, `výkres razítko materiál="${LONG} ${LONG} ${LONG}"\nvýkres razítko`));
+    ({ doc, log } = await run({ ...doc, materialName: `${LONG} ${LONG} ${LONG}` }, "výkres razítko"));
     expect(log).toMatch(/⚠ pole „Materiál“ má písmo jen \d,\d mm/);
   });
 });

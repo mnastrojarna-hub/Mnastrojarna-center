@@ -5,19 +5,14 @@
  (nahrazuje „{0}“)	 (ersetzt „{0}“)
  a zbytek zkraťte na samostatnou heslovitou poznámku („{0}“)	 und den Rest zu einem eigenen stichwortartigen Hinweis kürzen („{0}“)
 „{0}“ → {1} (údaje razítka se nepíšou jako poznámka)	„{0}“ → {1} (Schriftfeldangaben werden nicht als Hinweis geschrieben)
-„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 "{0}"; výkres ho převezme se šipkou), nebo cílem zvolte hranu / kótu (pohled přední v x y na hraně, na Ø40)	„{0}“ → {1}: die Hinweislinie muss auf eine Fläche oder Kante zeigen – den Hinweis im Modell an die Fläche schreiben (hinweis F7 "{0}"; die Zeichnung übernimmt ihn mit Pfeil) oder eine Kante / ein Maß als Ziel wählen (ansicht vorne bei x y auf einer Kante, an Ø40)
 „{0}“ obsahuje {1} – {2}	„{0}“ enthält {1} – {2}
 „{0}“ obsahuje údaj razítka ({1}) – do poznámky nepatří; zapište ho do razítka: {2}{3}	„{0}“ enthält Schriftfeldangaben ({1}) – sie gehören nicht in einen Hinweis; ins Schriftfeld schreiben: {2}{3}
 „{0}“ obsahuje údaj razítka ({1}) – zapište ho do razítka: {2} a poznámku smažte (výkres smazat {3})	„{0}“ enthält Schriftfeldangaben ({1}) – ins Schriftfeld schreiben: {2} und den Hinweis löschen (zeichnung löschen {3})
 „{0}“: {1} – pište strojařsky heslovitě (např. „Hrany srazit 0,5×45°“ patří do razítka, „Brousit“ k ploše odkazem), ne větou	„{0}“: {1} – technisch stichwortartig schreiben (z. B. „Kanten brechen 0,5×45°“ gehört ins Schriftfeld, „Schleifen“ mit Hinweislinie an die Fläche), nicht als Satz
 „{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“	„{0}“: {1} – Flächenhinweis kurz und stichwortartig (höchstens {2} Zeichen), z. B. „Schleifen“, „Polieren Ra 0,4“
 „{0}“: {1} u odkazu – údaje celého dílu patří do razítka ({2}), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná "58+2 HRC" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)	„{0}“: {1} an einer Hinweislinie – Angaben zum ganzen Teil gehören ins Schriftfeld ({2}), eine örtliche Behandlung einer Fläche ins Modell als Strichpunktlinie (behandlung F7 wärme "58+2 HRC" [von 0 bis 25]), Rauheit einer Fläche als Symbol (zeichnung symbol rauheit Ra 0,8 an …)
-{0} – volný text patří na list 1 nad razítko (nejvýš {1} řádků); na dalších listech jen pohledy, řezy, detaily, kóty a odkazy na geometrii – výkres list 1	{0} – freier Text gehört auf Blatt 1 über das Schriftfeld (höchstens {1} Zeilen); weitere Blätter tragen nur Ansichten, Schnitte, Einzelheiten, Maße und Hinweislinien an Geometrie – zeichnung blatt 1
-{0} – výkres by měl {1} řádků volného textu, nejvýš {2}: {3}; {4}	{0} – die Zeichnung hätte {1} Zeilen freien Text, höchstens {2}: {3}; {4}
-{0} „{1}“ je na listu {2} – poznámky patří na list 1 nad razítko (nejvýš {3} řádků)	{0} „{1}“ steht auf Blatt {2} – Hinweise gehören auf Blatt 1 über das Schriftfeld (höchstens {3} Zeilen)
 {0} „{1}“ není heslovitý: {2} – zkraťte (strojařsky, bez vět)	{0} „{1}“ ist nicht stichwortartig: {2} – kürzen (technisch, ohne Sätze)
 {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	{0} „{1}“ enthält Schriftfeldangaben ({2}) – gehört ins Schriftfeld: {3}
-{0} řádků volného textu nad razítkem (nejvýš {1}): {2} – {3}	{0} Zeilen freier Text über dem Schriftfeld (höchstens {1}): {2} – {3}
 {0} slov – heslovitě nejvýš {1}	{0} Wörter – stichwortartig höchstens {1}
 {0}: plocha modelu se změnila – na listu se nekreslí; označte plochu znovu (výkres stav ukáže plochy)	{0}: die Modellfläche hat sich geändert – wird auf dem Blatt nicht gezeichnet; Fläche neu markieren (zeichnung status zeigt die Flächen)
 {0}: plocha není vidět v žádném pohledu – přidejte pohled	{0}: die Fläche ist in keiner Ansicht sichtbar – Ansicht hinzufügen
@@ -36,7 +31,6 @@ generátor	Generator
 generátor {0}	Generator {0}
 legenda	Legende
 list {0} 	Blatt {0} 
-list {0} opakuje pohledy listu {1} a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho (výkres list smazat {0}) a údaje dejte do razítka / k ploše	Blatt {0} wiederholt die Ansichten von Blatt {1} und fügt nur Text hinzu – eine Zeichnung wird nicht in „Zeichnungsblatt + Hinweisblatt“ geteilt; löschen (zeichnung blatt löschen {0}) und Angaben ins Schriftfeld / an die Fläche
 list nemá žádný pohled – list jen s poznámkami nebo prázdný list výkres nemá; přidejte pohledy (výkres pohledy přední,horní) nebo list smažte (výkres list smazat {0})	das Blatt hat keine Ansicht – eine Zeichnung hat kein reines Hinweisblatt und kein leeres Blatt; Ansichten hinzufügen (zeichnung ansichten vorne,oben) oder Blatt löschen (zeichnung blatt löschen {0})
 materiál „{0}“	Werkstoff „{0}“
 materiál „{0}“ (už v razítku)	Werkstoff „{0}“ (bereits im Schriftfeld)
@@ -61,7 +55,6 @@ poznámka F7 "Brousit" · úprava F7 tepelná "58+2 HRC" [od 0 do 25] · úprava
 poznámka potřebuje krátký text: výkres značka poznámka "Lapovat" na Ø40 (popis plochy patří do modelu: poznámka F7 "…")	ein Hinweis braucht einen kurzen Text: zeichnung symbol hinweis "Läppen" an Ø40 (ein Flächenhinweis gehört ins Modell: hinweis F7 "…")
 poznámka: za plochou zadejte krátký popis v uvozovkách – {0}	hinweis: nach der Fläche einen kurzen Text in Anführungszeichen angeben – {0}
 poznámku u razítka listu „{0}“ („{1}“) skript nepřenese – textová cesta agenta přijme jen krátký heslovitý řádek na listu 1 bez údajů razítka (vlna 23); přeneste dokument jako JSON	der Schriftfeldhinweis von Blatt „{0}“ („{1}“) wird vom Skript nicht übertragen – der Textweg des Agenten nimmt nur eine kurze stichwortartige Zeile auf Blatt 1 ohne Schriftfeldangaben an; Dokument als JSON übertragen
-Poznámky nad razítkem: {0}/{1} řádků{2}	Hinweise über dem Schriftfeld: {0}/{1} Zeilen{2}
 Rada: nad razítkem je {0} řádků textu – strojařsky stačí {1} krátkých; údaje (tepelné zpracování, tvrdost, povrch, hrany, tolerance, drsnost) patří do razítka, popis plochy k ploše odkazem.	Tipp: über dem Schriftfeld stehen {0} Textzeilen – {1} kurze genügen; Angaben (Wärmebehandlung, Härte, Oberfläche, Kanten, Toleranzen, Rauheit) gehören ins Schriftfeld, ein Flächenhinweis mit Hinweislinie an die Fläche.
 ručně {0}	manuell {0}
 řádek má {0} znaků (nejvýš {1})	die Zeile hat {0} Zeichen (höchstens {1})
@@ -92,10 +85,12 @@ zkraťte a slučte řádky; údaje razítka zapište do razítka (výkres razít
 např. Odmastit	z. B. Entfetten
 #!dynamic – texty kódů protokolu (src/cad/engine/codes.ts), překládají se za běhu tr(def.key)
 list {0}: poznámky nad razítkem – {1}	Blatt {0}: Hinweise über dem Schriftfeld – {1}
-list {0}: poznámka není strojařsky heslovitá – {1}	Blatt {0}: Hinweis nicht technisch stichwortartig – {1}
-list {0}: údaj razítka v poznámce – {1}	Blatt {0}: Schriftfeldangabe in einem Hinweis – {1}
-list {0}: poznámky mimo list 1 – {1}	Blatt {0}: Hinweise außerhalb von Blatt 1 – {1}
+list {0}: text není strojařsky heslovitý – {1}	Blatt {0}: Text nicht technisch stichwortartig – {1}
+list {0}: údaj razítka mimo svou buňku razítka – {1}	Blatt {0}: Schriftfeldangabe außerhalb ihres Schriftfeldes – {1}
+list {0}: poznámky mimo hlavní list – {1}	Blatt {0}: Hinweise außerhalb des Hauptblatts – {1}
 list {0}: poznámka bez cíle v geometrii – {1}	Blatt {0}: Hinweis ohne Ziel in der Geometrie – {1}
 list {0}: přesunuto do razítka – {1}	Blatt {0}: ins Schriftfeld verschoben – {1}
+list {0}: místních popisů je moc – {1}	Blatt {0}: zu viele örtliche Hinweise – {1}
+list {0}: popis jen na výkrese, ne v modelu – {1}	Blatt {0}: Hinweis nur in der Zeichnung, nicht im Modell – {1}
 Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)	Technische Zeichnung – Schriftfeld, Hinweislinien, höchstens 5 Zeilen (Regel für jeden Agenten)
  – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany="ISO 13715 -0,3")	 – Wert eines Schriftfeldes stichwortartig, höchstens {0} Zeichen (z. B. Kanten="ISO 13715 -0,3")

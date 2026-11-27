@@ -122,11 +122,12 @@ const first = (log, re) => (re.exec(log) || [])[0] || '';
   // klik na záložku listu 1 → další příkaz pracuje s listem 1
   await p.locator('[data-drawing-workspace]').getByRole('button', { name: 'List 1', exact: true }).click();
   await p.waitForTimeout(1500);
-  const log5 = await run('výkres značka poznámka "ZE ZÁLOŽKY" na Ø40');
-  ok(/→ značka poznámka ZE ZÁLOŽKY → kóta Ø40.* · list 1 „List 1“/.test(log5), 'po kliknutí na záložku List 1 pracují příkazy s listem 1');
-  await p.waitForFunction(() => [...document.querySelectorAll('[data-sheet] > div svg text')].some((t) => t.textContent === 'ZE ZÁLOŽKY'), null, { timeout: 120000 }).catch(() => {});
+  // vlna 23 (R2): odkaz s popisem na kótu agent nesmí – po přepnutí záložky se ověří značkou drsnosti na kótě
+  const log5 = await run('výkres značka drsnost Ra 6,3 na Ø40');
+  ok(/→ značka drsnost Ra 6,3 → kóta Ø40.* · list 1 „List 1“/.test(log5), 'po kliknutí na záložku List 1 pracují příkazy s listem 1');
+  await p.waitForFunction(() => [...document.querySelectorAll('[data-sheet] > div svg text')].some((t) => (t.textContent || '').includes('6,3')), null, { timeout: 120000 }).catch(() => {});
   t = await sheetTexts();
-  ok(t.includes('ZE ZÁLOŽKY') && t.includes('Ra 0,8'), 'poznámka se zobrazila na listu 1 ve výkresovém prostředí');
+  ok(t.some((x) => x.includes('6,3')) && t.includes('Ra 0,8'), 'značka se zobrazila na listu 1 ve výkresovém prostředí');
   await p.screenshot({ path: S + 'sheet1.png' });
 
   // ── 6. smazat, list smazat ──

@@ -171,6 +171,8 @@ export const engineRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
       if (loadsModel(f.doc)) rb.code("op.accepted", { text: `${tr("otevřeno „{0}“", f.file)} – ${modelTail()}`, doc: f.doc.name });
       else rb.ok(null, tr("otevřeno „{0}“", f.file), f.doc.name);
       if (f.note) rb.code("msg.note", { text: f.note, doc: f.doc.name });
+      // --open = dokument agenta (vlna 23, R6 – readDocument ho přerazítkuje): porušení pravidel textu výkresu = ✗ (L-)
+      if (f.doc.drawings?.length) for (const x of (await import("../drawing-agent")).ingestFindings(f.doc)) rb.code(x.code, { args: x.args, doc: f.doc.name });
     } catch (e) {
       if (e instanceof MissingInputError) rb.code("file.missing", { text: e.message });
       else rb.code("op.failed", { args: [errText(e)] });

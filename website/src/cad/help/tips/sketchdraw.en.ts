@@ -550,8 +550,8 @@ export default {
     what: "Note with a leader: the arrow points at the feature, the text stands beside it.",
     when: "Short instruction at a face or edge (Grind, Lap). Heat treatment, hardness, finish and edges of the part go in the title block.",
     steps: ["Click where the arrow should point.", "Click the text location.", "Type the Note text and confirm OK."],
-    cmd: 'drawing mark note "Lap" on Ø40',
-    note: "An agent writes a face note into the model (note F7 \"Grind\") – the drawing takes it over with an arrow.",
+    cmd: 'note F7 "Lap"',
+    note: "Agent in text: face note into the model (the drawing takes it with an arrow); leader on a dimension = ✗. By hand: no limits.",
   },
   "drawing-ws/ann-roughness": {
     what: "Places a surface finish symbol to ISO 1302 (Ra, Rz).",

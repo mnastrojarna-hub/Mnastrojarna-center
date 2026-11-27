@@ -5,7 +5,7 @@
  * Kontrola kót (cad/dim-complete.ts) pak u funkčního prvku chce velikost, polohu (od základny) a toleranci.
  */
 import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-functional";
-import { classifyNote, LEADER_MAX_CHARS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
+import { classifyNote, isFreeAnn, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
 import { treatmentWord } from "../../pmi-marks";
 import { CodedError } from "../codes";
 import { acceptLine, sheetTail } from "../accept";
@@ -66,6 +66,12 @@ function checkPmiText(kind: "note" | "treatment", text: string): void {
     const heat = bad.some((p) => p.key === "heatTreatment" || p.key === "hardness" || p.key === "surfaceTreatment");
     throw new CodedError("drawing.note-title-data", [tr("model"), tr("„{0}“ obsahuje {1} – {2}", text, bad.map((p) => titleDataLabel(p.key)).join(", "), heat ? tr("úprava jen této plochy = oblastní úprava (úprava F… tepelná|povrchová \"…\" [od a do b]), úprava celého dílu do razítka ({0})", titleHint(bad)) : tr("patří do razítka: {0}", titleHint(bad)))]);
   }
+}
+
+/** R2: nejvýš NOTE_MAX_LEADERS místních popisů v dokumentu (model + odkazy na výkrese) – jinak ✗ s radou */
+function checkLeaders(d: CadDoc, what: string): void {
+  const n = (d.functional ?? []).filter((m) => m.kind === "note" && m.text).length + (d.drawings ?? []).reduce((k, s) => k + s.annotations.filter((a) => a.type === "note" && !isFreeAnn(a)).length, 0);
+  if (n > NOTE_MAX_LEADERS) throw new CodedError("drawing.leaders-limit", [tr("model"), tr("{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)", what, n, NOTE_MAX_LEADERS)]);
 }
 
 const nextId = (ms: readonly FunctionalMark[]) => {
@@ -142,6 +148,7 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
       const mark: FunctionalMark = {
         id: old?.id ?? nextId(next),
         kind: cmd.kind,
+        by: "agent", // textová cesta = agent (vlna 23, R6)
         face: { index: cmd.face },
         ...(geom ? { geom } : {}),
         rev: modelRev(d),
@@ -149,11 +156,11 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
         ...(cmd.kind === "treatment" ? { what: cmd.what, ...(cmd.from !== undefined ? { from: cmd.from } : {}), ...(cmd.to !== undefined ? { to: cmd.to } : {}) } : {}),
       };
       next.push(mark);
-      // vysvětlivka oblastní úpravy je řádek nad razítkem: limit 5 řádků celého výkresu (R4) – před zápisem do modelu
-      if (cmd.kind === "treatment" && d.drawings?.length) {
-        const { checkDocNotesBudget } = await import("../../drawing-agent");
-        checkDocNotesBudget({ ...d, functional: next }, tr("úprava {0}", pmiText(mark)));
-      }
+      // vysvětlivka oblastní úpravy je řádek nad razítkem: limit 5 řádků (R4) – před zápisem do modelu, i když výkres ještě
+      // není (vysvětlivky se pak objeví na každém výkresu dílu); místní popisy nejvýš NOTE_MAX_LEADERS (R2 – „ne 1000 poznámek“)
+      const { checkDocNotesBudget } = await import("../../drawing-agent");
+      if (cmd.kind === "treatment") checkDocNotesBudget({ ...d, functional: next }, tr("úprava {0}", pmiText(mark)));
+      else checkLeaders({ ...d, functional: next }, pmiText(mark));
       // s výkresem je to jen přijetí – zda se popis / čára na list vešla, řekne vyhodnocení listu (ℹ → ✓ / ⚠, vlna 22 bod 22i)
       const msg = cmd.kind === "note" ? tr("✓ {0} v modelu{1} – výkres ho přebírá jako odkaz se šipkou na plochu", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "") : tr("✓ {0} v modelu{1} – výkres ji přebírá jako tlustou čerchovanou čáru s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "");
       commit(next, d.drawings?.length ? acceptLine(msg, sheetTail()) : msg);

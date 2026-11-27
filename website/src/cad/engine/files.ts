@@ -391,6 +391,8 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
     if (!csv) throw new Error(tr("Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá."));
     return { name: `${base}_kusovnik.csv`, mime: OUT_MIME.csv, data: csv, format, warnings: [] };
   }
+  // listy s porušením pravidel textu agenta se neexportují (vlna 23 – jako exportDrawing; všechny výkresy dokumentu)
+  if (d.drawings?.length) (await import("../drawing-agent")).exportGuard(d, d.drawings.map((_, i) => i));
   const sheets = await documentSheets(env, d);
   // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
   // díly v záložkách: zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` jako v `kusovník`

@@ -302,7 +302,7 @@ export type DrawingResult = {
    * tečka na ploše, tlustá čerchovaná čára), `lost` = plocha modelu se změnila (index neukazuje na tutéž plochu – nekreslí
    * se), `unplaced` = žádný pohled plochu neukazuje vhodně (úprava potřebuje plochu z boku)
    */
-  pmi?: { id: string; kind: "note" | "treatment"; state: "ok" | "lost" | "unplaced"; view?: string; how?: "arrow" | "dot" | "chain"; ref?: string; text: string; face: number }[];
+  pmi?: { id: string; kind: "note" | "treatment"; state: "ok" | "lost" | "unplaced"; view?: string; how?: "arrow" | "dot" | "chain"; ref?: string; text: string; face: number; /** rozsah úpravy přesahuje plochu (délka plochy v pohledu) – na listu oříznut */ range?: { len: number; from: number; to: number } }[];
   /** tabulka děr: pohled, ze kterého jsou díry (s osou ve směru pohledu), a díry s jinou osou, které v ní nejsou (průměr, osa) */
   holeTableInfo?: { view: string; other: { d: number; axis: string }[] };
   /** počet tabulek údajů pružin na listu (volba springTable) */
@@ -1733,8 +1733,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
         // posune kamkoli do rámu, kde žádný její okraj pro kóty nezasáhne razítko ani tabulky – vedle razítka, nad ním (vlna 22,
         // bod 19, kolo 6: dřív jen vlevo nahoře a jen u Chytrých kót → ISO 7200 1:1, nástrojářská šablona 1:2). Polohy přisazené
         // k rámu a k hranám razítka / tabulek; přednost má poloha nejvýš vlevo.
-        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w]);
-        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h]);
+        // vlna 23: přisazení k rámu nechá před rámem rezervu EDGE (vícenásobné Chytré kóty sahají dál než DIM_ROOM – vyšší
+        // razítko s technickým pásem jinak posunulo pohled až k rámu a kóta ho přetínala); bez rezervy jen, když jinak nevyjde
+        const EDGE = 6;
+        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w, frame.x + EDGE - ext.x, frame.x + frame.w - EDGE - ext.x - ext.w]);
+        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h, frame.y + EDGE - ext.y, frame.y + frame.h - EDGE - ext.y - ext.h]);
         for (const q of fixed)
           for (const f of feet) {
             sxs.add(q.x - f.x - f.w);
@@ -1747,7 +1750,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
           for (const dy of sys) {
             if (!inside({ x: ext.x + dx, y: ext.y + dy, w: ext.w, h: ext.h }, frame)) continue;
             if (feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)))) continue;
-            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y);
+            const clear = Math.min(ext.x + dx - frame.x, frame.x + frame.w - ext.x - dx - ext.w, ext.y + dy - frame.y, frame.y + frame.h - ext.y - dy - ext.h);
+            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y) + (clear < EDGE - 1e-6 ? 1e5 : 0);
             if (!best || sc < best.sc - 1e-9) best = { o: [dx, dy], sc };
           }
         if (best) {
@@ -2124,6 +2128,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     occ.addRect({ x: SW - M - TB.w - 2, y: SH - M - TBH - 14, w: TB.w + 2, h: TBH + 14 });
     pmiOut = pmiOnSheet(shape, meta.pmi, ortho.filter((p) => p.key in VIEW_LABEL && p.key !== "iso"), polys, texts, { x: M_LEFT + 2, y: M + 2, w: SW - M_LEFT - M - 4, h: SH - 2 * M - 4 }, occ);
     for (const o of pmiOut) {
+      if (o.range) {
+        const text = tr("oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)", o.ref ?? "", o.text, o.face + 1, fmt(o.range.from), fmt(o.range.to), fmt(o.range.len));
+        warnings.push(text);
+        issues.push({ level: "warn", code: "drawing.pmi-range", kind: "other", text, data: { id: o.id, face: o.face + 1, len: o.range.len } });
+      }
       if (o.state === "ok") continue;
       const what = o.kind === "treatment" ? tr("oblastní úprava {0} „{1}“ (F{2})", o.ref ?? "", o.text, o.face + 1) : tr("popis „{0}“ (F{1})", o.text, o.face + 1);
       const text = o.state === "lost" ? tr("{0}: plocha modelu se změnila – na listu se nekreslí; označte plochu znovu (výkres stav ukáže plochy)", what) : o.kind === "treatment" ? tr("{0}: žádný pohled neukazuje plochu z boku – přidejte pohled (výkres pohledy …)", what) : tr("{0}: plocha není vidět v žádném pohledu – přidejte pohled", what);
@@ -2391,6 +2400,9 @@ function pmiOnSheet(shape: r.Shape3D, marks: PmiMark[], views: Placed[], polys: 
         const len0 = Math.max(...ts) - t0;
         const from = Math.max(0, Math.min(len0, m.from ?? 0));
         const to = Math.max(from, Math.min(len0, m.to ?? len0));
+        // rozsah mimo plochu se na listu ořízne – výkres a model by si odporovaly, proto se to ohlásí (⚠ drawing.pmi-range)
+        const outOf = (v: number | undefined) => v !== undefined && (v < -0.05 || v > len0 + 0.05);
+        const clamp = outOf(m.from) || outOf(m.to) ? { len: Math.round(len0 * 100) / 100 } : null;
         if (to - from < 1e-6) continue;
         const P = (t: number): Vec2 => toSheet(p, [pc[0] + L[0] * (t0 + t), pc[1] + L[1] * (t0 + t)]);
         const S0 = P(0);
@@ -2407,7 +2419,7 @@ function pmiOnSheet(shape: r.Shape3D, marks: PmiMark[], views: Placed[], polys: 
         const Ls: Vec2 = [(B[0] - A[0]) / (Math.hypot(B[0] - A[0], B[1] - A[1]) || 1), (B[1] - A[1]) / (Math.hypot(B[0] - A[0], B[1] - A[1]) || 1)];
         texts.push({ x: Bc[0] + Ls[0] * 2 + nv[0] * 1.5, y: Bc[1] + Ls[1] * 2 + nv[1] * 1.5 + 1.2, s: ref, size: 3.5, bold: true, anchor: "start", layer: "text" });
         occ.addPoly([Ac, Bc]);
-        out.push({ ...base, state: "ok", view: p.key, how: "chain" });
+        out.push({ ...base, state: "ok", view: p.key, how: "chain", ...(clamp ? { range: { len: clamp.len, from: m.from ?? 0, to: m.to ?? clamp.len } } : {}) });
         done = true;
         break;
       }
@@ -3868,12 +3880,20 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
       add(0, "SOLID", 8, layer, 10, f(a[0]), 20, f(H - a[1]), 30, 0, 11, f(b[0]), 21, f(H - b[1]), 31, 0, 12, f(c[0]), 22, f(H - c[1]), 32, 0, 13, f(c[0]), 23, f(H - c[1]), 33, 0);
       continue;
     }
+    if (p.pts.length < 2) continue;
+    if (p.layer === "chain") {
+      // tlustá čerchovaná 04.2 (oblastní úprava – vlna 23, R3): R12 nemá tloušťku čáry hladiny (370) – POLYLINE se šířkou
+      // 0,7 mm (40/41) a typem CENTER, ať se v DXF neliší od tenké osy 04.1 jen barvou
+      add(0, "POLYLINE", 8, layer, 6, "CENTER", 66, 1, 10, 0, 20, 0, 30, 0, 40, f(0.7), 41, f(0.7), 70, 128);
+      for (const [x, y] of p.pts) add(0, "VERTEX", 8, layer, 10, f(x), 20, f(H - y), 30, 0, 40, f(0.7), 41, f(0.7));
+      add(0, "SEQEND", 8, layer);
+      continue;
+    }
     if (p.pts.length === 2) {
       const [[x1, y1], [x2, y2]] = p.pts;
       add(0, "LINE", 8, layer, 10, f(x1), 20, f(H - y1), 30, 0, 11, f(x2), 21, f(H - y2), 31, 0);
       continue;
     }
-    if (p.pts.length < 2) continue;
     // POLYLINE se souvislým generováním typu čáry (70: 128)
     add(0, "POLYLINE", 8, layer, 66, 1, 10, 0, 20, 0, 30, 0, 70, 128);
     for (const [x, y] of p.pts) add(0, "VERTEX", 8, layer, 10, f(x), 20, f(H - y), 30, 0);

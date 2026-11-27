@@ -58,7 +58,7 @@ export type DrawingIssueKind =
 export type DrawingIssue = {
   level: "error" | "warn" | "note";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.bom-overflow" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional" | "drawing.dim-detached" | "drawing.pmi-lost" | "drawing.pmi-unplaced" | "drawing.notes-limit" | "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet" | "drawing.sheet-empty" | "drawing.sheet-duplicate" | "drawing.note-to-title";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.bom-overflow" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional" | "drawing.dim-detached" | "drawing.pmi-lost" | "drawing.pmi-unplaced" | "drawing.notes-limit" | "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet" | "drawing.leaders-limit" | "drawing.note-not-model" | "drawing.pmi-range" | "drawing.sheet-empty" | "drawing.sheet-duplicate" | "drawing.note-to-title";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;

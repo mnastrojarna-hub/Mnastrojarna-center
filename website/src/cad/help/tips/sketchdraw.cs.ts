@@ -550,8 +550,8 @@ export default {
     what: "Poznámka s odkazovou čarou: šipka ukazuje na prvek, text stojí vedle.",
     when: "Krátký pokyn u plochy nebo hrany (Brousit, Lapovat). Tepelné zpracování, tvrdost, povrch a hrany dílu do razítka.",
     steps: ["Klikněte, kam má šipka ukazovat.", "Klikněte umístění textu.", "Napište Text poznámky a potvrďte OK."],
-    cmd: 'výkres značka poznámka "Lapovat" na Ø40',
-    note: "Agent píše popis plochy do modelu (poznámka F7 \"Brousit\") – výkres ho převezme se šipkou.",
+    cmd: 'poznámka F7 "Lapovat"',
+    note: "Agent textem: popis plochy do modelu (výkres ho převezme se šipkou); odkaz na kótu = ✗. Ručně bez omezení.",
   },
   "drawing-ws/ann-roughness": {
     what: "Vloží značku drsnosti povrchu podle ISO 1302 (Ra, Rz).",

@@ -3,7 +3,7 @@
  * Repro: src/cad/engine/__corpus__/84-w23-notes.txt (parita), w23/greens-notes.test.ts (skutečné jádro), e2e/cad-w23-notes.e2e.cjs.
  */
 import { describe, expect, it } from "vitest";
-import { classifyNote, freeTextLines, lineCount, linesOf, notesBudgetLine, notesRuleIssues, noteStyle, NOTE_MAX_LINES, stampAgentNotes, TITLE_VALUE_MAX, titleHint } from "./drawing-notes-rules";
+import { auditDoc, auditItems, classifyNote, metaBy, freeTextLines, lineCount, linesOf, mainSheet, newAgentFindings, notesBudgetLine, notesRuleIssues, noteStyle, NOTE_MAX_LINES, stampAgentNotes, stampOrigin, TITLE_VALUE_MAX, titleHint } from "./drawing-notes-rules";
 import { drawTitleBlock, techStripKeys, titleBlockSize } from "./title-block";
 import { setLang } from "./i18n";
 import { pmiMarksOf, zoneLegendOf } from "./pmi-marks";
@@ -74,7 +74,7 @@ describe("R4 – heslovitý řádek (noteStyle)", () => {
   });
 });
 
-describe("R4/R5 – volný text celého výkresu (všechny listy sady)", () => {
+describe("R4/R5 – volný text celého dokumentu (všechny výkresy a listy)", () => {
   it("text na listu 1 i 2, poznámka u razítka, poznámka bez cíle; odkazy na geometrii se nepočítají", () => {
     const d = doc(
       sheet("s1", [text("A", "agent"), text("B", "agent"), { id: "n", view: "front", type: "note", at: [1, 1], leader: [0, 0], text: "Lapovat", by: "agent" }, { id: "f", view: "sheet", type: "note", at: [1, 1], leader: [0, 0], text: "Volný", free: true, by: "agent" }], { note: "Odmastit", noteBy: "agent" }),
@@ -84,12 +84,27 @@ describe("R4/R5 – volný text celého výkresu (všechny listy sady)", () => {
     expect(items.map((x) => x.text)).toEqual(["Odmastit", "A", "B", "Volný", "C"]);
     expect(linesOf(items)).toBe(5);
     expect(notesRuleIssues(d, [0, 1]).filter((f) => f.code === "drawing.notes-limit")).toEqual([]);
-    // text na listu 2 = R5 (poznámky mimo list 1)
-    expect(notesRuleIssues(d, [0, 1]).find((f) => f.code === "drawing.notes-sheet")?.level).toBe("warn");
+    // text agenta na listu 2 = R5 (poznámky mimo hlavní list) – ✗ (agent)
+    expect(notesRuleIssues(d, [0, 1]).find((f) => f.code === "drawing.notes-sheet")?.level).toBe("error");
     const d6 = doc(...d.drawings!.slice(0, 1), sheet("s2", [text("C", "agent"), text("D", "agent")]));
     const lim = notesRuleIssues(d6, [0, 1]).find((f) => f.code === "drawing.notes-limit")!;
-    expect(lim.level).toBe("warn");
-    expect(lim.data).toMatchObject({ lines: 6, max: NOTE_MAX_LINES, agent: 6 });
+    expect(lim.level).toBe("error");
+    // počet řádků je pod `count` – `lines` nesou v protokolu čísla řádků skriptu (engine/drawing-track.ts)
+    expect(lim.data).toMatchObject({ count: 6, max: NOTE_MAX_LINES, agent: 6 });
+    expect(lim.data).not.toHaveProperty("lines");
+  });
+  it("druhý výkres téhož dílu má společný limit; text na něm = mimo hlavní list", () => {
+    const d = doc(sheet("s1", [text("A", "agent"), text("B", "agent"), text("C", "agent")]), sheet("p1", [text("D", "agent"), text("E", "agent"), text("F", "agent")], {}, "Poznámky"));
+    const f = notesRuleIssues(d);
+    expect(f.find((x) => x.code === "drawing.notes-limit")?.level).toBe("error");
+    expect(f.filter((x) => x.code === "drawing.notes-sheet")).toHaveLength(3);
+  });
+  it("hlavní list = první list s pravoúhlým pohledem a kótami (list jen s izometrií a poznámkami jím není)", () => {
+    const iso = { views: { front: false, top: false, left: false, iso: true } };
+    const dim = { id: "k", view: "front", type: "dim" as const, kind: "horizontal" as const, a: [0, 0] as [number, number], b: [10, 0] as [number, number], offset: 10 };
+    const d = doc({ ...sheet("s1", [text("A", "agent")]), options: iso }, { ...sheet("s2", [dim]), options: { views: { front: true, top: true } } });
+    expect(mainSheet(d)).toBe(1);
+    expect(notesRuleIssues(d).find((x) => x.code === "drawing.notes-sheet")?.level).toBe("error");
   });
   it("ruční text (GUI / starší dokument) = jen ℹ rada, ne ⚠ (R6)", () => {
     const d = doc(sheet("s1", Array.from({ length: 8 }, (_, i) => text(`Ruční poznámka ${i + 1} pokud není uvedeno jinak.`, "user"))));
@@ -100,14 +115,61 @@ describe("R4/R5 – volný text celého výkresu (všechny listy sady)", () => {
     const legacy = doc(sheet("s1", Array.from({ length: 8 }, (_, i) => text(`Text ${i}`))));
     expect(notesRuleIssues(legacy, [0]).every((x) => x.level === "note")).toBe(true);
   });
-  it("JSON dokument z textové cesty: poznámky bez razítka dostanou by=agent", () => {
-    const d = stampAgentNotes(doc(sheet("s1", [text("A"), text("B", "user")], { note: "N" })));
-    expect(d.drawings![0].annotations.map((a) => a.by)).toEqual(["agent", "user"]);
-    expect((d.drawings![0].meta as { noteBy?: string }).noteBy).toBe("agent");
+  it("dokument z textové cesty: vše je od agenta – i když JSON tvrdí by=user (R6: rozhoduje cesta)", () => {
+    const d = stampAgentNotes({ ...doc(sheet("s1", [text("A"), text("B", "user")], { note: "N", noteBy: "user", name: "Deska", by: { name: "user" }, revisions: [{ rev: "A", date: "", note: "x", by: "user" }] })), functional: [{ id: "f1", kind: "note" as const, face: { index: 1 }, text: "Brousit", by: "user" as const }] });
+    expect(d.drawings![0].annotations.map((a) => a.by)).toEqual(["agent", "agent"]);
+    const m = d.drawings![0].meta as { noteBy?: string; by?: Record<string, string>; revisions?: { by?: string }[] };
+    expect(m.noteBy).toBe("agent");
+    expect(m.by?.name).toBe("agent");
+    expect(m.revisions?.[0].by).toBe("agent");
+    expect(d.functional?.[0].by).toBe("agent");
   });
-  it("legenda oblastních úprav se počítá do limitu; stav to vypíše", () => {
+  it("stampOrigin: nová / textově změněná položka dostane původ, nezměněná si ho nechá", () => {
+    const s0 = sheet("s1", [text("A", "agent"), text("B", "agent")], { name: "Deska", by: { name: "agent" } });
+    const s1 = stampOrigin(s0, { ...s0, annotations: [s0.annotations[0], { ...s0.annotations[1], text: "B2" } as DrawingAnnotation, text("C")], meta: { ...s0.meta, customer: "ACME" } }, "user");
+    expect(s1.annotations.map((a) => a.by)).toEqual(["agent", "user", "user"]);
+    // buňka bez razítka původu = ručně (GUI); buňka agenta zůstane agentova, dokud ji člověk nezmění
+    expect(metaBy(s1.meta, "customer")).toBe("user");
+    expect(metaBy(s1.meta, "name")).toBe("agent");
+    expect(metaBy(stampOrigin(s1, { ...s1, meta: { ...s1.meta, name: "Deska 2" } }, "user").meta, "name")).toBe("user");
+  });
+  it("legenda oblastních úprav se počítá do limitu (původ = původ úpravy); stav to vypíše", () => {
     const d = doc(sheet("s1", [text("A", "agent")]));
-    expect(notesBudgetLine(d, [0], { legend: ["Z1 tepelná: 58+2 HRC"] })).toBe("Poznámky nad razítkem: 2/5 řádků (agent 1, generátor 1)");
+    expect(notesBudgetLine(d, [0], { legend: [{ text: "Z1 tepelná: 58+2 HRC", by: "agent" }] })).toBe("Poznámky nad razítkem: 2/5 řádků (agent 2) · místní popisy 0/8");
+  });
+  it("příkaz zastaví jen nález u položky, kterou zapsal nebo změnil (newAgentFindings)", () => {
+    const d0 = doc(sheet("s1", [text("Odmastit", "agent")]));
+    const d1 = doc(sheet("s1", [...d0.drawings![0].annotations, text("Tuto plochu je nutné vždy pečlivě odmastit.", "agent")]));
+    const f = newAgentFindings(auditDoc(d0), auditDoc(d1), auditItems(d0), auditItems(d1));
+    expect(f.map((x) => x.code)).toEqual(["drawing.note-style"]);
+    // stejný (už porušený) text bez změny příkaz nezastaví
+    expect(newAgentFindings(auditDoc(d1), auditDoc(d1), auditItems(d1), auditItems(d1))).toEqual([]);
+  });
+});
+
+describe("R1/R4 – ostatní kanály textu (kóty, popisy, značky, buňky razítka, revize)", () => {
+  const dim = (x: Record<string, unknown>) => ({ id: "k", view: "front", type: "dim" as const, kind: "horizontal" as const, a: [0, 0] as [number, number], b: [10, 0] as [number, number], offset: 10, by: "agent" as const, ...x }) as DrawingAnnotation;
+  it.each([
+    [dim({ text: "Kalit a popustit na 58-60 HRC, ostré hrany srazit" }), "drawing.note-style"],
+    [dim({ suffix: "58 HRC" }), "drawing.note-title-data"],
+    [{ id: "r", view: "front", type: "roughness", at: [0, 0], ra: "Ra 3,2 kalit na 58 HRC a černit", by: "agent" } as DrawingAnnotation, "drawing.note-style"],
+    [{ id: "g", view: "front", type: "gdt", at: [0, 0], symbol: "flat", value: "Povrch černit, pokud není", by: "agent" } as DrawingAnnotation, "drawing.note-style"],
+    [{ id: "c", view: "front", type: "callout", tip: [0, 0], at: [1, 1], lines: ["Ø9 skrz"], tol: "kalit 58-60 HRC, hrany srazit 0,5x45", by: "agent" } as DrawingAnnotation, "drawing.note-style"],
+  ])("značka %# → %s", (a, code) => {
+    expect(auditDoc(doc(sheet("s1", [a]))).map((f) => f.code)).toContain(code);
+  });
+  it.each([
+    [{ name: "Deska, kterou je nutné kalit" }, "drawing.note-style"],
+    [{ name: "Deska kalená 58 HRC" }, "drawing.note-title-data"],
+    [{ surfaceTreatment: "Černění dle normy, vrstva rovnoměrná bez skvrn" }, "drawing.note-style"],
+    [{ revisions: [{ rev: "A", date: "", note: "Při jakékoli nejasnosti kontaktujte konstruktéra" }] }, "drawing.note-style"],
+    [{ revisions: [{ rev: "A", date: "", note: "Kalit 58 HRC" }] }, "drawing.note-title-data"],
+  ])("razítko / revize %# → %s", (m, code) => {
+    expect(auditDoc(doc(sheet("s1", [], m as Record<string, unknown>))).map((f) => f.code)).toContain(code);
+  });
+  it("krátké technické údaje projdou: kóta „H7“, popis „4× M6 - 6H ↧12“, revize „Ø20 → Ø22“, název „Deska upínací“", () => {
+    const d = doc(sheet("s1", [dim({ suffix: "H7" }), { id: "c", view: "front", type: "callout", tip: [0, 0], at: [1, 1], lines: ["4× M6 - 6H ↧12", "0,5×45°"] } as DrawingAnnotation], { name: "Deska upínací", revisions: [{ rev: "A", date: "", note: "Ø20 → Ø22" }] }));
+    expect(auditDoc(d)).toEqual([]);
   });
 });
 

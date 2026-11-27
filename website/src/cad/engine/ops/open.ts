@@ -5,7 +5,7 @@ import { flush, runOf } from "../run-doc";
 import { startRunDoc } from "../runs";
 import { freshenRunDoc } from "../spring-fresh";
 import { acceptLine, loadsModel } from "../accept";
-import { say, type OpHandler } from "./util";
+import { coded, say, type OpHandler } from "./util";
 
 export const openOp: OpHandler<"open"> = async (op, ctx) => {
   const res = await readDocument(ctx.host, op.name);
@@ -18,5 +18,7 @@ export const openOp: OpHandler<"open"> = async (op, ctx) => {
   say(ctx, loadsModel(res.doc) ? acceptLine(text) : text);
   if (res.note) say(ctx, `  ${res.note}`);
   st.report();
+  // dokument otevřený textovou cestou = dokument agenta (vlna 23, R6 – engine/open-file.ts ho přerazítkuje): porušení ✗
+  if (res.doc.drawings?.length) for (const f of (await import("../../drawing-agent")).ingestFindings(res.doc)) coded(ctx, f.code, { args: f.args });
   await freshenRunDoc(ctx, op.line); // pružiny: délka z dosedacích ploch, ⚠ spring.stale (vlna 22, bod 7)
 };

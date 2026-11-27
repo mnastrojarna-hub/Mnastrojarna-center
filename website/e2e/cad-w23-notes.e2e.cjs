@@ -70,7 +70,7 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   fs.writeFileSync(S + 'agent.txt', log);
   ok(/přesunuto do razítka – „Tvrdost 58-60 HRC“ → tvrdost „58-60 HRC“/.test(log), 'R1: text s HRC od agenta se přesunul do razítka (ℹ) – ' + line(log, /přesunuto do razítka/));
   ok(/Údaje razítka \(technické, v buňkách\): tepelné zpracování „kalit a popustit“ · tvrdost „58-60 HRC“ · povrchová úprava „černit“ · hrany „ISO 13715 -0,3“ · nepředepsané „ISO 2768-mK“ · drsnost „Ra 3,2“/.test(log), 'R1: výkres stav – všechny technické údaje v buňkách razítka');
-  ok(/Poznámky nad razítkem: 4\/5 řádků \(agent 3, generátor 1\)/.test(log), 'R4: výkres stav – 4/5 řádků nad razítkem – ' + line(log, /Poznámky nad razítkem/));
+  ok(/Poznámky nad razítkem: 4\/5 řádků \(agent 4\) · místní popisy 1\/8/.test(log), 'R4: výkres stav – 4/5 řádků nad razítkem (vysvětlivka úpravy agenta se počítá jako agentova), 1/8 místních popisů – ' + line(log, /Poznámky nad razítkem/));
   ok(/Z modelu: F2 „Brousit“ → \S+ \(odkaz se šipkou\) · Z1 F3 „62\+2 HRC“ → přední \(tlustá čerchovaná 04\.2 \+ kóta rozsahu\)/.test(log), 'R2/R3: výkres stav – popis a úprava z modelu na listu');
   ok(/✓ (řádek \d+: )?výkres: list „List 1“ vyhodnocen bez nálezů \(pohledy, řezy, Chytré kóty, poznámky a razítko\)/.test(log), 'R7: čistý list = ✓ bez nálezů (…, poznámky a razítko)');
   await closeConsole();
@@ -90,8 +90,8 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   // ── agent: 5. a 6. řádek, věta ──
   log = await run('výkres značka text "Expedovat" v 30 50\nvýkres značka text "Zabalit do fólie" v 30 45\nvýkres značka text "Při jakékoli nejasnosti kontaktujte konstruktéra." v 30 40');
   fs.writeFileSync(S + 'agent-limit.txt', log);
-  ok(/✗ (řádek 2: )?.*poznámky nad razítkem – text „Zabalit do fólie“ – výkres by měl 6 řádků volného textu, nejvýš 5/.test(log), 'R4: 6. řádek agenta = ✗ drawing.notes-limit – ' + line(log, /nejvýš 5/));
-  ok(/✗ (řádek 3: )?.*není strojařsky heslovitá/.test(log), 'R4: věta = ✗ drawing.note-style');
+  ok(/✗ (řádek 2: )?.*poznámky nad razítkem – text „Zabalit do fólie“ – dokument by měl 6 řádků volného textu, nejvýš 5/.test(log), 'R4: 6. řádek agenta = ✗ drawing.notes-limit – ' + line(log, /nejvýš 5/));
+  ok(/✗ (řádek 3: )?.*není strojařsky heslovitý/.test(log), 'R4: věta = ✗ drawing.note-style');
   ok(!/vyhodnocen bez nálezů/.test(log.split('\n').slice(-4).join('\n')) || /✗/.test(log), 'R7: po ✗ žádné samotné „bez nálezů“ bez chyby');
   await closeConsole();
 
@@ -109,7 +109,21 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   ok(hint !== null && Number(hint) > 5, `R6 GUI: jen nenápadná rada v panelu Razítko (data-notes-hint=${hint})`);
   ok((await p.locator('[data-title-field="hardness"]').inputValue().catch(() => '')) === '58-60 HRC', 'R1 GUI: pole Tvrdost v panelu Razítko = 58-60 HRC');
   ok((await p.locator('[data-title-field="roughness"]').inputValue().catch(() => '')) === 'Ra 3,2', 'R1 GUI: pole Obecná drsnost = Ra 3,2');
+  // R6: co člověk zapsal v GUI, nese v dokumentu razítko původu „user“ (pravidla pro agenty ho neomezují)
+  await p.waitForTimeout(1500);
+  const by = await p.evaluate((t) => { const d = window.mncad.getDocument(); return (d.drawings || []).flatMap((s) => s.annotations).filter((a) => a.type === 'text' && a.text === t).map((a) => a.by); }, LONG);
+  ok(by.length === 1 && by[0] === 'user', `R6 GUI: ruční text má v dokumentu by="user" (${JSON.stringify(by)})`);
   await p.screenshot({ path: S + 'shots/human-note.png' });
+  // R6 (oponent, bod 7/16): agent nesmí přerazítkovat text na „user“ – JSON přes window.mncad.run je dokument agenta → ✗
+  const forged = await p.evaluate(async (t) => {
+    const d = JSON.parse(JSON.stringify(window.mncad.getDocument()));
+    d.name = 'Deska JSON';
+    for (const s of d.drawings || []) s.annotations = s.annotations.map((a) => (a.type === 'text' ? { ...a, by: 'user' } : a));
+    d.drawings[0].annotations.push(...[1, 2, 3, 4, 5, 6].map((i) => ({ id: 'z' + i, view: 'sheet', type: 'text', at: [30, 30 + i * 5], text: i + '. ' + t, size: 3.5, by: 'user' })));
+    return window.mncad.run(JSON.stringify(d) + '\nvýkres export pdf');
+  }, 'Kalit a popouštět na 58-60 HRC, pokud není uvedeno jinak.');
+  fs.writeFileSync(S + 'forged.txt', String(forged));
+  ok(/✗/.test(forged) && /drawing\.notes-limit|poznámky nad razítkem/.test(forged) && /export odmítnut/.test(forged) && !/vyhodnocen bez nálezů/.test(forged), 'R6/R7: JSON s "by":"user" od agenta = ✗, export odmítnut, žádné ✓ – ' + line(String(forged), /export odmítnut|✗/));
   ok(errs.length === 0, `bez chyb stránky (${errs.slice(0, 2).join(' | ')})`);
   await b.close();
 })().catch((e) => {

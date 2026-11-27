@@ -12,6 +12,7 @@ import { emptyDraftDoc, isDraftDoc, normalizeDraftDoc } from "./doc";
 import { pruneSelection, sessionFor, type DraftCmdResult } from "./session";
 import { draftStatus, draftStatusText, type DraftStatus } from "./status";
 import { parseUnits } from "./units";
+import { draftNotesGuard } from "./agent-notes";
 import type { DraftModel, DraftUnits } from "./model";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
@@ -62,6 +63,16 @@ export async function applyDraftText(doc: CadDoc, text: string): Promise<DraftAp
     const s = sessionFor(model);
     const r = await runScriptAsync(model, s, line, { interactive: false });
     const res = r.results[0];
+    // pravidla textu výkresu pro agenty (vlna 23 – cad/draft/agent-notes.ts): text, který by je porušil, se nepřijme
+    if (res?.ok && r.model !== model) {
+      const bad = draftNotesGuard(model, r.model);
+      if (bad.length) {
+        const msg = `${bad[0].text}${bad.length > 1 ? tr(" (a dalších {0})", bad.length - 1) : ""}`;
+        log.push(`✗ ${res.cmd}: ${tr("pravidla výkresu pro agenty – {0}", msg)}`);
+        results.push({ ...res, ok: false, error: msg, created: [], changed: [], deleted: [] });
+        continue;
+      }
+    }
     results.push(...r.results);
     if (res) {
       if (res.ok) log.push(...(res.log.length ? res.log : [tr("✓ {0}", res.cmd)]));

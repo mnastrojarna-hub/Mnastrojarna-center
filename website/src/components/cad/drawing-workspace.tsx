@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
-import { freeTextLines, linesOf, NOTE_MAX_LINES } from "@/cad/drawing-notes-rules";
+import { freeTextLines, linesOf, NOTE_MAX_LINES, stampOrigin } from "@/cad/drawing-notes-rules";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, dimLabel, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { rebindDim, settleDim, userDimAttach } from "@/cad/drawing-dim-attach";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
@@ -387,7 +387,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   /** vydání aktivního listu (`výkres vydat`): písmeno revize + revize modelu + datum, krok historie */
   const issueNow = (rev?: string) => {
-    const r = issueSheet(doc, sheetDoc(), rev ? { rev } : {});
+    const r = issueSheet(doc, stampOrigin(saved, sheetDoc(), "user"), rev ? { rev } : {});
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = r.sheet;
     const m = r.sheet.meta as Partial<DrawingMeta>;
@@ -400,7 +400,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   const withdrawNow = () => {
     const next = sheets.length ? [...sheets] : [];
-    next[sheetIdx] = withdrawIssue(sheetDoc());
+    next[sheetIdx] = withdrawIssue(stampOrigin(saved, sheetDoc(), "user"));
     dirty.current = false;
     const out = withGroup(next);
     wrote.current = JSON.stringify(out);
@@ -410,7 +410,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const persistNow = () => {
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
-    next[sheetIdx] = sheetDoc();
+    // co člověk v GUI zapsal nebo změnil, nese razítko původu „user“ (vlna 23, R6 – pravidla textu pro agenty ho neomezují);
+    // text, který GUI jen přepočítalo / uložilo beze změny, si původ nechá (agent ho tím „člověkem“ neudělá)
+    next[sheetIdx] = stampOrigin(saved, sheetDoc(), "user");
     // krok Zpět jen za změnu uživatele; uložení nezměněného listu a samotné sloučení Chytrých kót po výpočtu listu (odvozená
     // data, ne úprava) se zapíšou bez kroku – jinak by Ctrl+Z hned po „+ Výkres“ vrátil jen sloučení kót, ne nový výkres
     const record = dirty.current && !autoOnly.current;
@@ -458,7 +460,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const addSheet = () => {
     if (!onDrawingsChange) return;
     const cur = sheets.length ? [...sheets] : [];
-    cur[sheetIdx] = sheetDoc();
+    cur[sheetIdx] = stampOrigin(saved, sheetDoc(), "user");
     const n = cur.length + 1;
     cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { ...inheritTitle(meta), name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance } as Record<string, unknown>, annotations: [] });
     dirty.current = false;

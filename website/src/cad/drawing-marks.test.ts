@@ -43,7 +43,7 @@ describe("listy: nový, přepnout, přejmenovat, smazat – příkazy pracují s
     expect(meta(doc, 1).edges).toBe("srazit 0,3");
     expect(meta(doc, 0).edges).toBeUndefined();
     // vlna 23 (R5): poznámka agenta na listu 2 = ✗ drawing.notes-sheet (volný text jen na listu 1)
-    await expect(run(doc, 'výkres poznámka "jen list 2"')).rejects.toThrow(/poznámky mimo list 1/);
+    await expect(run(doc, 'výkres poznámka "jen list 2"')).rejects.toThrow(/poznámky mimo hlavní list/);
     expect(activeSheetIndex(doc)).toBe(1);
     expect(log).toMatch(/✓ nový list 2 „Detail“ \(Chytré kóty\) – další příkazy výkresu pracují s ním/);
     expect(log).toMatch(/✓ výkres: A4, na výšku · list 2 „Detail“/);
@@ -86,12 +86,13 @@ describe("razítko a revize", () => {
   it("revize: přidat, upravit, smazat; revize v razítku = poslední", async () => {
     let { doc } = await run(plateDoc(), 'výkres razítko kreslil="Novák"\nvýkres revize A "první vydání" datum 1.1.2026\nvýkres revize B "díra Ø8"');
     expect(meta(doc).revisions).toEqual([
-      { rev: "A", date: "1.1.2026", note: "první vydání", author: "Novák" },
-      expect.objectContaining({ rev: "B", note: "díra Ø8", author: "Novák" }),
+      // textová cesta = agent: řádek revize nese razítko původu (vlna 23, R6)
+      { rev: "A", date: "1.1.2026", note: "první vydání", author: "Novák", by: "agent" },
+      expect.objectContaining({ rev: "B", note: "díra Ø8", author: "Novák", by: "agent" }),
     ]);
     expect(meta(doc).revision).toBe("B");
     ({ doc } = await run(doc, 'výkres revize A "opraveno" kreslil AI\nvýkres revize smazat B'));
-    expect(meta(doc).revisions).toEqual([{ rev: "A", date: "1.1.2026", note: "opraveno", author: "AI" }]);
+    expect(meta(doc).revisions).toEqual([{ rev: "A", date: "1.1.2026", note: "opraveno", author: "AI", by: "agent" }]);
     expect(meta(doc).revision).toBe("A");
     await expect(run(doc, "výkres revize smazat X")).rejects.toThrow(/revize X v tabulce není – revize: A/);
   });
@@ -195,7 +196,7 @@ describe("ruční kóty, úpravy a mazání", () => {
     // smazaná vygenerovaná kóta se při dalším příkazu (sloučení Chytrých kót) nevrátí
     const d2 = await run(d1.doc, "výkres stav");
     expect(anns(d2.doc).some((a) => a.auto === "ov:z")).toBe(false);
-    const d3 = await run(d1.doc, 'výkres značka poznámka "x" na 100\nvýkres smazat vlastní');
+    const d3 = await run(d1.doc, 'výkres značka drsnost Ra 3,2 na 100\nvýkres smazat vlastní');
     expect(anns(d3.doc).every((a) => a.auto)).toBe(true);
     const d4 = await run(d3.doc, "výkres smazat vše");
     expect(anns(d4.doc)).toEqual([]);

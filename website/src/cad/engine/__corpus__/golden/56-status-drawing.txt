@@ -40,7 +40,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
-Poznámky nad razítkem: 0/5 řádků
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
