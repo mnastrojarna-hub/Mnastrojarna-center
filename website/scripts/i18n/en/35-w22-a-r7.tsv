@@ -23,3 +23,7 @@ zápis textu STEP	writing the STEP text
 zapisovač STEP: krok „{0}“ skončil stavem {1} · {2}	STEP writer: step “{0}” ended with status {1} · {2}
 Změny, které běh zapsal do {0}, se vrátily.	Changes the run wrote to {0} were reverted.
 zrušeno{0}, soubor nevznikl	cancelled{0}, no file was written
+# kolo 7 – oprava po oponentuře (body 12, 15, 16, 22h)
+Záznam exportu z tohoto běhu (i neúspěšného nebo zrušeného) zůstal v „{0}“ – výpis `exporty`.	The export record of this run (including a failed or cancelled one) stays in “{0}” – list with `exports`.
+revize modelu v souboru chybí	model revision missing in the file
+Odkaz je useknutý – končí ještě před daty dokumentu (v hlavičce odkazu za #s=). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	The link is truncated – it ends before the document data (in the link header after #s=). Copy the whole link again, or ask for a short link with a code.

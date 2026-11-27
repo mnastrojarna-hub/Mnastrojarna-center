@@ -12,6 +12,7 @@ import { toWorld } from "@/cad/defaults";
 import { sectionKey, sectionPlane, type SectionState } from "@/cad/section-plane";
 import { entityPath } from "@/cad/sketch";
 import type { Feature, MeshData, Vec3 } from "@/cad/types";
+import { entityCandidates, findOnScreen, type ProbeHit, type ProbeQuery } from "@/cad/screen-probe"; // testovací háček screenOf (bod 20, kolo 7)
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { drawSurfOverlay } from "./viewport-surf-overlay";
 import type { SurfOverlay } from "./surf-overlay";
@@ -66,6 +67,11 @@ export type Gizmo = { id: string; matrix: number[]; mode: "translate" | "rotate"
 export type Hint = { id: string; kind: "face" | "edge" | "vertex"; index: number; x: number; y: number; p: Vec3; title: string };
 const axisName = (n: THREE.Vector3): string => (Math.abs(n.x) > 0.95 ? (n.x > 0 ? "+X" : "-X") : Math.abs(n.y) > 0.95 ? (n.y > 0 ? "+Y" : "-Y") : Math.abs(n.z) > 0.95 ? (n.z > 0 ? "+Z" : "-Z") : "");
 export type ViewportHandle = {
+  /**
+   * testovací háček (vlna 22 kolo 7, bod 20 – cad/screen-probe.ts): souřadnice klienta, kde klik myší vybere plochu / hranu /
+   * vrchol komponenty (ověřeno týmž výběrem jako klik); null = entita není vidět. Výběr sám nemění.
+   */
+  screenOf?: (q: ProbeQuery) => ProbeHit | null;
   hintList: () => Omit<Hint, "p">[];
   clickHint: (id: string, additive?: boolean) => boolean;
   setView: (v: ViewName) => void;
@@ -251,6 +257,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const S = useRef<St | null>(null);
   const boxApi = useRef<ViewportHandle["boxPick"]>(undefined);
   const propsRef = useRef(props);
+  /** výběr v bodě klienta podle filtru – tentýž `pickSel` jako klik (testovací háček `screenOf`) */
+  const probePick = useRef<((x: number, y: number, f: SelFilter) => SelItem | null) | null>(null);
   propsRef.current = props;
   /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
   const softOn = useSoftViewActive();
@@ -838,6 +846,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         }
       }
     };
+    probePick.current = (x, y, f) => pickSel({ clientX: x, clientY: y } as MouseEvent, f);
     const legacyPick = (e: PointerEvent) => {
       const s = S.current!;
       setRay(e);
@@ -1765,6 +1774,24 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       updateOrthoFrustum();
       s.controls.update();
       s.render();
+    },
+    screenOf: (q: ProbeQuery) => {
+      if (softView.current) return softView.current.screenOf?.(q) ?? null;
+      const s = S.current;
+      const pick = probePick.current;
+      if (!s || !pick) return null;
+      const pr = propsRef.current;
+      const av = q.compId !== undefined ? pr.assembly?.find((a) => a.id === q.compId) : undefined;
+      if (q.compId !== undefined && !av) return null;
+      const obj = av ? (s.asmGroup.children.find((o) => (o as THREE.Mesh).isMesh && !isCapObject(o) && o.userData.id === av.id) as THREE.Mesh | undefined) : undefined;
+      const src = av ? { mesh: av.mesh, vertices: av.vertices, matrix: obj ? obj.matrix.elements : av.matrix } : { mesh: pr.mesh, vertices: pr.vertices, matrix: s.model.matrix.elements };
+      const rect = s.renderer.domElement.getBoundingClientRect();
+      const project = (p: Vec3): [number, number] | null => {
+        const v = new THREE.Vector3(p[0], p[1], p[2]).project(s.camera);
+        if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 0.98 || Math.abs(v.y) > 0.98) return null;
+        return [((v.x + 1) / 2) * rect.width + rect.left, ((1 - v.y) / 2) * rect.height + rect.top];
+      };
+      return findOnScreen(entityCandidates(src, q.kind, q.index), q, project, (x, y) => pick(x, y, q.kind));
     },
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
     hintList: () => softView.current?.hintList?.() ?? hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),

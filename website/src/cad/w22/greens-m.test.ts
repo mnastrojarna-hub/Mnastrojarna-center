@@ -41,7 +41,7 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const run = await runLines(changed, env, "pohyb spustit");
     expect(run.log).toContain(GREEN_MATES);
     expect(run.codes.map((c) => c.code)).toEqual(["motion.recomputed"]);
-    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:- level=kin groups=1:z-30.35"); // vlna 22, M2: úroveň na konci; M3: tuhé skupiny na konci
+    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:- level=kin groups=1:z-30.35:Deska%20A"); // kolo 7, bod 15: + jméno kořene; vlna 22, M2: úroveň na konci; M3: tuhé skupiny na konci
     // krok, export i přehrání po další změně také nejdřív přepočítají (ℹ motion.recomputed) – nikdy starý krok
     const again = resizePart(changed, "Rám", [100, 100, 20]);
     const step = await runLines(again, env, "pohyb krok 4");

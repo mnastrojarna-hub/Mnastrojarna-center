@@ -191,23 +191,89 @@ async function edgeClick(p, tag, run, idle) {
 }
 
 /**
+ * Kolo 7 (bod 20, oponentura): ztracenou HRANU a ztracený VRCHOL vybrat znovu KLIKNUTÍM do modelu – s WebGL i bez WebGL.
+ * Bod na obrazovce dá testovací háček `window.mncadTest.screenOf` (cad/screen-probe.ts: body entity ze sítě, kterou kreslí
+ * 3D okno, promítnuté kamerou okna a ověřené TÝMŽ výběrem jako klik); klik sám je skutečná myš (`page.mouse.click`).
+ * Vrchol: vazba Shodně „Přidržovač K“ V1 → „Deska K“ V<k> (vnitřní roh schodu [20; 0; 5], číslo zjistí `mncad.measure`),
+ * schod smazán → ztracený vrchol → „Vybrat vrchol znovu“ → klik na roh [60; 40; 10] → odkaz B = ten vrchol, vazba ok.
+ * Hrana: totéž s hranou schodu E11 → klik na horní pravou hranu [60; 0; 10]–[60; 40; 10].
+ */
+async function entClick(p, tag0, ent) {
+  const run = (t, o) => p.evaluate(([t, o]) => window.mncad.run(t, o), [t, o]);
+  const idle = () => p.waitForFunction(() => !window.mncad.progress(), null, { timeout: 120000 });
+  const sfx = ent === 'vertex' ? 'K' : 'H';
+  const tag = `${tag0} klik-${ent === 'vertex' ? 'vrchol' : 'hrana'}`;
+  await run([`nový díl "Deska ${sfx}"`, 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat'].join('\n'));
+  let ref0 = 'E11';
+  if (ent === 'vertex') {
+    // číslo vnitřního rohu schodu [20; 0; 5] (zmizí se schodem) – měřením vrcholů dílu
+    ref0 = await p.evaluate(async () => {
+      for (let k = 1; k <= 24; k++) {
+        const r = await window.mncad.measure(`V${k}`);
+        const q = r && r.ok && r.points && r.points[0];
+        if (q && Math.abs(q[0] - 20) < 1e-6 && Math.abs(q[1]) < 1e-6 && Math.abs(q[2] - 5) < 1e-6) return `V${k}`;
+      }
+      return null;
+    });
+    ok(!!ref0, `[${tag}] vnitřní roh schodu [20; 0; 5] nalezen měřením (${ref0})`);
+    if (!ref0) return;
+  }
+  const log = await run([
+    `nový díl "Přidržovač ${sfx}"`, 'kvádr 10 10 10',
+    `nová sestava "Sestava ${sfx}"`, `vložit "Deska ${sfx}" ukotvit`, `vložit "Přidržovač ${sfx}" v 5 10 30`,
+    `sestava vazba shodně "Přidržovač ${sfx}" V1 "Deska ${sfx}" ${ref0}`,
+  ].join('\n'));
+  ok(new RegExp(`✓ vazba Shodně „Přidržovač ${sfx}“ V1 → „Deska ${sfx}“ ${ref0}: ok`).test(log), `[${tag}] vazba Shodně V1 → ${ref0} založena`);
+  const edit = await run([`sestava upravit "Deska ${sfx}"`, 'smazat "Kvádr 2"', 'sestava hotovo'].join('\n'));
+  ok(new RegExp(`ztracená reference B ${ref0}`).test(edit), `[${tag}] po smazání schodu ztracená reference ${ref0}`);
+  await idle();
+  const lostOk = await p.waitForFunction(() => document.querySelector('[data-mates-list]')?.getAttribute('data-mates-lost') === '1', null, { timeout: 60000 }).then(() => true, () => false);
+  if (!lostOk) return ok(false, `[${tag}] seznam vazeb nehlásí ztracenou referenci`);
+  await p.locator(`[data-mate-repick-ent="${ent}"]`).first().click();
+  await p.locator('[data-repick-panel]').waitFor({ timeout: 15000 });
+  await p.waitForFunction((e) => (document.querySelector(`[data-repick-ent="${e}"]`)?.options.length ?? 0) > 1, ent, { timeout: 60000 });
+  const opts = await p.evaluate((e) => [...document.querySelector(`[data-repick-ent="${e}"]`).options].map((o) => ({ v: o.value, t: o.textContent })), ent);
+  const want = ent === 'vertex' ? /\[60; 40; 10\]/ : /\[60; 0; 10\]–\[60; 40; 10\]|\[60; 40; 10\]–\[60; 0; 10\]/;
+  const target = opts.find((o) => o.v && want.test(o.t || ''));
+  ok(!!target, `[${tag}] cíl v seznamu dílu: ${target ? target.t : '–'} (${opts.length - 1} položek)`);
+  if (!target) return;
+  const idx = Number(target.v.split('|')[1]);
+  const at = await p.evaluate(([c, e, i]) => window.mncadTest.screenOf(c, e, i), [`Deska ${sfx}`, ent, idx]);
+  ok(!!at, `[${tag}] ${ent === 'vertex' ? 'vrchol V' : 'hrana E'}${idx + 1} je v okně vidět – bod ${at ? `${at.x}, ${at.y}` : '–'}`);
+  if (!at) return;
+  await p.mouse.move(at.x, at.y);
+  await p.waitForTimeout(150);
+  await p.mouse.click(at.x, at.y);
+  const done = await p.waitForFunction(() => document.querySelector('[data-mate]')?.getAttribute('data-mate-status') === 'ok', null, { timeout: 60000 }).then(() => true, () => false);
+  const ref = await p.evaluate(() => window.mncad.getDocument().mates[0].b);
+  ok(done && ref.ent === ent && ref.face === idx && !ref.lost, `[${tag}] KLIKNUTÍM do modelu převzato: vazba splněna, odkaz B = ${ent === 'vertex' ? 'V' : 'E'}${idx + 1} bez ztráty (${JSON.stringify(ref).slice(0, 140)})`);
+  ok(!(await p.locator('[data-repick-panel]').count()), `[${tag}] panel nového výběru se po kliknutí zavřel`);
+  const list = await run('sestava vazby');
+  ok(new RegExp(`Vazby sestavy „Sestava ${sfx}“: 1 \\(1 ok\\)`).test(list), `[${tag}] text sestava vazby = 1 ok (GUI = text)`);
+  await p.screenshot({ path: `${S}w22a2-${tag0}-6-click-${ent}.png` });
+}
+
+/**
  * Kolo 7 (bod 20): ztracená DOSEDACÍ PLOCHA PRUŽINY se vybere znovu jako plocha vazby – tlačítko „Vybrat dosedací plochu znovu“
  * v seznamu vazeb (dřív jen „Zadat dosedací plochy znovu“ = panel pružiny s automatickou volbou). S WebGL ze seznamu ploch
  * (`data-repick-face`), bez WebGL KLIKNUTÍM na horní plochu desky v pohledu shora. Zápis = tentýž textový příkaz
  * `sestava pružina … mezi … F… … F…` (protokol, kontrola rovinné plochy), pak stav bez `springs.lost`.
  */
-async function springFlow(p, tag) {
+async function springFlow(p, tag0, how) {
   const run = (t, o) => p.evaluate(([t, o]) => window.mncad.run(t, o), [t, o]);
   const idle = () => p.waitForFunction(() => !window.mncad.progress(), null, { timeout: 120000 });
+  // kolo 7 (oponentura): obě cesty v OBOU průchodech – výběr ze seznamu i klik do modelu (WebGL klik přes háček screenOf)
+  const sfx = how === 'click' ? '' : ' L';
+  const tag = `${tag0} ${how === 'click' ? 'klik' : 'seznam'}`;
   const log = await run([
-    'nový díl "Deska S"', 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat',
-    'nový díl "Přidržovač S"', 'kvádr 10 10 10',
-    'nový díl "Pružina S"', 'pružina tlačná d 1 De 8 L0 30 n 6 konce broušené',
-    'nová sestava "Sestava S"', 'vložit "Deska S" ukotvit', 'vložit "Přidržovač S" v 5 15 30', 'vložit "Pružina S" v 10 20 5',
-    'sestava pružina "Pružina S" mezi "Deska S" F3 "Přidržovač S" F5 volná 30 blok 8 tuhost 2',
+    `nový díl "Deska S${sfx}"`, 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat',
+    `nový díl "Přidržovač S${sfx}"`, 'kvádr 10 10 10',
+    `nový díl "Pružina S${sfx}"`, 'pružina tlačná d 1 De 8 L0 30 n 6 konce broušené',
+    `nová sestava "Sestava S${sfx}"`, `vložit "Deska S${sfx}" ukotvit`, `vložit "Přidržovač S${sfx}" v 5 15 30`, `vložit "Pružina S${sfx}" v 10 20 5`,
+    `sestava pružina "Pružina S${sfx}" mezi "Deska S${sfx}" F3 "Přidržovač S${sfx}" F5 volná 30 blok 8 tuhost 2`,
   ].join('\n'));
   ok(/✓ pružina/.test(log), `[${tag}] pružina: dosedá na plochu schodu F3 desky`);
-  const edit = await run(['sestava upravit "Deska S"', 'smazat "Kvádr 2"', 'sestava hotovo'].join('\n'));
+  const edit = await run([`sestava upravit "Deska S${sfx}"`, 'smazat "Kvádr 2"', 'sestava hotovo'].join('\n'));
   ok(/mate\.lost|ztracen/.test(edit), `[${tag}] pružina: po smazání schodu ztracená dosedací plocha`);
   await idle();
   const btnOk = await p.waitForFunction(() => !!document.querySelector('[data-spring-repick]'), null, { timeout: 60000 }).then(() => true, () => false);
@@ -217,8 +283,22 @@ async function springFlow(p, tag) {
   await p.locator('[data-spring-repick]').first().click();
   await p.locator('[data-repick-panel]').waitFor({ timeout: 15000 });
   const head = ((await p.locator('[data-repick-panel] p').first().textContent()) || '').trim();
-  ok(/^Nová dosedací plocha pružiny „Pružina S“ – komponenta „Deska S“/.test(head), `[${tag}] pružina: panel nového výběru je pro dosedací plochu pružiny („${head}“)`);
-  if (tag === 'nowebgl') {
+  ok(head.startsWith(`Nová dosedací plocha pružiny „Pružina S${sfx}“ – komponenta „Deska S${sfx}“`), `[${tag}] pružina: panel nového výběru je pro dosedací plochu pružiny („${head}“)`);
+  if (how === 'click' && tag0 === 'webgl') {
+    // WebGL: bod horní plochy desky na obrazovce z háčku screenOf (ověřený týmž výběrem jako klik), pak SKUTEČNÝ klik myší
+    await p.waitForFunction(() => (document.querySelector('[data-repick-face]')?.options.length ?? 0) > 1, null, { timeout: 60000 });
+    const opts = await p.evaluate(() => [...document.querySelector('[data-repick-face]').options].map((o) => ({ v: o.value, t: o.textContent })));
+    const top = opts.filter((o) => /rovinná \+Z/.test(o.t || ''));
+    ok(top.length === 1, `[${tag}] pružina: horní plocha desky +Z (${top.map((o) => o.t).join(' | ')})`);
+    if (top.length !== 1) return;
+    const face = Number(top[0].v.split('|')[1]);
+    const at = await p.evaluate(([c, f]) => window.mncadTest.screenOf(c, 'face', f), [`Deska S${sfx}`, face]);
+    ok(!!at, `[${tag}] pružina: horní plocha F${face + 1} je ve WebGL vidět (bod ${at ? `${at.x}, ${at.y}` : '–'})`);
+    if (!at) return;
+    await p.mouse.move(at.x, at.y);
+    await p.waitForTimeout(150);
+    await p.mouse.click(at.x, at.y);
+  } else if (how === 'click') {
     // klik na horní plochu desky v pohledu shora, vpravo od přidržovače a pružiny (x ≈ 85 % šířky desky)
     await p.locator('[data-soft-view="top"]').click(); await p.waitForTimeout(700);
     const at = await p.evaluate(() => {
@@ -249,11 +329,11 @@ async function springFlow(p, tag) {
     await p.locator('[data-repick-face]').selectOption(top.v);
   }
   const fixed = await p.waitForFunction(() => !document.querySelector('[data-mate-spring]'), null, { timeout: 60000 }).then(() => true, () => false);
-  const sp = await p.evaluate(() => window.mncad.getDocument().components.find((c) => c.spring)?.spring);
-  ok(fixed && sp && !sp.a.lost && sp.a.face >= 0, `[${tag}] pružina: dosedací plocha vybrána znovu ${tag === 'nowebgl' ? 'KLIKNUTÍM' : 'ze seznamu'} – řádek ztracené pružiny zmizel, A = F${sp ? sp.a.face + 1 : '?'} bez ztráty`);
+  const sp = await p.evaluate((n) => window.mncad.getDocument().components.find((c) => c.spring && c.name === n)?.spring, `Pružina S${sfx}`);
+  ok(fixed && sp && !sp.a.lost && sp.a.face >= 0, `[${tag}] pružina: dosedací plocha vybrána znovu ${how === 'click' ? 'KLIKNUTÍM' : 'ze seznamu'} – řádek ztracené pružiny zmizel, A = F${sp ? sp.a.face + 1 : '?'} bez ztráty`);
   const st = await run('stav', { protocol: 'short' });
   ok(!/springs\.lost=/.test(st), `[${tag}] pružina: stav bez springs.lost (${(st.split('\n').find((l) => /^D /.test(l)) || '').slice(0, 160)})`);
-  await p.screenshot({ path: `${S}w22a2-${tag}-5-spring.png` });
+  await p.screenshot({ path: `${S}w22a2-${tag0}-5-spring-${how}.png` });
 }
 
 const browsers = [];
@@ -268,7 +348,10 @@ const browsers = [];
   await start(p, BASE + '/cad');
   await flow(p, 'webgl');
   await edgeFlow(p, 'webgl');
-  await springFlow(p, 'webgl');
+  await springFlow(p, 'webgl', 'list');
+  await springFlow(p, 'webgl', 'click');
+  await entClick(p, 'webgl', 'edge');
+  await entClick(p, 'webgl', 'vertex');
   ok(errs.length === 0, 'žádná chyba stránky (WebGL): ' + errs.slice(0, 3).join(' | '));
   await ctx.close();
 
@@ -293,7 +376,10 @@ const browsers = [];
   ok(noGl, 'druhý průchod běží bez WebGL (softwarový náhled)');
   await flow(p2, 'nowebgl');
   await edgeFlow(p2, 'nowebgl');
-  await springFlow(p2, 'nowebgl');
+  await springFlow(p2, 'nowebgl', 'list');
+  await springFlow(p2, 'nowebgl', 'click');
+  await entClick(p2, 'nowebgl', 'edge');
+  await entClick(p2, 'nowebgl', 'vertex');
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

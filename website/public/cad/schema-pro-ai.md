@@ -970,7 +970,8 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
 - **Souhrn po tuhých skupinách (bod 15):** výchozí výpis pohybu = jeden řádek na skupinu dílů se stále stejnou vzájemnou polohou
   (tolerance, žádné „58 + 1“ ze zaokrouhlení): ` „Horní deska“ + 20 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm`, pak
   ` stojí: 1 („Deska A“)` a nesplněné vazby; po dílech `pohyb detail` / `pohyb stav detail` (EN `motion detail`). Strojově na konci
-  řádku `groups=21:z-30,1:z-24.75` (počet dílů : osy ± posunutí v kroku největšího vychýlení).
+  řádku `groups=21:z-30:Horní%20deska,1:z-24.75:Razník` (počet dílů : osy ± posunutí v kroku největšího vychýlení : jméno
+  kořene skupiny – znaky mezera , : = " % zapsané jako v URL, `%20` = mezera; kolo 7).
 - `pohyb` / `pohyb stav` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);

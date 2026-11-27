@@ -122,7 +122,6 @@ import { trackedMotion } from "./motion-runs"; // výpočty pohybové studie v t
 import { ComputeStatus } from "./compute-status";
 import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
 import { failedPhaseOf, failText, recordExportFailure } from "@/cad/export-failures";
-import { motionCsvWithRev } from "@/cad/motion-export-rev";
 import { exportModelRev } from "@/cad/engine/export-job";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
 import { ExportList, RunWaitChip } from "./run-chip";
@@ -1036,7 +1035,7 @@ export function CadApp() {
         const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
         // procesní vrstva: operace, stav výrobku po krocích, úroveň „geometrická aproximace“ (vlna 22, bod 4)
         const proc = (await import("@/cad/motion-process")).processApi(res, d);
-        return { ...(run ? { run } : {}), steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: motionCsvWithRev(studyCsv(res, d), d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
+        return { ...(run ? { run } : {}), steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1117,6 +1116,15 @@ export function CadApp() {
     }, () => apiHostRef.current);
     // každé volání nejdřív zapíše rozepsané změny (22e, 22f); výstupy počkají na dokončený stav (12) – run-host.ts guardApi
     window.mncad = guardApi(api, { flush: (why) => flushPending(why), wait: (what) => waitOutputsRef.current(what) });
+    // testovací háček e2e (vlna 22 kolo 7, bod 20 – cad/screen-probe.ts): kde kliknout myší na plochu / hranu / vrchol komponenty
+    // (WebGL i softwarový náhled, ověřeno týmž výběrem jako klik); výběr ani dokument nemění – kliká test skutečnou myší
+    (window as unknown as { mncadTest?: unknown }).mncadTest = {
+      screenOf: (comp: string | null, kind: "face" | "edge" | "vertex", index: number) => {
+        const d = histRef.current.present;
+        const id = comp == null ? undefined : (d.components?.find((c) => c.id === comp || c.name === comp)?.id ?? comp);
+        return vp.current?.screenOf?.({ ...(id !== undefined ? { compId: id } : {}), kind, index }) ?? null;
+      },
+    };
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
       window.removeEventListener("hashchange", onHash);

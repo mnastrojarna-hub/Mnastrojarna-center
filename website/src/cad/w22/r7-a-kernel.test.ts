@@ -9,7 +9,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { setHostAssets } from "../host-assets";
 import { setLang } from "../i18n";
-import { makeKernelClient } from "../kernel-client";
+import { CadCancelled, makeKernelClient } from "../kernel-client";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "../engine/host";
 import { MemoryWorkspace } from "../engine/memory-workspace";
 import { runScript } from "../engine/run";
@@ -61,6 +61,28 @@ describe("kolo 7 (jádro): trvalý záznam neúspěšného exportu", async () =>
     expect(ws.present().exportFailures).toBeUndefined();
   });
 
+  it("bod 22h (oponentura kola 7): zrušený export v TEXTOVÉM běhu záznam v dokumentu nechá (dřív ho zahodil s rozpracovaným dokumentem)", async () => {
+    setLang("cs");
+    const ws = new MemoryWorkspace();
+    await runScript(ws, 'nový díl "Deska A"\nkvádr 20 10 10', hostOf());
+    const before = ws.present();
+    const cancelling = { ...kernel, exportFile: async () => Promise.reject(new CadCancelled()) };
+    const r = await runScript(ws, "export step", hostOf(cancelling));
+    expect(r.entries.find((x) => x.code?.startsWith("run.cancelled"))?.code).toBe("run.cancelled");
+    const d = ws.present();
+    expect(d.features).toEqual(before.features); // model se nezměnil
+    expect(d.exportFailures).toHaveLength(1);
+    expect(d.exportFailures![0]).toMatchObject({ format: "step", file: "Deska_A.step", state: "cancelled" });
+    expect(r.console).toMatch(/Záznam exportu z tohoto běhu \(i neúspěšného nebo zrušeného\) zůstal v „Deska A“/);
+    const ls = await runScript(ws, "exporty", hostOf());
+    expect(ls.console).toMatch(/Neúspěšné exporty \(1\) – soubor nevznikl:\n {2}1\. – STEP „Deska_A\.step“ .* – zrušeno/);
+    // nový dokument, který běh založil, se zrušením zahodí celý – záznam nemá kam (a do jiné záložky nepatří)
+    const r2 = await runScript(ws, 'nový díl "Deska B"\nkvádr 5 5 5\nexport step', hostOf(cancelling));
+    expect(r2.entries.some((x) => x.code?.startsWith("run.cancelled"))).toBe(true);
+    expect(ws.present().name).toBe("Deska A");
+    expect(ws.present().exportFailures).toHaveLength(1);
+  });
+
   it("bod 12: `pohyb export csv` – soubor nese revizi sestavy (sloupec „Revize modelu“, F … rev=r·…)", async () => {
     setLang("cs");
     const host = hostOf();
@@ -72,5 +94,12 @@ describe("kolo 7 (jádro): trvalý záznam neúspěšného exportu", async () =>
     expect(csv[0]).toMatch(/;Revize modelu$/);
     for (const row of csv.slice(1)) expect(row.endsWith(`;${rev}`)).toBe(true);
     expect(formatShort(rep, { budget: Infinity })).toMatch(new RegExp(`^F csv "Pohyb-pohyb\\.csv" \\d+B .*rev=${rev}`, "m"));
+    // oponentura kola 7: revize je v JEDINÉ funkci CSV studie (studyCsv) – nese ji i výpis v konzoli, ZIP snímků a CSV z panelu
+    // Pohyb / mncad.motion().csv (dřív jen soubor z textového příkazu; panel měl vlastní obal v souboru stopy M)
+    const again = await runScript(ws, "pohyb export csv", hostOf());
+    const listed = (again.console ?? "").split("\n").filter((l) => /^\uFEFF?(Krok;|\d+;)/.test(l));
+    expect(listed).toHaveLength(6);
+    expect(listed[0]).toMatch(/;Revize modelu$/);
+    for (const row of listed.slice(1)) expect(row.endsWith(`;${rev}`)).toBe(true);
   }, 240_000);
 });

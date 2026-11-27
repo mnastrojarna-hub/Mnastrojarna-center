@@ -103,6 +103,8 @@ export type OpenResult =
       chars?: number;
       /** odkaz s kontrolou úplnosti (`1dpk`): kolik znaků dat má mít – useknutý „má X z Y znaků“ */
       expected?: number;
+      /** useknuto ještě PŘED daty dokumentu (sůl hesla, hlavička kontroly) – data v odkazu vůbec nejsou */
+      head?: boolean;
     };
 /** poškození obsahu dlouhého odkazu (`#s=…`): useknutý × změněný */
 export type ShareDamage = "truncated" | "corrupt";
@@ -759,12 +761,16 @@ export function parseShareHash(hash: string): ParsedShare | null {
   }
   const s = params.get("s");
   if (s) {
-    const m = /^1([dr])(p?)(k?)\.(.+)$/s.exec(s);
-    if (!m) return null;
-    const rest = m[4];
+    const m = /^1([dr])(p?)(k?)(?:\.(.*))?$/s.exec(s);
+    if (!m || (m[3] && !m[2])) return null;
+    const rest = m[4] ?? "";
+    // tvar s kontrolou je celý, ale za ním nic (useknuto hned za `#s=1dpk.`) – useknutý odkaz, ne „není to odkaz“ (starší
+    // tvary beze změny: `#s=1d.` bez dat hlásí ověření odkazu vlastním textem „za #s= chybí data“)
+    if (!rest) return m[3] ? { kind: "link", compressed: m[1] === "d", salt: "", data: "", check: { broken: true } } : null;
     if (m[2]) {
       const i = rest.indexOf(".");
-      if (i < 0) return null;
+      // useknuto uvnitř soli hesla (oponentura kola 7): u tvaru s kontrolou je to jistě useknutý odkaz; starší `1dp` beze změny
+      if (i < 0) return m[3] ? { kind: "link", compressed: m[1] === "d", salt: rest, data: "", check: { broken: true } } : null;
       const salt = rest.slice(0, i);
       if (!m[3]) return { kind: "link", compressed: m[1] === "d", salt, data: rest.slice(i + 1) };
       const k = /^(\d{1,8})\.([A-Za-z0-9_-]{8})\.(.*)$/s.exec(rest.slice(i + 1));
@@ -1129,7 +1135,8 @@ export async function openShareLink(parsed: ParsedShare, password?: string, o: O
     // kontrola úplnosti šifrovaného odkazu (`1dpk`, bod 16 kolo 7) – rozhodne BEZ hesla: kratší = useknutý, jiný otisk =
     // změněný; znaky přilepené za odkaz (tečka, závorka od messengeru) se odříznou, sedí-li pak otisk
     const chk = parsed.check;
-    if (chk && "broken" in chk) return { ok: false, reason: "invalid", damage: "truncated", chars: 0 };
+    // useknuto ještě před daty (v soli nebo v hlavičce kontroly) – vlastní text bez „má 0 znaků“ (oponentura kola 7)
+    if (chk && "broken" in chk) return { ok: false, reason: "invalid", damage: "truncated", chars: 0, head: true };
     if (chk) {
       if (data.length < chk.n) return { ok: false, reason: "invalid", damage: "truncated", chars: data.length, expected: chk.n };
       const head = data.slice(0, chk.n);
@@ -1192,8 +1199,9 @@ export function shareMessage(docName: string, r: ShareResult): string {
  * Důvod neotevření odkazu česky. `kind` = druh odkazu: u odkazu s kódem „nenalezeno“ nejčastěji znamená překlep
  * (jiné písmeno, velikost písmen) – hlášení na to upozorní.
  */
-export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"], damage?: { damage?: ShareDamage; chars?: number; expected?: number }): string {
+export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"], damage?: { damage?: ShareDamage; chars?: number; expected?: number; head?: boolean }): string {
   // useknutý / změněný dlouhý odkaz (vlna 22, bod 16) – vlastní text s délkou dat, ne obecné „neplatný“
+  if (reason === "invalid" && damage?.damage === "truncated" && damage.head) return tr("Odkaz je useknutý – končí ještě před daty dokumentu (v hlavičce odkazu za #s=). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.");
   if (reason === "invalid" && damage?.damage === "truncated" && damage.expected) return tr("Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} z {1} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.", damage.chars ?? 0, damage.expected);
   if (reason === "invalid" && damage?.damage === "truncated") return tr("Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.", damage.chars ?? 0);
   if (reason === "invalid" && damage?.damage === "corrupt") return tr("Odkaz je poškozený – data dokumentu jsou úplná, ale změněná (část za #s= má {0} znaků; změnu mohl udělat program, kterým se odkaz předával). Požádejte odesílatele o nový odkaz.", damage.chars ?? 0);

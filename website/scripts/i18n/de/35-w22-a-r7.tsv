@@ -23,3 +23,7 @@ zápis textu STEP	Schreiben des STEP-Texts
 zapisovač STEP: krok „{0}“ skončil stavem {1} · {2}	STEP-Schreiber: Schritt „{0}“ endete mit Status {1} · {2}
 Změny, které běh zapsal do {0}, se vrátily.	Die während des Laufs in {0} geschriebenen Änderungen wurden zurückgenommen.
 zrušeno{0}, soubor nevznikl	abgebrochen{0}, keine Datei geschrieben
+# kolo 7 – oprava po oponentuře (body 12, 15, 16, 22h)
+Záznam exportu z tohoto běhu (i neúspěšného nebo zrušeného) zůstal v „{0}“ – výpis `exporty`.	Der Exporteintrag dieses Laufs (auch ein fehlgeschlagener oder abgebrochener) bleibt in „{0}“ – Liste mit `exporte`.
+revize modelu v souboru chybí	Modellrevision fehlt in der Datei
+Odkaz je useknutý – končí ještě před daty dokumentu (v hlavičce odkazu za #s=). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	Der Link ist abgeschnitten – er endet vor den Dokumentdaten (im Link-Kopf nach #s=). Kopieren Sie den ganzen Link erneut oder bitten Sie um einen kurzen Link mit Code.

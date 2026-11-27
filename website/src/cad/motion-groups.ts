@@ -26,6 +26,8 @@ type StepsLike = { steps: { place: Record<string, Placement> }[]; comps: { id: s
 export type RigidGroup = {
   /** vedoucí komponenta (název skupiny): kořen zámků, komponenta poháněné vazby, jinak první v pořadí dokumentu */
   root: string;
+  /** jméno vedoucí komponenty (komponenta dokumentu, jinak výsledek studie, jinak id) – strojový řádek `groups=` (kolo 7) */
+  name: string;
   ids: string[];
   n: number;
   /** posunutí v kroku největšího vychýlení (znaménko a osy) a na konci studie [mm] */
@@ -135,7 +137,8 @@ export function rigidMotionGroups(res: StepsLike, doc?: Pick<CadDoc, "components
     const root = lockRoot ?? mem.find((id) => driven.has(id)) ?? mem[0];
     const locked = mem.length > 1 && mem.some((a) => mem.some((b) => a !== b && lockedPair(a, b)));
     const x = info.get(root)!;
-    return { root, ids: mem, n: mem.length, delta: x.delta, end: x.end, travel: x.travel, turn: Math.max(...mem.map((id) => info.get(id)!.turn)), locked };
+    const name = doc?.components?.find((c) => c.id === root)?.name ?? res.comps.find((c) => c.id === root)?.name ?? root;
+    return { root, name, ids: mem, n: mem.length, delta: x.delta, end: x.end, travel: x.travel, turn: Math.max(...mem.map((id) => info.get(id)!.turn)), locked };
   });
   moving.sort((a, b) => b.n - a.n || b.travel - a.travel);
   return { moving, still };
@@ -179,8 +182,16 @@ export function groupLines(g: RigidGroups, name: (id: string) => string): string
 }
 
 /**
- * Strojové pole skupin na konci řádku `= … motion …` (vlna 22, bod 15): `groups=<n>:<osy>` po skupinách s posuvem (stejné
- * skupiny jako `travel=`), osy jako `z-30.35` / `x+5z-30` (posunutí v kroku největšího vychýlení, desetinná tečka).
+ * Jméno do strojového pole: znaky, které by rozbily `klíč=hodnota` / seznam položek (mezera, čárka, dvojtečka, rovnítko,
+ * uvozovky, %, řídicí znaky), se zapíšou jako v URL (`Horní deska` → `Horní%20deska`); písmena s diakritikou zůstanou.
+ */
+export const kvName = (s: string): string => s.replace(/[%\s,:="'\\\u0000-\u001f]/g, (c) => encodeURIComponent(c));
+
+/**
+ * Strojové pole skupin na konci řádku `= … motion …` (vlna 22, bod 15): `groups=<n>:<osy>:<kořen>` po skupinách s posuvem
+ * (stejné skupiny jako `travel=`), osy jako `z-30.35` / `x+5z-30` (posunutí v kroku největšího vychýlení, desetinná tečka),
+ * kořen = jméno vedoucí komponenty skupiny (kolo 7: dřív řádek neříkal, KTERÁ skupina se hýbe – jen počet dílů) zapsané
+ * `kvName` (mezera = %20). Čtenáři, kteří berou jen první dvě části `n:osy` (scripts/cad-acceptance.mjs), čtou dál beze změny.
  */
 export function groupsKv(g: RigidGroups): string[] {
   const list = g.moving.filter((x) => x.turn <= ROT_EPS_DEG);
@@ -190,5 +201,5 @@ export function groupsKv(g: RigidGroups): string[] {
     ["x", "y", "z"]
       .map((a, k) => (Math.abs(d[k]) >= STILL_MM ? `${a}${d[k] > 0 ? "+" : "-"}${n(Math.abs(d[k]))}` : ""))
       .join("") || "0";
-  return [`groups=${list.map((x) => `${x.n}:${ax(x.delta)}`).join(",")}`];
+  return [`groups=${list.map((x) => `${x.n}:${ax(x.delta)}:${kvName(x.name)}`).join(",")}`];
 }

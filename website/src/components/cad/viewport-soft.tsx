@@ -11,7 +11,8 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sectionPlane } from "@/cad/section-plane";
 import { fitSoftCam, newSoftCam, softCamOnModel, type SoftCam } from "@/cad/soft-cam";
-import { buildPickIndex, edgeNear, edgeSnaps, itemEdgePolyline, pickAt, snapNear, softHintSteps, surfaceAt, type PickItem, type SoftHint, type SoftPickIndex } from "@/cad/soft-pick";
+import { buildPickIndex, edgeNear, edgeSnaps, itemEdgePolyline, pickAt, projectPoint, snapNear, softHintSteps, surfaceAt, type PickItem, type SoftHint, type SoftPickIndex } from "@/cad/soft-pick";
+import { entityCandidates, findOnScreen, type ProbeQuery } from "@/cad/screen-probe"; // testovací háček screenOf (bod 20, kolo 7)
 import { basisOf, hexToRgb, orbitAngles, screenToWorld, softBounds, softRender, type RGB, type SoftViewName } from "@/cad/soft-render";
 import type { MeshData, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -155,6 +156,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   // ---------- výběr: vlastnosti 3D okna, entita pod kurzorem, body k uchopení ----------
   const pickRef = useRef(pick ?? null);
   pickRef.current = pick ?? null;
+  /** výběr v bodě plátna (CSS px) podle filtru – tentýž `pickSel` jako klik (testovací háček `screenOf`) */
+  const probePick = useRef<((p: { x: number; y: number }, f: SelFilter) => SelItem | null) | null>(null);
   const [hover, setHover] = useState<SelItem | null>(null);
   /** formuláře prvků (hrany zaoblení, plochy skořepiny, plocha skici): plocha / hrana pod kurzorem */
   const [lhover, setLhover] = useState<{ face: number; edge: number }>({ face: -1, edge: -1 });
@@ -683,6 +686,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       }
       return r;
     };
+    probePick.current = pickSel;
     const legacyPick = (p: { x: number; y: number }) => {
       const ix = pickIndex();
       const mode = pickRef.current?.pickMode;
@@ -993,6 +997,21 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         cam.current = { ...(c as SoftCam) };
         setViewName(cam.current.view);
         schedule();
+      },
+      screenOf: (q: ProbeQuery) => {
+        const cv = canvas.current;
+        const ix = pickIndex();
+        const pick = probePick.current;
+        if (!cv || !ix || !pick) return null;
+        const it = q.compId !== undefined ? baseRef.current.find((x) => x.compId === q.compId) : baseRef.current.find((x) => !x.compId);
+        if (!it) return null;
+        const r = cv.getBoundingClientRect();
+        const project = (p: Vec3): [number, number] | null => {
+          const [x, y] = projectPoint(ix, p);
+          return x >= 2 && y >= 2 && x <= r.width - 2 && y <= r.height - 2 ? [x + r.left, y + r.top] : null;
+        };
+        const src = { mesh: it as unknown as MeshData, vertices: it.points ?? null, matrix: it.matrix ?? null };
+        return findOnScreen(entityCandidates(src, q.kind, q.index), q, project, (x, y) => pick({ x: x - r.left, y: y - r.top }, q.kind));
       },
       hintList: () => hintsNow().map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
       clickHint: (id, additive = false) => {

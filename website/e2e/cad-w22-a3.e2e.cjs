@@ -485,6 +485,62 @@ async function undoAfterExport(p, tag) {
   ok(/odpovídá modelu/.test(line2), `${tag}kolo 4: Ctrl+Y vrátí model exportu – záznam zase „odpovídá modelu“ (${line2})`);
 }
 
+/**
+ * Kolo 7 (bod 12, oponentura): video WebM pohybové studie nese revizi modelu – značka MODEL_REVISION v souboru (zápis vlastním
+ * muxerem cad/webm-mux.ts, ne MediaRecorder), kontrola exportu ji přečte zpět; zpráva exportu ji uvádí („z modelu r·…“) a je
+ * stejná jako sloupec „Revize modelu“ v CSV téže studie (mncad.motion().csv). Po změně modelu nový export = nová revize.
+ */
+async function motionWebmRev(b, tag) {
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 }, acceptDownloads: true });
+  const p = await ctx.newPage();
+  await start(p, `${BASE}/cad`);
+  const run = (t) => p.evaluate((x) => window.mncad.run(x), t);
+  const log = await run(['nový díl "Deska W"', 'kvádr 200 100 10', 'nový díl "Přidržovač W"', 'kvádr 200 100 10', 'nová sestava "Studie W"', 'vložit "Deska W" ukotvit', 'vložit "Přidržovač W" v 0 0 67,5', 'sestava vazba vzdálenost "Přidržovač W" spodní "Deska W" horní hodnota 57,5 název "ZDVIH"', 'sestava vazba rovnoběžně "Přidržovač W" +X "Deska W" +X', 'sestava vazba rovnoběžně "Přidržovač W" +Y "Deska W" +Y', 'pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 12 čas 0,4', 'pohyb spustit'].join('\n'));
+  ok(!/^✗/m.test(log), `${tag}12 webm: studie spočtena`);
+  const revOfCsv = async () => {
+    const m = await p.evaluate(() => window.mncad.motion());
+    const row = String(m && m.csv || '').replace(/^\uFEFF/, '').trim().split(/\r?\n/)[1] || '';
+    return (/;(r·[0-9a-f]{6})$/.exec(row) || [])[1] || null;
+  };
+  const exportOnce = async (name) => {
+    const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);
+    await run('pohyb export webm');
+    const f = await dl;
+    if (!f) return { file: null, rep: null };
+    const file = S + name;
+    await f.saveAs(file);
+    await p.waitForFunction(() => !!document.querySelector('[data-video-report]'), null, { timeout: 30000 }).catch(() => {});
+    const rep = await p.locator('[data-video-report]').textContent().catch(() => '');
+    return { file, rep, name: f.suggestedFilename() };
+  };
+  /** značka MODEL_REVISION ze souboru: SimpleTag (0x67C8) → TagName (0x45A3) + TagString (0x4487), čteno bez aplikace */
+  const tagOf = (buf) => {
+    const name = Buffer.from('MODEL_REVISION');
+    const i = buf.indexOf(name);
+    if (i < 0) return null;
+    const o = i + name.length;
+    if (buf[o] !== 0x44 || buf[o + 1] !== 0x87) return null;
+    const len = buf[o + 2] & 0x7f; // délka jako 1bajtový EBML vint
+    return buf.slice(o + 3, o + 3 + len).toString('utf8');
+  };
+  const rev1 = await revOfCsv();
+  ok(/^r·[0-9a-f]{6}$/.test(rev1 || ''), `${tag}12 webm: revize studie z CSV ${rev1}`);
+  const a = await exportOnce(`w22a3-rev-1${tag ? '-nogl' : ''}.webm`);
+  ok(!!a.file && /\.webm$/.test(a.name || ''), `${tag}12 webm: soubor WebM stažen (${a.name})`);
+  if (a.file) {
+    const t1 = tagOf(fs.readFileSync(a.file));
+    ok(t1 === rev1, `${tag}12 webm: soubor nese MODEL_REVISION = ${t1} (CSV ${rev1})`);
+    ok(new RegExp(`z modelu ${rev1}`).test(a.rep || ''), `${tag}12 webm: zpráva exportu uvádí revizi – ${(a.rep || '').slice(-80)}`);
+  }
+  // změna modelu → nová studie a nový export nesou NOVOU revizi (ne starou)
+  await run(['sestava upravit "Deska W"', 'kvádr 20 20 5 v 0 0 10', 'sestava hotovo', 'pohyb spustit'].join('\n'));
+  const rev2 = await revOfCsv();
+  ok(!!rev2 && rev2 !== rev1, `${tag}12 webm: po změně modelu jiná revize (${rev1} → ${rev2})`);
+  const c = await exportOnce(`w22a3-rev-2${tag ? '-nogl' : ''}.webm`);
+  if (c.file) ok(tagOf(fs.readFileSync(c.file)) === rev2, `${tag}12 webm: nový soubor nese novou revizi ${rev2}`);
+  await ctx.close();
+}
+
 const browsers = [];
 const launch = async (o) => { const x = await chromium.launch(o); browsers.push(x); return x; };
 (async () => {
@@ -506,6 +562,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   }
   await menuExport(b, '');
   await drawingUnload(b, '');
+  await motionWebmRev(b, '');
   for (const [tag, url, lang] of [['', `${BASE}/cad`, 'cs'], ['[en] ', `${BASE}/en/cad`, 'en'], ['[de] ', `${BASE}/de/cad`, 'de']]) await ctrlSave(b, tag, url, lang);
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
@@ -519,6 +576,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   await drawing(p, '[bez WebGL] ', 'cs');
   await ctrlSave(nogl, '[bez WebGL] ', `${BASE}/cad`, 'cs');
   await drawingUnload(nogl, '[bez WebGL] ');
+  await motionWebmRev(nogl, '[bez WebGL] ');
   await nogl.close();
 })()
   .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })

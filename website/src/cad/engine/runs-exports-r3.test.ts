@@ -78,6 +78,31 @@ describe("kolo 3: zrušení běhu, revize ve STEP, záznam úlohy exportu", asyn
     expect(r.console).toMatch(/zůstaly v „Deska A“ \(Zpět je vrátí\)/);
   });
 
+  it("bod 12 (kolo 7, oponentura): cizí změna MIMO geometrii (výkres, materiál, vazby) se zrušením nezahodí – ✗ run.cancelled-partial, ne „beze změny“", async () => {
+    setLang("cs");
+    // dřív porovnání revizí geometrie (modelRev) tuto změnu nevidělo: záložka se přepsala stavem před během a konzole tvrdila
+    // „dokument zůstal beze změny … se vrátily“ – cizí list výkresu / materiál / název zmizel bez slova
+    const edits: [(d: CadDoc) => CadDoc, (d: CadDoc) => boolean][] = [
+      [(d) => ({ ...d, drawings: [{ id: "dX", name: "Cizí list" } as never] }), (d) => d.drawings?.[0]?.id === "dX"],
+      [(d) => ({ ...d, material: "1.2379" }) as CadDoc, (d) => (d as { material?: string }).material === "1.2379"],
+      [(d) => ({ ...d, mates: [...(d.mates ?? []), { id: "mX" } as never] }), (d) => !!d.mates?.some((m) => m.id === "mX")],
+    ];
+    for (const [edit, kept] of edits) {
+      const ws = new MemoryWorkspace();
+      await runScript(ws, 'nový díl "Deska A"\nkvádr 20 10 10', hostOf());
+      const ac = new AbortController();
+      const hooks = { opEnd: (l: number | null) => void (l === 2 && (ws.commit(edit(ws.present())), ac.abort())) };
+      const r = await runScript(ws, 'kvádr 5 5 5 v 0 0 10\nnový díl "Deska D"\nkvádr 10 10 10', hostOf(), { signal: ac.signal, hooks });
+      expect(r.entries.find((x) => x.code?.startsWith("run.cancelled"))?.code).toBe("run.cancelled-partial");
+      expect(r.console).not.toMatch(/beze změny|se vrátily/);
+      const a = ws.tabs().find((t) => t.title === "Deska A")!;
+      await ws.activate(a.id);
+      const cur = ws.present();
+      expect(cur.features.length).toBe(2); // zápis běhu zůstal (Zpět ho vrátí) …
+      expect(kept(cur)).toBe(true); // … a cizí změna také
+    }
+  });
+
   it("bod 12: STEP nese revizi modelu v hlavičce = řádek F `rev=`; zpětné načtení s revizí projde (✓ kontrola)", async () => {
     setLang("cs");
     const ws = new MemoryWorkspace();

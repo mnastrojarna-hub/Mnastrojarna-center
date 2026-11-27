@@ -2,7 +2,6 @@
  * Sestava textem (cad/agent-asm.ts, provedení cad/asm-agent.ts): vazby, komponenty, pole, šroub, podsestavy, úprava
  * v kontextu, kusovník, rám formy, záložky, pohybová studie. Prostředí sestavy nad `ws` a jádrem (`engine/asm-env.ts`).
  */
-import { motionCsvWithRev } from "../../motion-export-rev";
 import { modelRev, setMateStatus } from "../result-key";
 import { tr } from "../../i18n";
 import type { AsmEnv } from "../../asm-agent";
@@ -76,8 +75,8 @@ async function writeMotionCsv(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc, e
   const [{ motionCached }, { studyCsv }] = await Promise.all([import("../../asm-agent-kin"), import("../../motion-dynamic-report")]);
   const res = motionCached(d, env);
   if (!res) return;
-  // soubor nese revizi sestavy, ze které výsledek vznikl (sloupec „Revize modelu“ – kolo 7, bod 12)
-  const data = new TextEncoder().encode(motionCsvWithRev(studyCsv(res, d), d));
+  // soubor nese revizi sestavy, ze které výsledek vznikl (sloupec „Revize modelu“ ze studyCsv – kolo 7, bod 12)
+  const data = new TextEncoder().encode(studyCsv(res, d));
   const f = await ctx.host.files.write({ name: `${d.name || tr("sestava")}-pohyb.csv`, mime: "text/csv;charset=utf-8", data, doc: d.name, format: "csv" });
   f.modelRev = modelRev(d); // řádek F nese revizi (`rev=r·…`) jako STEP a výkresy
 }

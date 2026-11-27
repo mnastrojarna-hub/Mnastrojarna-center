@@ -39,7 +39,7 @@ describe("tuhé skupiny s tolerancí (bod 15)", () => {
     expect(g.moving).toHaveLength(1);
     expect(g.moving[0]).toMatchObject({ n: 2, ids: ["Deska", "Šroub"] });
     expect(motionGroups(res).moving).toEqual([{ n: 2, travel: 30.35 }]);
-    expect(groupsKv(g)).toEqual(["groups=2:z-30.35"]);
+    expect(groupsKv(g)).toEqual(["groups=2:z-30.35:Deska"]); // kolo 7, bod 15: + jméno kořene skupiny (n:osy:kořen) – vědomě upraveno
   });
   it("různý pohyb = různé skupiny; stojící díly zvlášť; skutečné natočení celé skupiny = jedna skupina", () => {
     const res = result(["A", "B", "C", "R1", "R2"], [
@@ -107,7 +107,7 @@ describe("sestava ~100 komponent (pole šroubů zamčených k desce) – čas a 
     expect(study).toContain(" „Horní deska“ + 98 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm");
     expect(study.filter((l) => l.includes("Šroub"))).toHaveLength(0); // žádný řádek po šroubech
     expect(r.kv).toMatch(/ travel=30mm:99 static=1 /);
-    expect(r.kv).toMatch(/ level=kin groups=99:z-30$/);
+    expect(r.kv).toMatch(/ level=kin groups=99:z-30:Horní%20deska$/); // kolo 7, bod 15: + jméno kořene (mezera = %20) – vědomě upraveno
     // detail po dílech je jen na vyžádání
     const d = await runLines(r.doc, env, "pohyb detail");
     expect(d.log.filter((l) => l.includes("rozsah pohybu"))).toHaveLength(99);
