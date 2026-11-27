@@ -548,9 +548,10 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Note with a leader: the arrow points at the feature, the text stands beside it.",
-    when: "Shop instruction at a feature: break edges, harden, thread, weld.",
+    when: "Short instruction at a specific face or edge (e.g. Grind, Lap). Heat treatment, hardness, finish and edges of the whole part belong in the title block.",
     steps: ["Click where the arrow should point.", "Click the text location.", "Type the Note text and confirm OK."],
-    cmd: 'drawing mark note "Harden" view front at 0 20',
+    cmd: 'drawing mark note "Lap" on Ø40',
+    note: "An agent writes a face note into the model (note F7 \"Grind\") – the drawing takes it over with an arrow.",
   },
   "drawing-ws/ann-roughness": {
     what: "Places a surface finish symbol to ISO 1302 (Ra, Rz).",
@@ -573,9 +574,9 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Places free text on the sheet, without a leader.",
-    when: "Technical requirements, heat treatment, general notes in a free area of the sheet.",
+    when: "Short general note above the title block (keyword style, at most 5 lines). Write heat treatment, hardness, finish, edges and tolerances into the title block.",
     steps: ["Click the text location on the sheet.", "Type the Text, adjust Text height [mm] (default 3.5) and confirm OK."],
-    cmd: 'drawing mark text "Harden 58 HRC" at 20 30',
+    cmd: 'drawing mark text "Degrease" at 20 30',
     note: "The text belongs to the sheet, not to a view – it stays put when a view moves.",
   },
   "drawing-ws/ann-detail": {

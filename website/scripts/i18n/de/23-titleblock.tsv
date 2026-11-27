@@ -52,7 +52,6 @@ Nahrát obrázek loga (PNG, JPEG, SVG) – zmenší se na nejvýš 600 × 300 px
 Nahrát…	Hochladen…
 např. černit	z. B. brünieren
 např. DIN ISO 2768-mK	z. B. DIN ISO 2768-mK
-např. kalit 58–60 HRC	z. B. härten 58–60 HRC
 např. plech 40×160×185	z. B. Blech 40×160×185
 nástrojářská (všechna pole)	Werkzeugbau (alle Felder)
 nepodporovaný barevný typ PNG {0}	nicht unterstützter PNG-Farbtyp {0}
@@ -111,6 +110,5 @@ v – velmi hrubá	v – sehr grob
 velmi hrubá	sehr grob
 Vlastní text	Eigener Text
 Výkres nemá nepředepsané tolerance{0} – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)	Die Zeichnung hat keine Allgemeintoleranzen{0} – angeben: zeichnung allgemein ISO 2768-mK (Klasse f/m/c/v + H/K/L) oder zeichnung allgemein dezimal (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)
-výkres razítko název="…" číslo="…" kreslil="…" kontroloval="…" schválil="…" revize="…" datum="…" materiál="…" polotovar="…" počet="…" tepelné="…" povrch="…" nepředepsané="ISO 2768-mK|desetinná" úhly="…" sražení="…" hrany="…" zákazník="…" projekt="…" firma="…" logo="soubor.png" šablona=iso7200|kompaktní|nástrojářská poznámka="…"	zeichnung schriftfeld benennung="…" nummer="…" ersteller="…" geprüft="…" genehmigt="…" revision="…" datum="…" werkstoff="…" rohteil="…" menge="…" wärmebehandlung="…" oberflächenbehandlung="…" allgemeintoleranz="ISO 2768-mK|dezimal" winkel="…" fasen="…" kanten="…" kunde="…" projekt="…" firma="…" logo="datei.png" vorlage=iso7200|kompakt|werkzeugbau hinweis="…"
 zákazník	Kunde
 Zákazník	Kunde

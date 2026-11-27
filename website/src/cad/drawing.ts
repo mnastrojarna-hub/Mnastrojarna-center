@@ -2296,7 +2296,8 @@ function pmiLeader(p: Placed, tip: Vec2, text: string, end: "arrow" | "dot", pol
   let pick: Spot | null = null;
   let first: Spot | null = null;
   for (const u of dirs) {
-    for (const extra of [6, 12, 20]) {
+    // za pásem kót u pohledu (Chytré kóty se kreslí až nad listem – obsazenost je nezná)
+    for (const extra of [18, 26, 34, 10]) {
       const L = exitDist(tip, u, R.x, R.y, R.x + R.w, R.y + R.h) + extra;
       const knee: Vec2 = [tip[0] + u[0] * L, tip[1] + u[1] * L];
       const right = u[0] >= 0;

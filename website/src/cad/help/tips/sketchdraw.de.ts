@@ -548,9 +548,10 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Anmerkung mit Hinweislinie: der Pfeil zeigt auf das Element, der Text steht daneben.",
-    when: "Werkstatthinweis an einem Element: Kanten brechen, härten, Gewinde, Schweißnaht.",
+    when: "Kurzer Hinweis an einer bestimmten Fläche oder Kante (z. B. Schleifen, Läppen). Wärmebehandlung, Härte, Oberfläche und Kanten des ganzen Teils gehören ins Schriftfeld.",
     steps: ["Klicken, wohin der Pfeil zeigen soll.", "Position des Textes anklicken.", "Anmerkungstext eingeben und mit OK bestätigen."],
-    cmd: 'zeichnung symbol hinweis "Härten" ansicht vorne bei 0 20',
+    cmd: 'zeichnung symbol hinweis "Läppen" an Ø40',
+    note: "Ein Agent schreibt den Flächenhinweis ins Modell (hinweis F7 \"Schleifen\") – die Zeichnung übernimmt ihn mit Pfeil.",
   },
   "drawing-ws/ann-roughness": {
     what: "Setzt ein Oberflächensymbol nach ISO 1302 (Ra, Rz).",
@@ -573,9 +574,9 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Setzt freien Text auf das Blatt, ohne Hinweislinie.",
-    when: "Technische Anforderungen, Wärmebehandlung, allgemeine Hinweise auf einer freien Blattfläche.",
+    when: "Kurzer allgemeiner Hinweis über dem Schriftfeld (stichwortartig, höchstens 5 Zeilen). Wärmebehandlung, Härte, Oberfläche, Kanten und Toleranzen ins Schriftfeld.",
     steps: ["Position des Textes auf dem Blatt anklicken.", "Text eingeben, Schrifthöhe [mm] anpassen (Standard 3,5) und mit OK bestätigen."],
-    cmd: 'zeichnung symbol text "Härten 58 HRC" bei 20 30',
+    cmd: 'zeichnung symbol text "Entfetten" bei 20 30',
     note: "Der Text gehört zum Blatt, nicht zu einer Ansicht – er bleibt stehen, wenn eine Ansicht verschoben wird.",
   },
   "drawing-ws/ann-detail": {

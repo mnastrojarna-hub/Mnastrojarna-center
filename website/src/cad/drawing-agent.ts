@@ -478,8 +478,13 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
   return tr("„{0}“ → {1} (údaje razítka se nepíšou jako poznámka)", text, done.join(", "));
 }
 
-/** klíč pohledů listu (pohledy, iso, řez, detaily, další modely, pomocné pohledy) – list, který jen opakuje jiný list */
-const viewsKey = (o: DrawingOptions) => JSON.stringify([o.views, o.section ?? null, o.details ?? [], o.models ?? [], (o as { aux?: unknown }).aux ?? [], (o as { cuts?: unknown }).cuts ?? []]);
+/** zapnuté pohledy listu (bez zapnutého pohledu kreslí jádro přední – drawing.ts) */
+const viewsOnSheet = (o: DrawingOptions): string[] => {
+  const on = Object.entries(o.views).filter(([, v]) => v).map(([k]) => k);
+  return on.length ? on : ["front"];
+};
+/** list nemá vlastní pohledy navíc: žádný řez, detail, další model, pomocný pohled ani řez lomenou čarou */
+const plainViews = (o: DrawingOptions): boolean => !o.section && !o.details?.length && !o.models?.length && !(o as { aux?: unknown[] }).aux?.length && !(o as { cuts?: unknown[] }).cuts?.length && !(o as { brokenOut?: unknown[] }).brokenOut?.length;
 
 /**
  * R7 (vlna 23): nálezy pravidel poznámek pro list `idx` – limit řádků celého výkresu (na listu 1 a na listu, kde text je),
@@ -510,10 +515,16 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
   // R5: list dílu bez pohledu (ne list jen s kusovníkem sestavy) – „list jen s poznámkami“
   const noViews = res ? !res.views.length && !o.views.iso && !o.models?.length && !o.details?.length : false;
   if (noViews && !o.bomOnly) out.push({ level: "warn", code: "drawing.sheet-empty", kind: "other", text: tr("list nemá žádný pohled – list jen s poznámkami nebo prázdný list výkres nemá; přidejte pohledy (výkres pohledy přední,horní) nebo list smažte (výkres list smazat {0})", pos + 1), sheetId: s.id, data: { sheetPos: pos + 1 } });
-  // R5: další list, který jen opakuje pohledy dřívějšího listu výkresu (rozdělení „výkres + poznámky“)
-  if (pos > 0 && !noViews) {
-    const k = viewsKey(o);
-    const twin = set.slice(0, pos).find((j) => viewsKey(sheetOptions(doc.drawings![j])) === k);
+  // R5: další list, který jen opakuje pohledy dřívějšího listu výkresu (rozdělení „výkres + poznámky“): jeho pohledy jsou
+  // podmnožinou pohledů dřívějšího listu, nemá řez / detail / model navíc a kromě vygenerovaných kót nese jen volný text
+  if (pos > 0 && !noViews && plainViews(o)) {
+    const mine = res ? [...res.views.map((v) => v.key), ...(o.views.iso ? ["iso"] : [])] : viewsOnSheet(o);
+    // stejné měřítko (list s pohledem ve větším měřítku je detailní list, ne kopie)
+    const twin = set.slice(0, pos).find((j) => {
+      const tw = sheetOptions(doc.drawings![j]);
+      const has = new Set(viewsOnSheet(tw));
+      return String(tw.scale) === String(o.scale) && mine.every((k) => has.has(k));
+    });
     const own = s.annotations.some((a) => !a.auto && a.type !== "text" && !(a.type === "note" && isFreeAnn(a)));
     if (twin !== undefined && !own) out.push({ level: "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list {0} opakuje pohledy listu {1} a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho (výkres list smazat {0}) a údaje dejte do razítka / k ploše", pos + 1, set.indexOf(twin) + 1), sheetId: s.id, data: { sheetPos: pos + 1, twin: set.indexOf(twin) + 1 } });
   }
@@ -1140,7 +1151,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         if (!made.attached) throw new CodedError("drawing.note-free-leader", [sheetTitle(doc, idx), tr("„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 \"{0}\"; výkres ho převezme se šipkou), nebo cílem zvolte hranu / kótu (pohled přední v x y na hraně, na Ø40)", v, where)]);
         const cls = classifyNote(v);
         const bad = cls?.parts.filter((p) => p.key !== "edges") ?? [];
-        if (bad.length) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: {1} u odkazu – celé dílce patří do razítka ({2}), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná \"58+2 HRC\" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)", v, bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad))]);
+        if (bad.length) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: {1} u odkazu – údaje celého dílu patří do razítka ({2}), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná \"58+2 HRC\" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)", v, bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad))]);
         checkStyle(doc, idx, v, LEADER_MAX_CHARS);
       }
       if (cmd.mark.type === "text") ann = { ...ann, by: "agent" };

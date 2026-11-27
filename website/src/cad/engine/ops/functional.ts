@@ -8,6 +8,7 @@ import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-funct
 import { classifyNote, LEADER_MAX_CHARS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
 import { treatmentWord } from "../../pmi-marks";
 import { CodedError } from "../codes";
+import { acceptLine, sheetTail } from "../accept";
 import { runMeasure } from "../../agent-measure-run";
 import { markLabel } from "../../dim-complete";
 import { tr } from "../../i18n";
@@ -153,7 +154,9 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
         const { checkDocNotesBudget } = await import("../../drawing-agent");
         checkDocNotesBudget({ ...d, functional: next }, tr("úprava {0}", pmiText(mark)));
       }
-      commit(next, cmd.kind === "note" ? tr("✓ {0} v modelu{1} – výkres ho kreslí odkazem se šipkou na plochu (výkres stav: „Z modelu“)", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "") : tr("✓ {0} v modelu{1} – výkres ji kreslí tlustou čerchovanou čarou s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : ""));
+      // s výkresem je to jen přijetí – zda se popis / čára na list vešla, řekne vyhodnocení listu (ℹ → ✓ / ⚠, vlna 22 bod 22i)
+      const msg = cmd.kind === "note" ? tr("✓ {0} v modelu{1} – výkres ho přebírá jako odkaz se šipkou na plochu", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "") : tr("✓ {0} v modelu{1} – výkres ji přebírá jako tlustou čerchovanou čáru s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "");
+      commit(next, d.drawings?.length ? acceptLine(msg, sheetTail()) : msg);
       return;
     }
     case "clear": {

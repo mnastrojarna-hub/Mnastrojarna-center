@@ -24,8 +24,10 @@ Razítko: název Uložení · číslo — · kreslil — · revize — · datum 
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Pozice: 2 (přední 2) · přiřazené ručně 0 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 1–2
@@ -34,7 +36,7 @@ Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty,
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…80, y 0…40 mm · 2:1 · na listu x 34…194, y 193…273
   horní (x = X, y = Y): x 0…80, y 0…60 mm · 2:1 · na listu x 34…194, y 49…169
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
 ✓ Díra 1 (hole) · úběr 865,9 mm³ (4 % nástroje) · těleso platné
 ✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné

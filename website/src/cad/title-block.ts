@@ -18,7 +18,7 @@
  * Technické údaje (vlna 23, R1 – „klíčové věci vždy v hlavičce“): tepelné zpracování, tvrdost, povrchová úprava, hrany
  * ISO 13715, nepředepsané tolerance (i úhlů / sražení) a obecná drsnost jsou VŽDY v buňkách razítka, nikdy jako text nad
  * ním. Šablony ISO 7200 a kompaktní, které pro ně buňky nemají, dostanou nad sebou technický pás razítka (řádek buněk
- * 180 × 12 mm, jen vyplněná pole) – razítko je pak o 12 mm vyšší; nástrojářská šablona má buňky pro všechna.
+ * 180 × 10 mm, jen vyplněná pole) – razítko je pak o 10 mm vyšší; nástrojářská šablona má buňky pro všechna.
  */
 import { cadLocale, tr } from "./i18n";
 import type { DText, DrawingMeta, Poly, RevisionItem } from "./drawing";
@@ -176,7 +176,7 @@ export const titleTemplateOf = (meta: Pick<DrawingMeta, "template"> | undefined)
 export const TECH_KEYS = ["heatTreatment", "hardness", "surfaceTreatment", "edges", "tolerance", "angleTol", "chamferTol", "roughness"] as const;
 const TECH_WEIGHT: Record<(typeof TECH_KEYS)[number], number> = { heatTreatment: 1.25, hardness: 0.85, surfaceTreatment: 1.1, edges: 1.05, tolerance: 1.3, angleTol: 0.75, chamferTol: 0.75, roughness: 0.85 };
 /** výška technického pásu razítka [mm] */
-export const TECH_ROW_H = 12;
+export const TECH_ROW_H = 10;
 type TechMeta = Partial<Pick<DrawingMeta, "template" | "heatTreatment" | "hardness" | "surfaceTreatment" | "edges" | "tolerance" | "tolTable" | "angleTol" | "chamferTol" | "roughness">>;
 /** vyplněná technická pole, která šablona v buňkách nemá (ta dostanou technický pás) */
 export function techStripKeys(meta: TechMeta | undefined): string[] {
@@ -194,7 +194,7 @@ function effectiveTemplate(meta: TechMeta | undefined): TemplateDef {
   let x = 0;
   const strip = keys.map((k, i) => {
     const w = i === keys.length - 1 ? def.w - x : Math.round((def.w * TECH_WEIGHT[k as (typeof TECH_KEYS)[number]]) / sum * 2) / 2;
-    const c = T(k as CellKey, x, 0, w, TECH_ROW_H, 3);
+    const c = T(k as CellKey, x, 0, w, TECH_ROW_H, 2.6);
     x += w;
     return c;
   });

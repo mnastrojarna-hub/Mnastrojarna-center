@@ -68,8 +68,10 @@ Razítko: název Nástroj · číslo — · kreslil — · revize — · datum ?
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Vygenerované kóty a pozice upravené: posunuté pos:7 [0; 6] · zamčené pos:6 – výkres vygenerované obnovit
 Pozice: 12 (přední 7, horní 5) · přiřazené ručně 4 · posunuté 1 · zamčené 1 · nevešlo se 0 · křížení odkazů 0
@@ -80,7 +82,7 @@ Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty,
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…95, y 0…23 mm · 2:1 · na listu x 120…310, y 216…262
   horní (x = X, y = Y): x 0…95, y 0…40 mm · 2:1 · na listu x 120…310, y 112…192
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 1200 mm³ · těleso platné
 ✓ Kvádr 3 (box) · přidáno 1400 mm³ · těleso platné
@@ -123,7 +125,7 @@ Pozice: 12 (přední 10, horní 2) · přiřazené ručně 0 · posunuté 1 · z
   horní: 1, 9
 Kusovník: 12 řádků · ve 2 sloupcích – první nad razítkem, další vlevo od razítka
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 
 Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska 1 [0; 0; 0] ⚓ · Deska 2 [25; 0; 16] · Deska 3 [50; 0; 0] · Deska 4 [75; 0; 8] · Deska 5 [0; 15; 16] · Deska 6 [25; 15; 0] · Deska 7 [50; 15; 8] · Deska 8 [75; 15; 16] · Deska 9 [0; 30; 0] · Deska 10 [25; 30; 8] · Deska 11 [50; 30; 16] · Deska 12 [75; 30; 0] · Deska 12 [0; -30; 0]
@@ -171,8 +173,10 @@ Razítko: název Deska K · číslo — · kreslil — · revize — · datum ?.
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 1 (text × geometrie 1) – posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
