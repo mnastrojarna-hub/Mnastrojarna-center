@@ -22,6 +22,7 @@
  *
  * Čistý modul bez jádra a bez prohlížeče.
  */
+import { classifyNote, lineCount, NOTE_MAX_LINES, noteStyle } from "./drawing-notes-rules";
 import { parseAgentText } from "./agent";
 import type { DrawingOptions, DetailView, ModelView, RevisionItem, GenEdit, DrawingMeta } from "./drawing";
 import type { AuxViewOpt, CutSectionOpt, ViewBreakOpt } from "./drawing-views";
@@ -133,7 +134,9 @@ const TITLE_FIELDS: [string, W3][] = [
   ["stock", L("polotovar", "stock", "rohteil")],
   ["quantity", L("počet", "quantity", "menge")],
   ["heatTreatment", L("tepelné", "heat-treatment", "wärmebehandlung")],
+  ["hardness", L("tvrdost", "hardness", "härte")],
   ["surfaceTreatment", L("povrch", "surface", "oberflächenbehandlung")],
+  ["roughness", L("drsnost", "roughness", "rauheit")],
   ["tolerance", L("nepředepsané", "general", "allgemeintoleranz")],
   ["angleTol", L("úhly", "angles", "winkel")],
   ["chamferTol", L("sražení", "chamfers", "fasen")],
@@ -211,7 +214,7 @@ const viewsOn = (opts: Rec): Record<string, boolean> => ({ ...SCRIPT_DEFAULT_VIE
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 /** údaje razítka, které nový list převezme z aktivního (title-block.ts INHERITED_TITLE – hlídá test) */
-export const SCRIPT_INHERITED_TITLE = ["name", "number", "author", "revision", "date", "tolerance", "tolTable", "template", "logo", "company", "customer", "project", "checkedBy", "approvedBy", "quantity", "stock", "heatTreatment", "surfaceTreatment", "angleTol", "chamferTol", "edges"];
+export const SCRIPT_INHERITED_TITLE = ["name", "number", "author", "revision", "date", "tolerance", "tolTable", "template", "logo", "company", "customer", "project", "checkedBy", "approvedBy", "quantity", "stock", "heatTreatment", "hardness", "surfaceTreatment", "angleTol", "chamferTol", "edges", "roughness"];
 /** popisové údaje dokumentu, které nastavuje řádek razítka (drawing-agent.ts case "title") */
 const PROP_KEYS = ["number", "author", "revision"] as const;
 type PropKey = (typeof PROP_KEYS)[number];
@@ -318,6 +321,12 @@ export function emitTitle(o: SheetOut, doc: CadDoc, s: DrawingDoc, st: TitleStat
       if ((v || doc.name) === (str(M.name) || st.docName)) continue;
       v = v || (doc.name === st.docName ? "" : doc.name);
     } else if (v === str(M[key])) continue; // revizi nastavily řádky tabulky revizí (poslední)
+    // poznámka u razítka: textová cesta (= agent, vlna 23) přijme jen heslovitý řádek na listu 1 bez údajů razítka – ruční
+    // poznámku, která pravidlům nevyhoví, skript nepřenese (dokument přeneste jako JSON); nikdy řádek, který by při čtení selhal
+    if (key === "note" && v.trim() && (classifyNote(v) || v.split(/\r?\n/).some((l) => noteStyle(l)) || lineCount(v) > NOTE_MAX_LINES || at.pos > 1)) {
+      o.note(tr("poznámku u razítka listu „{0}“ („{1}“) skript nepřenese – textová cesta agenta přijme jen krátký heslovitý řádek na listu 1 bez údajů razítka (vlna 23); přeneste dokument jako JSON", s.name, v.length > 40 ? `${v.slice(0, 39)}…` : v));
+      continue;
+    }
     const q = o.q(v, true);
     if (!q) {
       o.note(tr("údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek", key, s.name));

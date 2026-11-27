@@ -161,7 +161,7 @@ export class DrawingTracker {
 
   /** ✓ listu po vyhodnocení (řádek posledního příkazu bloku): pohledy, řezy a Chytré kóty bez hlášení */
   private sheetOk(line: number, doc: string, sheet: string, lines: number[]): void {
-    const text = tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)", sheet);
+    const text = tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)", sheet);
     if (this.ctx.log) this.ctx.log.body.push({ line, text: `✓ ${text}` });
     this.ctx.report.add({ line, level: "ok", text, doc, data: { lines } });
   }

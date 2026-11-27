@@ -1,5 +1,6 @@
 /** `{ … }` (JSON dokument .mncad, `window.mncad.setDocument`): nová záložka, s `inPlace` nahradí dokument aktivní záložky. */
 import { internBlobs } from "../../blobs";
+import { stampAgentNotes } from "../../drawing-notes-rules";
 import { tr } from "../../i18n";
 import { flush, prepare, runOf, startDoc } from "../run-doc";
 import { acceptLine, loadsModel } from "../accept";
@@ -9,7 +10,9 @@ import { say, type OpHandler } from "./util";
 
 export const docOp: OpHandler<"doc"> = async (op, ctx) => {
   await flush(ctx);
-  const din = internBlobs(op.doc); // data importů z mapy `blobs` (.mncad této verze) do úložiště ještě před ověřovací stavbou
+  // data importů z mapy `blobs` (.mncad této verze) do úložiště ještě před ověřovací stavbou; poznámky listů z JSON skriptu
+  // agenta = poznámky agenta (vlna 23, R6 – pravidla poznámek nejdou obejít vloženým JSON dokumentem)
+  const din = stampAgentNotes(internBlobs(op.doc));
   const incoming = din.features;
   // inPlace = nahradit dokument aktivní záložky jedním krokem historie; jinak nová záložka, při opakovaném běhu záložka téhož
   // dokumentu (JSON / setDocument / otevřít) z dřívějšího běhu (engine/runs.ts)

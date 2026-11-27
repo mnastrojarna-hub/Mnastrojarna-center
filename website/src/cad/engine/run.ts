@@ -218,7 +218,9 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           if (isCancelled(e)) throw e;
           rb.code("build.failed", { line: op.line, doc: run.doc.name, args: [errMessage(e)] });
         });
-        if (op.k === "drawingCmd") draw.add(op.line);
+        // popis plochy / oblastní úprava v modelu (vlna 23) mění list výkresu a JSON dokument s listy je přináší – list se
+        // vyhodnotí jako po příkazu výkresu (pravidla poznámek, R7)
+        if (op.k === "drawingCmd" || (op.k === "doc" && !!runOf(ctx).doc.drawings?.length) || (op.k === "functional" && (op.cmd.kind === "note" || op.cmd.kind === "treatment" || (op.cmd.kind === "clear" && (op.cmd.what === "note" || op.cmd.what === "treatment"))) && !!runOf(ctx).doc.drawings?.length)) draw.add(op.line);
         hooks.opEnd?.(op.line, label, now() - t0);
         const fresh = rb.entries.slice(before);
         if (stopOn(fresh, op.line)) break;
