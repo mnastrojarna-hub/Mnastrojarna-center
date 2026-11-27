@@ -1,6 +1,7 @@
 /**
  * Stav 2D výkresu pro agenty a protokol: jednotky, rozsah, počty entit podle druhu, hladiny s počty, výběr.
  */
+import { draftNotesLine } from "./agent-notes";
 import { tr } from "../i18n";
 import { colorLabel } from "./colors";
 import { boxUnion, emptyBox, isEmptyBox, type Box } from "./geom";
@@ -73,6 +74,8 @@ export function draftStatusText(model: DraftModel, session?: DraftSession | null
     const st = [l.on ? tr("zapnutá") : tr("vypnutá"), l.frozen ? tr("zmrazená") : "", l.locked ? tr("zamčená") : "", l.plot ? "" : tr("netiskne")].filter(Boolean).join(", ");
     out.push(`  ${l.current ? "✓" : "·"} ${l.name} — ${tr("barva")} ${colorLabel(l.color)}, ${l.linetype}, ${lwLabel(l.lineweight)}, ${st}, ${tr("entit")} ${l.count}${l.desc ? ` — ${l.desc}` : ""}`);
   }
+  // pravidla textu výkresu (vlna 23): řádky volného textu a odkazy s popisem celého výkresu, nálezy agenta / souboru
+  out.push(draftNotesLine(model));
   if (s.selection.length) out.push(tr("Výběr: {0} ({1})", s.selection.length, s.selection.slice(0, 30).join(", ") + (s.selection.length > 30 ? " …" : "")));
   return out.join("\n");
 }

@@ -222,6 +222,13 @@ const WORDS = {
   supplyPart: ["druh", "supply", "beschaffung"],
   // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
   functionalMark: ["funkční", "functional", "funktional"],
+  // popisy ploch a oblastní úpravy v modelu (vlna 23 – agent-functional.ts)
+  pmiNote: ["poznámka", "note", "hinweis"],
+  pmiTreat: ["úprava", "treatment", "behandlung"],
+  pmiHeat: ["tepelná", "heat", "wärme"],
+  pmiSurface: ["povrchová", "surface", "oberfläche"],
+  pmiFrom: ["od", "from", "von"],
+  pmiTo: ["do", "to", "bis"],
   datumMark: ["základna", "datum", "bezug"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
@@ -1886,6 +1893,17 @@ function emitFunctional(c: Ctx, doc: CadDoc) {
     if (m.kind === "datum") {
       if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
       else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    if (m.kind === "note" || m.kind === "treatment") {
+      // popis plochy / oblastní úprava v modelu (vlna 23): `poznámka F7 "…"` · `úprava F7 tepelná "…" od a do b`
+      const tq = m.text ? scriptQuote(m.text, true) : null;
+      if (!m.face || !tq) {
+        c.note(tr("popis / úpravu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
+        continue;
+      }
+      const range = `${m.from !== undefined ? ` ${c.w("pmiFrom")} ${scriptNum(m.from)}` : ""}${m.to !== undefined ? ` ${c.w("pmiTo")} ${scriptNum(m.to)}` : ""}`;
+      c.line(m.kind === "note" ? `${c.w("pmiNote")} F${m.face.index + 1} ${tq}` : `${c.w("pmiTreat")} F${m.face.index + 1} ${c.w(m.what === "surface" ? "pmiSurface" : "pmiHeat")} ${tq}${range}`);
       continue;
     }
     const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;

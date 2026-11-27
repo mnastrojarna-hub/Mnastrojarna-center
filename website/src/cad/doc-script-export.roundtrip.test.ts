@@ -50,6 +50,10 @@ function sheetCanon(d: CadDoc, i = 0): Rec {
   const m = { ...(s.meta as Rec) };
   // prázdné pole razítka = pole bez hodnoty (vyprázdněné `zákazník=""` × nikdy nezadané)
   for (const k of Object.keys(m)) if (m[k] === "") delete m[k];
+  // razítko původu (vlna 23 – agent × člověk) není obsah listu; skript ho nenese, textová cesta ho dá znovu
+  delete m.by;
+  delete m.noteBy;
+  if (Array.isArray(m.revisions)) m.revisions = (m.revisions as Rec[]).map(({ by: _b, ...r }) => (void _b, r));
   const logo = m.logo as Rec | undefined;
   if (logo) m.logo = { w: logo.w, h: logo.h, name: logo.name, trace: logo.trace };
   return round({ name: s.name, options: o, meta: m }) as Rec;
@@ -111,7 +115,7 @@ díra 8 skrz v 100 60 20`;
     const { orig, rt, script } = await roundTrip(
       `${PART}
 výkres A3 pohledy přední,horní
-výkres razítko šablona=nástrojářská číslo="NS-100" kreslil="JN" kontroloval="KP" schválil="MV" zákazník="Zákazník A" projekt="P-1" firma="Firma s.r.o." polotovar="Plech 20" počet="4 ks" tepelné="kalit 58 HRC" povrch="černit" úhly="±0,5°" sražení="±0,2" hrany="ISO 13715 -0,3" poznámka="Odjehlit"
+výkres razítko šablona=nástrojářská číslo="NS-100" kreslil="JN" kontroloval="KP" schválil="MV" zákazník="Zákazník A" projekt="P-1" firma="Firma s.r.o." polotovar="Plech 20" počet="4 ks" tepelné="kalit 58 HRC" povrch="černit" úhly="±0,5°" sražení="±0,2" hrany="ISO 13715 -0,3" poznámka="Viz model"
 výkres nepředepsané desetinná ±0,2 ±0,1 ±0,02 ±0,01
 výkres revize A "první vydání" datum 1.11.2026 kreslil "JN"
 výkres revize B "díra 8" datum 5.11.2026
@@ -348,7 +352,7 @@ výkres A2 měřítko 1:1 pohledy přední`,
   }, 600_000);
 
   it("kontrola 10: popisové údaje dokumentu (číslo, kreslil, revize) i s tabulkou revizí", async () => {
-    const { orig, rt, script } = await roundTrip(`${PART}\nvýkres A3 pohledy přední\nvýkres razítko číslo="MN-1" kreslil="AI" revize="C"\nvýkres revize A "první" datum 1.10.2026\nvýkres revize C "třetí" datum 19.11.2026`, "Deska");
+    const { orig, rt, script } = await roundTrip(`${PART}\nvýkres A3 pohledy přední\nvýkres razítko číslo="MN-1" kreslil="AI" revize="C"\nvýkres revize A "doplněna díra 8" datum 1.10.2026\nvýkres revize C "Ø8 → Ø10" datum 19.11.2026`, "Deska");
     expect(orig.props).toEqual({ number: "MN-1", author: "AI", revision: "C" });
     expect(rt.props).toEqual(orig.props);
     expect(script.text).toMatch(/^výkres razítko číslo="MN-1" kreslil="AI" revize="C"$/m);

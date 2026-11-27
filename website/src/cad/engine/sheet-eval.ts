@@ -20,7 +20,7 @@ import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { DIM_DETACHED_KEY, DIMS_INCOMPLETE_KEY, SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
 import { tr } from "../i18n";
 import type { CadDoc, DrawingAnnotation } from "../types";
-import { codeText, type Code, type CodeLevel } from "./codes";
+import { codeDef, codeText, type Code, type CodeLevel } from "./codes";
 import type { KernelApi } from "./kernel";
 
 type MemoEntry = { key: string; res: Awaited<ReturnType<DrawingCompute>> };
@@ -66,7 +66,9 @@ export const sheetLabel = (doc: CadDoc, idx: number) => doc.drawings?.[idx]?.nam
 /** hlášení výkresu (cad/drawing-issues.ts) jako nález listu `sheet` */
 export function sheetIssue(i: DrawingIssue, sheet: string): SheetIssue {
   const code = issueCode(i);
-  return { code, sheet, text: i.text, ...(code === "drawing.section-miss" || i.level === "error" ? { level: "error" as const } : {}), ...(i.data ? { data: i.data } : {}) };
+  // kód s výchozí úrovní ✗ (chyba příkazu agenta – vlna 23) jako nález listu: úroveň hlášení (⚠ / ℹ)
+  const own = i.level !== "error" && codeDef(code)?.level === "error" ? { level: i.level } : {};
+  return { code, sheet, text: i.text, ...(code === "drawing.section-miss" || i.level === "error" ? { level: "error" as const } : own), ...(i.data ? { data: i.data } : {}) };
 }
 
 /**
@@ -106,6 +108,10 @@ export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCo
   // překryvy celého listu (vlna 22, bod 17): balónky, odkazy, texty, kóty, geometrie, tabulky, rám → ⚠ drawing.overlap s počtem a radou
   const ov = await sheetOverlapIssue(doc, s, res, o, o2.knownTexts);
   if (ov) out.push(sheetIssue(ov, name));
+  // pravidla poznámek výkresu (vlna 23, R1/R4/R5/R7): ⚠ za text agenta, ℹ za ruční text – žádné „✓ bez nálezů“ nad
+  // výkresem s 10 poznámkami, s tvrdostí v poznámce nebo s listem jen s poznámkami
+  const { notesSheetIssues } = await import("../drawing-agent");
+  for (const i of notesSheetIssues(doc, idx, res)) out.push(sheetIssue(i, name));
   return out;
 }
 

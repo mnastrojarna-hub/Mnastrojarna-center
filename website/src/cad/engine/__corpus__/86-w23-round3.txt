@@ -1,0 +1,49 @@
+# vlna 23, 3. kolo (nálezy oponentů, rozhodnutí D1–D7): dílenské zápisy údajů razítka („Tol. ±0,1“, „Ra=1,6“, „Brunýrovat“,
+# „CHT 0,8 mm“) → razítko; slovo úpravy v kótě / drsnosti / revizi / buňce / názvu listu ✗; revize = popis změny; drsnost
+# s hodnotou; kóta bez hodnoty ✗; rozpor v razítku ⚠; materiál jiný než model ✗; list „Technické požadavky“ ✗; popis plochy
+# ve stavu dílu; 2D: krátká slova, kóta, blok × vložení
+nový díl "Deska"
+kvádr 100 60 12
+díra 9 skrz v 50 30
+materiál 1.2379
+výkres A3 měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres nepředepsané ISO 2768-mK
+výkres razítko číslo="MN-1" kreslil="AI"
+výkres značka text "Ra=1,6" v 30 120
+výkres značka text "Brunýrovat" v 30 115
+výkres značka text "CHT 0,8 mm" v 30 110
+výkres značka text "Nátěr šedý" v 30 105
+výkres značka text "Mat. 11 523" v 30 100
+výkres upravit a4 text="Odmastit"
+výkres upravit a5 přípona=" černit"
+výkres značka drsnost "Nitridovat" na Ø9
+výkres značka drsnost "Ra 0,4 lapovat" na 100
+výkres revize A "Konzervovat olejem"
+výkres revize A "Ø9 → Ø10"
+výkres razítko projekt="Hrany otupit" zákazník="Zabalit do VCI"
+výkres list nový "Technické požadavky"
+výkres značka text "Po obrobení díl očistit," v 30 90
+poznámka F2 "Brousit"
+výkres stav
+stav
+#--- run
+2d nový Deska2D
+#--- run
+2d obdélník 0,0 100,60
+#--- run
+2d text 10,150 3.5 0 "HRC60"
+#--- run
+2d text 10,145 3.5 0 "A-A"
+#--- run
+2d kóta-lineární 0,0 100,0 text "Kalit" 50,-15
+#--- run
+2d mtext 10,200 @120,-30 "Odmastit\PKonzervovat\PZabalit"
+#--- run
+2d blok POZN 10,200 e3
+#--- run
+2d vložit POZN 10,150
+#--- run
+2d vložit POZN 10,100
+#--- run
+2d stav

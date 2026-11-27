@@ -29,7 +29,7 @@ Schraube erst nach der Dynamik in die Bohrung (ein freies Teil fiele unter Schwe
 
 ## Zeichnung (Registerkarte des Teils)
 `registerkarte "Platte"` · `zeichnung A3 maßstab 1:1 ansichten vorne,oben,iso` · `zeichnung schnitt XZ versatz -30` (Ebene Y = 30; ohne Versatz liegt sie auf der Fläche) · `bemaßen intelligent funktional 100` · `zeichnung toleranz 100 ±0,05` · `zeichnung toleranz Ø21 H7`
-`zeichnung schriftfeld vorlage=iso7200` · `zeichnung allgemein ISO 2768-mK` · `zeichnung blatt neu "Detail"` · `bemaßen keine` · `zeichnung einzelheit vorne bei 25 8 radius 6` · `zeichnung status alle` · `zeichnung export pdf alle`. Sonst (Baugruppenzeichnung): `zeichnung stückliste ja`
+`zeichnung schriftfeld vorlage=iso7200` · `zeichnung allgemein ISO 2768-mK` · `zeichnung schriftfeld härte="58 HRC" rauheit="Ra 3,2"` (Angaben ins Schriftfeld, darüber ≤ 5 kurze Zeilen, alle Kanäle) · `zeichnung blatt neu "Detail"` · `bemaßen keine` · `zeichnung einzelheit vorne bei 25 8 radius 6` · `zeichnung status alle` · `zeichnung export pdf alle`. Sonst (Baugruppenzeichnung): `zeichnung stückliste ja`
 
 ## Ausgaben und Links
 `speichern` · `exportieren step` · `export skript` · `freigeben` · `link` (Adresse erneut) · CLI `--formats step,pdf,dxf` und `--share`. Sonst (Speicher): `freigeben tage 30` · `exportieren step link`

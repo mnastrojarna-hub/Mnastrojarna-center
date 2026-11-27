@@ -548,9 +548,10 @@ export default {
   },
   "drawing-ws/ann-note": {
     what: "Poznámka s odkazovou čarou: šipka ukazuje na prvek, text stojí vedle.",
-    when: "Pokyn pro dílnu u prvku: srazit hrany, kalit, závit, svar.",
+    when: "Krátký pokyn u plochy nebo hrany (Brousit, Lapovat). Tepelné zpracování, tvrdost, povrch a hrany dílu do razítka.",
     steps: ["Klikněte, kam má šipka ukazovat.", "Klikněte umístění textu.", "Napište Text poznámky a potvrďte OK."],
-    cmd: 'výkres značka poznámka "Kalit" pohled přední v 0 20',
+    cmd: 'poznámka F7 "Lapovat"',
+    note: "Agent textem: popis plochy do modelu (výkres ho převezme se šipkou); odkaz na kótu = ✗. Ručně bez omezení.",
   },
   "drawing-ws/ann-roughness": {
     what: "Vloží značku drsnosti povrchu podle ISO 1302 (Ra, Rz).",
@@ -573,9 +574,9 @@ export default {
   },
   "drawing-ws/ann-text": {
     what: "Vloží volný text na list, bez odkazové čáry.",
-    when: "Technické požadavky, tepelné zpracování, obecné poznámky na volné místo listu.",
+    when: "Krátká poznámka nad razítkem (heslovitě, nejvýš 5 řádků). Tepelné zpracování, tvrdost, povrch a hrany do razítka.",
     steps: ["Klikněte na místo textu na listu.", "Napište Text, upravte Výška písma [mm] (výchozí 3,5) a potvrďte OK."],
-    cmd: 'výkres značka text "Kalit 58 HRC" v 20 30',
+    cmd: 'výkres značka text "Odmastit" v 20 30',
     note: "Text patří k listu, ne k pohledu – při posunu pohledu zůstane na místě.",
   },
   "drawing-ws/ann-detail": {

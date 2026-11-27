@@ -192,6 +192,27 @@ export const CODES = [
   // ruční kóta po změně modelu neleží na geometrii / přichytila se ke změněné geometrii (vlna 22, bod 20 – cad/drawing-dim-attach.ts)
   { code: "drawing.dim-detached", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
+  // pravidla poznámek výkresu pro agenty (vlna 23, R1–R7 – cad/drawing-notes-rules.ts): příkaz agenta, který by je porušil,
+  // skončí ✗ s radou; vyhodnocení listu je hlásí ✗ za text agenta (i z JSON / otevřeného dokumentu) a ℹ (rada) za ruční
+  // text z GUI (úroveň u záznamu); export listu s porušením agenta se odmítne
+  { code: "drawing.notes-limit", level: "error", key: "list {0}: poznámky nad razítkem – {1}" },
+  { code: "drawing.note-style", level: "error", key: "list {0}: text není strojařsky heslovitý – {1}" },
+  { code: "drawing.note-title-data", level: "error", key: "list {0}: údaj razítka mimo svou buňku razítka – {1}" },
+  { code: "drawing.notes-sheet", level: "error", key: "list {0}: poznámky mimo hlavní list – {1}" },
+  { code: "drawing.leaders-limit", level: "error", key: "list {0}: místních popisů je moc – {1}" },
+  { code: "drawing.note-not-model", level: "warn", key: "list {0}: popis jen na výkrese, ne v modelu – {1}" },
+  { code: "drawing.note-free-leader", level: "error", key: "list {0}: poznámka bez cíle v geometrii – {1}" },
+  { code: "drawing.note-to-title", level: "note", key: "list {0}: přesunuto do razítka – {1}" },
+  // D3: přesun do buňky razítka, která už nese jinou hodnotu – první zůstane, obě v hlášce
+  { code: "drawing.title-conflict", level: "warn", key: "list {0}: rozpor v razítku – {1}" },
+  // D1: text ze souboru otevřeného z disku (nezměněný tímto během) porušuje pravidla pro agenty – ne ✗, export povolen, ale ne ✓
+  { code: "drawing.notes-loaded", level: "warn", key: "list {0}: načtený výkres – {1}" },
+  { code: "drawing.sheet-empty", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.sheet-duplicate", level: "warn", key: "list {0}: {1}" },
+  // popis plochy / oblastní úprava z modelu (vlna 23, R2 / R3): plocha se změnila, nebo ji žádný pohled neukazuje
+  { code: "drawing.pmi-lost", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.pmi-unplaced", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.pmi-range", level: "warn", key: "list {0}: {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },

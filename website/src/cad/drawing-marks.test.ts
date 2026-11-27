@@ -36,12 +36,14 @@ beforeEach(() => activeSheet.set(null, false));
 
 describe("listy: nový, přepnout, přejmenovat, smazat – příkazy pracují s aktivním listem", () => {
   it("příkazy nad 2. listem nemění 1. list; výkres list 1 vrátí práci na 1. list", async () => {
-    const { doc, log } = await run(plateDoc(), 'výkres A3\nvýkres list nový "Detail"\nvýkres A4 na výšku\nvýkres poznámka "jen list 2"');
+    const { doc, log } = await run(plateDoc(), 'výkres A3\nvýkres list nový "Detail"\nvýkres A4 na výšku\nvýkres hrany srazit 0,3');
     expect(doc.drawings!.map((s) => s.name)).toEqual(["List 1", "Detail"]);
     expect(opts(doc, 0).sheet).toBe("A3");
     expect(opts(doc, 1)).toMatchObject({ sheet: "A4", orientation: "portrait" });
-    expect(meta(doc, 1).note).toBe("jen list 2");
-    expect(meta(doc, 0).note).toBeUndefined();
+    expect(meta(doc, 1).edges).toBe("srazit 0,3");
+    expect(meta(doc, 0).edges).toBeUndefined();
+    // vlna 23 (R5): poznámka agenta na listu 2 = ✗ drawing.notes-sheet (volný text jen na listu 1)
+    await expect(run(doc, 'výkres poznámka "jen list 2"')).rejects.toThrow(/poznámky mimo hlavní list/);
     expect(activeSheetIndex(doc)).toBe(1);
     expect(log).toMatch(/✓ nový list 2 „Detail“ \(Chytré kóty\) – další příkazy výkresu pracují s ním/);
     expect(log).toMatch(/✓ výkres: A4, na výšku · list 2 „Detail“/);
@@ -84,12 +86,13 @@ describe("razítko a revize", () => {
   it("revize: přidat, upravit, smazat; revize v razítku = poslední", async () => {
     let { doc } = await run(plateDoc(), 'výkres razítko kreslil="Novák"\nvýkres revize A "první vydání" datum 1.1.2026\nvýkres revize B "díra Ø8"');
     expect(meta(doc).revisions).toEqual([
-      { rev: "A", date: "1.1.2026", note: "první vydání", author: "Novák" },
-      expect.objectContaining({ rev: "B", note: "díra Ø8", author: "Novák" }),
+      // textová cesta = agent: řádek revize nese razítko původu (vlna 23, R6)
+      { rev: "A", date: "1.1.2026", note: "první vydání", author: "Novák", by: "agent" },
+      expect.objectContaining({ rev: "B", note: "díra Ø8", author: "Novák", by: "agent" }),
     ]);
     expect(meta(doc).revision).toBe("B");
     ({ doc } = await run(doc, 'výkres revize A "opraveno" kreslil AI\nvýkres revize smazat B'));
-    expect(meta(doc).revisions).toEqual([{ rev: "A", date: "1.1.2026", note: "opraveno", author: "AI" }]);
+    expect(meta(doc).revisions).toEqual([{ rev: "A", date: "1.1.2026", note: "opraveno", author: "AI", by: "agent" }]);
     expect(meta(doc).revision).toBe("A");
     await expect(run(doc, "výkres revize smazat X")).rejects.toThrow(/revize X v tabulce není – revize: A/);
   });
@@ -130,12 +133,14 @@ describe("značky: na kótu i do bodu pohledu (přichycení), text na listu", ()
     expect(g.texts.map((t) => t.s)).toEqual(expect.arrayContaining(["Ra 1,6", "0,02", "A"]));
   });
   it("bod pohledu: přichytí se k hraně; mimo pohled = chyba s rozsahem; detail; text v mm listu (y nahoru)", async () => {
-    const { doc, log } = await run(plateDoc(), 'výkres značka drsnost Ra 0,8 pohled přední v 10 19,4\nvýkres značka základna pohled horní v -50,6 0\nvýkres značka text "Kalit" v 20 30 výška 5\nvýkres značka poznámka "pozn." pohled přední v 0 10 posun 20 10');
+    const { doc, log } = await run(plateDoc(), 'výkres značka drsnost Ra 0,8 pohled přední v 10 19,4\nvýkres značka základna pohled horní v -50,6 0\nvýkres značka text "Odmastit" v 20 30 výška 5\nvýkres značka poznámka "pozn." pohled přední v 0 19,4 posun 20 10');
     const [ra, datum, text, note] = anns(doc).filter((a) => !a.auto);
     expect(ra).toMatchObject({ view: "front", type: "roughness", at: [10, -20] });
     expect(datum).toMatchObject({ view: "top", type: "datum", label: "A", at: [-50, 0] });
-    expect(text).toMatchObject({ view: "sheet", type: "text", text: "Kalit", size: 5, at: [20, 267] });
-    expect(note).toMatchObject({ view: "front", type: "note", text: "pozn.", leader: [0, -10], at: [20, -20] });
+    expect(text).toMatchObject({ view: "sheet", type: "text", text: "Odmastit", size: 5, at: [20, 267], by: "agent" });
+    expect(note).toMatchObject({ view: "front", type: "note", text: "pozn.", leader: [0, -20], at: [20, -30], by: "agent" });
+    // vlna 23 (R2): odkaz agenta do volného bodu pohledu (ne na hranu / bod / kružnici) = ✗ drawing.note-free-leader
+    await expect(run(doc, 'výkres značka poznámka "pozn." pohled přední v 0 10')).rejects.toThrow(/poznámka bez cíle v geometrii/);
     expect(log).toMatch(/drsnost Ra 0,8 → přední \[10; 19,4\] – hrana/);
     expect(log).toMatch(/základna A → horní \[−50,6; 0\] – hrana/);
     await expect(run(doc, "výkres značka drsnost Ra 1 pohled přední v 0 90")).rejects.toThrow(/bod \[0; 90\] je mimo pohled přední \(x −50…50, y 0…20 mm\)/);
@@ -156,7 +161,7 @@ describe("značky: na kótu i do bodu pohledu (přichycení), text na listu", ()
 
 describe("ruční kóty, úpravy a mazání", () => {
   it("vodorovně po hraně (asociativní), svisle, průměr, úhel – hodnoty a strana mimo pohled", async () => {
-    const { doc, log } = await run(plateDoc(), "kótovat nic\nvýkres kóta vodorovně pohled přední -50 20 50 20 odsazení 8\nvýkres kóta svisle pohled přední 50 0 50 20\nvýkres kóta průměr pohled horní střed 0 0\nvýkres kóta úhel pohled přední -50 20 50 20 50 20 50 0\nvýkres kóta šikmo pohled horní -50 -30 50 30 text \"úhlopříčka\"");
+    const { doc, log } = await run(plateDoc(), "kótovat nic\nvýkres kóta vodorovně pohled přední -50 20 50 20 odsazení 8\nvýkres kóta svisle pohled přední 50 0 50 20\nvýkres kóta průměr pohled horní střed 0 0\nvýkres kóta úhel pohled přední -50 20 50 20 50 20 50 0\nvýkres kóta šikmo pohled horní -50 -30 50 30 text \"116,62 úhl.\"");
     const v = await views(doc);
     const [h, vv, dia, ang, al] = anns(doc);
     expect(h).toMatchObject({ type: "dim", kind: "horizontal", view: "front", a: [-50, -20], b: [50, -20], edge: true, offset: -8 });
@@ -166,7 +171,9 @@ describe("ruční kóty, úpravy a mazání", () => {
     expect(dia).toMatchObject({ kind: "diameter", view: "top", c: [0, 0], r: 20, ang: -45, offset: 8 });
     expect(annLabel(v, dia)).toBe("Ø40");
     expect(annLabel(v, ang)).toBe("90°");
-    expect(annLabel(v, al)).toBe("úhlopříčka");
+    // vlna 23, kolo 3 (D2): text kóty nese hodnotu (116,62 = úhlopříčka 100 × 60); slova místo hodnoty = ✗ (dřív „úhlopříčka“)
+    expect(annLabel(v, al)).toBe("116,62 úhl.");
+    await expect(run(doc, 'výkres kóta šikmo pohled horní -50 -30 50 30 text "úhlopříčka"')).rejects.toThrow(/nahrazuje měřenou hodnotu/);
     expect(log).toMatch(/✓ kóta 100 \(přední, vodorovně, hrana\) · a1/);
     expect(log).toMatch(/✓ kóta Ø40 \(horní, průměr\) · a3/);
     await expect(run(doc, "výkres kóta průměr pohled horní střed 10 10")).rejects.toThrow(/v pohledu horní není kružnice se středem \[10; 10\] – kružnice: střed \[0; 0\] R20/);
@@ -191,7 +198,7 @@ describe("ruční kóty, úpravy a mazání", () => {
     // smazaná vygenerovaná kóta se při dalším příkazu (sloučení Chytrých kót) nevrátí
     const d2 = await run(d1.doc, "výkres stav");
     expect(anns(d2.doc).some((a) => a.auto === "ov:z")).toBe(false);
-    const d3 = await run(d1.doc, 'výkres značka poznámka "x" na 100\nvýkres smazat vlastní');
+    const d3 = await run(d1.doc, 'výkres značka drsnost Ra 3,2 na 100\nvýkres smazat vlastní');
     expect(anns(d3.doc).every((a) => a.auto)).toBe(true);
     const d4 = await run(d3.doc, "výkres smazat vše");
     expect(anns(d4.doc)).toEqual([]);

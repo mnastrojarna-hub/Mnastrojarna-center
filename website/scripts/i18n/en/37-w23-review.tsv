@@ -1,0 +1,55 @@
+# vlna 23, 2. kolo – nálezy oponenta (kanály textu, druhý výkres, JSON = agent, 2D, místní popisy)
+ (a dalších {0} nálezů – výkres stav)	 (and {0} more findings – drawing status)
+ (a dalších {0})	 (and {0} more)
+ ⚠ rozsah {0}–{1} přesahuje plochu {2} mm	 ⚠ range {0}–{1} exceeds the face {2} mm
+„{0}“ → {1}: místní popis míří šipkou na plochu nebo hranu, ne na kótu – popis plochy zapište do modelu (poznámka F7 "{0}"; výkres ho převezme se šipkou), údaj ke kótě patří do kóty (výkres upravit <kóta> přípona=…)	“{0}” → {1}: a local note points with its arrow at a face or edge, not at a dimension – write the face note into the model (note F7 "{0}"; the drawing takes it over with an arrow), data for a dimension belongs in the dimension (drawing edit <dimension> suffix=…)
+„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 "{0}"; výkres ho převezme se šipkou), nebo cílem zvolte hranu (pohled přední v x y na hraně)	“{0}” → {1}: the leader must point at a face or edge – write the note into the model at the face (note F7 "{0}"; the drawing takes it over with an arrow), or choose an edge as the target (view front at x y on the edge)
+„{0}“ není heslovitý: {1} – zkraťte (strojařsky, bez vět)	“{0}” is not in keyword style: {1} – shorten it (engineering style, no sentences)
+„{0}“ obsahuje údaj razítka ({1}) – {2}	“{0}” contains title block data ({1}) – {2}
+(a dalších {0}: {1})	(and {0} more: {1})
+{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)	{0} – the document would have {1} local notes (leaders with an arrow), at most {2}; merge notes of the same finish, put a treatment of the whole part into the title block, cancel the rest (note clear F…)
+{0} – dokument by měl {1} řádků volného textu, nejvýš {2} (všechny výkresy a listy dohromady): {3}; {4}	{0} – the document would have {1} lines of free text, at most {2} (all drawings and sheets together): {3}; {4}
+{0} – volný text patří jen na hlavní list „{1}“ (pohledy s kótami) nad razítko, nejvýš {2} řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii	{0} – free text belongs only on the main sheet “{1}” (views with dimensions) above the title block, at most {2} lines in the whole document; other sheets and drawings carry only views, sections, details, dimensions and leaders to geometry
+{0} – výkres by měl {1} řádků volného textu nad razítkem (vysvětlivky úprav se počítají), nejvýš {2}: {3}; {4}	{0} – the drawing would have {1} lines of free text above the title block (treatment legends count), at most {2}: {3}; {4}
+{0} „{1}“ je na listu „{2}“ – volný text patří jen na hlavní list „{3}“ (pohledy s kótami) nad razítko; žádný list ani výkres jen s poznámkami	{0} “{1}” is on sheet “{2}” – free text belongs only on the main sheet “{3}” (views with dimensions) above the title block; no sheet or drawing with notes only
+{0} „{1}“: výška písma {2} mm – nejvýš {3} mm (vysoké písmo limit řádků neobejde)	{0} “{1}”: text height {2} mm – at most {3} mm (tall text does not get around the line limit)
+{0} {1} „{2}“ obsahuje údaj razítka ({3}) – patří do razítka: {4}	{0} {1} “{2}” contains title block data ({3}) – it belongs in the title block: {4}
+{0} {1} „{2}“: {3} – u značky jen krátký technický údaj, ne poznámka	{0} {1} “{2}”: {3} – a mark carries only a short technical value, not a note
+{0} řádků volného textu nad razítkem (nejvýš {1} v celém dokumentu – všechny výkresy a listy): {2} – {3}	{0} lines of free text above the title block (at most {1} in the whole document – all drawings and sheets): {2} – {3}
+2D výkres by měl {0} odkazů s popisem (nejvýš {1}) – slučte popisy stejné úpravy, údaje celého dílu dejte do razítka	the 2D drawing would have {0} leaders with text (at most {1}) – merge notes of the same finish, put data of the whole part into the title block
+2D výkres by měl {0} řádků volného textu (nejvýš {1}): {2} – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte	the 2D drawing would have {0} lines of free text (at most {1}): {2} – data of the whole part into the title block (technical row), a face note briefly with a leader, delete the rest
+a{0} „{1}“ je popis jen na výkrese – místní popis patří k ploše do modelu (poznámka F7 "{1}"), výkres ho převezme se šipkou (jeden zdroj); tento odkaz pak smažte (výkres smazat a{0})	a{0} “{1}” is a note only on the drawing – a local note belongs at the face in the model (note F7 "{1}"), the drawing takes it over with an arrow (one source); then delete this leader (drawing delete a{0})
+a{0} „{1}“ u odkazu není heslovitý: {2} – popis u plochy krátce (např. „Brousit“)	a{0} “{1}” at the leader is not in keyword style: {2} – a face note briefly (e.g. “Grind”)
+a{0} „{1}“: {2} u odkazu – údaje celého dílu do razítka ({3}), úprava jen plochy do modelu (úprava F7 tepelná "58+2 HRC")	a{0} “{1}”: {2} at a leader – data of the whole part into the title block ({3}), a treatment of one face only into the model (treatment F7 heat "58+2 HRC")
+atribut razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – {3}	title block attribute {0} “{1}” contains data of another field ({2}) – {3}
+atribut razítka {0} „{1}“: {2} – hodnota buňky heslovitě	title block attribute {0} “{1}”: {2} – a cell value in keywords
+buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}	title block cell {0} “{1}” contains data of another field ({2}) – write it into its own cell: {3}
+buňka razítka {0} „{1}“: {2} – hodnota buňky heslovitě (např. tepelné="kalit a popustit", tvrdost="58-60 HRC")	title block cell {0} “{1}”: {2} – a cell value in keywords (e.g. heat="harden and temper", hardness="58-60 HRC")
+do razítka rozvržení: 2d upravit-atributy <razítko> {0} (nebo 2d rozvržení nové … {0})	into the layout title block: 2d attedit <title block> {0} (or 2d layout new … {0})
+export odmítnut – {0}{1}	export refused – {0}{1}
+list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše	sheet “{0}” repeats the views of sheet “{1}” and adds nothing but text – a drawing is not split into “drawing sheet + notes sheet”; delete it and put the data into the title block / at the face
+materiál „{0}“ obsahuje údaj jiného pole ({1}) – zapište ho do jeho buňky: {2}	material “{0}” contains data of another field ({1}) – write it into its own cell: {2}
+materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379“, „C45“)	material “{0}”: {1} – material designation in keywords (e.g. “1.2379”, “C45”)
+model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	model {0} “{1}” contains {2} – a treatment of this face only = treatment {0} heat|surface "…", a treatment of the whole part into the title block ({3})
+model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	model {0} “{1}”: {2} – a face note / specification briefly in keywords (at most {3} characters)
+model F{0}	model F{0}
+oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	local treatment {0} “{1}” (F{2}): range {3}–{4} mm exceeds the face of length {5} mm – clipped on the sheet; correct the range in the model (treatment F{2} … from a to b)
+odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	leader “{0}” is not in keyword style: {1} – a face note briefly (e.g. “Grind”)
+odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	leader “{0}” contains data of the whole part ({1}) – {2}
+popis	callout
+Poznámky nad razítkem: {0}/{1} řádků · odkazy s popisem {2}/{3}	Notes above the title block: {0}/{1} lines · leaders with text {2}/{3}
+Poznámky nad razítkem: {0}/{1} řádků{2} · místní popisy {3}/{4}	Notes above the title block: {0}/{1} lines{2} · local notes {3}/{4}
+pravidla výkresu pro agenty – {0}	drawing rules for agents – {0}
+předpona kóty	dimension prefix
+přípona kóty	dimension suffix
+revize {0} „{1}“ nese údaj razítka ({2}), který v razítku není – zapište ho do razítka: {3}	revision {0} “{1}” carries title block data ({2}) that is not in the title block – write it into the title block: {3}
+revize {0} „{1}“: {2} – popis změny krátce (např. „Ø20 → Ø22“, „doplněna díra Ø9“)	revision {0} “{1}”: {2} – describe the change briefly (e.g. “Ø20 → Ø22”, “hole Ø9 added”)
+text kóty	dimension text
+tolerance popisu	callout tolerance
+úpravy se stejným předpisem slučte do jedné vysvětlivky (stejný text = jeden řádek „Z1, Z2 …“), úpravu celého dílu dejte do razítka (výkres razítko tepelné=… tvrdost=…)	merge treatments with the same specification into one legend line (same text = one line “Z1, Z2 …”), put a treatment of the whole part into the title block (drawing titleblock heat=… hardness=…)
+výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, razítko) · ruční text: {1} rad ℹ (pravidla pro agenty, člověka neomezují)	drawing: sheet “{0}” evaluated without findings (views, sections, Smart dimensions, title block) · manual text: {1} hints ℹ (rules for agents, they do not restrict a person)
+základna tolerance	tolerance datum
+listu	of the sheet
+výkresu	of the drawing
+název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	name {0} “{1}” contains title block data ({2}) – it belongs in the title block: {3}
+název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)	name {0} “{1}”: {2} – keep a sheet / drawing name short (e.g. “Detail”, “Sections”)

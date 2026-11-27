@@ -658,10 +658,8 @@ Zobrazit řez se šrafováním	Show section with hatching
 Zpět do 3D (Esc)	Back to 3D (Esc)
 Základna	Datum
 detailní pohled: střed, poloměr, umístění	detail view: centre, radius, placement
-např. Kalit 58 ± 2 HRC	e.g. Harden 58 ± 2 HRC
 např. MN-2026-001	e.g. MN-2026-001
 např. Nekótované rozměry dle 3D modelu (STEP)	e.g. Undimensioned sizes per 3D model (STEP)
-např. Ostré hrany srazit 0,5×45°	e.g. Break sharp edges 0.5×45°
 např. srazit 0,5×45°	e.g. chamfer 0.5×45°
 odkazová čára + text	leader line + text
 označení do razítka, např. ČSN 11 423	designation for the title block, e.g. ČSN 11 423

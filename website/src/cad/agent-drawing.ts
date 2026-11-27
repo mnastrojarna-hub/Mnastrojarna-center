@@ -888,7 +888,7 @@ function parseMark(rt0: RawTok[]): DrawingCmd {
   let mark: MarkSpec;
   switch (type) {
     case "note":
-      if (!words.join("").trim()) throw new Error(tr("poznámka potřebuje text: výkres značka poznámka \"Kalit 58 HRC\" na Ø40"));
+      if (!words.join("").trim()) throw new Error(tr("poznámka potřebuje krátký text: výkres značka poznámka \"Lapovat\" na Ø40 (popis plochy patří do modelu: poznámka F7 \"…\")"));
       mark = { type, text: words.join(" ") };
       break;
     case "roughness": {
@@ -915,7 +915,7 @@ function parseMark(rt0: RawTok[]): DrawingCmd {
       break;
     }
     case "text":
-      if (!words.join("").trim()) throw new Error(tr("text: výkres značka text \"Kalit 58 HRC\" v 20 30 [výška 5] (mm listu od levého dolního rohu)"));
+      if (!words.join("").trim()) throw new Error(tr("text: výkres značka text \"Odmastit\" v 20 30 [výška 5] (mm listu od levého dolního rohu; nejvýš 5 krátkých řádků nad razítkem, údaje do razítka)"));
       if (!("sheet" in target)) throw new Error(tr("text se umisťuje na list: výkres značka text \"…\" v x y (mm listu od levého dolního rohu)"));
       mark = { type, text: words.join(" "), size: size && size > 0 ? size : 3.5 };
       break;

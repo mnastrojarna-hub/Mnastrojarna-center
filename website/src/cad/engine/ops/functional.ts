@@ -4,7 +4,11 @@
  * (rovina: normála + bod; válec: osa, bod, poloměr); válcová plocha díry / odebraného válce se uloží jako ten prvek.
  * Kontrola kót (cad/dim-complete.ts) pak u funkčního prvku chce velikost, polohu (od základny) a toleranci.
  */
-import { functionalUsage, type FunctionalCmd } from "../../agent-functional";
+import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-functional";
+import { classifyNote, leaderCount, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
+import { treatmentWord } from "../../pmi-marks";
+import { CodedError } from "../codes";
+import { acceptLine, sheetTail } from "../accept";
 import { runMeasure } from "../../agent-measure-run";
 import { markLabel } from "../../dim-complete";
 import { tr } from "../../i18n";
@@ -34,9 +38,41 @@ export function functionalListText(d: CadDoc): string {
   if (!ms.length) return tr("funkční prvky ani základny nejsou vyznačené – funkční F7 [H7] · funkční \"Díra 1\" · základna A F3 (kontrola kót pak ověří velikost, polohu a toleranci)");
   return [
     tr("Funkční prvky a základny ({0}):", ms.length),
-    ...ms.map((m) => `  ${m.id} ${m.kind === "datum" ? "" : tr("funkční ")}${markLabel(d, m)}${m.tol ? tr(" · tolerance {0}", m.tol) : ""}${m.geom ? ` · ${geomText(m)}` : ""}`),
+    ...ms.map((m) =>
+      m.kind === "note" || m.kind === "treatment"
+        ? `  ${m.id} ${pmiText(m)}${m.geom ? ` · ${geomText(m)}` : ""}`
+        : `  ${m.id} ${m.kind === "datum" ? "" : tr("funkční ")}${markLabel(d, m)}${m.tol ? tr(" · tolerance {0}", m.tol) : ""}${m.geom ? ` · ${geomText(m)}` : ""}`,
+    ),
     tr("  (geometrie plochy je z doby označení – po změně modelu plochu označte znovu)"),
   ].join("\n");
+}
+
+/** popis / úprava modelu do výpisu: „popis F7 „Brousit““, „úprava tepelná F2 „58+2 HRC“ od 0 do 25“ */
+function pmiText(m: FunctionalMark): string {
+  const f = `F${(m.face?.index ?? 0) + 1}`;
+  if (m.kind === "note") return tr("popis {0} „{1}“", f, m.text ?? "");
+  const range = m.from !== undefined || m.to !== undefined ? tr(" od {0} do {1}", fmt(m.from ?? 0), m.to !== undefined ? fmt(m.to) : tr("konce")) : tr(" (celá plocha)");
+  return tr("úprava {0} {1} „{2}“{3}", treatmentWord(m.what), f, m.text ?? "", range);
+}
+
+/** text popisu / předpisu úpravy z textové cesty (agent): krátký, heslovitý, žádný údaj razítka (R1 / R2 / R4) */
+function checkPmiText(kind: "note" | "treatment", text: string): void {
+  const why = noteStyle(text, LEADER_MAX_CHARS);
+  if (why) throw new CodedError("drawing.note-style", [tr("model"), tr("„{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“", text, why, LEADER_MAX_CHARS)]);
+  if (kind === "treatment") return;
+  const cls = classifyNote(text);
+  const bad = cls?.parts.filter((p) => p.key !== "edges" && p.key !== "roughness") ?? [];
+  if (bad.length) {
+    const heat = bad.some((p) => p.key === "heatTreatment" || p.key === "hardness" || p.key === "surfaceTreatment");
+    throw new CodedError("drawing.note-title-data", [tr("model"), tr("„{0}“ obsahuje {1} – {2}", text, bad.map((p) => titleDataLabel(p.key)).join(", "), heat ? tr("úprava jen této plochy = oblastní úprava (úprava F… tepelná|povrchová \"…\" [od a do b]), úprava celého dílu do razítka ({0})", titleHint(bad)) : tr("patří do razítka: {0}", titleHint(bad)))]);
+  }
+}
+
+/** R2: nejvýš NOTE_MAX_LEADERS místních popisů v dokumentu (model + odkazy na výkrese) – jinak ✗ s radou */
+function checkLeaders(d: CadDoc, what: string): void {
+  // stejný počet jako kontrola výkresu (odkazy z modelu i z výkresu, popisy s volným textem, značky drsnosti se slovy – D2)
+  const n = leaderCount(d);
+  if (n > NOTE_MAX_LEADERS) throw new CodedError("drawing.leaders-limit", [tr("model"), tr("{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)", what, n, NOTE_MAX_LEADERS)]);
 }
 
 const nextId = (ms: readonly FunctionalMark[]) => {
@@ -100,15 +136,47 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
     case "list":
       say(ctx, functionalListText(d));
       return;
+    case "note":
+    case "treatment": {
+      // popis plochy / oblastní úprava v modelu (vlna 23, R2 / R3): plocha se změří (snímek geometrie – výkres pozná změnu)
+      const text = cmd.text.trim();
+      checkPmiText(cmd.kind, text);
+      const geom = await faceGeom(ctx, d, cmd.face);
+      if (cmd.kind === "treatment" && geom?.t !== "plane") throw new Error(tr("úprava: plocha F{0} není rovinná – oblastní úprava se kreslí čerchovanou čárou podél rovinné plochy viděné z boku; u válce zvolte jeho rovinné čelo nebo úpravu celého dílu do razítka", cmd.face + 1));
+      const same = (m: FunctionalMark) => m.kind === cmd.kind && m.face?.index === cmd.face && (cmd.kind === "note" || (m.from ?? null) === ((cmd as { from?: number }).from ?? null));
+      const old = ms.find(same);
+      const next = ms.filter((m) => !same(m));
+      const mark: FunctionalMark = {
+        id: old?.id ?? nextId(next),
+        kind: cmd.kind,
+        by: "agent", // textová cesta = agent (vlna 23, R6)
+        face: { index: cmd.face },
+        ...(geom ? { geom } : {}),
+        rev: modelRev(d),
+        text,
+        ...(cmd.kind === "treatment" ? { what: cmd.what, ...(cmd.from !== undefined ? { from: cmd.from } : {}), ...(cmd.to !== undefined ? { to: cmd.to } : {}) } : {}),
+      };
+      next.push(mark);
+      // vysvětlivka oblastní úpravy je řádek nad razítkem: limit 5 řádků (R4) – před zápisem do modelu, i když výkres ještě
+      // není (vysvětlivky se pak objeví na každém výkresu dílu); místní popisy nejvýš NOTE_MAX_LEADERS (R2 – „ne 1000 poznámek“)
+      const { checkDocNotesBudget } = await import("../../drawing-agent");
+      if (cmd.kind === "treatment") checkDocNotesBudget({ ...d, functional: next }, tr("úprava {0}", pmiText(mark)));
+      else checkLeaders({ ...d, functional: next }, pmiText(mark));
+      // s výkresem je to jen přijetí – zda se popis / čára na list vešla, řekne vyhodnocení listu (ℹ → ✓ / ⚠, vlna 22 bod 22i)
+      const msg = cmd.kind === "note" ? tr("✓ {0} v modelu{1} – výkres ho přebírá jako odkaz se šipkou na plochu", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "") : tr("✓ {0} v modelu{1} – výkres ji přebírá jako tlustou čerchovanou čáru s kótou rozsahu a značkou; vysvětlivka se počítá do 5 řádků poznámek", pmiText(mark), old ? tr(" (nahrazuje „{0}“)", old.text ?? "") : "");
+      commit(next, d.drawings?.length ? acceptLine(msg, sheetTail()) : msg);
+      return;
+    }
     case "clear": {
       const keep = ms.filter((m) => {
         if (m.kind !== cmd.what) return true;
         if (cmd.target === "all") return false;
         const w = cmd.target.map(fold);
+        if (m.kind === "note" || m.kind === "treatment") return !(w.includes(fold(m.id)) || (m.face && w.includes(`f${m.face.index + 1}`)));
         const label = fold(m.kind === "datum" ? (m.label ?? "") : markLabel(d, m));
         return !(w.includes(fold(m.id)) || w.join(" ") === label || (m.face && w.includes(`f${m.face.index + 1}`)));
       });
-      if (keep.length === ms.length) throw new Error(tr("nic ke zrušení: {0} – {1}", cmd.target === "all" ? tr("vše") : cmd.target.join(" "), functionalListText(d)));
+      if (keep.length === ms.length) throw new Error(tr("nic ke zrušení: {0} – {1}", cmd.target === "all" ? tr("vše") : cmd.target.join(" "), cmd.what === "note" || cmd.what === "treatment" ? `${functionalListText(d)} · ${pmiUsage()}` : functionalListText(d)));
       commit(keep, tr("✓ zrušeno {0} – zbývá {1}", ms.length - keep.length, keep.length));
       return;
     }

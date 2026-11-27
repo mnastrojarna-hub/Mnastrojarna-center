@@ -43,7 +43,7 @@ Kontrola dílu: \`stav\` · \`měřit těleso\` · \`měřit díry\` · \`kontro
 
 ## Výkres (záložka dílu)
 \`záložka "Deska"\` · \`výkres A3 měřítko 1:1 pohledy přední,horní,iso\` · \`výkres řez XZ odsazení -30\` (rovina Y = 30; bez odsazení leží na stěně) · \`kótovat chytře funkční 100\` · \`výkres tolerance 100 ±0,05\` · \`výkres tolerance Ø21 H7\`
-\`výkres razítko šablona=iso7200\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres list nový "Detail"\` · \`kótovat nic\` · \`výkres detail přední v 25 8 poloměr 6\` · \`výkres stav vše\` · \`výkres export pdf vše\`. Jinde (výkres sestavy): \`výkres kusovník ano\`
+\`výkres razítko šablona=iso7200\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres razítko tvrdost="58 HRC" drsnost="Ra 3,2"\` (údaje jen do razítka, volný text nad ním ≤ 5 krátkých řádků všemi kanály, revize = popis změny, popis plochy odkazem z modelu) · \`výkres list nový "Detail"\` · \`kótovat nic\` · \`výkres detail přední v 25 8 poloměr 6\` · \`výkres stav vše\` · \`výkres export pdf vše\`. Jinde (výkres sestavy): \`výkres kusovník ano\`
 
 ## Výstupy a odkazy
 \`uložit\` · \`export step\` · \`export skript\` · \`sdílet\` · \`odkaz\` (adresa znovu) · v CLI \`--formats step,pdf,dxf\` a \`--share\`. Jinde (úložiště): \`sdílet dní 30\` · \`export step odkaz\`
@@ -89,7 +89,7 @@ Bolt into a hole only after the dynamics (a free part would fall under gravity):
 
 ## Drawing (part tab)
 \`tab "Plate"\` · \`drawing A3 scale 1:1 views front,top,iso\` · \`drawing section XZ offset -30\` (plane Y = 30; without the offset it lies on the face) · \`dimension smart functional 100\` · \`drawing tolerance 100 ±0.05\` · \`drawing tolerance Ø21 H7\`
-\`drawing titleblock template=iso7200\` · \`drawing general ISO 2768-mK\` · \`drawing sheet new "Detail"\` · \`dimension none\` · \`drawing detail front at 25 8 radius 6\` · \`drawing status all\` · \`drawing export pdf all\`. Elsewhere (assembly drawing): \`drawing bom yes\`
+\`drawing titleblock template=iso7200\` · \`drawing general ISO 2768-mK\` · \`drawing titleblock hardness="58 HRC" roughness="Ra 3.2"\` (data only in the title block, free text above it ≤ 5 short lines over all channels, revision = change, face notes as leaders from the model) · \`drawing sheet new "Detail"\` · \`dimension none\` · \`drawing detail front at 25 8 radius 6\` · \`drawing status all\` · \`drawing export pdf all\`. Elsewhere (assembly drawing): \`drawing bom yes\`
 
 ## Outputs and links
 \`save\` · \`export step\` · \`export script\` · \`share\` · \`link\` (address again) · CLI \`--formats step,pdf,dxf\` and \`--share\`. Elsewhere (storage): \`share days 30\` · \`export step link\`
@@ -135,7 +135,7 @@ Schraube erst nach der Dynamik in die Bohrung (ein freies Teil fiele unter Schwe
 
 ## Zeichnung (Registerkarte des Teils)
 \`registerkarte "Platte"\` · \`zeichnung A3 maßstab 1:1 ansichten vorne,oben,iso\` · \`zeichnung schnitt XZ versatz -30\` (Ebene Y = 30; ohne Versatz liegt sie auf der Fläche) · \`bemaßen intelligent funktional 100\` · \`zeichnung toleranz 100 ±0,05\` · \`zeichnung toleranz Ø21 H7\`
-\`zeichnung schriftfeld vorlage=iso7200\` · \`zeichnung allgemein ISO 2768-mK\` · \`zeichnung blatt neu "Detail"\` · \`bemaßen keine\` · \`zeichnung einzelheit vorne bei 25 8 radius 6\` · \`zeichnung status alle\` · \`zeichnung export pdf alle\`. Sonst (Baugruppenzeichnung): \`zeichnung stückliste ja\`
+\`zeichnung schriftfeld vorlage=iso7200\` · \`zeichnung allgemein ISO 2768-mK\` · \`zeichnung schriftfeld härte="58 HRC" rauheit="Ra 3,2"\` (Angaben ins Schriftfeld, darüber ≤ 5 kurze Zeilen, alle Kanäle) · \`zeichnung blatt neu "Detail"\` · \`bemaßen keine\` · \`zeichnung einzelheit vorne bei 25 8 radius 6\` · \`zeichnung status alle\` · \`zeichnung export pdf alle\`. Sonst (Baugruppenzeichnung): \`zeichnung stückliste ja\`
 
 ## Ausgaben und Links
 \`speichern\` · \`exportieren step\` · \`export skript\` · \`freigeben\` · \`link\` (Adresse erneut) · CLI \`--formats step,pdf,dxf\` und \`--share\`. Sonst (Speicher): \`freigeben tage 30\` · \`exportieren step link\`

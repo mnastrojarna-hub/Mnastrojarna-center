@@ -6,7 +6,7 @@
 import { attachedFiles, attachedList } from "./attached-files";
 import type { DrawingMeta } from "./drawing";
 import { tr } from "./i18n";
-import { drawTitleBlock, generalTolDescribe, generalTolFields, generalTolOf, parseGeneralTol, parseTemplate, templateKeys, templateLabel, titleBlockSize, titleRevision, titleTemplateOf, type TitleFieldKey } from "./title-block";
+import { drawTitleBlock, generalTolDescribe, generalTolFields, generalTolOf, generalTolText, parseGeneralTol, parseTemplate, TECH_ROW_H, techStripKeys, templateKeys, templateLabel, titleBlockSize, titleRevision, titleTemplateOf, type TitleFieldKey } from "./title-block";
 import { prepareLogo, sniffImage, toDataUrl } from "./title-logo";
 import type { CadDoc } from "./types";
 
@@ -39,7 +39,9 @@ export const TITLE_WORDS: Record<string, TitleCmdField> = {
   nepredepsane: "tolerance", tolerance: "tolerance", general: "tolerance", generaltolerance: "tolerance", generaltolerances: "tolerance", allgemeintoleranz: "tolerance", allgemeintoleranzen: "tolerance", toleranz: "tolerance",
   uhly: "angleTol", toleranceuhlu: "angleTol", uhel: "angleTol", angles: "angleTol", angle: "angleTol", angletolerance: "angleTol", angular: "angleTol", winkel: "angleTol", winkeltoleranz: "angleTol",
   srazeni: "chamferTol", tolerancesrazeni: "chamferTol", chamfers: "chamferTol", chamfer: "chamferTol", chamfertolerance: "chamferTol", fasen: "chamferTol", fase: "chamferTol", fasentoleranz: "chamferTol",
-  hrany: "edges", edges: "edges", kanten: "edges", werkstuckkanten: "edges",
+  hrany: "edges", edges: "edges", kanten: "edges", werkstuckkanten: "edges", stavhran: "edges", iso13715: "edges",
+  tvrdost: "hardness", hardness: "hardness", harte: "hardness", haerte: "hardness", hrc: "hardness",
+  drsnost: "roughness", obecnadrsnost: "roughness", nepredepsanadrsnost: "roughness", roughness: "roughness", generalroughness: "roughness", rauheit: "roughness", rauigkeit: "roughness", allgemeinrauheit: "roughness",
   zakaznik: "customer", odberatel: "customer", customer: "customer", client: "customer", kunde: "customer", auftraggeber: "customer",
   projekt: "project", zakazka: "project", project: "project", job: "project", auftrag: "project",
   firma: "company", spolecnost: "company", vlastnik: "company", company: "company", owner: "company", unternehmen: "company", inhaber: "company",
@@ -64,6 +66,8 @@ export function titleKeyLabel(k: TitleCmdField): string {
     case "stock": return tr("polotovar");
     case "quantity": return tr("počet kusů");
     case "heatTreatment": return tr("tepelné zpracování");
+    case "hardness": return tr("tvrdost");
+    case "roughness": return tr("drsnost");
     case "surfaceTreatment": return tr("povrchová úprava");
     case "tolerance": return tr("nepředepsané");
     case "angleTol": return tr("tolerance úhlů");
@@ -80,8 +84,20 @@ export function titleKeyLabel(k: TitleCmdField): string {
 
 /** nápověda k příkazu razítka (chybová hláška neznámého pole) */
 export const titleUsage = () =>
-  tr("výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" kontroloval=\"…\" schválil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" polotovar=\"…\" počet=\"…\" tepelné=\"…\" povrch=\"…\" nepředepsané=\"ISO 2768-mK|desetinná\" úhly=\"…\" sražení=\"…\" hrany=\"…\" zákazník=\"…\" projekt=\"…\" firma=\"…\" logo=\"soubor.png\" šablona=iso7200|kompaktní|nástrojářská poznámka=\"…\"");
+  tr("výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" kontroloval=\"…\" schválil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" polotovar=\"…\" počet=\"…\" tepelné=\"…\" tvrdost=\"58–60 HRC\" povrch=\"…\" drsnost=\"Ra 3,2\" nepředepsané=\"ISO 2768-mK|desetinná\" úhly=\"…\" sražení=\"…\" hrany=\"…\" zákazník=\"…\" projekt=\"…\" firma=\"…\" logo=\"soubor.png\" šablona=iso7200|kompaktní|nástrojářská poznámka=\"…\"");
 
+/** tvrdost s jednotkou: 58 HRC, 58–60 HRC, 58+2 HRC, 650 HV10, 220 HB, 60 ± 2 HRC */
+const HARDNESS_RE = /^(?:min\.?\s*|max\.?\s*|≥\s*|≤\s*)?\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?\s*(?:HRC|HRB|HRA|HV\s?\d{0,2}|HBW|HB)\b/i;
+/**
+ * D3: hodnota, kterou poznámka přesouvá do buňky razítka, musí mít tvar, jaký přijme `výkres razítko …=` (tvrdost
+ * s jednotkou „58–60 HRC“, drsnost s hodnotou „Ra 3,2“) – jinak důvod (null = v pořádku).
+ */
+export function titleValueProblem(key: string, value: string): string | null {
+  const v = value.trim();
+  if (key === "hardness" && !HARDNESS_RE.test(v)) return tr("tvrdost „{0}“ nemá tvar hodnoty s jednotkou (např. „58–60 HRC“, „650 HV10“)", v);
+  if (key === "roughness" && !/^(?:R[az]|Rmax)\s*\d|^\d|^N\d/.test(v)) return tr("drsnost „{0}“ nemá hodnotu (např. „Ra 3,2“)", v);
+  return null;
+}
 const NONE = new Set(["", "ne", "no", "nein", "none", "zadne", "zadna", "zadny", "keine", "kein", "smazat", "delete", "loschen", "loeschen", "-", "—"]);
 
 /**
@@ -145,8 +161,16 @@ export async function applyTitleFields(meta: Record<string, unknown>, f: Partial
       parts.push(`${titleKeyLabel(k)} „${fl.tolerance || tr("nezadané")}“`);
       continue;
     }
-    meta[k] = v;
-    parts.push(`${titleKeyLabel(k)} „${v}“`);
+    if (k === "hardness" && v.trim() && !NONE.has(fold(v)) && !HARDNESS_RE.test(v.trim())) throw new Error(tr("tvrdost „{0}“: zadejte hodnotu s jednotkou – např. tvrdost=\"58–60 HRC\", \"58+2 HRC\", \"650 HV10\", \"220 HB\"", v));
+    if (k === "roughness" && v.trim() && !NONE.has(fold(v)) && !/^(?:R[az]|Rmax)\s*\d|^\d/.test(v.trim())) throw new Error(tr("drsnost „{0}“: zadejte hodnotu – např. drsnost=\"Ra 3,2\" (obecná drsnost ISO 1302 v razítku)", v));
+    const val = k === "roughness" && /^\d/.test(v.trim()) ? `Ra ${v.trim()}` : v;
+    if (NONE.has(fold(v)) && (k === "hardness" || k === "roughness")) {
+      delete meta[k];
+      parts.push(`${titleKeyLabel(k)} —`);
+      continue;
+    }
+    meta[k] = val;
+    parts.push(`${titleKeyLabel(k)} „${val}“`);
   }
   return { parts, warnings };
 }
@@ -192,14 +216,19 @@ export function titleStatusLines(doc: Pick<CadDoc, "kind">, m: Partial<DrawingMe
   const L: string[] = [];
   const logo = (m.logo?.src ? tr(" · logo „{0}“ {1}×{2} px{3}", m.logo.name ?? tr("data URL"), m.logo.w, m.logo.h, m.logo.trace ? "" : tr(" (v DXF/DWG jen rámeček)")) + (m.logo.svg ? tr(" · SVG (vektor v SVG a PDF)") : "") : "") + (m.titleTpl ? tr(" · šablona hlavičky „{0}“", m.titleTpl) : "");
   L.push(tr("Šablona razítka: {0} {1}×{2} mm · promítání ISO {3} – značka ISO 5456-2 ({4}){5}", templateLabel(tpl), size.w, size.h, projection, projection === "E" ? tr("1. kvadrant, kružnice vpravo") : tr("3. kvadrant, kružnice vlevo"), logo));
-  const extra: TitleCmdField[] = ["company", "customer", "project", "checkedBy", "approvedBy", "stock", "quantity", "heatTreatment", "surfaceTreatment", "angleTol", "chamferTol"];
+  const extra: TitleCmdField[] = ["company", "customer", "project", "checkedBy", "approvedBy", "stock", "quantity", "heatTreatment", "hardness", "surfaceTreatment", "angleTol", "chamferTol", "roughness"];
   const filled = extra.filter((k) => typeof m[k as keyof DrawingMeta] === "string" && (m[k as keyof DrawingMeta] as string).trim());
-  const inCells = new Set(templateKeys(tpl));
+  const inCells = new Set(templateKeys(tpl, m));
   L.push(
     filled.length
       ? tr("Další pole razítka: {0}", filled.map((k) => `${titleKeyLabel(k)} „${(m[k as keyof DrawingMeta] as string).trim()}“${k === "company" || inCells.has(k) ? "" : tr(" (v patičce)")}`).join(" · "))
       : tr("Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole=\"…\")"),
   );
+  // technické údaje vždy v buňkách razítka (vlna 23, R1) – co je vyplněno a kde (technický pás u ISO 7200 / kompaktní)
+  const strip = techStripKeys(m);
+  const techVal = (k: string) => (k === "tolerance" ? generalTolText(generalTolOf(m)) : ((m as Record<string, unknown>)[k] as string | undefined)?.trim() ?? "");
+  const tech = (["heatTreatment", "hardness", "surfaceTreatment", "edges", "tolerance", "roughness"] as const).map((k) => `${titleKeyLabel(k === "edges" ? "edges" : k)} ${techVal(k) ? `„${techVal(k)}“` : "—"}`);
+  L.push(tr("Údaje razítka (technické, v buňkách): {0}{1}", tech.join(" · "), strip.length ? tr(" · technický pás razítka +{0} mm ({1} polí)", TECH_ROW_H, strip.length) : ""));
   const g = generalTolOf(m);
   L.push(!g ? (doc.kind === "assembly" ? tr("Nepředepsané tolerance: nezadané (sestava – nevyžadují se)") : tr("Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná")) : tr("Nepředepsané tolerance: {0}", generalTolDescribe(g)));
   // jak se pole vešla (stejný výpočet jako na listu; měřítko a formát tu nejsou známé)

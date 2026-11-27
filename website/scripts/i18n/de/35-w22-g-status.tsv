@@ -21,7 +21,6 @@ těleso NEPLATNÉ	Körper UNGÜLTIG
 těleso nezkontrolováno ({0})	Körper nicht geprüft ({0})
 těleso platné	Körper gültig
 úběr {0} mm³	Abtrag {0} mm³
-výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)	Zeichnung: Blatt „{0}“ ohne Befund ausgewertet (Ansichten, Schnitte, Smarte Maße)
 výsledek po vyhodnocení listu níže	Ergebnis nach der Auswertung des Blatts unten
 výsledek po výpočtu níže	Ergebnis nach der Berechnung unten
 velké těleso, {0} ploch – měřeno ze sítě, platnost se nekontroluje	großer Körper, {0} Flächen – aus dem Netz gemessen, Gültigkeit wird nicht geprüft

@@ -1,0 +1,57 @@
+# vlna 23, 3. kolo – původ textu (agent / načtený soubor), všechny kanály, slovník R1, hlavní list, výchozí list, 2D
+ (a dalších {0} nálezů – 2d stav)	 (und {0} weitere Befunde – 2d status)
+; volný text {0}/{1} řádků	; Freitext {0}/{1} Zeilen
+„{0}“ → materiál „{1}“, {2} (údaje razítka se do označení materiálu nepíšou)	„{0}“ → Werkstoff „{1}“, {2} (Schriftfeldangaben gehören nicht in die Werkstoffbezeichnung)
+„{0}“ není označení materiálu – obsahuje {1}; zadejte materiál samotný (materiál 1.2379) a ostatní do razítka: {2}	„{0}“ ist keine Werkstoffbezeichnung – enthält {1}; geben Sie nur den Werkstoff an (werkstoff 1.2379) und den Rest ins Schriftfeld: {2}
+„{0}“: {1} – do razítka se nepřesune; zapište ho přímo: {2}	„{0}“: {1} – wird nicht ins Schriftfeld übernommen; direkt eintragen: {2}
+„{0}“: {1} – zapište ho přímo: {2}	„{0}“: {1} – direkt eintragen: {2}
+„{0}“: {1} nepatří do označení materiálu – zadejte materiál {2} a po založení výkresu {3}	„{0}“: {1} gehört nicht in die Werkstoffbezeichnung – geben Sie Werkstoff {2} an und nach dem Anlegen der Zeichnung {3}
+„{0}“: materiál „{1}“ se liší od materiálu modelu „{2}“ – materiál razítka je materiál modelu; jiný materiál zadejte modelu (materiál {1}), poznámkou ne	„{0}“: Werkstoff „{1}“ weicht vom Modellwerkstoff „{2}“ ab – der Werkstoff im Schriftfeld ist der des Modells; anderen Werkstoff am Modell angeben (werkstoff {1}), nicht per Hinweis
+{0} „{1}“ – výkres poznámek / požadavků k jinému dílu (číslo „…/2“) nevzniká: požadavky patří do razítka a k ploše na výkres dílu	{0} „{1}“ – keine Zeichnung mit Hinweisen / Anforderungen zu einem anderen Teil (Nummer „…/2“): Anforderungen gehören ins Schriftfeld und an die Fläche der Teilzeichnung
+{0} „{1}“ (rozpor – ponecháno)	{0} „{1}“ (Widerspruch – beibehalten)
+{0} {1} „{2}“ je pokyn („{3}“) – u značky jen technický údaj, pokyny na výkres nepatří	{0} {1} „{2}“ ist eine Anweisung („{3}“) – am Symbol nur technische Angaben, Anweisungen gehören nicht auf die Zeichnung
+{0} místních popisů (odkazů se šipkou, popisů s textem, značek drsnosti se slovy) – nejvýš {1} v celém dokumentu: {2} – sluč popisy stejné úpravy, údaje celého dílu dejte do razítka	{0} lokale Hinweise (Bezugslinien, Beschriftungen mit Text, Rauheitssymbole mit Wörtern) – höchstens {1} im ganzen Dokument: {2} – Hinweise gleicher Behandlung zusammenfassen, Angaben des ganzen Teils ins Schriftfeld
+{0} řádků revize zapsal agent – nejvýš {1} (tabulka revizí není seznam poznámek): {2}	der Agent hat {0} Revisionszeilen geschrieben – höchstens {1} (die Revisionstabelle ist keine Hinweisliste): {2}
+{0} text kóty „{1}“ nahrazuje měřenou hodnotu {2} – kóta pak rozměr neukazuje (kontrola kót ji nepočítá); hodnotu nechte (text s „<>“ nebo číslem), slova nepište	{0} Maßtext „{1}“ ersetzt den gemessenen Wert {2} – das Maß zeigt dann keine Größe (die Maßprüfung zählt es nicht); Wert behalten (Text mit „<>“ oder Zahl), keine Wörter
+{0} značka drsnosti „{1}“ nemá hodnotu Ra / Rz – značka nese hodnotu (např. „Ra 0,8“), nanejvýš s jedním slovem způsobu výroby („Ra 0,4 lapovat“); slova bez hodnoty jsou poznámka	{0} Rauheitssymbol „{1}“ hat keinen Ra-/Rz-Wert – das Symbol trägt einen Wert (z. B. „Ra 0,8“), höchstens mit einem Wort Fertigungsverfahren („Ra 0,4 läppen“); Wörter ohne Wert sind ein Hinweis
+{0} značka drsnosti „{1}“: {2} slova – způsob výroby nejvýš jedním slovem (pole ISO 1302)	{0} Rauheitssymbol „{1}“: {2} Wörter – Fertigungsverfahren höchstens ein Wort (Feld nach ISO 1302)
+{0}: v razítku „{1}“, poznámka „{2}“ – ponecháno „{1}“ (jednu hodnotu zvolte příkazem výkres razítko {3}="…")	{0}: Schriftfeld „{1}“, Hinweis „{2}“ – „{1}“ beibehalten (einen Wert wählen mit zeichnung schriftfeld {3}="…")
+⚠ ze souboru {0}	⚠ aus Datei {0}
+✗ porušení agenta {0}	✗ Verstöße des Agenten {0}
+a{0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj (např. „Brousit“), pokyny na výkres nepatří	a{0} „{1}“ ist eine Fertigungs- / Versandanweisung – an der Fläche nur technische Angaben (z. B. „Schleifen“), Anweisungen gehören nicht auf die Zeichnung
+atribut razítka {0} „{1}“ je pokyn („{2}“) – buňka nese jméno / číslo, pokyny na výkres nepatří	Schriftfeldattribut {0} „{1}“ ist eine Anweisung („{2}“) – das Feld trägt Name / Nummer, Anweisungen gehören nicht auf die Zeichnung
+buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk	Schriftfeldzelle {0} „{1}“ ist eine Anweisung („{2}“), kein Name / keine Nummer – Anweisungen gehören nicht auf die Zeichnung, Schriftfeldangaben in ihre Zellen
+číslo výkresu	Zeichnungsnummer
+dokument „{0}“ je jen nosič textu (zástupné těleso do 5 mm a {1} řádků poznámek) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	Dokument „{0}“ trägt nur Text (Platzhalterkörper bis 5 mm und {1} Hinweiszeilen) – keine Zeichnung nur mit Hinweisen; Angaben ins Schriftfeld der Teilzeichnung
+dokument agenta (JSON / setDocument v tomto běhu): {0}{1}	Dokument des Agenten (JSON / setDocument in diesem Lauf): {0}{1}
+drsnost „{0}“ nemá hodnotu (např. „Ra 3,2“)	Rauheit „{0}“ hat keinen Wert (z. B. „Ra 3,2“)
+Místní popis plochy v modelu – výkres ho kreslí odkazem se šipkou / tečkou na plochu	Lokaler Flächenhinweis im Modell – die Zeichnung zeigt ihn als Bezugslinie mit Pfeil / Punkt auf der Fläche
+model {0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj (např. „Brousit“)	Modell {0} „{1}“ ist eine Fertigungs- / Versandanweisung – an der Fläche nur technische Angaben (z. B. „Schleifen“)
+název {0} „{1}“ je pokyn („{2}“) – název listu / výkresu krátce (např. „Detail“, „Řezy“)	Name {0} „{1}“ ist eine Anweisung („{2}“) – Blatt- / Zeichnungsname kurz (z. B. „Detail“, „Schnitte“)
+název dílu	Teilename
+název dílu „{0}“ – díl / výkres poznámek nebo požadavků k jinému dílu nevzniká: požadavky patří do razítka a k ploše na výkres dílu	Teilename „{0}“ – kein Teil / keine Zeichnung mit Hinweisen oder Anforderungen zu einem anderen Teil: Anforderungen gehören ins Schriftfeld und an die Fläche der Teilzeichnung
+název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří	Teilename „{0}“ ist eine Anweisung („{1}“) – Name kurz, Anweisungen gehören nicht auf die Zeichnung
+název dílu „{0}“ obsahuje údaj razítka ({1}) – patří do razítka: {2}	Teilename „{0}“ enthält Schriftfeldangaben ({1}) – gehört ins Schriftfeld: {2}
+název dílu „{0}“: {1} – název krátce (např. „Deska“, „Razník 12“), údaje razítka do razítka, pokyny nikam	Teilename „{0}“: {1} – Name kurz (z. B. „Platte“, „Stempel 12“), Schriftfeldangaben ins Schriftfeld, Anweisungen nirgends
+název listu	Blattname
+název v razítku	Name im Schriftfeld
+název výkresu	Zeichnungsname
+nepředepsané „{0}“ (rozpor – ponecháno)	Allgemeintoleranzen „{0}“ (Widerspruch – beibehalten)
+nepředepsané: v razítku „{0}“, poznámka „{1}“ – ponecháno „{0}“	Allgemeintoleranzen: Schriftfeld „{0}“, Hinweis „{1}“ – „{0}“ beibehalten
+Oblastní úprava plochy v modelu – výkres ji kreslí tlustou čerchovanou čarou s kótou rozsahu	Bereichsbehandlung einer Fläche im Modell – die Zeichnung zeigt sie als breite Strichpunktlinie mit Bereichsmaß
+Popisy ploch ({0})	Flächenhinweise ({0})
+Popisy ploch ({0}): {1}	Flächenhinweise ({0}): {1}
+revize {0} „{1}“ není popis změny – řádek revize říká, co se změnilo („Ø20 → Ø22“, „změna: doplněna díra Ø9“); pokyny a poznámky do tabulky revizí nepatří	Revision {0} „{1}“ ist keine Änderungsbeschreibung – eine Revisionszeile sagt, was sich geändert hat („Ø20 → Ø22“, „Änderung: Bohrung Ø9 ergänzt“); Anweisungen und Hinweise gehören nicht in die Revisionstabelle
+řádek pokračuje na dalším (věta rozdělená na řádky)	die Zeile setzt sich in der nächsten fort (auf Zeilen verteilter Satz)
+řádek začíná spojkou (věta rozdělená na řádky)	die Zeile beginnt mit einer Konjunktion (auf Zeilen verteilter Satz)
+text 2D výkresu ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů) – agent ho nezměnil, export je povolen. První: {1}	Text der 2D-Zeichnung aus einer von der Festplatte geöffneten Datei verletzt die Agentenregeln ({0} Befunde) – der Agent hat ihn nicht geändert, Export erlaubt. Erster: {1}
+text kóty „{0}“ je pokyn („{1}“) – u kóty jen hodnota a tolerance	Maßtext „{0}“ ist eine Anweisung („{1}“) – am Maß nur Wert und Toleranz
+text kóty „{0}“ nahrazuje naměřenou hodnotu – ponechte „<>“ nebo číslo rozměru	Maßtext „{0}“ ersetzt den gemessenen Wert – „<>“ oder die Maßzahl beibehalten
+text kóty „{0}“ obsahuje údaj razítka ({1}) – {2}	Maßtext „{0}“ enthält Schriftfeldangaben ({1}) – {2}
+text kóty „{0}“: {1} – u kóty jen hodnota a tolerance, ne poznámka	Maßtext „{0}“: {1} – am Maß nur Wert und Toleranz, kein Hinweis
+text ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů: {1}{2}) – agent ho nezměnil, export je povolen; co agent změní, platí jako jeho text (✗). První: {3}	Text aus einer von der Festplatte geöffneten Datei verletzt die Agentenregeln ({0} Befunde: {1}{2}) – der Agent hat ihn nicht geändert, Export erlaubt; was der Agent ändert, gilt als sein Text (✗). Erster: {3}
+tvrdost „{0}“ nemá tvar hodnoty s jednotkou (např. „58–60 HRC“, „650 HV10“)	Härte „{0}“ ist kein Wert mit Einheit (z. B. „58–60 HRC“, „650 HV10“)
+úprava {0} „{1}“	{0} Behandlung „{1}“
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts), překládají se za běhu tr(def.key)
+list {0}: rozpor v razítku – {1}	Blatt {0}: Widerspruch im Schriftfeld – {1}
+list {0}: načtený výkres – {1}	Blatt {0}: geladene Zeichnung – {1}
