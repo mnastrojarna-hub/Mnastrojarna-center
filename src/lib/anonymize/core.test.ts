@@ -420,3 +420,27 @@ describe("nastavení", () => {
     expect(await termsHash(["A", "b"])).toBe(await termsHash(["B", "a"]));
   });
 });
+
+describe("jen název firmy, nic jiného (28. 11.)", () => {
+  it("looseRange najde název bez ohledu na velikost písmen a diakritiku — rozsah v originálu", async () => {
+    const { looseRange } = await import("./text");
+    const t = "Kalit 58 HRC · BOSCH Rexroth";
+    const r = looseRange(t, "bosch rexroth")!;
+    expect(t.slice(r[0], r[1])).toBe("BOSCH Rexroth");
+    expect(looseRange("Nitridace — Brisk Tábor a.s.", "BRISK TABOR")).not.toBeNull();
+    expect(looseRange("Materiál 42CrMo4", "Hitachi")).toBeNull();
+  });
+  it("štít: logo z obrazu se ořízne o technický text, přes text celé → nezakryje se; textová oblast beze změny", async () => {
+    const { shieldText } = await import("./regions");
+    const logo = { page: 1, box: { x: 0, y: 0, w: 100, h: 40 }, category: "logo" as const, source: "ai" as const, zone: "title_block" as const, textHeight: 0 };
+    const text = { ...logo, category: "company" as const, textHeight: 8, box: { x: 0, y: 30, w: 50, h: 8 } };
+    // technický řádek „Kalit 58 HRC" leží v dolní části boxu loga → ořez nahoru
+    const cut = shieldText([logo, text], [{ page: 1, box: { x: 0, y: 30, w: 100, h: 10 } }]);
+    expect(cut.regions.find((r) => r.category === "logo")!.box).toEqual({ x: 0, y: 0, w: 100, h: 30 });
+    expect(cut.regions.find((r) => r.category === "company")!.box).toEqual(text.box);
+    // text přes celé logo → logo se nezakryje (varování)
+    const drop = shieldText([logo], [{ page: 1, box: { x: -5, y: -5, w: 110, h: 50 } }]);
+    expect(drop.regions).toHaveLength(0);
+    expect(drop.warnings[0]?.code).toBe("keep_overlap");
+  });
+});

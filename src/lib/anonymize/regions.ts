@@ -141,6 +141,43 @@ export function protectKeep(regions: RawRegion[], keep: RawKeep[], mode: PadMode
   return { regions: out, warnings };
 }
 
+/**
+ * Štít technického textu (majitel 28. 11.: „jediné, co se smí zakrýt, je název firmy — nikam jinam nesmí zasahovat"):
+ * oblasti z OBRAZU (logo, firma v křivkách — bez textové vrstvy, textHeight 0) se oříznou o každý jiný text na
+ * stránce (materiál, kalení, povrch, poznámky…). Když ořez nejde bez zásahu do textu, oblast se vynechá (+ varování) —
+ * radši nechat logo, než smazat technický údaj.
+ */
+export function shieldText(regions: RawRegion[], protectedBoxes: { page: number; box: Box }[]): { regions: RawRegion[]; warnings: AnonWarning[] } {
+  const out: RawRegion[] = [];
+  const warnings: AnonWarning[] = [];
+  for (const r of regions) {
+    if (r.textHeight > 0) { out.push(r); continue; }
+    let box = r.box;
+    let quad = r.quad;
+    let dropped = false;
+    for (const p of protectedBoxes) {
+      if (p.page !== r.page || !intersection(box, p.box)) continue;
+      const inter = intersection(box, p.box)!;
+      // dotyk hranou / zanedbatelný přesah (< 15 % plochy textu) nevadí
+      if (area(inter) < 0.15 * (area(p.box) || 1)) continue;
+      const cut = trimAgainst(box, p.box);
+      if (cut && area(cut) >= 0.2 * area(r.box)) {
+        box = cut;
+        quad = undefined;
+        continue;
+      }
+      dropped = true;
+      break;
+    }
+    if (dropped) {
+      warnings.push({ code: "keep_overlap", message: "Logo / název firmy leží přes technický text — nezakryto, zkontroluj a případně zakryj ručně.", page: r.page });
+      continue;
+    }
+    out.push({ ...r, box, ...(quad ? { quad } : { quad: undefined }) });
+  }
+  return { regions: out, warnings };
+}
+
 /** Největší část boxu `a` mimo `k` (vlevo / vpravo / nad / pod), nebo null. */
 function trimAgainst(a: Box, k: Box): Box | null {
   const cands: Box[] = [];

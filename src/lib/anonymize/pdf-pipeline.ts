@@ -1,4 +1,9 @@
 import "server-only";
+import { shieldText } from "./regions";
+
+/** Čitelný text (aspoň 2 písmena / číslice za sebou) — štít chrání jen ten; Type3 / CID bez Unicode ne. */
+const READABLE_RE = /[\p{L}\p{N}]{2,}/u;
+import { looseRange } from "./text";
 import { addUsage } from "@/lib/ai/ai-call";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { boxInsideSent, fitForClaude } from "./claude-image";
@@ -487,10 +492,10 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       let start = sub ? l.text.indexOf(sub) : 0;
       let end = sub ? start + sub.length : l.text.length;
       if (sub && start < 0) {
-        const nl = normalizeText(l.text), ns = normalizeText(sub);
-        if (!ns || !nl.includes(ns)) continue; // podřetězec musí existovat
-        start = 0;
-        end = l.text.length;
+        // jen ten podřetězec (velikost písmen, diakritika, mezery nevadí) — nikdy celý řádek (28. 11.)
+        const r = looseRange(l.text, sub);
+        if (!r) continue; // podřetězec musí existovat
+        [start, end] = r;
       }
       if (keepLines.has(rl.id) && asArray<{ id: string; field: string }>(aiPage.keep).some((k) => k.id === rl.id && k.field === "drawingNumber")) continue;
       const text = l.text.slice(start, end);
@@ -575,8 +580,11 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   let raw = [...textRegions, ...aiRegions, ...filterToggles(ruleGraphics.map((r) => ({ ...r, rule: r.category })), input.ctx.redact)]
     .map((r) => padRegion(r, "vector", W, H));
   const prot = protectKeep(raw, keep, "vector");
-  raw = mergeRegions(prot.regions, keep);
-  res.warnings.push(...prot.warnings);
+  // štít: logo / firma z obrazu nesmí zakrýt žádný jiný text (materiál, kalení, povrch, poznámky…) — 28. 11.
+  const hitLines = new Set(hits.map((h) => h.lineId));
+  const shield = shieldText(prot.regions, info.lines.filter((l) => !hitLines.has(l.id) && READABLE_RE.test(l.text)).map((l) => ({ page: info.page, box: l.box })));
+  raw = mergeRegions(shield.regions, keep);
+  res.warnings.push(...prot.warnings, ...shield.warnings);
   const cap = areaCapWarning(raw, W, H, info.titleBlock, info.page);
   if (cap) res.warnings.push(cap);
 
