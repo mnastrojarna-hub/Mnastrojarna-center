@@ -26,5 +26,7 @@ brání:	blockiert durch:
 Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} · {3}{4} · spočítáno {5}	Das Ergebnis gilt für „{0}“ im jetzigen Zustand · {1} Komponenten · {2} · {3}{4} · berechnet {5}
  · výpočet {0}	 · Berechnung {0}
 pohybová studie	Bewegungsstudie
+motor začíná jinde než hodnota vazby v sestavě – dynamika startuje z rovnováhy pružin v okamžiku začátku motoru, ne z uložené polohy; bez skoku: začátek motoru = hodnota vazby v sestavě	der Motor beginnt abseits des Verknüpfungswerts in der Baugruppe – die Dynamik startet aus dem Federgleichgewicht im Moment des Motorstarts, nicht aus der gespeicherten Lage; ohne Sprung: Motorstart = Verknüpfungswert in der Baugruppe
+uložená poloha není v rovnováze pružin – kvazistatika začíná v rovnováze (díl se v kroku 0 posune); přechodový děj z uložené polohy počítá pohyb dynamika	die gespeicherte Lage ist nicht im Federgleichgewicht – die Quasistatik beginnt im Gleichgewicht (das Teil bewegt sich in Schritt 0); den Übergang aus der gespeicherten Lage berechnet bewegung dynamik
 #!dynamic – texty kódů registru (engine/codes.ts spring.lost)
 pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}	Feder „{0}“: verlorene Auflagefläche {1} – Länge und Kraft nicht geprüft; Korrektur: {2}

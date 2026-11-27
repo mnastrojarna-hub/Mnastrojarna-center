@@ -58,12 +58,19 @@ export function condValue(c: MotionCond, p: CondProbe): number | null {
   if ("mate" in c) return p.mate(c.mate);
   return p.motor(c.motor);
 }
-/** je podmínka splněná (tolerance 1e-9) */
+/**
+ * tolerance podmínky hodnoty VAZBY [mm / °]: hodnota vazby je výsledek řešiče (dotyk na mezi „Dosed“ sedí o zbytek řešiče nad 0),
+ * proto stejná tolerance jako nesplněná vazba / porušená mez (1e-3). Dřív 1e-9 – podmínka „vazba "Dosed" <= 0“ nastala pozdě
+ * a jen náhodou (oponent kola 6). Čas a hodnota motoru (předepsané, bez řešiče) zůstávají na 1e-9.
+ */
+export const COND_MATE_TOL = 1e-3;
+/** je podmínka splněná (vazba: COND_MATE_TOL, čas a motor: 1e-9) */
 export function condMet(c: MotionCond, p: CondProbe): boolean {
   const v = condValue(c, p);
   if (v === null) return false;
   if ("t" in c) return v >= c.t - 1e-9;
-  return c.op === "<=" ? v <= c.value + 1e-9 : v >= c.value - 1e-9;
+  const tol = "mate" in c ? COND_MATE_TOL : 1e-9;
+  return c.op === "<=" ? v <= c.value + tol : v >= c.value - tol;
 }
 /** lineární odhad okamžiku splnění podmínky hodnoty mezi dvěma kroky */
 export function crossTime(c: MotionCond, a: { t: number; v: number }, b: { t: number; v: number }): number {

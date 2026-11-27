@@ -117,7 +117,7 @@ export type MotionResult = {
    * komponenty, jejichž poloha v kroku 0 se liší od polohy v dokumentu (posun mm / natočení °) – výchozí poloha studie není poloha
    * sestavy (preferovaná strana meze, kterou v sestavě přebila rovnováha pružiny, nevyřešené vazby); ⚠ motion.start-jump (kolo 6)
    */
-  start0?: { comp: string; d: number; deg: number }[];
+  start0?: { comp: string; d: number; deg: number; cause?: "pref" | "springs" | "motor" }[];
   /**
    * nevedené díly (jen rovinné vazby se stejnou normálou – posuv v rovině a natočení kolem normály nic neurčuje), které rovnováha
    * pružin posunula v rovině / natočila (moment mimoosé pružiny): poloha zůstala na nejmenší změně od předchozího kroku a výsledek
@@ -294,6 +294,10 @@ export async function runMotion(
   // režim a úroveň (cad/motion-mode.ts): kvazistatika = rovnováha pružin v každém kroku; kinematika = jen vazby (+ preference)
   const mode0 = studyMode(doc, study);
   let M = build(mode0);
+  // kvazistatika: díly, jejichž polohu v kroku 0 určuje rovnováha pružin (ne motor) – krok 0 jinde než sestava = ⚠ (kolo 6, oponent:
+  // dřív jen díly mezí s preferencí; přidržovač, kterého pružina v kroku 0 posune o 5,5 mm z uložené polohy, prošel bez ⚠)
+  const motorRoots0 = new Set(motors.flatMap((x) => [M.rootOf(x.m.a.compId), M.rootOf(x.m.b.compId)]));
+  const springRoots0 = new Set(M.quasi ? M.springs.flatMap((sp) => [...sp.seats, sp.id].map(M.rootOf)).filter((r) => M.moving(r) && !motorRoots0.has(r)) : []);
   const motorOfTerm = (id: string) => motors.find((x) => (x.abs ? x.m.id : x.key) === id);
   /** odchylky konfliktní množiny v poloze konfliktu: vazby, dorazy pružin, motory (žádaná × dosažená hodnota) */
   const devsOf = (ids: string[], short: string[]): MateDev[] => {
@@ -464,26 +468,55 @@ export async function runMotion(
       let tau = t;
       const a0 = prevVal.get(i);
       if (a0 && v !== null && prevPoses && k > 0) {
+        // nejdřívější okamžik splnění mezi krokem k−1 (nesplněno) a k (splněno): sečna, a kde sečna nepomůže (dotyk na mezi –
+        // hodnota „sedne“ na 0 a dál se nemění, sečna míří na konec intervalu), půlení. Dřív jen sečna s koncem při |hodnota −
+        // mez| < 0,001: u dotyku vyšel okamžik kroku k, ne okamžik dosednutí (oponent kola 6: 0,833 s místo ~0,81 s)
+        const P0 = prevPoses;
+        const at = (x: number) => {
+          for (const [id, P] of P0) poses.set(id, P);
+          solveAt(x);
+          return condValue(c, probe(x));
+        };
         let a = a0;
         let b = { t, v };
-        tau = crossTime(c, a, b);
-        let solved = NaN;
-        for (let it = 0; it < 6; it++) {
-          for (const [id, P] of prevPoses) poses.set(id, P);
-          solveAt(tau);
-          solved = tau;
-          const vm = condValue(c, probe(tau));
-          if (vm === null || Math.abs(vm - c.value) < 1e-3 || b.t - a.t < 1e-9) break;
-          if (condMet(c, probe(tau))) b = { t: tau, v: vm };
-          else a = { t: tau, v: vm };
-          const next = crossTime(c, a, b);
-          if (Math.abs(next - tau) < 1e-12) break;
-          tau = next;
+        let solved = t;
+        // cíl hledání: přesná hodnota podmínky, když ji krok k dosáhl (průběh hodnotu protne – motor, vazba v pohybu: okamžik
+        // průchodu, poloha s hodnotou přesně na mezi, jako dřív); jinak (dotyk – hodnota sedí o zbytek řešiče nad mezí) první
+        // okamžik v toleranci COND_MATE_TOL. Tolerance hledání by jinak posunula začátek o 0,001 před průchod a zapnutá vazba
+        // (zachytí polohu v okamžiku začátku) by držela díl 0,001 mm vedle (korpus 67a)
+        const exactTol = 1e-6 * Math.max(1, Math.abs(c.value));
+        const exactAt = (val: number) => (c.op === "<=" ? val <= c.value + exactTol : val >= c.value - exactTol);
+        const exact = exactAt(v);
+        const met = (x: number, val: number | null) => val !== null && (exact ? exactAt(val) : condMet(c, probe(x)));
+        const tolT = Math.max(1e-9, (b.t - a.t) * 1e-3);
+        let triedA = false;
+        let triedB = false;
+        for (let it = 0; it < 16 && b.t - a.t > tolT; it++) {
+          const w = b.t - a.t;
+          let x = crossTime(c, a, b);
+          // sečna u kraje intervalu: jednou zkusit těsně u kraje (průchod přesně v kroku k / těsně za k−1), jinak půlit
+          let edge = false;
+          if (x >= b.t - 0.05 * w) {
+            edge = !triedB;
+            x = triedB ? a.t + 0.5 * w : b.t - tolT;
+            triedB = true;
+          } else if (x <= a.t + 0.05 * w) {
+            edge = !triedA;
+            x = triedA ? a.t + 0.5 * w : a.t + tolT;
+            triedA = true;
+          }
+          const vm = at(x);
+          solved = x;
+          if (vm === null) break;
+          if (!met(x, vm)) a = { t: x, v: vm };
+          else {
+            b = { t: x, v: vm };
+            // průběh, který hodnotu protne: sečna zasáhne přesně – okamžik nalezen
+            if (!edge && Math.abs(vm - c.value) <= exactTol) break;
+          }
         }
-        if (solved !== tau) {
-          for (const [id, P] of prevPoses) poses.set(id, P);
-          solveAt(tau);
-        }
+        tau = b.t;
+        if (solved !== tau) at(tau);
         tau = Math.max(runs[i - 1]?.t ?? 0, tau);
       }
       runs[i].value = condValue(c, probe(tau)) ?? v ?? undefined;
@@ -571,9 +604,22 @@ export async function runMotion(
   };
   const unguided = new Map<string, { springs: string[]; steps: [number, number]; d: number; deg: number }>();
   let lastPoses = new Map(poses); // poloha předchozího kroku (krok 0: výchozí poloha sestavy)
+  // kotva nevedeného dílu: poloha, od které se měří posuv v rovině / natočení – od kroku, kdy se díl stal nevedeným (ne od
+  // předchozího kroku: drift pod tolerancí v každém kroku by se jinak sčítal bez ⚠ – oponent kola 6)
+  const anchors = new Map<string, Map<string, Pose>>();
   const holdUnguided = (k: number) => {
-    const base = lastPoses;
-    for (const [root, n] of unguidedRoots()) {
+    const roots = unguidedRoots();
+    for (const r of [...anchors.keys()]) if (!roots.has(r)) anchors.delete(r);
+    for (const [root, n] of roots) {
+      let base = anchors.get(root);
+      if (!base) {
+        base = new Map<string, Pose>();
+        for (const id of [root, ...(M.groups.members.get(root) ?? []).map((x) => x.id)]) {
+          const P = lastPoses.get(id);
+          if (P) base.set(id, P);
+        }
+        anchors.set(root, base);
+      }
       const A = base.get(root);
       const B = poses.get(root);
       if (!A || !B) continue;
@@ -582,7 +628,7 @@ export async function runMotion(
       const inPlane = Math.hypot(dp[0] - dn * n[0], dp[1] - dn * n[1], dp[2] - dn * n[2]);
       const deg = rotationAngleDeg(placementOf(A).rotation, placementOf(B).rotation);
       if (inPlane <= UNGUIDED_EPS && deg <= UNGUIDED_EPS) continue;
-      // celá skupina: poloha předchozího kroku posunutá jen ve směru normály (tuhá vzájemná poloha zůstává)
+      // celá skupina: poloha kotvy posunutá jen ve směru normály (tuhá vzájemná poloha zůstává)
       for (const id of [root, ...(M.groups.members.get(root) ?? []).map((x) => x.id)]) {
         const a = base.get(id);
         if (!a) continue;
@@ -714,12 +760,13 @@ export async function runMotion(
   // rovnováha pružin – jinde je krok 0 vyřešená poloha vazeb (nevyřešený dokument řeší sestava, skok motoru motion.start-jump motoru)
   const prefRoots = new Set(M.mates.filter((m) => m.prefer && isLimitMate(m)).flatMap((m) => [M.rootOf(m.a.compId), M.rootOf(m.b.compId)]));
   const start0: NonNullable<MotionResult["start0"]> = [];
-  for (const c of prefRoots.size ? comps : []) {
+  for (const c of prefRoots.size || springRoots0.size ? comps : []) {
     const p = steps[0]?.place[c.id];
-    if (!p || !prefRoots.has(M.rootOf(c.id))) continue;
+    const pref = prefRoots.has(M.rootOf(c.id));
+    if (!p || (!pref && !springRoots0.has(M.rootOf(c.id)))) continue;
     const d = Math.hypot(p.position[0] - c.placement.position[0], p.position[1] - c.placement.position[1], p.position[2] - c.placement.position[2]);
     const deg = rotationAngleDeg(c.placement.rotation, p.rotation);
-    if (d > START0_EPS || deg > START0_EPS) start0.push({ comp: c.id, d, deg });
+    if (d > START0_EPS || deg > START0_EPS) start0.push({ comp: c.id, d, deg, cause: pref ? "pref" : "springs" });
   }
   return {
     steps,
@@ -743,7 +790,7 @@ export async function runMotion(
 /** tolerance posuvu v rovině [mm] / natočení [°] nevedeného dílu mezi kroky */
 const UNGUIDED_EPS = 0.01;
 /** mez skoku výchozí polohy studie proti dokumentu (mm / °) – menší rozdíl je zaokrouhlení řešiče */
-const START0_EPS = 0.01;
+export const START0_EPS = 0.01;
 
 /** Sestava s polohami komponent z kroku studie (zobrazení, kolize, export); `springs` = délky pružin v kroku. */
 export function poseDoc(doc: CadDoc, place: Record<string, Placement>, springs?: Record<string, Pick<SpringStep, "length" | "offset"> & { seat?: number }> | null): CadDoc {
@@ -1026,8 +1073,12 @@ export function motionFindings(res: MotionResult, doc: CadDoc): MotionFinding[] 
       .slice(0, DEV_SUMMARY)
       .map((x) => `„${nm(x.comp)}“ ${x.d > START0_EPS ? `${txt(x.d, 3)} mm` : ""}${x.d > START0_EPS && x.deg > START0_EPS ? " · " : ""}${x.deg > START0_EPS ? `${txt(x.deg, 3)}°` : ""}`)
       .join(", ");
-    const pref = mates.filter((m) => m.prefer && isLimitMate(m) && res.start0!.some((x) => x.comp === m.a.compId || x.comp === m.b.compId));
-    const why = pref.length
+    const pref = mates.filter((m) => m.prefer && isLimitMate(m) && res.start0!.some((x) => x.cause !== "springs" && x.cause !== "motor" && (x.comp === m.a.compId || x.comp === m.b.compId)));
+    const why = res.start0.some((x) => x.cause === "motor")
+      ? tr("motor začíná jinde než hodnota vazby v sestavě – dynamika startuje z rovnováhy pružin v okamžiku začátku motoru, ne z uložené polohy; bez skoku: začátek motoru = hodnota vazby v sestavě")
+      : !pref.length && res.start0.some((x) => x.cause === "springs")
+        ? tr("uložená poloha není v rovnováze pružin – kvazistatika začíná v rovnováze (díl se v kroku 0 posune); přechodový děj z uložené polohy počítá pohyb dynamika")
+        : pref.length
       ? tr("výpočet drží preferovanou stranu meze „{0}“ ({1}), v sestavě ji přebila rovnováha pružiny / vazby – kinematika pružinou netlačí; fyzikální poloha = pohyb kvazistatika, jinak sestava vazba {2} preferovat ne", pref[0].name ?? tr(MATE_LABEL[pref[0].type]), pref[0].prefer!, mates.indexOf(pref[0]) + 1)
       : tr("vazby sestavy v uložené poloze nesplněné nebo neurčené – sestava (přepočet) a pak pohyb spustit");
     out.push({ code: "motion.start-jump", args: ["0", what, String(res.start0.length)], steps: [0, 0], text: tr("krok 0 se liší od polohy v sestavě: {0} – studie nezačíná v poloze, kterou sestava ukazuje; {1}", what, why) });

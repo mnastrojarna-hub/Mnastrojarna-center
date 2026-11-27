@@ -848,15 +848,21 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   vrstva). JSON: \`motion.mode: "kinematic" | "quasistatic" | "dynamic"\` (chybí = automaticky).
   Kolo 6: kinematika s preferovanou stranou meze, kterou v sestavě přebila rovnováha pružiny, začne jinde než sestava → ⚠
   \`motion.start-jump\` „krok 0 se liší od polohy v sestavě: „Přidržovač“ 11 mm …“ (a souhrn bez „Vazby splněny“); pružina na
-  dorazu Ln ve všech krocích = ⚠, ne ✓. Nevedený díl (jen rovinné vazby – posuv v rovině a natočení nic neurčuje), který moment
-  mimoosé pružiny v kvazistatice posouval / natáčel, drží nejmenší změnu od předchozího kroku → ⚠ \`motion.undetermined\` „díl „X“
-  není veden – moment pružiny …“. Dynamika startuje z kvazistatické rovnováhy v okamžiku začátku motorů (krok 0 = krok 0 kvazistatiky).
+  dorazu Ln ve všech krocích = ⚠, ne ✓. Kvazistatika, jejíž krok 0 (rovnováha pružin) je jinde než uložená poloha, to řekne také
+  (⚠ \`motion.start-jump\` „… uložená poloha není v rovnováze pružin …“). Nevedený díl (jen rovinné vazby – posuv v rovině
+  a natočení nic neurčuje), který moment mimoosé pružiny v kvazistatice posouval / natáčel, drží nejmenší změnu od polohy, kdy se
+  stal nevedeným (bez sčítání malých posunů) → ⚠ \`motion.undetermined\` „díl „X“ není veden – moment pružiny …“. Dynamika startuje
+  z polohy dokumentu (přechodový děj, např. puštění přidržovače na doraz); jen když začátek motoru skáče proti hodnotě vazby
+  v sestavě, startuje z kvazistatické rovnováhy v okamžiku začátku motoru (krok 0 = krok 0 kvazistatiky) a řekne to ⚠
+  \`motion.start-jump\` krok 0.
 - **Priorita podmínek a motor na mezi (bod 8):** tvrdé podmínky (ukotvení, zámky, kontakty, zarovnání, souosost, pevné vzdálenosti,
   meze, Ln pružin) > hodnota motoru > preference. Nesplnitelný krok se nikdy nevyřeší kompromisem (ujetí a naklopení desek):
   \`na mezi stop\` (výchozí; EN \`at limit stop\`, DE \`an grenze stopp\`) = motor stojí na poslední dosažitelné hodnotě, krok má
   fyzikální polohu → ⚠ \`motion.motor-limit\` „motor 1 stojí na mezi v krocích 8–12: žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm –
   brání: „Mez“ 5 mm – na mezi min 5 mm (doraz); „PEVNÁ“ 24,5 mm (splněno); příčina: …“; \`na mezi chyba\` (EN \`error\`, DE
-  \`fehler\`; JSON motoru \`atLimit: "error"\`) = kroky neplatné, \`place\` = poslední platný krok, ⚠ \`motion.invalid\`. Vazby, které si
+  \`fehler\`; JSON motoru \`atLimit: "error"\`) = kroky neplatné, \`place\` = poslední platný krok, ⚠ \`motion.invalid\`. Volba platí
+  pro každý motor zvlášť (i v dynamice: motor, který díl porušené meze nepohání, se jí neřídí) a zastavení je směrové – když profil
+  couvne na dosažitelnou stranu (zpětný zdvih), motor se znovu rozjede a „stojí na mezi“ hlásí jen kroky, kdy opravdu stál. Vazby, které si
   odporují i bez motoru = neplatné kroky s příčinou „vazby si odporují“. Kód \`motion.conflict\` po vazbách a úsecích zůstává; souhrn
   vypíše nejvýš tři odchylky, \`pohyb krok N\` všechny („konflikt: …“). Strojově \`stopped=N invalid=N undetermined=N\` před \`level=\`.
   Panel: krok „motor stojí na mezi“ / „NEŘEŠITELNÝ krok – zobrazen krok 7“, 3D okno neplatného kroku červeně orámované

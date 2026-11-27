@@ -26,5 +26,7 @@ brání:	blocked by:
 Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} · {3}{4} · spočítáno {5}	The result is valid for “{0}” in its current state · {1} components · {2} · {3}{4} · computed {5}
  · výpočet {0}	 · computation {0}
 pohybová studie	motion study
+motor začíná jinde než hodnota vazby v sestavě – dynamika startuje z rovnováhy pružin v okamžiku začátku motoru, ne z uložené polohy; bez skoku: začátek motoru = hodnota vazby v sestavě	the motor starts away from the mate value in the assembly – dynamics starts from the spring equilibrium at the moment the motor starts, not from the saved position; without a jump: motor start = mate value in the assembly
+uložená poloha není v rovnováze pružin – kvazistatika začíná v rovnováze (díl se v kroku 0 posune); přechodový děj z uložené polohy počítá pohyb dynamika	the saved position is not in spring equilibrium – quasi-statics starts in equilibrium (the part moves at step 0); the transient from the saved position is computed by motion dynamics
 #!dynamic – texty kódů registru (engine/codes.ts spring.lost)
 pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}	spring “{0}”: lost seat face {1} – length and force not checked; fix: {2}

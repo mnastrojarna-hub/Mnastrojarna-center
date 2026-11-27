@@ -251,6 +251,25 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     const m = await markMissingSeats(doc, fakeEnv());
     expect(docKv(docSummaryOf(m.doc, null, { mates: {} } as never))).toMatch(/\bsprings\.lost=1\b/);
   });
+  it("„Vazby splněny ve všech krocích“ ne, když kvazistatika začne jinde než uložená poloha (pružina posune přidržovač v kroku 0) – ⚠ motion.start-jump (kolo 6, oponent)", async () => {
+    // dřív: krok 0 kvazistatiky v rovnováze pružin (přidržovač o 2,5 mm níž než v sestavě) bez ⚠ a „Vazby splněny ve všech krocích“ –
+    // start0 hlídal jen díly mezí s preferencí
+    const env = fakeEnv();
+    const base = press({ holder: true });
+    const spr = (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc;
+    const doc: CadDoc = { ...base, components: [...base.components!, { id: "s", name: "P", source: { kind: "part", doc: spr }, placement: { position: [0, 0, 38], rotation: [0, 0, 0] } }] };
+    const setup = [MATE, 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40 název "Mez"', 'sestava vazba mez-vzdálenosti "Přidržovač" F1 "Rám" F2 min 0 max 500 název "Dosed"', 'sestava vazba zámek "P" "Přidržovač"', 'sestava pružina "P" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20'];
+    const a = await runLines(doc, env, ...setup, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    const txt = a.last.log.join("\n");
+    expect(txt).not.toMatch(new RegExp(`^ ?${GREEN_MATES}$`, "m"));
+    expect(txt).toMatch(/⚠ vazby splněny ve všech krocích, ale krok 0 je jinde než poloha v sestavě \(„Přidržovač“/);
+    const jump = a.last.codes?.find((c) => c.code === "motion.start-jump");
+    expect(jump?.text).toMatch(/„Přidržovač“ 2,5 mm.*uložená poloha není v rovnováze pružin/);
+    // týž model v rovnováze (mez max 25 – sestava ho sama posadí na 34,5): ⚠ krok 0 není, „Vazby splněny…“ ano
+    const b = await runLines(doc, env, ...setup.map((l) => l.replace("max 40", "max 25")), "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    expect((b.last.codes ?? []).some((c) => c.code === "motion.start-jump")).toBe(false);
+    expect(b.last.log.join("\n")).toMatch(new RegExp(`^ ?${GREEN_MATES}$`, "m"));
+  });
   it("„Úroveň simulace: kvazistatika“ ne u kinematického výpočtu", async () => {
     const env = fakeEnv();
     const a = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57,5..40 kroky 2");

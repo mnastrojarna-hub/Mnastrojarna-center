@@ -74,6 +74,50 @@ describe("kolo 6 – body 2 a 8 se skutečným jádrem", async () => {
     expect(poseIn(con, 12, "Deska A")!.p[2]).toBeGreaterThan(47.4);
   }, 300_000);
 
+  it("bod 8 (oponent kola 6): dynamika, zpětný zdvih po mezi stop – motor se po couvnutí profilu zase rozjede, na konci zpět ve výchozí poloze", async () => {
+    // dřív (rev6m/dynback): zastavení na mezi platilo do konce studie – krok 12 (t = 2 s, motor 57,5) Deska A Z 47,4994, stopped=9,
+    // „žádáno 37,226 → 57,5 mm … brání: Mez“ (Mez zpětnému zdvihu nahoru nebrání); kinematika téhož dokumentu se vrátí na 67,5
+    const { r, con } = await run([...DYN, 'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 pak 57.5 kroky 24 na mezi stop', "pohyb krok 6", "pohyb krok 12"]);
+    expect(poseIn(con, 6, "Deska A")!.p[2]).toBeCloseTo(47.5, 1); // dole stojí na mezi
+    expect(poseIn(con, 12, "Deska A")!.p[2]).toBeCloseTo(67.5, 2); // nahoře zpět
+    const kv = r.entries.filter((e) => e.level === "measure" && / mode=dyn /.test(e.text)).at(-1)!.text;
+    expect(kv).toMatch(/ stopped=5 /);
+    expect(con).toMatch(/„Deska A“: ΔZ −20,00\d mm · na konci zpět ve výchozí poloze/);
+    const lim = r.entries.find((e) => e.code === "motion.motor-limit")!;
+    expect(lim.text).toMatch(/v krocích 4–8 /);
+    expect(lim.text).not.toMatch(/→ 57,5 mm/);
+  }, 300_000);
+  it("bod 8 (oponent kola 6): volba „na mezi“ platí pro každý motor zvlášť – „chyba“ motoru, kterého se mez netýká, nezneplatní kroky", async () => {
+    // dřív: jediná volba pro celou studii (některý motor „chyba“ = všechny „chyba“) → motor 1 („stop“) neplatné kroky ⚠ motion.invalid
+    const { r, con } = await run([...PARTS, 'nový díl "Deska B"', "kvádr 20 20 5", 'nová sestava "Mechanika"', 'vložit "Rám" ukotvit', 'vložit "Deska A" v 0 0 67.5', 'vložit "Přidržovač" v 0 0 34.5', 'vložit "Deska B" v 200 0 20', ZDVIH, 'sestava vazba vzdálenost "Přidržovač" spodní "Rám" horní hodnota 24.5 název "PEVNÁ"', MEZ, 'sestava vazba vzdálenost "Deska B" spodní "Rám" horní hodnota 10 název "B"', "pohyb dynamika čas 2 krok 0.001 snímky 12", 'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12 na mezi stop', 'pohyb motor lineární vazba "B" 10..30 kroky 12 na mezi chyba', "pohyb krok 12"]);
+    expect(r.entries.some((e) => e.code === "motion.invalid")).toBe(false);
+    expect(r.entries.some((e) => e.code === "motion.motor-limit" && /motor 1 stojí na mezi/.test(e.text))).toBe(true);
+    expect(poseIn(con, 12, "Deska A")!.p[2]).toBeCloseTo(47.5, 1);
+    expect(poseIn(con, 12, "Deska B")!.p[2]).toBeCloseTo(40, 2);
+  }, 300_000);
+  it("bod 2 (oponent kola 6): dynamika bez skoku motoru startuje z polohy dokumentu (přechodový děj), kvazistatika ten rozdíl hlásí ⚠", async () => {
+    // dřív (rev6m/dynoff): dynamika vždy z rovnováhy – krok 0 Přidržovač Z 34,5 místo 40 z dokumentu, puštění na doraz zmizelo,
+    // warn=0 a „Vazby splněny ve všech krocích“ i u kvazistatiky, která začala o 5,5 mm jinde
+    const SPR = [...PARTS, 'vložit "Přidržovač" v 20 20 40', 'vložit "Pružina" v 50 50 42.5', ZDVIH, MEZ, DOSED, 'sestava vazba zámek "Pružina" "Přidržovač"', 'sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20', 'pohyb hmotnost "Přidržovač" 1', 'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12'];
+    const q = await run(SPR);
+    expect(q.r.entries.some((e) => e.code === "motion.start-jump" && /„Přidržovač“ 5,5 mm.*uložená poloha není v rovnováze pružin/.test(e.text))).toBe(true);
+    expect(q.con).not.toMatch(/^ {0,2}Vazby splněny ve všech krocích$/m);
+    const d = await run([...SPR, "pohyb dynamika čas 2 krok 0.001 gravitace -Z tlumení 0.05 odraz 0 snímky 12", "pohyb krok 0"]);
+    expect(poseIn(d.con, 0, "Přidržovač")!.p[2]).toBeCloseTo(40, 3);
+    expect(d.con).toMatch(/doraz „Mez Přidržovač → Deska A“ \(max 25 mm\): dotyk [\d,]+–[\d,]+ s · nárazy/);
+  }, 300_000);
+  it("bod 3 (oponent kola 6): podmínka „vazba Dosed <= 0“ na dotyku meze nastane v okamžiku dosednutí, ne o krok později", async () => {
+    // dřív (ver6/p3/quasi-cycle, tolerance 1e-9): mezera dotyku sedí o zbytek řešiče nad 0 → Fáze 2 až kroky 11–12 · t = 0,916 s;
+    // přidržovač dosedne v ~0,81 s (krok 10 už Z 10)
+    const { r, con } = await run([...PARTS, 'vložit "Přidržovač" v 20 20 34.5', 'vložit "Pružina" v 50 50 42.5', ZDVIH, MEZ, DOSED, 'sestava vazba zámek "Pružina" "Přidržovač"', 'sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20', 'pohyb fáze "Nájezd"', 'pohyb fáze "Přidržení" při vazba "Dosed" <= 0', 'pohyb fáze "Návrat" při vazba "ZDVIH" >= 28', 'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 pak 57.5 kroky 24', "pohyb krok 10"]);
+    const m = con.match(/Fáze 2 „Přidržení“: kroky (\d+)–\d+ · t = ([\d,]+)–/)!;
+    expect(Number(m[1])).toBe(10);
+    const t = Number(m[2].replace(",", "."));
+    expect(t).toBeGreaterThan(0.75);
+    expect(t).toBeLessThan(0.82);
+    expect(poseIn(con, 10, "Přidržovač")!.p[2]).toBeCloseTo(10, 2);
+    expect(r.entries.filter((e) => e.level === "measure" && /phases=3\/3/.test(e.text)).length).toBeGreaterThan(0);
+  }, 300_000);
   it("bod 2: dynamika nahoru startuje z kvazistatické rovnováhy – krok 0 = krok 0 kvazistatiky, žádná falešná špička síly", async () => {
     // dřív (repro-dyn-up): krok 0 Přidržovač Z 15,15 (na Ln pružiny), spring.max=337,3N@0.001s, „✓ … (max 359,2 N)“
     const { r, con } = await run([...PARTS, 'vložit "Přidržovač" v 20 20 34.5', 'vložit "Pružina" v 50 50 42.5', ZDVIH, MEZ, DOSED, 'sestava vazba zámek "Pružina" "Přidržovač"', 'sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20', 'pohyb hmotnost "Přidržovač" 1', 'pohyb motor lineární vazba "ZDVIH" 27.15..57.5 kroky 12', "pohyb dynamika čas 2 krok 0.001 gravitace -Z tlumení 0.05 odraz 0 snímky 12", "pohyb krok 0"]);
