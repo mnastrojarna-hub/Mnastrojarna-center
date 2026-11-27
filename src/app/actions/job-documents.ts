@@ -33,7 +33,7 @@ import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import {
-  FLOW_QUOTE_COLUMNS, invoiceDeliveryOf, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent,
+  FLOW_QUOTE_COLUMNS, deliveryConfirmed, invoiceDeliveryOf, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent,
   userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { FV_SERIES, invoiceDeliveryError, isOwnInvoiceFile } from "@/lib/jobs/invoice-file";
@@ -217,11 +217,12 @@ async function advanceStage(db: JobsDb, jobId: string, from: JobStage, to: JobSt
 /** Fakta dokladů zakázky (revize objednávky, dodání) pro vystavení a odeslání. */
 async function docFacts(db: JobsDb, jobId: string) {
   const { data } = await db.from("orders")
-    .select("status, order_status, order_revision, items_count, items_delivered, items_partial, partial_delivery_at")
+    .select("status, order_status, order_revision, items_count, items_delivered, items_partial, partial_delivery_at, delivery_note_confirmed_at, last_delivery_at, invoice_before_delivery")
     .eq("id", jobId).maybeSingle();
   const r = (data ?? {}) as {
     status?: string; order_status?: string | null; order_revision?: number | null; items_count?: number | null;
     items_delivered?: number | null; items_partial?: number | null; partial_delivery_at?: string | null;
+    delivery_note_confirmed_at?: string | null; last_delivery_at?: string | null; invoice_before_delivery?: boolean | null;
   };
   const count = Number(r.items_count) || 0;
   const delivered = Number(r.items_delivered) || 0;
@@ -239,6 +240,12 @@ async function docFacts(db: JobsDb, jobId: string) {
       stage: stage ?? "poptavka", itemsCount: count, itemsDelivered: delivered,
       itemsPartial: Number(r.items_partial) || 0, partialDeliveryAt: r.partial_delivery_at ?? null,
     }),
+    /** Dodání potvrzené (potvrzený DL / Dodáno zákazníkovi) — teprve pak běžná faktura (27. 11.). */
+    deliveryConfirmed: deliveryConfirmed({
+      stage: stage ?? "poptavka", deliveryNoteConfirmedAt: r.delivery_note_confirmed_at ?? null, lastDeliveryAt: r.last_delivery_at ?? null,
+    }),
+    /** Výjimka „Fakturovat před dodáním". */
+    invoiceEarly: r.invoice_before_delivery === true,
   };
 }
 
@@ -478,7 +485,8 @@ export async function generateJobDocument(
       if (plan.kind === "blocked") return { ok: false, error: plan.error, code: plan.code };
       // nová faktura jen po dodání všeho (dílčí faktura by účtovala i nedodané kusy)
       if (!plan.row) {
-        const gate = invoiceDeliveryError((await docFacts(db, jobId)).invoiceDelivery);
+        const df = await docFacts(db, jobId);
+        const gate = invoiceDeliveryError(df.invoiceDelivery, { confirmed: df.deliveryConfirmed, early: df.invoiceEarly });
         if (gate) return { ok: false, error: gate, code: "delivery" };
       }
       // ceny zkontrolovat dřív, než se spotřebuje číslo z řady
@@ -599,7 +607,8 @@ export async function generateJobDocument(
 
     // faktura posune zakázku, jen když je dodáno vše (při dílčí dodávce stav zůstává — M5)
     const stageNow = facts.stage ?? job.stage;
-    if (kind === "faktura" && !partialInvoice && isForward(stageNow, "fakturovano")) {
+    // faktura před dodáním (výjimka) stav neposouvá — zakázka jde dál běžně, Vyfakturováno až po potvrzeném DL
+    if (kind === "faktura" && !partialInvoice && facts.deliveryConfirmed && isForward(stageNow, "fakturovano")) {
       await advanceStage(db, jobId, stageNow, "fakturovano", `vystavena faktura ${number}`);
     }
 
@@ -908,7 +917,8 @@ export async function draftInvoiceEmail(
       return { ...draft, unpriced: 0, existing: { fileId: plan.file.fileId, filename: plan.file.filename, number: plan.number } };
     }
     if (!plan.row) {
-      const gate = invoiceDeliveryError((await docFacts(c.db, jobId)).invoiceDelivery);
+      const df = await docFacts(c.db, jobId);
+      const gate = invoiceDeliveryError(df.invoiceDelivery, { confirmed: df.deliveryConfirmed, early: df.invoiceEarly });
       if (gate) return { ok: false, error: gate, code: "delivery" };
     }
     const reserved = plan.reserved;

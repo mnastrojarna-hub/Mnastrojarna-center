@@ -28,7 +28,15 @@ export const INVOICE_NEEDS_DELIVERY = "Fakturu vystavíš po dodání — nejdř
 export const INVOICE_NEEDS_FULL_DELIVERY =
   "Fakturu vystavíš, až bude dodáno vše — dílčí faktura na část dodávky zatím nejde. Dodej zbytek, nebo položku uzavři s menším množstvím.";
 
-export function invoiceDeliveryError(state: InvoiceDeliveryState): string | null {
-  if (state === "complete") return null;
-  return state === "partial" ? INVOICE_NEEDS_FULL_DELIVERY : INVOICE_NEEDS_DELIVERY;
+export const INVOICE_NEEDS_CONFIRMED_DL =
+  "Fakturu vystavíš po potvrzení dodání — nahraj potvrzený dodací list („Potvrdit DL“), nebo v ⋯ zvol „Fakturovat před dodáním…“.";
+
+/**
+ * Brána faktury (majitel 27. 11.): dodáno vše A dodání potvrzené (potvrzený DL / Dodáno zákazníkovi), nebo
+ * výjimka „Fakturovat před dodáním" (early). Bez `confirmed` (starší volání) platí jen dodání.
+ */
+export function invoiceDeliveryError(state: InvoiceDeliveryState, opts: { confirmed?: boolean; early?: boolean } = {}): string | null {
+  if (opts.early) return null;
+  if (state !== "complete") return state === "partial" ? INVOICE_NEEDS_FULL_DELIVERY : INVOICE_NEEDS_DELIVERY;
+  return opts.confirmed === false ? INVOICE_NEEDS_CONFIRMED_DL : null;
 }

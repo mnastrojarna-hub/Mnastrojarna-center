@@ -126,7 +126,8 @@ describe.skipIf(!LOCAL_ENABLED)("parita deriveFlow ↔ job_flow_v", () => {
     expect(pick("6", "order_key", "confirmation_key")).toEqual({ order_key: "dorucena", confirmation_key: "vystaveno" });
     expect(pick("7", "order_key", "waiting_days")).toEqual({ order_key: "rozpor", waiting_days: 0 });
     expect(pick("8", "delivery_key", "fulfilment_key")).toEqual({ delivery_key: "castecne", fulfilment_key: "castecne_dodana" });
-    expect(pick("9", "status", "delivery_key")).toEqual({ status: "dodano_zakaznikovi", delivery_key: "dodano" });
+    // DL potvrzený PŘED poslední dodávkou neplatí → stav se neposune (27. 11.)
+    expect(pick("9", "status", "delivery_key")).toEqual({ status: "potvrzeno", delivery_key: "dodano" });
     expect(pick("10", "payment_key", "status")).toEqual({ payment_key: "po_splatnosti", status: "fakturovano" });
     expect(pick("11", "delivery_key", "fulfilment_key")).toEqual({ delivery_key: "castecne", fulfilment_key: "castecne_dodana" });
     expect(pick("12", "status", "order_key", "payment_key")).toEqual({ status: "zruseno", order_key: "stornovana", payment_key: null });

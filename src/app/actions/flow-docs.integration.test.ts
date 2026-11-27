@@ -268,7 +268,11 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     expect(early).toMatchObject({ ok: false, code: "delivery" });
     expect(await job(jobId)).toMatchObject({ status: "ve_vyrobe", invoice_number: null });
 
-    expect((await flow.setDeliveredQuantities(jobId, [{ itemId: b.id, delivered: 2 }])).stage).toBe("dodano_zakaznikovi");
+    // dodáno vše → stav zůstává; faktura až po potvrzeném DL (27. 11.)
+    expect((await flow.setDeliveredQuantities(jobId, [{ itemId: b.id, delivered: 2 }])).stage).toBe("ve_vyrobe");
+    expect(await docs.generateJobDocument(jobId, "faktura")).toMatchObject({ ok: false, code: "delivery" });
+    const { confirmDeliveryNote } = await import("./production");
+    expect(await confirmDeliveryNote(jobId)).toMatchObject({ ok: true, stage: "dodano_zakaznikovi" });
     const inv = await docs.generateJobDocument(jobId, "faktura");
     expect(inv.ok, inv.error).toBe(true);
     expect((await events(jobId, "file")).at(-1)?.message).toBe(`Vystavena faktura ${inv.number} (PDF)`);

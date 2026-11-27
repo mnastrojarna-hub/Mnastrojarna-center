@@ -567,7 +567,9 @@ await T("Doklady ▾: Dodací list → zápis dodání (předvyplněno vše) →
   const dl = /DL-\d{4}-\d+/.exec(await result.innerText())[0];
   expect(await page.getByRole("heading", { name: "Doklad má položky bez ceny" }).count() === 0, "dodací list se na ceny neptá");
   await dlg.getByRole("button", { name: "Hotovo" }).click();
-  await eventually(() => expect(sql(`select status from orders where id = ${lit(D1.id)}`) === "dodano_zakaznikovi", "vše dodáno → Dodáno zákazníkovi"));
+  // 27. 11.: vystavený DL stav neposune (zboží může být na cestě) — Dodáno zákazníkovi až potvrzený DL
+  await eventually(() => expect(sql(`select delivery_note_number from orders where id = ${lit(D1.id)}`) !== "", "DL zapsán"));
+  expect(sql(`select status from orders where id = ${lit(D1.id)}`) !== "dodano_zakaznikovi", "vše dodáno, ale bez potvrzeného DL stav zůstává");
   await eventually(() => expect(sql(`select delivery_note_number from orders where id = ${lit(D1.id)}`) === dl, `orders.delivery_note_number = ${dl}`));
   const f = filesOf(D1.id, "dodaci_list");
   expect(f.length === 1 && f[0][1] === "1" && f[0][3].includes(dl.replace(/^DL-/, "")), `job_files dodací list v1 (${f.map((x) => x.join("|")).join(" ; ")})`);
@@ -577,6 +579,8 @@ await T("Doklady ▾: Dodací list → zápis dodání (předvyplněno vše) →
 // A2 (sk. 1, 9): Doklady ▾ → Faktura = tentýž dialog jako hlavní „Vystavit fakturu" (PDF + odeslání jako u nabídky);
 // neoceněná položka → „Přesto vystavit" v dialogu, pak „Vystavit, neposílat" (faktura vznikne až tímto tlačítkem)
 await T("Doklady ▾: Faktura (neoceněná položka → Přesto vystavit → Vystavit, neposílat) → FV-…, evidence faktur + archiv dokladů, zakázka Vyfakturováno", async (context) => {
+  // potvrzený DL vrácen zákazníkem (27. 11.: teprve pak Dodáno zákazníkovi a faktura)
+  sql(`update orders set delivery_note_confirmed_at = (now() + interval '1 day')::date, status = 'dodano_zakaznikovi' where id = ${lit(D1.id)}`);
   const page = await context.newPage();
   await openJob(page, USERS.obchod, D1);
   await issueFromMenu(page, "Faktura");

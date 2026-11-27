@@ -410,6 +410,38 @@ export async function startWithoutCustomerPo(jobId: string, input: { note?: stri
   }
 }
 
+// ── Fakturovat před dodáním ─────────────────────────────────
+/**
+ * Výjimka „Fakturovat před dodáním" (majitel 27. 11.): zákazník chce fakturu dřív (záloha, konec měsíce…) —
+ * fakturu jde vystavit ještě před potvrzeným dodacím listem. Stav zakázky se nemění; jen s právem na faktury.
+ */
+export async function allowInvoiceBeforeDelivery(jobId: string, input: { note?: string | null } = {}): Promise<Result> {
+  const c = await begin("margins");
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  const text = cleanText(input.note, 300);
+  try {
+    const job = await loadJob(c.db, jobId, "id, status, invoice_number, invoice_before_delivery");
+    if (!job || !isJobStage(job.status)) return fail(NOT_FOUND);
+    const rank = flowRank(job.status);
+    if (rank < 3) return fail("Fakturovat jde až objednanou zakázku.");
+    if ((typeof job.invoice_number === "string" ? job.invoice_number : "").trim()) return fail("Zakázka už fakturu má.");
+    const { error } = await c.db.from("orders").update({
+      invoice_before_delivery: true, invoice_before_delivery_note: text, invoice_before_delivery_by: c.user.id,
+      invoice_before_delivery_at: new Date().toISOString(),
+    } as never).eq("id", jobId);
+    if (error) return fail(error.message);
+    await logJobEvent(c.db, {
+      jobId, type: "field", message: `Fakturovat před dodáním${text ? ` — ${text}` : ""}`,
+      data: { exception: "invoice_before_delivery", ...(text ? { note: text } : {}) }, actorId: c.user.id,
+    });
+    revalidate(jobId);
+    return { ok: true, stage: job.status };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
 /** Objednávka zákazníka dorazila (k zakázce vyráběné bez ní): číslo a datum → příznak zmizí (DB), další krok potvrzení. */
 export async function registerCustomerPo(
   jobId: string, input: { number: string; date?: string | null; note?: string | null },
