@@ -25,6 +25,5 @@ výkres značka text "Technicke pozadavky viz list 1" v 30 60
 výkres list 1
 výkres stav
 #--- run
-záložka "Deska"
 poznámka F2 "Brousit"
 výkres stav

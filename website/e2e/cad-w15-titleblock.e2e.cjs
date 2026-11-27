@@ -186,7 +186,9 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   // engine (fáze B): nález příkazu výkresu = řádek ⚠ s kódem drawing.warning („⚠ řádek N: list …: …“), dřív „! …“
   ok(/(! |⚠ (řádek \d+: )?(list [^:\n]+: )?)revize v razítku „C“ není v tabulce revizí \(A, B\)/.test(log), 'revize C mimo tabulku → ⚠ upozornění');
   log = await run('výkres razítko revize=""\nvýkres razítko materiál="1.2379 (X153CrMoV12) kalené a popuštěné na 58–60 HRC, nitridováno 0,1 mm"\nvýkres razítko');
-  ok(/Razítko bez zkracování textu: .*Materiál \d řádky \d,\d mm/.test(log), 'stav razítka hlásí i zalomený materiál – ' + first(log, /Razítko bez zkracování textu: .*$/m));
+  // vlna 23 (R1/R4): agent textem nezapíše do buňky Materiál větu (≤ 32 znaků, heslovitě) – ✗ s radou; zalomení dlouhého
+  // materiálu zadaného člověkem v GUI ověřuje src/cad/title-block-review.test.ts
+  ok(/✗.*označení materiálu heslovitě/.test(log) && !/materiál 1\.2379 \(X153CrMoV12\) kalené/.test(log), 'agent: dlouhý materiál větou → ✗ (buňka razítka heslovitě) – ' + first(log, /✗.*$/m).slice(0, 160));
   log = await run('výkres nepředepsané X. ±0,1 · X.X ±0,1 · X.XX ±0,01 · X.XXX ±0,005\nvýkres razítko');
   ok(/Nepředepsané tolerance: tabulka podle desetinných míst: X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,01 \/ X\.XXX ±0,005/.test(log), 'výkres nepředepsané X. ±0,1 · X.X ±0,1 · … → tabulka (dřív text)');
   log = await run('výkres nepředepsané X. ±0,1 / X.X ±0,1 / X.XX ±0,02 / X.XXX ±0,005\nvýkres nepředepsané desetinná ±0,1 / ±0,1 / ±0,01 / ±0,005\ndrawing general f H\nvýkres razítko materiál=""');

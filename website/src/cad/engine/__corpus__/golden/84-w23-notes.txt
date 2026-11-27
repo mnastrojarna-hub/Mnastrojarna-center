@@ -62,7 +62,6 @@ Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 72000 mm³ · těleso platné – 100 × 60 × 12 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 763,4 mm³ (5 % nástroje) · těleso platné – Ø9 skrz v [50; 30; 12], osa Z
 === run 2 ===
-✓ záložka „Deska“ už je aktivní
 → popis F2 „Brousit“ v modelu (nahrazuje „Lapovat“) – výkres ho přebírá jako odkaz se šipkou na plochu – výsledek po vyhodnocení listu níže
 Výkres „List 1“ (list 1/2): list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
 Listy (2): 1 „List 1“ A3 (aktivní) · 2 „Poznámky“ auto
