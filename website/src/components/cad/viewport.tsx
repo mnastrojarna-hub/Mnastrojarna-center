@@ -1813,6 +1813,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
     },
     focus: (center: Vec3, radius: number) => {
+      // softwarový náhled (bez WebGL): tentýž směr pohledu, cíl = střed, viditelná výška ≈ 2,4 × poloměr (kolo 7, bod 5 – přiblížení
+      // na místo průniku z panelu Kolize; dřív focus softwarový náhled ignoroval)
+      if (softView.current) {
+        const v = softView.current.viewState?.();
+        if (v && softView.current.setViewState) softView.current.setViewState({ dir: v.dir, target: [center[0], center[1], center[2]], height: Math.max(2.4 * radius, 1e-3) });
+        return;
+      }
       const s = S.current;
       if (!s) return;
       const c = new THREE.Vector3(...center);

@@ -33,6 +33,9 @@
 //     314 mm³, plech po střihu ve 3D / náhledu (síť z požadavku s mezipolohami – stejný klíč jako výpočet); korpus 74j – otisk + střih:
 //     krok 6 „děrovaný + v záběru“ (data-process-engaged=1); korpus 74h – vůle 0,03 mm mezi kroky 17 a 18: řádek s polohou v úseku,
 //     ⚠ pod limitem (data-clearance-below=1), nikdy „dodržen v celém pohybu“; „Na minimum“ skočí na nejbližší krok úseku
+// 14) kolo 7: klik na nález v panelu Kolize přiblíží 3D okno / softwarový náhled na místo průniku (cíl kamery = místo průniku
+//     data-clash-at → data-clash-focused); korpus 74l – podmínka operace `při motor 1 <= 5` splněná uprostřed kroku, bez kolizí:
+//     krok 1 data-process-state=pierced 314 mm³ (dřív „nezasáhl“, plný)
 // Spuštění: E2E_BASE=http://localhost:3535 node e2e/cad-w22-c.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -337,6 +340,46 @@ async function round6Flow(p, tag, soft) {
   await p.screenshot({ path: `${S}w22c-${tag}-13-clearance.png` });
 }
 
+/** 14 (kolo 7, body 5 a 4): přiblížení na místo průniku z panelu Kolize; začátek operace uprostřed kroku – s WebGL i bez něj */
+async function round7Flow(p, tag, soft) {
+  const { run, idle, waitState } = helpers(p);
+  const log = await run(corpus('70-clash-classes').replace(/^(kolize|stav|kolize seznam.*)$/gm, ''));
+  ok(!/^✗/m.test(log), `[${tag}] kolo 7: sestava 5 založena textem`);
+  await idle();
+  await p.waitForTimeout(1200);
+  await run('kolize'); // příkaz kolize otevře panel s novým výsledkem zobrazeného dokumentu
+  await idle();
+  ok(await waitState('clash'), `[${tag}] kolo 7: panel Kolize ve stavu clash`);
+  const btn = p.locator('[data-clash-group] button[data-clash-at]').first();
+  const at = (await btn.getAttribute('data-clash-at').catch(() => null)) || '';
+  ok(/^-?[\d.]+;-?[\d.]+;-?[\d.]+$/.test(at), `[${tag}] kolo 7: položka nese místo průniku (${at})`);
+  const before = await p.evaluate(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-focused') || '');
+  await btn.click();
+  await p.waitForFunction(() => !!document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-focused'), null, { timeout: 15000 }).catch(() => {});
+  const foc = await p.evaluate(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-focused') || '');
+  const a = at.split(';').map(Number);
+  const f = foc.split(';').map(Number);
+  ok(!before && f.length === 3 && a.length === 3 && f.every((v, i) => Math.abs(v - a[i]) < 0.01), `[${tag}] kolo 7: klik přiblížil ${soft ? 'softwarový náhled' : '3D okno'} na místo průniku (cíl kamery ${foc} = místo ${at})`);
+  await p.screenshot({ path: `${S}w22c-${tag}-14-focus.png` });
+
+  const mp = p.locator('[data-motion-panel]');
+  const mid = await run(corpus('74l-process-start-mid'));
+  ok(!/^✗/m.test(mid) && /removed=314\.1\d* scrap=1 through=1|odebráno 314,1/.test(mid) && !/nezasáhl/.test(mid), `[${tag}] kolo 7 · 74l: začátek uprostřed kroku – střih spočítán, ne „nezasáhl“`);
+  await idle();
+  if (!(await mp.count())) {
+    await p.locator('button', { hasText: /^Pohybová studie$/ }).first().click().catch(() => {});
+    await mp.waitFor({ timeout: 30000 }).catch(() => {});
+  }
+  await p.waitForFunction(() => document.querySelector('[data-motion-panel]')?.getAttribute('data-motion-state') === 'ok', null, { timeout: 240000 }).catch(() => {});
+  await run('pohyb krok 1');
+  await p.waitForTimeout(1200);
+  const st = await p.evaluate(() => {
+    const el = document.querySelector('[data-process-state]');
+    return el ? { state: el.getAttribute('data-process-state'), removed: Number(el.getAttribute('data-process-removed')), text: el.textContent } : null;
+  });
+  ok(st && st.state === 'pierced' && Math.abs(st.removed - 314.159) < 3.2 && !/plný/.test(st.text || ''), `[${tag}] kolo 7 · 74l krok 1: děrovaný 314 mm³ (${JSON.stringify(st)})`);
+}
+
 (async () => {
   const browsers = [];
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -434,6 +477,8 @@ async function round6Flow(p, tag, soft) {
     ok(errs.length === 0, 'C3: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
     await round6Flow(pc, 'webgl', false); // kolo 6: záběr mezi kroky, děrovaný + v záběru, vůle mezi kroky
     ok(errs.length === 0, 'kolo 6: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
+    await round7Flow(pc, 'webgl', false); // kolo 7: přiblížení na místo průniku, začátek operace uprostřed kroku
+    ok(errs.length === 0, 'kolo 7: žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));
     await cx.close();
   }
 
@@ -467,6 +512,7 @@ async function round6Flow(p, tag, soft) {
   await clearanceFlow(p2, 'nowebgl', true); // C2: úsečka vůle v softwarovém náhledu (majitel testoval bez WebGL)
   await processFlow(p2, 'nowebgl', true); // C3: plech po střihu a odpad v softwarovém náhledu
   await round6Flow(p2, 'nowebgl', true); // kolo 6 bez WebGL
+  await round7Flow(p2, 'nowebgl', true); // kolo 7 bez WebGL
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

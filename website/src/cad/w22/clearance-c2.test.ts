@@ -238,4 +238,27 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     expect(e.level).toBe("warn");
     expect(e.text).toMatch(/„Střižník“ × „Vodítko“ 0,01 mm < 0,05 mm/);
   }, 300_000);
+
+  it("kolo 7 · 74n: vůle při ROTACI – roh kliky projde kolem kolíku 0,500 mm mezi kroky (v krocích nejméně 0,855 mm); ⚠, ne „dodržen“", async () => {
+    const { short, con } = await run("74n", corpus("74n-clearance-rotation"));
+    const kv = lines(short, /^= L\d+ asm "Rot" motion steps=12 .* clear\.min=/);
+    expect(kv.length).toBeGreaterThan(0);
+    const m = / clear\.min=([\d.]+) clear\.limit=0\.7 clear\.below=0\/13 clear\.below\.between=2 /.exec(kv[0])!;
+    expect(m, kv[0]).toBeTruthy();
+    // analyticky 38,855 − 3 − √(35² + 5²) = 0,4995 mm
+    expect(Math.abs(Number(m[1]) - (38.855 - 3 - Math.hypot(35, 5)))).toBeLessThan(0.01);
+    expect(short).toMatch(/clash\.clearance "Rot": vůle „Klika“ × „Kolík“ 0,5\d* mm < 0,7 mm mezi kroky 0 a 1, 11 a 12/);
+    expect(con).not.toMatch(/dodržen/);
+    expect(short).toMatch(/^= L\d+ status "Rot" .* motion=warn$/m);
+  }, 300_000);
+
+  it("kolo 7 · 74o: vůle v DYNAMICE – 0,03 mm mezi snímky, poloha jen „přibližně … interpolováno“; level=dyn, ⚠, ne „dodržen“", async () => {
+    const { short, con } = await run("74o", corpus("74o-clearance-dynamic"));
+    const kv = lines(short, /^= L\d+ asm "Sestava 6V" motion .* mode=dyn .* clear\.min=/);
+    expect(kv.length).toBeGreaterThan(0);
+    for (const l of kv) expect(l).toMatch(/ level=dyn clear\.min=0\.03 clear\.limit=0\.05 clear\.below=0\/\d+ clear\.below\.between=1 /);
+    expect(short).toMatch(/clash\.clearance "Sestava 6V": vůle „Nůž“ × „Kolík“ 0,03 mm < 0,05 mm mezi kroky \d+ a \d+ \(nejmenší mezi kroky \d+ a \d+ \(po přímé dráze: přibližně poloha/);
+    expect(con).not.toMatch(/limit 0,05 mm dodržen/);
+    expect(short).toMatch(/^= L\d+ status "Sestava 6V" .* motion=warn$/m);
+  }, 300_000);
 });

@@ -41,11 +41,12 @@ import { MemoryWorkspace } from "../engine/memory-workspace";
 import { formatConsole } from "../engine/protocol";
 import { runScript } from "../engine/run";
 import type { KernelApi } from "../engine/kernel";
-import type { AsmComponent, BuildResult, CadDoc, ComponentSource } from "../types";
+import type { AsmComponent, BuildResult, CadDoc, ComponentSource, ProcessOp, Vec3 } from "../types";
 import { emptyDoc } from "../types";
 import type { MotionResult } from "../motion";
 import { levelLine } from "../motion-mode";
-import { processCodes, processLines, processOf, processRun, processStatusText } from "../motion-process";
+import { opStart, processCodes, processKv, processLines, processOf, processRun, processStatusText } from "../motion-process";
+import { motorValue } from "../motion";
 import type { ProcReq, ProcRes } from "../process-types";
 
 setLang("cs");
@@ -335,6 +336,174 @@ describe("vlna 22 C3: žádné falešné zelené v procesní vrstvě (bod 4)", (
     const other = { ...jump, between: [{ k0: 0, k1: 1, clashes: [det("d", "r", "real")] }] } as unknown as MotionResult;
     const o2 = await processRun(d0, other, { process: k4 });
     expect(processCodes(o2, d0).map((c) => c.code)).toContain("motion.process-miss");
+  });
+  it("11d. podmínka operace splněná UPROSTŘED kroku (kolo 7): nikdy „nezasáhl“ / „plný“ – úsek začíná polohou v okamžiku začátku", async () => {
+    // oponent kola 6: `při motor 1 <= 5` uprostřed jediného kroku – plán úsek přeskočil (poloha kroku 0 je před začátkem
+    // neaktivní), vrstva psala „bez záběru – nástroj obrobek nezasáhl“, „plný“ a ⚠ process-miss, ač razník plech prorazil
+    const one = { ...res, steps: [res.steps[0], { ...res.steps[2], i: 1 }].map((s) => ({ ...s, clashes: [] })) } as unknown as MotionResult;
+    const calls: ProcReq[] = [];
+    // razník v t = 0,3 nad plechem, v t ∈ (0,4; 0,6) v plechu, v kroku 1 (t = 1) pod ním – záběr jen mezi polohami
+    const zAt = (t: number) => 20 - 40 * t;
+    const k5 = async (q: ProcReq): Promise<ProcRes> => {
+      calls.push(q);
+      const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as [number, number, number], thickness: null, volume0: 100, ms: 0 };
+      const z = q.rels.map((m) => (m ? m[11] : null));
+      if (q.plan) {
+        const gaps: NonNullable<ProcRes["gaps"]> = [];
+        const near: number[] = [];
+        for (let i = 1; i < z.length; i++) if (z[i - 1] !== null && z[i] !== null) (near.push(i), gaps.push({ i, n: 3 }));
+        return { ...base, steps: [], ...(gaps.length ? { gaps, near } : {}) };
+      }
+      let hit = false;
+      return { ...base, steps: z.map((v) => (v !== null && v <= 4 && v >= -4 ? ((hit = true), { contact: true, depth: 1, through: true, state: 1 }) : { contact: false, depth: 0, through: hit, state: hit ? 1 : 0 })), states: [...base.states, { removed: 50, volume: 50, scrap: [{ volume: 50, center: [0, 0, 0] }] }] };
+    };
+    const d0 = { ...pdoc, motion: { ...pdoc.motion!, steps: 1, process: [{ id: "p", kind: "cut", tool: "r", target: "pl", at: { motor: "m", op: ">=", value: 0.3 } }] } } as unknown as CadDoc;
+    const poseAt = (_k: number, t: number) => ({ place: { pl: { position: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 }, r: { position: [0, 0, zAt(t)] as Vec3, rotation: [0, 0, 0] as Vec3 } } });
+    const out = await processRun(d0, one, { process: k5 }, { poseAt });
+    const txt = [...processLines(out, d0), processStatusText(out, d0)].join("\n");
+    expect(txt).not.toMatch(/nezasáhl/);
+    expect(processStatusText(out, d0)).not.toMatch(/plný/);
+    expect(processStatusText(out, d0)).toMatch(/děrovaný/);
+    expect(processCodes(out, d0).map((c) => c.code)).not.toContain("motion.process-miss");
+    // první poloha úseku = okamžik začátku (t = 0,3), mezipolohy mezi začátkem a krokem 1 – nic před začátkem
+    const o = processOf(out)!;
+    expect(o.sub?.[0].t).toBeCloseTo(0.3, 9);
+    expect(o.sub!.every((x) => x.t >= 0.3 - 1e-9 && x.t < 1)).toBe(true);
+    expect(o.ops[0].contact?.between).toEqual([0, 1]);
+    // bez řešiče mezipoloh (dynamika) a s dráhou přes obrobek: nezjištěn, nikdy „nezasáhl“ / „plný“
+    const blind = await processRun(d0, one, { process: k5 });
+    expect([...processLines(blind, d0), processStatusText(blind, d0)].join("\n")).not.toMatch(/nezasáhl|na konci „Plech“ plný/);
+    expect(processCodes(blind, d0).map((c) => c.code)).toContain("motion.process-between");
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it("11e. strop mezipoloh jedné operace nepřebije spočitatelnou operaci téhož úseku; odebraný objem pak jen „nejméně“ (kolo 7)", async () => {
+    // NIT oponenta kola 6: `capped` platil pro úsek – i druhá operace (tlustý razník, 3 mezipolohy) psala „nezjištěn … víc než 64
+    // mezipoloh“ a její výsledek se ztratil; celkový objem se pak nesmí tvrdit přesně
+    const jump = { ...res, steps: res.steps.map((s) => ({ ...s, clashes: [] })) } as unknown as MotionResult;
+    const kc = async (q: ProcReq): Promise<ProcRes> => {
+      const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as [number, number, number], thickness: null, volume0: 100, ms: 0 };
+      // tenký střižník stojí v x = 5 (souřadnice nástroje v obrobku), tlustý razník v x = 0
+      const thinOf = (rels: ProcReq["rels"]) => rels.find(Boolean)?.[9] === 5;
+      const thin = thinOf(q.rels);
+      if (q.plan) return { ...base, steps: [], gaps: [{ i: 1, n: thin ? 64 : 3, ...(thin ? { capped: true as const } : {}) }], near: [1] };
+      const n = q.rels.length;
+      const row = (hit: boolean) => q.rels.map((_m, i) => (hit && i === 1 ? { contact: true, depth: 1, through: true, state: 1 } : { contact: false, depth: 0, through: hit && i > 1, state: hit && i > 1 ? 1 : 0 }));
+      const st = row(!thin && n > 3); // tlustý razník zachytí mezipoloha, tenký nic
+      const states = [...base.states, { removed: 40, volume: 60, scrap: [{ volume: 40, center: [0, 0, 0] as Vec3 }] }];
+      const comb = row(n > 3 && (!thin || !!q.others?.some((o) => !thinOf(o.rels))));
+      return { ...base, steps: st, states, ...(q.others?.length ? { combined: { steps: comb.map((x) => x.state), states } } : {}) };
+    };
+    const two = { ...pdoc, components: [...pdoc.components!, { ...comp("s", "Střižník"), placement: { position: [5, 0, 20], rotation: [0, 0, 0] } }], motion: { ...pdoc.motion!, process: [{ id: "a", kind: "cut", tool: "r", target: "pl" }, { id: "b", kind: "cut", tool: "s", target: "pl" }] } } as unknown as CadDoc;
+    const poseAt = (_k: number, t: number) => ({ place: { pl: { position: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 }, r: { position: [0, 0, 20 - 20 * t] as Vec3, rotation: [0, 0, 0] as Vec3 }, s: { position: [5, 0, 20 - 20 * t] as Vec3, rotation: [0, 0, 0] as Vec3 } } });
+    const out = await processRun(two, jump, { process: kc }, { poseAt });
+    const ops = processOf(out)!.ops;
+    expect(ops[0].unresolved).toBeUndefined(); // razník: spočítán
+    expect(ops[0].contact).not.toBeNull();
+    expect(ops[1]).toMatchObject({ unresolved: 1, unresolvedWhy: "cap" }); // jen střižník nezjištěn
+    const lines = processLines(out, two).join("\n");
+    expect(lines).not.toMatch(/celkem odebráno/);
+    expect(lines).toMatch(/odebráno nejméně 40 mm³ – výsledek některé operace nezjištěn/);
+    expect(processStatusText(out, two)).toMatch(/odebráno nejméně 40 mm³/);
+    expect(processKv(out)).toContain("removed=40+");
+  });
+
+  /* ── kolo 7, oponent kola 7: podmínka začátku mezi kroky u NEmonotónního motoru („tam a zpět“) ── */
+  // sestava: plech v z 10…11, razník spodkem v z = 10 + v (v = hodnota motoru 10 → −45 → 10, kosinový průběh přes 2 s)
+  const back = { id: "m", kind: "linear", mate: "z", from: 10, to: -45, back: true } as const;
+  const turnDoc = (steps: number, at?: ProcessOp["at"]) =>
+    ({ ...pdoc, motion: { motors: [back], duration: 2, steps, process: [{ id: "p", kind: "cut", tool: "r", target: "pl", ...(at ? { at } : {}) }] } }) as unknown as CadDoc;
+  const vAt = (t: number) => 10 + (-55 * (1 - Math.cos((2 * Math.PI * t) / 2))) / 2;
+  const placeOf = (v: number) => ({ pl: { position: [0, 0, 10] as Vec3, rotation: [0, 0, 0] as Vec3 }, r: { position: [0, 0, 10 + v] as Vec3, rotation: [0, 0, 0] as Vec3 } });
+  const turnRes = (n: number, motor: (k: number) => number = (k) => motorValue(back, k, n, 2)) =>
+    ({ steps: Array.from({ length: n + 1 }, (_x, k) => ({ i: k, t: (2 * k) / n, motors: [motor(k)], place: placeOf(motor(k)), conflicts: [], clashes: [] })), comps: [], motors: [back], collision: null, collisionsChecked: false, conflictSteps: 0, level: { level: "kinematic" } }) as unknown as MotionResult;
+  const turnPose = (_k: number, t: number) => ({ place: placeOf(vAt(t)) });
+  // zkušební jádro s plánem podle obálky DVOU sousedních poloh (jako process-kernel.ts planOf): spodek razníku z = m[11]
+  // (poloha v obrobku: plech v z 10 → spodek razníku nad plechem z > 1), razník délky 40 → v plechu, když −40 < z < 1
+  const turnKernel = (calls: ProcReq[] = []) => async (q: ProcReq): Promise<ProcRes> => {
+    calls.push(q);
+    const base = { states: [{ removed: 0, volume: 100, scrap: [] }], dir: [0, 0, -1] as Vec3, thickness: 1, volume0: 100, ms: 0 };
+    const z = q.rels.map((m) => (m ? m[11] : null));
+    const inSheet = (v: number) => v < 1 && v > -40;
+    if (q.plan) {
+      const gaps: NonNullable<ProcRes["gaps"]> = [];
+      const near: number[] = [];
+      for (let i = 1; i < z.length; i++) {
+        const a = z[i - 1];
+        const b = z[i];
+        if (a === null || b === null) continue;
+        if (Math.min(a, b) < 1 && Math.max(a, b) > -40) (near.push(i), Math.abs(a - b) > 1e-9 && gaps.push({ i, n: 3 }));
+      }
+      return { ...base, steps: [], ...(gaps.length ? { gaps, near } : {}) };
+    }
+    let hit = false;
+    const steps = z.map((v) => (v !== null && inSheet(v) ? ((hit = true), { contact: true, depth: 1, through: true, state: 1 }) : { contact: false, depth: 0, through: hit, state: hit ? 1 : 0 }));
+    return { ...base, steps, states: [...base.states, { removed: 50, volume: 50, scrap: [{ volume: 50, center: [0, 0, 0] as Vec3 }] }] };
+  };
+
+  it("11f. podmínka splněná jen MEZI kroky „tam a zpět“: začátek z profilu motoru, okamžik z kosinového průběhu (ne lineární odhad)", () => {
+    // oponent kola 7: `kroky 3 tam a zpět` + `<= -45` (dolní úvrať t = 1 s mezi kroky 1 a 2, v krocích −31,25) → „nenastal“
+    const r3 = turnRes(3);
+    [10, -31.25, -31.25, 10].forEach((v, k) => expect(r3.steps[k].motors[0]).toBeCloseTo(v, 9));
+    const s3 = opStart({ at: { motor: "m", op: "<=", value: -45 } }, r3, turnDoc(3).motion!);
+    expect(s3).not.toBeNull();
+    expect(s3!.step).toBe(2);
+    expect(s3!.t).toBeCloseTo(1, 4);
+    // `<= 0` mezi kroky 0 (10) a 1 (−17,5, t = 0,5 s): kosinus dává t = acos(35/55)/π = 0,2803 s, lineární odhad 0,1818 s
+    const r4 = turnRes(4);
+    const s4 = opStart({ at: { motor: "m", op: "<=", value: 0 } }, r4, turnDoc(4).motion!)!;
+    expect(s4.step).toBe(1);
+    expect(s4.t).toBeCloseTo(Math.acos(35 / 55) / Math.PI, 6);
+    expect(vAt(s4.t)).toBeCloseTo(0, 6);
+    const s5 = opStart({ at: { motor: "m", op: ">=", value: 11 } }, r4, turnDoc(4).motion!);
+    expect(s5).toBeNull(); // nad horní úvratí nikdy – „nenastal“ zůstává pravdou
+  });
+
+  it("11g. bdc ve 3 krocích: „nenastal“ / „plný“ / ⚠ process-miss se netvrdí – razník při zpětném zdvihu plechem projde", async () => {
+    const d = turnDoc(3, { motor: "m", op: "<=", value: -45 });
+    const out = await processRun(d, turnRes(3), { process: turnKernel() }, { poseAt: turnPose });
+    const txt = [...processLines(out, d), processStatusText(out, d)].join("\n");
+    expect(txt).not.toMatch(/nenastal|nezasáhl/);
+    expect(processStatusText(out, d)).toMatch(/děrovaný/);
+    expect(processCodes(out, d).map((c) => c.code)).not.toContain("motion.process-miss");
+    expect(processOf(out)!.ops[0].start?.t).toBeCloseTo(1, 4);
+  });
+
+  it("11h. jediný krok „tam a zpět“ (obě polohy nahoře): obrat motoru je mezipolohou – střih spočítán, ne „nezasáhl“", async () => {
+    // bez podmínky: plán z obálky kroků 0 a 1 (obě z = 20) úsek přeskočil → „bez záběru – nezasáhl“, „plný“, ⚠ process-miss
+    for (const at of [undefined, { motor: "m", op: "<=", value: 5 } as const]) {
+      const d = turnDoc(1, at);
+      const out = await processRun(d, turnRes(1), { process: turnKernel() }, { poseAt: turnPose });
+      const txt = [...processLines(out, d), processStatusText(out, d)].join("\n");
+      expect(txt, String(at)).not.toMatch(/nenastal|nezasáhl/);
+      expect(processStatusText(out, d)).toMatch(/děrovaný/);
+      expect(processCodes(out, d).map((c) => c.code)).not.toContain("motion.process-miss");
+      // poloha v dolní úvrati (t = 1 s) mezi mezipolohami
+      expect(processOf(out)!.sub!.some((x) => Math.abs(x.t - 1) < 1e-6)).toBe(true);
+      // s podmínkou: první poloha úseku = okamžik začátku z kosinového průběhu (v = 5), nic před ním
+      if (at) expect(Math.min(...processOf(out)!.sub!.map((x) => x.t))).toBeCloseTo(Math.acos(1 - 10 / 55) / Math.PI, 6);
+    }
+  });
+
+  it("11i. profil motoru nesedí na kroky (průběh mezi kroky neznámý): „nezjištěn“, nikdy „nenastal“ / „plný“ / ⚠ process-miss", async () => {
+    // hodnoty v krocích lineární 10 → −31,25 → … – zadaný motor „tam a zpět“ by v krocích dal jiná čísla: mezi kroky nic nevíme
+    const d = turnDoc(3, { motor: "m", op: "<=", value: -45 });
+    const odd = turnRes(3, (k) => [10, -31, -31, 10][k]);
+    const out = await processRun(d, odd, { process: turnKernel() }, { poseAt: turnPose });
+    const txt = [...processLines(out, d), processStatusText(out, d)].join("\n");
+    expect(txt).not.toMatch(/obrobek beze změny|nezasáhl/);
+    expect(processStatusText(out, d)).not.toMatch(/plný/);
+    expect(processLines(out, d).join("\n")).toMatch(/začátek operace nenastal v žádném kroku, mezi kroky od kroku 1 nezjištěn/);
+    const codes = processCodes(out, d).map((c) => c.code);
+    expect(codes).not.toContain("motion.process-miss");
+    expect(codes).toContain("motion.process-between");
+    // podmínka splněná v kroku, ale okamžik jen lineárně odhadnutý: kotva (poloha v odhadu) se nebere – řešič se na odhad neptá
+    const asked: number[] = [];
+    const d2 = turnDoc(3, { motor: "m", op: "<=", value: -20 });
+    const o2 = await processRun(d2, odd, { process: turnKernel() }, { poseAt: (k, t) => (asked.push(t), turnPose(k, t)) });
+    const est = (2 / 3) * ((-20 - 10) / (-31 - 10));
+    expect(asked.some((t) => Math.abs(t - est) < 1e-9)).toBe(false);
+    expect(processOf(o2)!.sub?.some((x) => Math.abs(x.t - est) < 1e-9) ?? false).toBe(false);
   });
 });
 

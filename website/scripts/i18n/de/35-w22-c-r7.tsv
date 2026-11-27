@@ -1,0 +1,9 @@
+# Vlna 22, kolo 7, balík C (body 4, 5, 6): začátek operace mezi kroky, strop mezipoloh po operacích, vůle a kolize
+ „{0}“: {1} operací, odebráno nejméně {2} mm³ – výsledek některé operace nezjištěn (sjednocení spočítaných operací; jejich součet {3} mm³)	 „{0}“: {1} Operationen, entfernt mindestens {2} mm³ – das Ergebnis einer Operation ist nicht ermittelt (Vereinigung der berechneten Operationen; ihre Summe {3} mm³)
+šroub v závitu: {0} dvojic v kroku {1}	Schraube im Gewinde: {0} Paare in Schritt {1}
+{0} dvojic dílů v kroku {1}	{0} Teilepaare in Schritt {1}
+pracovní kontakt „{0}“ × „{1}“ v kroku {2} (pravidlo {3}), největší průnik {4} mm³	Arbeitskontakt „{0}“ × „{1}“ in Schritt {2} (Regel {3}), größte Durchdringung {4} mm³
+Vybrat a přiblížit na místo průniku	Auswählen und auf die Durchdringungsstelle zoomen
+procesní operace {0}: začátek operace mohl nastat mezi kroky (průběh motoru mezi kroky neznámý) – výsledek procesu „{1}“ → „{2}“ nezjištěn (jemnější kroky: pohyb kroky N)	Prozessoperation {0}: der Operationsbeginn kann zwischen den Schritten liegen (Motorverlauf zwischen den Schritten unbekannt) – Prozessergebnis „{1}“ → „{2}“ nicht ermittelt (feinere Schritte: bewegung schritte N)
+začátek operace mohl nastat už mezi kroky před krokem {0} (průběh motoru mezi kroky neznámý) – výsledek procesu nezjištěn	der Operationsbeginn kann schon zwischen den Schritten vor Schritt {0} liegen (Motorverlauf zwischen den Schritten unbekannt) – Prozessergebnis nicht ermittelt
+začátek operace nenastal v žádném kroku, mezi kroky od kroku {0} nezjištěn (průběh motoru mezi kroky neznámý) – výsledek procesu nezjištěn	die Operation hat in keinem Schritt begonnen, zwischen den Schritten ab Schritt {0} nicht ermittelt (Motorverlauf zwischen den Schritten unbekannt) – Prozessergebnis nicht ermittelt
