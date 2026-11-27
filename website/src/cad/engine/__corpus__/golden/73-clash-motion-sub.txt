@@ -65,7 +65,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez
 ✓ vazba Zámek „Šroub M12“ [S2] → „Deska A“: ok · poloha beze změny
 ✓ vazba ZDVIH „Deska A“ F5 → „Základ“ F6 · 40 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
- pohání: „Deska A“ + 2 díly – spolu s ním kvůli pevné vazbě (zámku): „Šroub M12“, „Šroub M12“ · směr +Z
+ pohání: „Deska A“ + 2 díly – spolu s ním kvůli pevné vazbě (zámku): „Šroub M12 [S1]“, „Šroub M12 [S2]“ · směr +Z
 Pohybová studie: 15 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Deska A“ + 2 díly (tuhá skupina – zámek / pevné vazby): ΔZ +15 mm

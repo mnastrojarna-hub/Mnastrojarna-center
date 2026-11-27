@@ -1,0 +1,80 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Mechanika“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm: ok · poloha beze změny
+✓ vazba PEVNÁ „Přidržovač“ F5 → „Rám“ F6 · 24,5 mm: ok · poloha beze změny
+✓ vazba Mez „Přidržovač“ F6 → „Deska A“ F5 · ⟨5; 25⟩ mm: ok · poloha beze změny
+  vybráno: A F6 rovinná · B F5 rovinná
+Pohybová studie: motorů 0 · kroků 36
+Dynamika: krok 0,002 s · gravitace −Z · tlumení 0 N·s/mm · odraz 0
+ stojí: 3 („Rám“, „Deska A“, „Přidržovač“)
+Vazby splněny ve všech krocích
+Dynamika: 2 s · krok 2 ms · 1000 kroků · gravitace −Z · tlumení 0 N·s/mm · odraz 0
+ „Deska A“ 0,785 kg (z objemu × hustoty): v klidu
+ „Přidržovač“ 0,2261 kg (z objemu × hustoty): v klidu
+ doraz „Mez Přidržovač → Deska A“ (max 25 mm): dotyk 0–2 s
+ Kontrola energie: odchylka 0 % z 0 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0 J, dotyky 0 J, zadané síly 0 J)
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 30,35 mm/s · 1 s (pak stojí do konce studie 2 s)
+ pohání: „Deska A“ · směr −Z
+Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 30,35 mm/s · 1 s (pak stojí do konce studie 2 s)
+ „Deska A“: ΔZ −15,296 mm
+ stojí: 2 („Rám“, „Přidržovač“)
+⚠ nesplněné vazby v 9 krocích (mechanismus se zasekl nebo motor překročil meze)
+ ⚠ motion.conflict pohyb porušuje vazbu „Mez Přidržovač → Deska A“ v kroku 4–12 (t = 0.672–2 s)
+Dynamika: 2 s · krok 2 ms · 1000 kroků · gravitace −Z · tlumení 0 N·s/mm · odraz 0
+ ⚠ neplatné kroky 4–12 (motor za mezí – na mezi chyba): zdvih, rychlosti, zrychlení, dotyky, síly pružin a energie jen z platných kroků; v CSV a grafu vynechány
+ „Deska A“ 0,785 kg (z objemu × hustoty): zdvih Z 15,296 mm · v max 0,03 m/s · a max 0 m/s²
+ „Přidržovač“ 0,2261 kg (z objemu × hustoty): v klidu
+ doraz „Mez Přidržovač → Deska A“ (max 25 mm): dotyk 0 s
+ Energie: na začátku 0,0004 J, v posledním platném kroku (t = 0,658 s) -0,1534 J (motor koná práci – bilance se nekontroluje)
+⚠ řádek 25: neřešitelné kroky 4–12 (t = 0.672–2 s) – zobrazena poslední platná poloha (krok 3), žádný kompromis; konflikt: „Mez Přidržovač → Deska A“ 4,605 mm < min 5 mm (-0,395 mm); příčina: motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)
+Krok 12 (t = 2 s, motory 27,15):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 52,2036]
+ Přidržovač [0; 0; 34,5]
+ ⚠ nesplněné vazby: 1
+ ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok 3), žádný kompromis
+  konflikt: „Mez Přidržovač → Deska A“ -5,35 mm < min 5 mm (-10,35 mm)
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 (1 s) → 57,5 (2 s) mm ↓↑ zdvih 30,35 mm · úseků 2
+ pohání: „Deska A“ · směr −Z
+Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 (1 s) → 57,5 (2 s) mm ↓↑ zdvih 30,35 mm · úseků 2
+ „Deska A“: ΔZ −19,97 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Rám“, „Přidržovač“)
+⚠ nesplněné vazby v 4 krocích (mechanismus se zasekl nebo motor překročil meze)
+ ⚠ motion.conflict pohyb porušuje vazbu „ZDVIH Deska A → Rám“ v kroku 4–7 (t = 0.672–1.176 s)
+Dynamika: 2 s · krok 2 ms · 1000 kroků · gravitace −Z · tlumení 0 N·s/mm · odraz 0
+ „Deska A“ 0,785 kg (z objemu × hustoty): zdvih Z 19,97 mm · v max 0,03 m/s · a max 15,17 m/s² (bez rázů na dorazech)
+ „Přidržovač“ 0,2261 kg (z objemu × hustoty): v klidu
+ doraz „Mez Přidržovač → Deska A“ (max 25 mm): dotyk 0 s, 2 s · nárazy 0,03 m/s (t = 2 s)
+  návrat na doraz v t = 2 s
+ doraz „Mez Přidržovač → Deska A“ (min 5 mm): dotyk 0,66 s · nárazy 0,03 m/s (t = 0,66 s)
+  první dotyk v t = 0,66 s
+ Energie: na začátku 0,0004 J, na konci 0 J (motor koná práci – bilance se nekontroluje)
+ℹ řádek 27: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
+⚠ řádek 27: motor 1 stojí na mezi v krocích 4–7 (t = 0.672–1.176 s): žádáno 37,105 → 32,492 mm (nejdál 27,15 mm), dosaženo 37,53 mm – brání: „Mez Přidržovač → Deska A“ 5,03 mm v mezích ⟨5; 25⟩; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly stojí v poslední dosažitelné poloze (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
+Krok 6 (t = 1,008 s, motory 27,393):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 47,5297]
+ Přidržovač [0; 0; 34,5]
+ ⚠ nesplněné vazby: 1
+ ⚠ motor stojí na mezi: dosaženo 37,5297 (žádáno 27,3928)
+  konflikt: „Mez Přidržovač → Deska A“ 5,03 mm v mezích ⟨5; 25⟩
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 28800 mm³ · těleso platné
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5] · Přidržovač [0; 0; 34,5]
+Vazby: 3 (3 ok)
+Pohybová studie: motorů 1 · kroků 24 · 2 s – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 228,80 cm³ · hmotnost Σ 1,796 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, nesplněné vazby v 4 krocích, kolize nekontrolovány (podrobně pohyb stav)

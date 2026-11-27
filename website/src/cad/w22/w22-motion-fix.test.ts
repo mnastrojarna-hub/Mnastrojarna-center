@@ -172,7 +172,7 @@ describe("5 – `motion=ok` jen po skutečné kontrole", () => {
     const { store, key } = slotOf(env);
     const s = motionStatusOf(store, key, jump.doc)!;
     expect(s.state).toBe("warn");
-    expect(s.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)");
+    expect(s.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 2 kroky, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)");
     // mezera pod nulou bez kontroly kolizí: také „warn“
     const gap = await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..-5 kroky 2");
     expect(motionStatusOf(store, key, gap.doc)!.state).toBe("warn");

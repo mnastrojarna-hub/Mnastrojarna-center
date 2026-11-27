@@ -378,6 +378,18 @@ export function motorKv(motors: readonly MotionMotor[], duration: number): strin
 }
 
 /**
+ * Motory, které ve studii délky `duration` na konec rozsahu nedojedou (⚠ motion.motor-short): `m<i>.end=<hodnota na konci studie>`.
+ * Pole `m<i>=…` dál nese ZADANÝ rozsah (jako příkaz), skutečný dojezd je tady – dřív ho řádek neuváděl a zkrácená studie vypadala
+ * jako celý zdvih (bod 9, kolo 6: „po zkrácení studie strojový řádek dál píše plný rozsah“).
+ */
+export function motorShortKv(motors: readonly MotionMotor[], duration: number): string[] {
+  return motors.flatMap((mo, i) => {
+    const s = motorSpan(mo, duration);
+    return s.short ? [`m${i + 1}.end=${fmtNum(s.endAt, 4)}`] : [];
+  });
+}
+
+/**
  * Strojový souhrn studie na JEDEN řádek (zkouška 959, B6 – protokol místo rozsahu každé komponenty):
  * `motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 [rot=N] [clash.steps=41/41 thread=30 real=1 first.real=3]
  * [mode=dyn …] m1=range:0>50:+` – `travel` = zdvih tuhých skupin (`motionGroups`) s počtem komponent; motory (`motorKv`: průběh,
@@ -408,6 +420,8 @@ export function motionKv(res: MotionResult, cl: MotionClashStats | null, duratio
     ...phaseKv(res.phases),
     // vlna 22, bod 4 – nová pole na KONEC řádku: procesní vrstva (operace, odebraný objem, odpad, krok prostřižení)
     ...processKv(res),
+    // vlna 22, bod 9 (kolo 7) – nové pole na KONEC řádku: motor, který ve zkrácené studii na konec nedojede, skutečná hodnota na konci
+    ...motorShortKv(res.motors, duration),
   ];
   return `motion ${parts.join(" ")}`;
 }
@@ -520,7 +534,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
         const st = motionState(d, env);
         if (st.state === "stale") {
           codes.push({ code: "motion.stale", args: [st.changed.join("; ")] });
-          kv = [`motion steps=${d.motion.steps} t=${fmtNum(d.motion.duration, 3)} motors=${d.motion.motors.length} motion.stale=1`, ...motorKv(d.motion.motors, d.motion.duration)].join(" ");
+          kv = [`motion steps=${d.motion.steps} t=${fmtNum(d.motion.duration, 3)} motors=${d.motion.motors.length} motion.stale=1`, ...motorKv(d.motion.motors, d.motion.duration), ...motorShortKv(d.motion.motors, d.motion.duration)].join(" ");
         } else await runLog(d);
       }
       return signal(d, log, false, undefined, codes, kv);

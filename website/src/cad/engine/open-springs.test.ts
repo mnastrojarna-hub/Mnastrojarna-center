@@ -113,6 +113,36 @@ describe("bod 7: pružina po načtení dokumentu – délka z dosedacích ploch 
     expect(st.stopped).toBeTruthy();
   }, 240_000);
 
+  it("STEP po načtení: pružina v souboru má délku z dosedacích ploch (15 mm), ne uloženou 25 mm; kolize s ní v neověřené délce řekne proč (kolo 7)", async () => {
+    // dřív bez testu (CAD-M1-OPRAVY, bod 7 „Co zbývá“): geometrie pružiny ve STEP po načtení. Výška dílu „Pružina“ v souboru
+    // (rozdělení STEP na díly jádrem, obálka znovu načteného dílu) = délka v sestavě + drát; uložená 25 mm by dala ~27 mm
+    const zOf = async (doc: CadDoc) => {
+      const host = hostOf();
+      const ws = new MemoryWorkspace();
+      const r = await runScript(ws, `${JSON.stringify(doc)}\nexport step "m"`, host);
+      expect(r.counts.errors).toBe(0);
+      const f = [...(host.files as ReturnType<typeof memoryFileSink>).files.values()].find((x) => x.file.format === "step")!;
+      const split = await kernel.stepSplit(f.data, "m.step");
+      // výrobky bez jmen (zapisovač OCCT): 4. výskyt kořenové sestavy = 4. komponenta „Pružina“ (pořadí komponent dokumentu)
+      expect(split!.nodes[0].children).toHaveLength(4);
+      const part = split!.parts.find((p) => p.pd === split!.nodes[0].children[3].pd)!;
+      expect(part).toBeTruthy();
+      const st = await kernel.exportStats(doc, part.bytes, "step");
+      return st.file.bbox[1][2] - st.file.bbox[0][2];
+    };
+    const hOpen = await zOf(edited(built));
+    const hBuilt = await zOf(built);
+    expect(hBuilt).toBeGreaterThan(24);
+    expect(hOpen).toBeLessThan(18);
+    expect(hOpen).toBeGreaterThan(14);
+    // kolize s pružinou, které chybí dosedací plocha: text dvojice řekne, že pružina stojí v neověřené délce
+    const lostDoc = JSON.parse(JSON.stringify(edited(built))) as CadDoc;
+    for (const c of lostDoc.components ?? []) if (c.spring) c.spring.b.face = 99;
+    const r = await runScript(new MemoryWorkspace(), `${JSON.stringify(lostDoc)}\nkolize`, hostOf());
+    const hit = r.entries.find((e) => e.code === "clash.real" && /Pružina/.test(e.text));
+    expect(hit?.text).toMatch(/pružina „Pružina“ v neověřené délce \(ztracená dosedací plocha – spring\.lost\)/);
+  }, 300_000);
+
   it("dokument, jehož délka plochám odpovídá: žádné ⚠ spring.stale", async () => {
     const ws = new MemoryWorkspace();
     const r = await runScript(ws, `${JSON.stringify(built)}\nstav`, hostOf());

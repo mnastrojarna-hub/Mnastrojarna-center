@@ -33,7 +33,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 40 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 1 krocích (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 1 kroku (podrobně pohyb stav)
 === run 3 ===
 ✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 → Kvádr 1: size [60; 40; 10] → [30; 40; 10] – výsledek po výpočtu níže
