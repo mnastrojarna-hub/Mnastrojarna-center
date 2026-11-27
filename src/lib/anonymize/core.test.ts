@@ -444,3 +444,16 @@ describe("jen název firmy, nic jiného (28. 11.)", () => {
     expect(drop.warnings[0]?.code).toBe("keep_overlap");
   });
 });
+
+describe("celý název firmy, ne jeho kus (28. 11.)", () => {
+  it("rozšíří zásah na celý známý název a právní formu, technika zůstane", async () => {
+    const { expandCompanyRange } = await import("./company-names");
+    const t = "Kalit 58 HRC · BRISK Tábor a.s.";
+    const s = t.indexOf("BRISK");
+    const [a, b] = expandCompanyRange(t, [s, s + 5], ["Brisk Tábor a.s."]);
+    expect(t.slice(a, b)).toBe("BRISK Tábor a.s.");
+    const u = "Bosch GmbH, Nitridace";
+    const [c, d] = expandCompanyRange(u, [0, 5], []);
+    expect(u.slice(c, d)).toBe("Bosch GmbH");
+  });
+});

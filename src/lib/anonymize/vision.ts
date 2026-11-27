@@ -9,6 +9,7 @@ import { quadBox, substringQuad } from "./lines";
 import { areaCapWarning, mergeRegions, padRegion, protectKeep, shieldText, type RawKeep, type RawRegion } from "./regions";
 import { containsTerm, filterToggles, isTechnicalText, rulePage, type RuleContext } from "./rules";
 import { looseRange, normalizeText } from "./text";
+import { expandCompanyRange } from "./company-names";
 import { checkTranscript, type VerifyTile } from "./verify";
 import { burnGraphic, burnRectKeepLines, type Raster } from "./pdf-raster";
 import type { AnonCategory, AnonWarning, Box, KeepField, Quad, TextItem, TextLine, Zone } from "./types";
@@ -325,7 +326,9 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
       if (category === "custom" && !containsTerm(text, input.ctx.terms)) category = "other";
       // jen samotný název (redactText), ne celý řádek — „Kalit 58 HRC · BOSCH" smaže jen BOSCH (28. 11.)
       const sub = String(ln.redactText ?? "").trim();
-      const range = redact && sub ? looseRange(text, sub) : null;
+      const found = redact && sub ? looseRange(text, sub) : null;
+      // celý název firmy s právní formou, ne jeho kus (28. 11.)
+      const range = found && category === "company" ? expandCompanyRange(text, found, input.ctx.terms.filter((t) => !t.word).map((t) => t.raw)) : found;
       const part = range && range[1] - range[0] < text.length ? range : null;
       const redText = part ? text.slice(part[0], part[1]) : text;
       if (redact && category !== "custom" && isTechnicalText(redText)) redact = false;
@@ -357,8 +360,9 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
   for (const h of pr.hits) {
     const it = items.get(h.lineId);
     if (!it) continue;
-    const q = h.wholeItem ? (it.quad as Quad) : substringQuad(it, h.start, h.end, 1);
-    ruleRegions.push({ page: input.page, box: quadBox(q), quad: q, category: h.category, source: "rule", zone: textLines.find((l) => l.id === h.lineId)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: it.str.slice(h.start, h.end) });
+    const [hs, he] = h.category === "company" && !h.wholeItem ? expandCompanyRange(it.str, [h.start, h.end], input.ctx.terms.filter((t) => !t.word).map((t) => t.raw)) : [h.start, h.end];
+    const q = h.wholeItem ? (it.quad as Quad) : substringQuad(it, hs, he, 1);
+    ruleRegions.push({ page: input.page, box: quadBox(q), quad: q, category: h.category, source: "rule", zone: textLines.find((l) => l.id === h.lineId)?.zone ?? "body", textHeight: it.fontSize * 1.3, text: it.str.slice(hs, he) });
     const p2 = pass2Texts.find((t) => t.id === h.lineId);
     if (p2) p2.redacted = true;
   }

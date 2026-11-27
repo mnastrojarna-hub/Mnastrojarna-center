@@ -1,5 +1,6 @@
 import "server-only";
 import { shieldText } from "./regions";
+import { expandCompanyRange } from "./company-names";
 
 /** Čitelný text (aspoň 2 písmena / číslice za sebou) — štít chrání jen ten; Type3 / CID bez Unicode ne. */
 const READABLE_RE = /[\p{L}\p{N}]{2,}/u;
@@ -562,9 +563,19 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   const hitItems = new Set<string>();
   /** Položky zasažené jen zčásti → rozsahy smazaných znaků (zbytek položky zůstává). */
   const partial = new Map<string, [number, number][]>();
-  for (const h of filterToggles(hits, input.ctx.redact)) {
-    const l = lineById.get(h.lineId);
+  // známé názvy firem (zakázka / CRM / výkres / AI) — zásah do firmy se dotáhne na celý název (28. 11.)
+  const knownNames = [
+    ...input.ctx.terms.filter((t) => !t.word).map((t) => t.raw),
+    ...(aiPage ? asArray<CompanyItem>(aiPage.companies).filter((c) => isRemovableCompany(c.role)).map((c) => String(c.text ?? "")).filter(Boolean) : []),
+  ];
+  for (const h0 of filterToggles(hits, input.ctx.redact)) {
+    const l = lineById.get(h0.lineId);
     if (!l) continue;
+    let h = h0;
+    if (h.category === "company" && !h.wholeItem) {
+      const [s, e] = expandCompanyRange(l.text, [h.start, h.end], knownNames);
+      if (s !== h.start || e !== h.end) h = { ...h, start: s, end: e };
+    }
     for (const part of lineRangeToItems(l, h.start, h.end)) {
       const it = itemById.get(part.itemId);
       if (!it) continue;

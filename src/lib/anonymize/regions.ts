@@ -43,7 +43,8 @@ export type PadMode = "vector" | "photo";
 export function padRegion(r: RawRegion, mode: PadMode, pageW: number, pageH: number): RawRegion {
   const h = r.textHeight;
   if (mode === "vector") {
-    const px = r.tight ? 0 : h > 0 ? 0.6 * h : 1;
+    // podřetězec (jen název firmy): malá rezerva, ať nezůstanou okraje krajních písmen (28. 11.)
+    const px = r.tight ? (h > 0 ? 0.15 * h : 0.5) : h > 0 ? 0.6 * h : 1;
     const py = h > 0 ? Math.max(1, 0.25 * h) : 1;
     if (r.quad) return { ...r, quad: padQuad(r.quad, py, px), box: quadBox(padQuad(r.quad, py, px)) };
     return { ...r, box: { x: r.box.x - px, y: r.box.y - py, w: r.box.w + 2 * px, h: r.box.h + 2 * py } };
