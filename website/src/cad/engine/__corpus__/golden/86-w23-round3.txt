@@ -1,0 +1,158 @@
+=== run 1 ===
+✓ nový díl „Deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ materiál „1.2379“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 8: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3, měřítko 1:1, pohledy přední, horní, iso – výsledek po vyhodnocení listu níže
+→ Chytré kóty (řetězově): 4 kót a popisů – horní 3, přední 1 · očekávaných rozměrů 4 – výsledek po vyhodnocení listu níže
+→ nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
+→ razítko: číslo „MN-1“, kreslil „AI“ – výsledek po vyhodnocení listu níže
+ℹ řádek 13: list List 1: přesunuto do razítka – „Ra=1,6“ → drsnost „Ra 1,6“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 14: list List 1: přesunuto do razítka – „Brunýrovat“ → povrchová úprava „Brunýrovat“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 15: list List 1: přesunuto do razítka – „CHT 0,8 mm“ → tepelné zpracování „CHT 0,8 mm“ (údaje razítka se nepíšou jako poznámka)
+ℹ řádek 16: list List 1: přesunuto do razítka – „Nátěr šedý“ → povrchová úprava „Brunýrovat“ (rozpor – ponecháno) (údaje razítka se nepíšou jako poznámka)
+⚠ řádek 16: list List 1: rozpor v razítku – povrchová úprava: v razítku „Brunýrovat“, poznámka „Nátěr šedý“ – ponecháno „Brunýrovat“ (jednu hodnotu zvolte příkazem výkres razítko povrch="…")
+✗ řádek 17: list List 1: údaj razítka mimo svou buňku razítka – „Mat. 11 523“: materiál „11 523“ se liší od materiálu modelu „1.2379“ – materiál razítka je materiál modelu; jiný materiál zadejte modelu (materiál 11 523), poznámkou ne
+✗ řádek 18: list List 1: text není strojařsky heslovitý – a4 text kóty „Odmastit“ je pokyn („odmastit“) – u značky jen technický údaj, pokyny na výkres nepatří (a dalších 1: a4 text kóty „Odmastit“ nahrazuje měřenou hodnotu 100)
+✗ řádek 19: list List 1: údaj razítka mimo svou buňku razítka – a5 přípona kóty „černit“ obsahuje údaj razítka (povrchová úprava) – patří do razítka: výkres razítko povrch="černit"
+✗ řádek 20: list List 1: text není strojařsky heslovitý – a7 značka drsnosti „Nitridovat“ nemá hodnotu Ra / Rz – značka nese hodnotu (např. „Ra 0,8“), nanejvýš s jedním slovem způsobu výroby („Ra 0,4 lapovat“); slova bez hodnoty jsou poznámka
+→ značka drsnost Ra 0,4 lapovat → kóta 100 (horní, a4) · a7 – výsledek po vyhodnocení listu níže
+✗ řádek 22: list List 1: text není strojařsky heslovitý – revize A „Konzervovat olejem“ je pokyn („konzervovat“), ne popis změny výkresu – pokyny do tabulky revizí nepatří ani s „změna:“ / „→“ (popis změny např. „Ø20 → Ø22“, „doplněna díra Ø9“)
+→ revize A ?.?.???? „Ø9 → Ø10“ – v razítku revize A – výsledek po vyhodnocení listu níže
+✗ řádek 24: list List 1: text není strojařsky heslovitý – buňka razítka customer „Zabalit do VCI“ je pokyn („zabalit“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk (a dalších 1: buňka razítka project „Hrany otupit“ obsahuje údaj jiného pole (hrany))
+✗ řádek 25: list Technické požadavky: poznámky mimo hlavní list – název listu „Technické požadavky“ – výkres poznámek / požadavků k jinému dílu (číslo „…/2“) nevzniká: požadavky patří do razítka a k ploše na výkres dílu
+✗ řádek 26: list List 1: text není strojařsky heslovitý – „Po obrobení díl očistit,“: řádek pokračuje na dalším (věta rozdělená na řádky) – pište strojařsky heslovitě (např. „Hrany srazit 0,5×45°“ patří do razítka, „Brousit“ k ploše odkazem), ne větou
+→ popis F2 „Brousit“ v modelu – výkres ho přebírá jako odkaz se šipkou na plochu – výsledek po vyhodnocení listu níže
+Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (4, z toho vygenerovaných 4):
+  horní: Ø9 skrz · 100 · 60
+  přední: 12
+Poznámky a značky: osa souměrnosti · osa souměrnosti · Ra 0,4 lapovat
+Id (výkres upravit / smazat / značka na <id>): a1 osa souměrnosti (horní) · a2 osa souměrnosti (horní) · a3 Ø9 skrz (horní) · a4 100 (horní) · a5 60 (horní) · a6 12 (přední) · a7 Ra 0,4 lapovat (horní)
+Duplicity: žádné
+Kontrola kót: velikosti 4/4 · polohy 2/2 · tolerance neověřeny (funkční prvky nevyznačeny)
+Polohy děr: kóty od hran (horní) – na listu 2/2
+U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
+Razítko: název Deska · číslo MN-1 · kreslil AI · revize A · datum ?.?.???? · materiál 1.2379
+Revize (1): A ?.?.???? „Ø9 → Ø10“ (AI)
+Šablona razítka: ISO 7200 (výchozí) 180×48 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: tepelné zpracování „CHT 0,8 mm“ · povrchová úprava „Brunýrovat“ · drsnost „Ra 1,6“
+Údaje razítka (technické, v buňkách): tepelné zpracování „CHT 0,8 mm“ · tvrdost — · povrchová úprava „Brunýrovat“ · hrany — · nepředepsané „ISO 2768-mK“ · drsnost „Ra 1,6“ · technický pás razítka +10 mm (4 polí)
+Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků · místní popisy 2/8
+Z modelu: F2 „Brousit“ → horní (odkaz se šipkou)
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…100, y 0…12 mm · 1:1 · na listu x 44…144, y 251…263
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 1:1 · na listu x 44…144, y 157…217
+⚠ řádek 28: list List 1: rozpor v razítku – povrchová úprava: v razítku „Brunýrovat“, poznámka „Nátěr šedý“ – ponecháno „Brunýrovat“ (jednu hodnotu zvolte příkazem výkres razítko povrch="…")
+✓ Kvádr 1 (box) · přidáno 72000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 763,4 mm³ (5 % nástroje) · těleso platné
+
+Dokument: „Deska“ · díl · materiál 1.2379 (hustota podle: Ocel) · prvků 2 (2 ✓, 0 ✗)
+Popisy ploch (1): F2 „Brousit“
+Rozměry: 100 × 60 × 12 mm (X 0…100, Y 0…60, Z 0…12) · objem 71,24 cm³ · ploch 7 · hran 15
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 72000 mm³ · těleso platné – 100 × 60 × 12 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 763,4 mm³ (5 % nástroje) · těleso platné – Ø9 skrz v [50; 30; 12], osa Z
+=== run 2 ===
+✓ nový 2D výkres „Deska2D“ (mm) – nová záložka
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 0
+Rozsah: prázdný výkres
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 0
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
+=== run 3 ===
+✓ Křivka: e1
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 1 (Křivka 1)
+Rozsah: 0.0000,0.0000 – 100.0000,60.0000 (100.0000 × 60.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 1
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
+=== run 4 ===
+✗ TEXT: pravidla výkresu pro agenty – „HRC60“ obsahuje údaj razítka (tvrdost) – do razítka rozvržení: 2d upravit-atributy <razítko> TVRDOST="…" (nebo 2d rozvržení nové … TVRDOST="…")
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 1 (Křivka 1)
+Rozsah: 0.0000,0.0000 – 100.0000,60.0000 (100.0000 × 60.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 1
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
+=== run 5 ===
+✓ Text: e2
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 2 (Křivka 1, Text 1)
+Rozsah: 0.0000,0.0000 – 100.0000,148.5000 (100.0000 × 148.5000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 2
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
+=== run 6 ===
+✗ DIMLINEAR: pravidla výkresu pro agenty – text kóty „Kalit“ obsahuje údaj razítka (tepelné zpracování) – do razítka rozvržení: 2d upravit-atributy <razítko> TEPELNE="…" (nebo 2d rozvržení nové … TEPELNE="…")
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 2 (Křivka 1, Text 1)
+Rozsah: 0.0000,0.0000 – 100.0000,148.5000 (100.0000 × 148.5000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 2
+Poznámky nad razítkem: 0/5 řádků · odkazy s popisem 0/8
+=== run 7 ===
+✓ Odstavcový text: e3
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Odstavcový text 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 3
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8
+=== run 8 ===
+✓ blok „POZN“ (1 entit) – objekty nahrazeny vložením
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Vložení bloku 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 4
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8
+=== run 9 ===
+✗ INSERT: pravidla výkresu pro agenty – 2D výkres by měl 6 řádků volného textu (nejvýš 5): „Odmastit Konzervovat Zabalit“ – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Vložení bloku 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 4
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8
+=== run 10 ===
+✗ INSERT: pravidla výkresu pro agenty – 2D výkres by měl 6 řádků volného textu (nejvýš 5): „Odmastit Konzervovat Zabalit“ – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Vložení bloku 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 4
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8
+=== run 11 ===
+2D výkres · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Vložení bloku 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 4
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8
+
+2D výkres „Deska2D“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Křivka 1, Text 1, Vložení bloku 1)
+Rozsah: 0.0000,0.0000 – 130.0000,200.0000 (130.0000 × 200.0000)
+Hladiny (1), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 4
+Poznámky nad razítkem: 3/5 řádků · odkazy s popisem 0/8

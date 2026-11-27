@@ -239,8 +239,8 @@ describe("22i – příkazy výkresu: přijetí ℹ, výsledek po vyhodnocení l
   it("list bez nálezů: ✓ „list … vyhodnocen bez nálezů“ až po vyhodnocení, na posledním řádku bloku", { timeout: 120_000 }, async () => {
     const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres řez XZ odsazení -20');
     expect(at(r.entries, 3).map((e) => e.level)).toEqual(["note", "note"]);
-    expect(at(r.entries, 4).map((e) => `${e.level}:${e.text}`)).toEqual(["note:výkres: řez XZ odsazení -20 (rovina Y = 20) – výsledek po vyhodnocení listu níže", "ok:výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)"]);
-    expect(formatConsole(r)).toContain("✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)");
+    expect(at(r.entries, 4).map((e) => `${e.level}:${e.text}`)).toEqual(["note:výkres: řez XZ odsazení -20 (rovina Y = 20) – výsledek po vyhodnocení listu níže", "ok:výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)"]);
+    expect(formatConsole(r)).toContain("✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)");
   });
   it("výkres stav s řezem mimo těleso: výpis = a ✗ hned, žádné ✓", { timeout: 120_000 }, async () => {
     const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres řez XZ odsazení 500\nvýkres stav');

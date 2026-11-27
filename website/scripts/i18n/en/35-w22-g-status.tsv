@@ -21,7 +21,6 @@ těleso NEPLATNÉ	body INVALID
 těleso nezkontrolováno ({0})	body not checked ({0})
 těleso platné	body valid
 úběr {0} mm³	removed {0} mm³
-výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)	drawing: sheet “{0}” evaluated with no findings (views, sections, Smart dimensions)
 výsledek po vyhodnocení listu níže	result after the sheet is evaluated below
 výsledek po výpočtu níže	result after computation below
 velké těleso, {0} ploch – měřeno ze sítě, platnost se nekontroluje	large body, {0} faces – measured from the mesh, validity is not checked

@@ -193,7 +193,7 @@ function inView(v: PlacedView, q: Vec2, name: string) {
 }
 
 /** Bod cíle značky na listu: pohled (s přichycením) nebo detail; vrací pohled poznámky a bod listu (y dolů). */
-function targetPoint(res: DrawingResult, o: Partial<DrawingOptions>, view: string, at: Vec2): { view: string; sheet: Vec2; what: string; name: string } {
+function targetPoint(res: DrawingResult, o: Partial<DrawingOptions>, view: string, at: Vec2): { view: string; sheet: Vec2; what: string; name: string; snapped: boolean } {
   if (view.startsWith("detail:")) {
     const label = view.slice(7);
     const d = o.details?.find((x) => x.label === label);
@@ -202,7 +202,7 @@ function targetPoint(res: DrawingResult, o: Partial<DrawingOptions>, view: strin
     const q = agentToView(at);
     if (Math.hypot(q[0] - d.cx, q[1] - d.cy) > d.r * 1.05) throw new Error(tr("bod {0} leží mimo kruh detailu {1} (střed {2}, r {3})", fmtP(at), label, fmtP(viewToAgent([d.cx, d.cy])), fmtN(d.r)));
     const sheet: Vec2 = [placed.x + (q[0] - (d.cx - d.r)) * d.scale, placed.y + (q[1] - (d.cy - d.r)) * d.scale];
-    return { view: "sheet", sheet, what: "", name: tr("detail {0}", label) };
+    return { view: "sheet", sheet, what: "", name: tr("detail {0}", label), snapped: false };
   }
   const v = findView(res, o, view);
   const name = NAME(v.key, o);
@@ -210,7 +210,7 @@ function targetPoint(res: DrawingResult, o: Partial<DrawingOptions>, view: strin
   inView(v, q0, name);
   const s = snapView(v, q0);
   const what = s.what === "point" ? tr("bod geometrie") : s.what === "edge" ? tr("hrana") : s.what === "circle" ? tr("kružnice") : tr("volný bod");
-  return { view: v.key, sheet: annToSheet(res.views, v.key, s.q), what, name };
+  return { view: v.key, sheet: annToSheet(res.views, v.key, s.q), what, name, snapped: s.what === "point" || s.what === "edge" || s.what === "circle" };
 }
 
 /**
@@ -316,8 +316,9 @@ function obstacles(res: DrawingResult, anns: DrawingAnnotation[]): [number, numb
  * Značka podle zadání agenta: poloha na listu podle cíle (kóta, bod pohledu s přichycením, místo na listu), posun popisku
  * `shift` [mm listu, y nahoru] a poznámka v souřadnicích pohledu (asociativní s pohledem). Vrací poznámku a popis do protokolu.
  */
-export function makeMark(res: DrawingResult, o: Partial<DrawingOptions>, anns: DrawingAnnotation[], mark: MarkSpec, target: MarkTarget, shift?: Vec2): { ann: DrawingAnnotation; where: string } {
+export function makeMark(res: DrawingResult, o: Partial<DrawingOptions>, anns: DrawingAnnotation[], mark: MarkSpec, target: MarkTarget, shift?: Vec2): { ann: DrawingAnnotation; where: string; /** cíl je v geometrii (kóta / popis, bod, hrana nebo kružnice pohledu) – ne volný bod ani místo na listu */ attached: boolean } {
   let view = "sheet";
+  let attached = false;
   let anchor: Vec2;
   let where: string;
   /** směr od kóty ven (značka na kótu se odsadí tímto směrem) */
@@ -330,8 +331,10 @@ export function makeMark(res: DrawingResult, o: Partial<DrawingOptions>, anns: D
     anchor = ad.p;
     out = ad.out;
     where = tr("kóta {0} ({1}, {2})", annLabel(res.views, a), NAME(a.view, o), shortId(i));
+    attached = true;
   } else if ("view" in target) {
     const t = targetPoint(res, o, target.view, target.at);
+    attached = t.snapped;
     view = t.view;
     anchor = t.sheet;
     where = t.what ? tr("{0} {1} – {2}", t.name, fmtP(target.at), t.what) : `${t.name} ${fmtP(target.at)}`;
@@ -380,7 +383,7 @@ export function makeMark(res: DrawingResult, o: Partial<DrawingOptions>, anns: D
       break;
     }
   }
-  return { ann, where: `${tr(MARK_NAME[mark.type])} ${annLabel(res.views, ann)} → ${where}` };
+  return { ann, where: `${tr(MARK_NAME[mark.type])} ${annLabel(res.views, ann)} → ${where}`, attached };
 }
 
 // ---------------------------------------------------------------- ruční kóty

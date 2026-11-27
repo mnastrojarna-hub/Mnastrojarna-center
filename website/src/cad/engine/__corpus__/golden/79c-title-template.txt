@@ -10,10 +10,11 @@ Razítko: název Deska T · číslo DT-001 · kreslil — · revize — · datum
 Revize: žádné
 Šablona razítka: nástrojářská (všechna pole) 180×64 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo) · logo „data URL“ 600×200 px · SVG (vektor v SVG a PDF) · šablona hlavičky „Firma“
 Další pole razítka: firma „Firma s.r.o.“ · kontroloval „Novák“
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Šablony hlavičky: v dokumentu „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) [výchozí] · v Nastavení — · list: „Firma“
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ nový díl „Deska U“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
@@ -22,13 +23,14 @@ Razítko: název Deska U · číslo — · kreslil — · revize — · datum ?.
 Revize: žádné
 Šablona razítka: nástrojářská (všechna pole) 180×64 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo) · logo „data URL“ 600×200 px · SVG (vektor v SVG a PDF) · šablona hlavičky „Firma“
 Další pole razítka: firma „Firma s.r.o.“ · kontroloval „Novák“
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 → razítko: šablona kompaktní (180×27 mm) – výsledek po vyhodnocení listu níže
 → razítko: šablona hlavičky „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) – výsledek po vyhodnocení listu níže
 → šablona hlavičky „Firma“ smazána z dokumentu i z Nastavení (razítka listů zůstávají) – výsledek po vyhodnocení listu níže
 Šablony hlavičky: v dokumentu — · v Nastavení — · list: „Firma“
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 20000 mm³ · těleso platné
 

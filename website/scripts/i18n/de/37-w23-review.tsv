@@ -1,0 +1,54 @@
+# vlna 23, 2. kolo – nálezy oponenta (kanály textu, druhý výkres, JSON = agent, 2D, místní popisy)
+ (a dalších {0} nálezů – výkres stav)	 (und {0} weitere Befunde – zeichnung status)
+ (a dalších {0})	 (und {0} weitere)
+ ⚠ rozsah {0}–{1} přesahuje plochu {2} mm	 ⚠ Bereich {0}–{1} überschreitet die Fläche {2} mm
+„{0}“ → {1}: místní popis míří šipkou na plochu nebo hranu, ne na kótu – popis plochy zapište do modelu (poznámka F7 "{0}"; výkres ho převezme se šipkou), údaj ke kótě patří do kóty (výkres upravit <kóta> přípona=…)	„{0}“ → {1}: ein örtlicher Hinweis zeigt mit dem Pfeil auf eine Fläche oder Kante, nicht auf ein Maß – den Flächenhinweis ins Modell schreiben (hinweis F7 "{0}"; die Zeichnung übernimmt ihn mit Pfeil), eine Angabe zum Maß gehört ins Maß (zeichnung ändern <maß> suffix=…)
+„{0}“ → {1}: odkazová čára musí mířit na plochu nebo hranu – zapište popis do modelu k ploše (poznámka F7 "{0}"; výkres ho převezme se šipkou), nebo cílem zvolte hranu (pohled přední v x y na hraně)	„{0}“ → {1}: die Hinweislinie muss auf eine Fläche oder Kante zeigen – den Hinweis im Modell an die Fläche schreiben (hinweis F7 "{0}"; die Zeichnung übernimmt ihn mit Pfeil), oder eine Kante als Ziel wählen (ansicht vorne bei x y auf der Kante)
+„{0}“ není heslovitý: {1} – zkraťte (strojařsky, bez vět)	„{0}“ ist nicht stichwortartig: {1} – kürzen (technisch, ohne Sätze)
+„{0}“ obsahuje údaj razítka ({1}) – {2}	„{0}“ enthält eine Schriftfeldangabe ({1}) – {2}
+(a dalších {0}: {1})	(und {0} weitere: {1})
+{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)	{0} – das Dokument hätte {1} örtliche Hinweise (Hinweislinien mit Pfeil), höchstens {2}; Hinweise gleicher Bearbeitung zusammenfassen, Behandlung des ganzen Teils ins Schriftfeld, Überflüssiges aufheben (hinweis aufheben F…)
+{0} – dokument by měl {1} řádků volného textu, nejvýš {2} (všechny výkresy a listy dohromady): {3}; {4}	{0} – das Dokument hätte {1} Zeilen freien Text, höchstens {2} (alle Zeichnungen und Blätter zusammen): {3}; {4}
+{0} – volný text patří jen na hlavní list „{1}“ (pohledy s kótami) nad razítko, nejvýš {2} řádků v celém dokumentu; na dalších listech a výkresech jen pohledy, řezy, detaily, kóty a odkazy na geometrii	{0} – freier Text gehört nur auf das Hauptblatt „{1}“ (Ansichten mit Maßen) über das Schriftfeld, höchstens {2} Zeilen im ganzen Dokument; weitere Blätter und Zeichnungen nur Ansichten, Schnitte, Einzelheiten, Maße und Hinweislinien zur Geometrie
+{0} – výkres by měl {1} řádků volného textu nad razítkem (vysvětlivky úprav se počítají), nejvýš {2}: {3}; {4}	{0} – die Zeichnung hätte {1} Zeilen freien Text über dem Schriftfeld (Legenden der Behandlungen zählen), höchstens {2}: {3}; {4}
+{0} „{1}“ je na listu „{2}“ – volný text patří jen na hlavní list „{3}“ (pohledy s kótami) nad razítko; žádný list ani výkres jen s poznámkami	{0} „{1}“ ist auf Blatt „{2}“ – freier Text gehört nur auf das Hauptblatt „{3}“ (Ansichten mit Maßen) über das Schriftfeld; kein Blatt und keine Zeichnung nur mit Hinweisen
+{0} „{1}“: výška písma {2} mm – nejvýš {3} mm (vysoké písmo limit řádků neobejde)	{0} „{1}“: Schrifthöhe {2} mm – höchstens {3} mm (hohe Schrift umgeht die Zeilengrenze nicht)
+{0} {1} „{2}“ obsahuje údaj razítka ({3}) – patří do razítka: {4}	{0} {1} „{2}“ enthält eine Schriftfeldangabe ({3}) – gehört ins Schriftfeld: {4}
+{0} {1} „{2}“: {3} – u značky jen krátký technický údaj, ne poznámka	{0} {1} „{2}“: {3} – ein Symbol trägt nur eine kurze technische Angabe, keinen Hinweis
+{0} řádků volného textu nad razítkem (nejvýš {1} v celém dokumentu – všechny výkresy a listy): {2} – {3}	{0} Zeilen freier Text über dem Schriftfeld (höchstens {1} im ganzen Dokument – alle Zeichnungen und Blätter): {2} – {3}
+2D výkres by měl {0} odkazů s popisem (nejvýš {1}) – slučte popisy stejné úpravy, údaje celého dílu dejte do razítka	die 2D-Zeichnung hätte {0} Hinweislinien mit Text (höchstens {1}) – Hinweise gleicher Bearbeitung zusammenfassen, Angaben des ganzen Teils ins Schriftfeld
+2D výkres by měl {0} řádků volného textu (nejvýš {1}): {2} – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte	die 2D-Zeichnung hätte {0} Zeilen freien Text (höchstens {1}): {2} – Angaben des ganzen Teils ins Schriftfeld (technische Zeile), Flächenhinweis kurz mit Hinweislinie, Überflüssiges löschen
+a{0} „{1}“ je popis jen na výkrese – místní popis patří k ploše do modelu (poznámka F7 "{1}"), výkres ho převezme se šipkou (jeden zdroj); tento odkaz pak smažte (výkres smazat a{0})	a{0} „{1}“ ist ein Hinweis nur in der Zeichnung – ein örtlicher Hinweis gehört an die Fläche im Modell (hinweis F7 "{1}"), die Zeichnung übernimmt ihn mit Pfeil (eine Quelle); diese Hinweislinie dann löschen (zeichnung löschen a{0})
+a{0} „{1}“ u odkazu není heslovitý: {2} – popis u plochy krátce (např. „Brousit“)	a{0} „{1}“ an der Hinweislinie ist nicht stichwortartig: {2} – Flächenhinweis kurz (z. B. „Schleifen“)
+a{0} „{1}“: {2} u odkazu – údaje celého dílu do razítka ({3}), úprava jen plochy do modelu (úprava F7 tepelná "58+2 HRC")	a{0} „{1}“: {2} an einer Hinweislinie – Angaben des ganzen Teils ins Schriftfeld ({3}), Behandlung nur einer Fläche ins Modell (behandlung F7 wärme "58+2 HRC")
+atribut razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – {3}	Schriftfeldattribut {0} „{1}“ enthält eine Angabe eines anderen Feldes ({2}) – {3}
+atribut razítka {0} „{1}“: {2} – hodnota buňky heslovitě	Schriftfeldattribut {0} „{1}“: {2} – Feldwert stichwortartig
+buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}	Schriftfeld {0} „{1}“ enthält eine Angabe eines anderen Feldes ({2}) – in das eigene Feld schreiben: {3}
+buňka razítka {0} „{1}“: {2} – hodnota buňky heslovitě (např. tepelné="kalit a popustit", tvrdost="58-60 HRC")	Schriftfeld {0} „{1}“: {2} – Feldwert stichwortartig (z. B. wärmebehandlung="härten und anlassen", härte="58-60 HRC")
+do razítka rozvržení: 2d upravit-atributy <razítko> {0} (nebo 2d rozvržení nové … {0})	ins Schriftfeld des Layouts: 2d attedit <schriftfeld> {0} (oder 2d layout neu … {0})
+export odmítnut – {0}{1}	Export abgelehnt – {0}{1}
+list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše	Blatt „{0}“ wiederholt die Ansichten von Blatt „{1}“ und fügt nur Text hinzu – eine Zeichnung wird nicht in „Zeichnungsblatt + Hinweisblatt“ geteilt; löschen und die Angaben ins Schriftfeld / an die Fläche
+materiál „{0}“ obsahuje údaj jiného pole ({1}) – zapište ho do jeho buňky: {2}	Werkstoff „{0}“ enthält eine Angabe eines anderen Feldes ({1}) – in das eigene Feld schreiben: {2}
+materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379“, „C45“)	Werkstoff „{0}“: {1} – Werkstoffbezeichnung stichwortartig (z. B. „1.2379“, „C45“)
+model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	Modell {0} „{1}“ enthält {2} – Behandlung nur dieser Fläche = behandlung {0} wärme|oberfläche "…", Behandlung des ganzen Teils ins Schriftfeld ({3})
+model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	Modell {0} „{1}“: {2} – Flächenhinweis / Vorgabe kurz und stichwortartig (höchstens {3} Zeichen)
+oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	örtliche Behandlung {0} „{1}“ (F{2}): Bereich {3}–{4} mm überschreitet die {5} mm lange Fläche – auf dem Blatt abgeschnitten; Bereich im Modell korrigieren (behandlung F{2} … von a bis b)
+odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	Hinweislinie „{0}“ ist nicht stichwortartig: {1} – Flächenhinweis kurz (z. B. „Schleifen“)
+odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	Hinweislinie „{0}“ enthält eine Angabe des ganzen Teils ({1}) – {2}
+popis	Beschriftung
+Poznámky nad razítkem: {0}/{1} řádků · odkazy s popisem {2}/{3}	Hinweise über dem Schriftfeld: {0}/{1} Zeilen · Hinweislinien mit Text {2}/{3}
+Poznámky nad razítkem: {0}/{1} řádků{2} · místní popisy {3}/{4}	Hinweise über dem Schriftfeld: {0}/{1} Zeilen{2} · örtliche Hinweise {3}/{4}
+pravidla výkresu pro agenty – {0}	Zeichnungsregeln für Agenten – {0}
+předpona kóty	Maßpräfix
+přípona kóty	Maßsuffix
+revize {0} „{1}“ nese údaj razítka ({2}), který v razítku není – zapište ho do razítka: {3}	Änderung {0} „{1}“ trägt eine Schriftfeldangabe ({2}), die nicht im Schriftfeld steht – ins Schriftfeld schreiben: {3}
+revize {0} „{1}“: {2} – popis změny krátce (např. „Ø20 → Ø22“, „doplněna díra Ø9“)	Änderung {0} „{1}“: {2} – Änderung kurz beschreiben (z. B. „Ø20 → Ø22“, „Bohrung Ø9 ergänzt“)
+text kóty	Maßtext
+tolerance popisu	Toleranz der Beschriftung
+úpravy se stejným předpisem slučte do jedné vysvětlivky (stejný text = jeden řádek „Z1, Z2 …“), úpravu celého dílu dejte do razítka (výkres razítko tepelné=… tvrdost=…)	Behandlungen mit gleicher Vorgabe in eine Legende zusammenfassen (gleicher Text = eine Zeile „Z1, Z2 …“), Behandlung des ganzen Teils ins Schriftfeld (zeichnung schriftfeld wärmebehandlung=… härte=…)
+výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, razítko) · ruční text: {1} rad ℹ (pravidla pro agenty, člověka neomezují)	Zeichnung: Blatt „{0}“ ohne Befunde ausgewertet (Ansichten, Schnitte, Smarte Maße, Schriftfeld) · manueller Text: {1} Hinweise ℹ (Regeln für Agenten, sie schränken Menschen nicht ein)
+základna tolerance	Toleranzbezug
+listu	des Blatts
+výkresu	der Zeichnung
+název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}	Name {0} „{1}“ enthält eine Schriftfeldangabe ({2}) – gehört ins Schriftfeld: {3}
+název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)	Name {0} „{1}“: {2} – Blatt- / Zeichnungsname kurz (z. B. „Einzelheit“, „Schnitte“)

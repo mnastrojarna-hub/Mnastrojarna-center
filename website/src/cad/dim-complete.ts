@@ -18,6 +18,7 @@
  * - **výsledek nikdy neříká „kompletní“ ani „všech N“** – říká, co se zkontrolovalo (velikosti a/b, polohy c/d), co chybí
  *   a co se nekontroluje.
  */
+import { dimTextHidesValue } from "./drawing-notes-rules";
 import { tr } from "./i18n";
 import { auxInfo, countOf, expectedDims, presentDims, type DimKind } from "./dim-check";
 import { placementOf } from "./placements";
@@ -189,6 +190,8 @@ export function sheetFacts(views: readonly CheckView[], anns: readonly DrawingAn
     if (!cam) return;
     const ax = axisOf(cam.x);
     const up = axisOf(upOf(cam));
+    // D2 (vlna 23): kóta, jejíž text nahradil hodnotu slovy („Odmastit“), rozměr na listu neukazuje – velikost nepokrývá
+    if (dimTextHidesValue(a)) return;
     if (a.type === "dim" && (a.kind === "horizontal" || a.kind === "vertical" || a.kind === "aligned")) {
       let dir: "h" | "v" | null = a.kind === "horizontal" ? "h" : a.kind === "vertical" ? "v" : null;
       if (!dir && a.kind === "aligned") dir = Math.abs(a.b[1] - a.a[1]) < 1e-6 ? "h" : Math.abs(a.b[0] - a.a[0]) < 1e-6 ? "v" : null;

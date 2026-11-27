@@ -1,0 +1,31 @@
+# vlna 23, 2. kolo (nálezy oponenta): běžné zápisy klíčových údajů → razítko; věty v kótách, revizích a buňkách razítka ✗;
+# odkaz na kótu ✗; text na druhém výkrese téhož dílu ✗ (limit a hlavní list platí pro celý dokument); úpravy před
+# výkresem do limitu; 2D text agenta podle stejných pravidel
+nový díl "Deska"
+kvádr 100 60 12
+díra 9 skrz v 50 30
+materiál 1.2379
+úprava F3 tepelná "62+2 HRC" od 10 do 40
+úprava F4 povrchová "cernit" od 0 do 400
+výkres A3 měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres značka text "HRC 58-62" v 30 120
+výkres značka text "Tolerance ±0,1" v 30 115
+výkres značka text "0,5x45°" v 30 110
+výkres značka text "RAL 9005" v 30 105
+výkres značka text "N7" v 30 100
+výkres upravit a4 text="Kalit a popustit na 58-60 HRC, ostré hrany srazit"
+výkres revize A "Při jakékoli nejasnosti kontaktujte konstruktéra"
+výkres razítko název="Deska, kterou je nutné kalit na 58 HRC"
+výkres značka poznámka "Brousit" na Ø9
+výkres značka text "Odmastit" v 30 60 výška 7
+výkres značka text "Odmastit" v 30 60
+výkres nový "Detail"
+výkres pohledy iso
+výkres značka text "Konzervovat" v 30 60
+výkres výkresy 1
+výkres stav
+#--- run
+2d nový Deska2D
+#--- run
+2d mtext 10,200 @180,-60 "1. Kalit a popouštět na 58-60 HRC, pokud není uvedeno jinak.\P2. Hrany srazit."

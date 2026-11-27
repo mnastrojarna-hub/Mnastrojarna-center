@@ -35,17 +35,19 @@ Razítko: název Stojan · číslo — · kreslil — · revize — · datum ?.?
 Revize: žádné
 Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Pozice: 2 (přední 2) · přiřazené ručně 0 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
   přední: 1–2
 Kusovník: 2 řádků · nad razítkem
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
-  přední (x = X, y = Z): x 0…60, y 0…50 mm · 2:1 · na listu x 34…154, y 173…273
-  horní (x = X, y = Y): x 0…60, y 0…40 mm · 2:1 · na listu x 34…154, y 69…149
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+  přední (x = X, y = Z): x 0…60, y 0…50 mm · 2:1 · na listu x 46…166, y 161…261
+  horní (x = X, y = Y): x 0…60, y 0…40 mm · 2:1 · na listu x 46…166, y 57…137
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 
 Dokument: „Stojan“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Základ [0; 0; 0] ⚓ · Sloupek [30; 20; 10]

@@ -30,6 +30,7 @@
  * Čistý modul bez prohlížeče a bez jádra; stejný dokument a volby dají vždy stejný text.
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
+import { materialClass } from "./agent-strict";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
 import { processScript } from "./agent-process";
@@ -221,6 +222,13 @@ const WORDS = {
   supplyPart: ["druh", "supply", "beschaffung"],
   // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
   functionalMark: ["funkční", "functional", "funktional"],
+  // popisy ploch a oblastní úpravy v modelu (vlna 23 – agent-functional.ts)
+  pmiNote: ["poznámka", "note", "hinweis"],
+  pmiTreat: ["úprava", "treatment", "behandlung"],
+  pmiHeat: ["tepelná", "heat", "wärme"],
+  pmiSurface: ["povrchová", "surface", "oberfläche"],
+  pmiFrom: ["od", "from", "von"],
+  pmiTo: ["do", "to", "bis"],
   datumMark: ["základna", "datum", "bezug"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
@@ -1760,7 +1768,13 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
 
 /* ───────────────────────── díl ───────────────────────── */
 function emitDocMeta(c: Ctx, doc: CadDoc) {
-  if (doc.material && doc.material !== "ocel") c.line(`${c.w("material")} ${doc.material}`);
+  // označení, ze kterého se pozná JINÁ třída, než má dokument (třída změněná po označení – nabídka Materiál v GUI, `materiál
+  // nerez` po `materiál ČSN 11 423`): `materiál <označení>` nastaví třídu podle označení, proto se třída zapíše AŽ ZA označení
+  // (třída označení nechá). Dřív třída před označením → po přečtení třída označení = jiná hustota bez hlášky (vlna 22 kolo 7)
+  const des = doc.materialName?.trim();
+  const ofDes = des ? materialClass(des) : null;
+  const classAfter = !!ofDes && ofDes !== (doc.material || "ocel");
+  if (doc.material && doc.material !== "ocel" && !classAfter) c.line(`${c.w("material")} ${doc.material}`);
   if (doc.materialName?.trim()) {
     const l = `${c.w("material")} ${doc.materialName.trim()}`;
     let ok = false;
@@ -1774,6 +1788,7 @@ function emitDocMeta(c: Ctx, doc: CadDoc) {
     if (ok) c.line(l);
     else c.note(tr("označení materiálu „{0}“ nejde zapsat příkazem materiál (čte se jako třída materiálu)", doc.materialName));
   }
+  if (classAfter) c.line(`${c.w("material")} ${doc.material || "ocel"}`);
   if (doc.color && /^#[0-9a-f]{6}$/i.test(doc.color)) c.line(`${c.w("color")} ${doc.color}`);
   // druh položky kusovníku dílu (vlna 22, bod 19): `druh nakupovaný katalog "…" výrobce "…"`
   if (doc.supply && doc.kind !== "assembly") {
@@ -1878,6 +1893,17 @@ function emitFunctional(c: Ctx, doc: CadDoc) {
     if (m.kind === "datum") {
       if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
       else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    if (m.kind === "note" || m.kind === "treatment") {
+      // popis plochy / oblastní úprava v modelu (vlna 23): `poznámka F7 "…"` · `úprava F7 tepelná "…" od a do b`
+      const tq = m.text ? scriptQuote(m.text, true) : null;
+      if (!m.face || !tq) {
+        c.note(tr("popis / úpravu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
+        continue;
+      }
+      const range = `${m.from !== undefined ? ` ${c.w("pmiFrom")} ${scriptNum(m.from)}` : ""}${m.to !== undefined ? ` ${c.w("pmiTo")} ${scriptNum(m.to)}` : ""}`;
+      c.line(m.kind === "note" ? `${c.w("pmiNote")} F${m.face.index + 1} ${tq}` : `${c.w("pmiTreat")} F${m.face.index + 1} ${c.w(m.what === "surface" ? "pmiSurface" : "pmiHeat")} ${tq}${range}`);
       continue;
     }
     const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;

@@ -1,6 +1,6 @@
 // E2E – výkres textem pro agenty (balík drawing): listy, razítko, revize, značky, ruční kóty, úpravy, detaily,
 // rozšířený „výkres stav“ a export bez dialogu window.mncad.exportDrawing (PDF, DXF, DWG, SVG, PNG, CSV).
-// Díl textem → výkres A3 → kótovat → značky na Ø40 → razítko → nový list „Detail“ → výkres stav vše (id, souřadnice
+// Díl textem → výkres A3 → kótovat → značky na Ø40 → razítko → nový list „Detail“ (na listu 2 jen odkaz ke geometrii – vlna 23, R5) → výkres stav vše (id, souřadnice
 // pohledů) → export → výkresové prostředí ukáže značky na správném listu a přepne list podle „výkres list 1“.
 // Spuštění: E2E_BASE=http://localhost:3322 node e2e/cad-agent-drawing.e2e.cjs <složka>
 const { chromium } = require('playwright');
@@ -59,7 +59,7 @@ const first = (log, re) => (re.exec(log) || [])[0] || '';
   ok(doc1.props?.number === 'MN-1' && doc1.props?.author === 'AI' && doc1.materialName === 'ČSN 11 523', 'číslo / kreslil do vlastností dokumentu, materiál do označení materiálu');
 
   // ── 2. druhý list, stav všech listů (id, souřadnice, razítko) ──
-  const log2 = await run('výkres list nový "Detail"\nvýkres A4 pohledy přední měřítko 2:1\nvýkres detail přední v 45 10 poloměr 5 měřítko 5:1\nvýkres značka text "JEN LIST 2" v 20 20 výška 5\nvýkres stav vše');
+  const log2 = await run('výkres list nový "Detail"\nvýkres A4 pohledy přední měřítko 2:1\nvýkres detail přední v 45 10 poloměr 5 měřítko 5:1\nvýkres značka poznámka "JEN LIST 2" pohled přední v 50 10\nvýkres stav vše');
   fs.writeFileSync(S + 'log2.txt', log2);
   ok(!/^✗/m.test(log2), 'druhý list bez chyb' + (first(log2, /^✗.*$/m) ? ' – ' + first(log2, /^✗.*$/m) : ''));
   ok(/→ nový list 2 „Detail“/.test(log2) && /→ výkres: A4, pohledy přední, měřítko 2:1 · list 2 „Detail“/.test(log2), 'výkres list nový "Detail" + volby platí pro list 2');
@@ -122,11 +122,12 @@ const first = (log, re) => (re.exec(log) || [])[0] || '';
   // klik na záložku listu 1 → další příkaz pracuje s listem 1
   await p.locator('[data-drawing-workspace]').getByRole('button', { name: 'List 1', exact: true }).click();
   await p.waitForTimeout(1500);
-  const log5 = await run('výkres značka poznámka "ZE ZÁLOŽKY" na Ø40');
-  ok(/→ značka poznámka ZE ZÁLOŽKY → kóta Ø40.* · list 1 „List 1“/.test(log5), 'po kliknutí na záložku List 1 pracují příkazy s listem 1');
-  await p.waitForFunction(() => [...document.querySelectorAll('[data-sheet] > div svg text')].some((t) => t.textContent === 'ZE ZÁLOŽKY'), null, { timeout: 120000 }).catch(() => {});
+  // vlna 23 (R2): odkaz s popisem na kótu agent nesmí – po přepnutí záložky se ověří značkou drsnosti na kótě
+  const log5 = await run('výkres značka drsnost Ra 6,3 na Ø40');
+  ok(/→ značka drsnost Ra 6,3 → kóta Ø40.* · list 1 „List 1“/.test(log5), 'po kliknutí na záložku List 1 pracují příkazy s listem 1');
+  await p.waitForFunction(() => [...document.querySelectorAll('[data-sheet] > div svg text')].some((t) => (t.textContent || '').includes('6,3')), null, { timeout: 120000 }).catch(() => {});
   t = await sheetTexts();
-  ok(t.includes('ZE ZÁLOŽKY') && t.includes('Ra 0,8'), 'poznámka se zobrazila na listu 1 ve výkresovém prostředí');
+  ok(t.some((x) => x.includes('6,3')) && t.includes('Ra 0,8'), 'značka se zobrazila na listu 1 ve výkresovém prostředí');
   await p.screenshot({ path: S + 'sheet1.png' });
 
   // ── 6. smazat, list smazat ──

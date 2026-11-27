@@ -211,6 +211,10 @@ export function generalTolWarnings(doc: CadDoc, sheets: Pick<SheetOut, "meta" | 
 export async function exportDrawing(doc: CadDoc, format: DrawingExportFormat, opts: DrawingExportOptions, compute: DrawingCompute, extras?: DrawingExtras): Promise<DrawingExportResult> {
   if (!DRAWING_FORMATS.includes(format)) throw new Error(tr("Neznámý formát výkresu „{0}“ – pdf, dxf, dwg, svg, csv, png.", String(format)));
   if (!doc.features.length && !doc.components?.length) throw new Error(tr("Výkres: model je prázdný – nejdřív vymodelujte díl"));
+  // textová cesta (výkres export, window.mncad.exportDrawing, CLI --formats): list s porušením pravidel textu agenta se
+  // neexportuje (vlna 23, R4/R5/R7 – soubor s 10 větami nad razítkem ani „list poznámek“ nevznikne); export z GUI jde jinudy
+  // i výchozí list dokumentu bez výkresu (D5: název dílu a materiál v razítku)
+  (await import("./drawing-agent")).exportGuard(doc, doc.drawings?.length ? exportSheets(doc, opts.sheet) : []);
   const sheets = await drawingSheetsOut(doc, opts.sheet, compute, extras);
   const meta = sheets[0].meta;
   const sheet0 = doc.drawings?.[exportSheets(doc, opts.sheet)[0]];

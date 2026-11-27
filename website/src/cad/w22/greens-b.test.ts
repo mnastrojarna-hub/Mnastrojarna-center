@@ -15,6 +15,7 @@ import { MemoryWorkspace } from "../engine/memory-workspace";
 import { runScript } from "../engine/run";
 import { designationNote, designationPatch, knownMaterialId, withDesignation } from "../material-designation";
 import { emptyDoc, type CadDoc } from "../types";
+import { docToScript } from "../doc-script";
 import { realHost } from "./real-host";
 
 let host: () => EngineHost;
@@ -82,4 +83,62 @@ describe("greens b: GUI pole označení = pravidlo textového příkazu", () => 
     expect(withDesignation(part("ocel", "X"), "Ocel").materialName).toBeUndefined();
     expect(knownMaterialId("Stahl")).toBe("ocel");
   });
+});
+
+/**
+ * Kolo 7 (oponent kola 6, balík b): „jedno pravidlo“ musí platit pro SKUTEČNÝ stav dokumentu, ne jen pro designationPatch().
+ * Oprava dílu (razítko textem = pole razítka, `materiál nerez` po označení = nabídka Materiál: označení zůstává + ⚠) je ve stopě D
+ * (meta.ts, drawing-agent.ts, drawing-cmd.ts – vlastník bodu 22g). Tady zbylé rozdíly téhož textu:
+ * * komponenta `sestava komponenta "X" materiál "nerez"` po označení dřív označení SMAZALA (withDesignation), díl ho nechá –
+ *   dva výsledky téhož zadání (asm-agent.ts);
+ * * skript z dokumentu (doc-script.ts) psal třídu PŘED označení – po přečtení nastavilo označení svou třídu a hustota se tiše
+ *   změnila (dokument hliník + označení ČSN 11 423 → po skriptu ocel).
+ */
+describe("greens b (kolo 7): stejný text = stejný stav dílu i komponenty, skript vrací týž materiál", () => {
+  // stejné hlášky se v protokolu slučují (protocol.ts mergeEntries: `lines` = všechny řádky) – hledat i v `lines`
+  const atL = (r: Awaited<ReturnType<typeof runScript>>, line: number) => r.entries.filter((e) => e.line === line || e.lines?.includes(line));
+  const partState = async (lines: string[]) => {
+    const ws = new MemoryWorkspace();
+    await runScript(ws, ['nový díl "Deska A"', "kvádr 10 10 10", ...lines.map((t) => `materiál ${t}`)].join("\n"), host());
+    const d = ws.present();
+    return [d.material, d.materialName] as const;
+  };
+  const compRun = async (lines: string[]) => {
+    const ws = new MemoryWorkspace();
+    const r = await runScript(ws, ['nový díl "Deska A"', "kvádr 10 10 10", 'nová sestava "S"', 'vložit "Deska A"', ...lines.map((t) => `sestava komponenta "Deska A" materiál "${t}"`)].join("\n"), host());
+    const src = ws.present().components?.[0]?.source;
+    return { r, mat: src?.kind === "part" ? ([src.doc.material, src.doc.materialName] as const) : null };
+  };
+
+  it("komponenta: `materiál \"nerez\"` po `\"ČSN 11 423\"` = jako díl: třída nerez, označení zůstává, „→“ + ⚠ (žádné ✓ za materiál)", async () => {
+    const { r, mat } = await compRun(["ČSN 11 423", "nerez"]);
+    expect(mat).toEqual(["nerez", "ČSN 11 423"]);
+    expect(mat).toEqual(await partState(["ČSN 11 423", "nerez"]));
+    const l6 = atL(r, 6);
+    expect(l6.filter((e) => e.level === "ok"), JSON.stringify(l6)).toEqual([]);
+    expect(l6.some((e) => e.level === "warn" && /^material\./.test(e.code ?? "")), JSON.stringify(l6)).toBe(true);
+    expect(l6.some((e) => e.code === "msg.note" && /materiál = Nerez.*„ČSN 11 423“ v razítku zůstává/.test(e.text ?? ""))).toBe(true);
+  }, 60_000);
+
+  it("komponenta: řada zadání dává po každém kroku týž materiál a označení jako příkaz dílu", async () => {
+    const seq = ["ČSN 11 423", "nerez", "Hardox 400", "EN AW-6082", "Ocel", "1.4301", "Hardox 400", "Nerez"];
+    for (let k = 1; k <= seq.length; k++) {
+      const steps = seq.slice(0, k);
+      const { mat } = await compRun(steps);
+      expect(mat, steps.join(" | ")).toEqual(await partState(steps));
+    }
+  }, 300_000);
+
+  it("skript z dokumentu: označení jiné třídy, než má dokument, se po přečtení vrátí se stejnou třídou (třída až za označením)", async () => {
+    const cases: [string, string | undefined][] = [["hlinik", "ČSN 11 423"], ["nerez", "ČSN 11 423"], ["ocel", "1.4301"], ["ocel", "ČSN 11 423"], ["hlinik", "EN AW-6082"], ["nerez", "Hardox 400"], ["ocel", "Hardox 400"], ["hlinik", undefined]];
+    for (const [material, materialName] of cases) {
+      const doc: CadDoc = { ...emptyDoc("Deska A"), material, ...(materialName ? { materialName } : {}) };
+      const s = docToScript(doc);
+      const ws = new MemoryWorkspace();
+      const r = await runScript(ws, s.text, host());
+      expect(r.entries.filter((e) => e.level === "error"), s.text).toEqual([]);
+      const d = ws.present();
+      expect([d.material, d.materialName], `${material} / ${materialName}: ${s.text}`).toEqual([material, materialName]);
+    }
+  }, 120_000);
 });

@@ -5,6 +5,7 @@
  * prohlížeče), DXF jako skica. Výsledek je dokument pro novou záložku.
  */
 import { internBlobs } from "../blobs";
+import { stampAgentNotes } from "../drawing-notes-rules";
 import { prepareImportWith } from "../formats/import-core";
 import { tr } from "../i18n";
 import { emptyDoc, uid, type CadDoc, type Feature } from "../types";
@@ -30,7 +31,10 @@ export async function readDocument(host: Pick<EngineHost, "inputs" | "kernel">, 
       throw new Error(tr("„{0}“ není platný JSON dokumentu: {1}", name, errText(e)));
     }
     if (!isDocJson(raw)) throw new Error(tr("„{0}“ není dokument MN CAD (chybí název nebo prvky)", name));
-    return { doc: internBlobs(stripModelRev(raw)), file: f.name }; // revize modelu patří souboru (engine/project-json.ts)
+    // revize modelu patří souboru (engine/project-json.ts); dokument otevřený ze souboru z disku (otevřít, CLI --open, HTTP
+    // open) nese text, který agent v tomto běhu nevytvořil – původ „loaded“ (vlna 23, D1: ⚠, ne ✗; co agent změní, je jeho),
+    // ať JSON tvrdí cokoli („by":"user" v souboru nekoupí víc než ⚠)
+    return { doc: stampAgentNotes(internBlobs(stripModelRev(raw)), "loaded"), file: f.name };
   }
   const file = new File([f.data as BlobPart], f.name.replace(/^.*[\\/]/, ""));
   const res = await prepareImportWith(file, (bytes, fileName) => host.kernel.stepSplit(bytes, fileName));
