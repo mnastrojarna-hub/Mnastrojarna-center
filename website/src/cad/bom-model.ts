@@ -263,13 +263,29 @@ export function docSupply(asm: CadDoc, key: (c: AsmComponent) => string): DocSup
   return { make: [...make.values()], standard: std.size, buy: buy.size };
 }
 
-/** jednořádkový souhrn dokumentace: „vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“ */
-export function docSupplyLine(s: DocSupply): string {
-  const missing = s.make.filter((m) => !m.drawing).length;
-  return tr("vyráběné {0}{1}, normálie {2}, nakupované {3}", s.make.length, missing ? tr(" (bez výkresu {0})", missing) : "", s.standard, s.buy);
+/** zastaralá kopie dílu v sestavě (asm-refresh.ts `staleHints`): co díl v záložce má a jak kopii obnovit */
+type StaleHintLike = { ref: string; number?: string; drawing: boolean };
+
+/**
+ * Jednořádkový souhrn dokumentace: „vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“. Kopie v sestavě bez výkresu,
+ * jejíž díl v záložce výkres má (`hints`), se nepočítá jako „bez výkresu“, ale zvlášť jako starší kopie (bod 22g, kolo 6) –
+ * výkres do výstupu sestavy přibude až po `sestava obnovit`.
+ */
+export function docSupplyLine(s: DocSupply, hints?: ReadonlyMap<string, StaleHintLike>): string {
+  const noDrw = s.make.filter((m) => !m.drawing);
+  const stale = noDrw.filter((m) => hints?.get(m.name)?.drawing).length;
+  const missing = noDrw.length - stale;
+  const paren = stale
+    ? missing
+      ? tr(" (bez výkresu {0}; starší kopie {1} – výkres má díl v záložce: sestava obnovit)", missing, stale)
+      : tr(" (starší kopie {0} – výkres má díl v záložce: sestava obnovit)", stale)
+    : missing
+      ? tr(" (bez výkresu {0})", missing)
+      : "";
+  return tr("vyráběné {0}{1}, normálie {2}, nakupované {3}", s.make.length, paren, s.standard, s.buy);
 }
 /** vyráběné díly, kterým chybí výkres nebo číslo: „Přidržovač (bez výkresu, bez čísla)“ */
-export function makeIncomplete(s: DocSupply, hints?: ReadonlyMap<string, { ref: string; number?: string; drawing: boolean }>): string[] {
+export function makeIncomplete(s: DocSupply, hints?: ReadonlyMap<string, StaleHintLike>): string[] {
   return s.make
     .filter((m) => !m.drawing || !m.number)
     .map((m) => {

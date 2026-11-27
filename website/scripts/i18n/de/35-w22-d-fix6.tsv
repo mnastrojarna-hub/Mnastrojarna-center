@@ -11,3 +11,5 @@ Kóta {0} znovu přichycena ke geometrii pohledu	Maß {0} wieder an die Ansichts
 odkazová čára × kóta	Hinweislinie × Maß
 odkazová čára × kotva jiné pozice	Hinweislinie × Ankerpunkt einer anderen Position
 Vyberte novou geometrii kóty {0} v pohledu (hranu, kružnici nebo dva body) a umístěte ji · Esc zruší	Neue Geometrie für Maß {0} in der Ansicht wählen (Kante, Kreis oder zwei Punkte) und platzieren · Esc bricht ab
+ (bez výkresu {0}; starší kopie {1} – výkres má díl v záložce: sestava obnovit)	 (ohne Zeichnung {0}; ältere Kopie {1} – das Teil im Reiter hat die Zeichnung: baugruppe aktualisieren)
+ (starší kopie {0} – výkres má díl v záložce: sestava obnovit)	 (ältere Kopie {0} – das Teil im Reiter hat die Zeichnung: baugruppe aktualisieren)

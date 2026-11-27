@@ -4,10 +4,12 @@
 číslo {0}	number {0}
 ⚠ vybírám…	⚠ picking…
 ⚠ Vybrat znovu	⚠ Pick again
-✓ šablona hlavičky {0} uložena do dokumentu; v Nastavení jen pro tento běh{1}	✓ title template {0} saved to the document; in Settings for this run only{1}
+✓ šablona hlavičky {0} uložena do dokumentu; v Nastavení jen pro tento běh{1}	✓ title block template {0} saved to the document; in Settings for this run only{1}
 Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil). Kliknutím vyberete novou geometrii – kóta si ponechá id, toleranci i text.	The edge or circle the dimension is attached to is no longer in the view (the model changed). Click to pick new geometry – the dimension keeps its id, tolerance and text.
 kóta	dimension
 Kóta {0} znovu přichycena ke geometrii pohledu	Dimension {0} re-attached to the view geometry
 odkazová čára × kóta	leader × dimension
 odkazová čára × kotva jiné pozice	leader × another item's anchor
 Vyberte novou geometrii kóty {0} v pohledu (hranu, kružnici nebo dva body) a umístěte ji · Esc zruší	Pick new geometry for dimension {0} in the view (edge, circle or two points) and place it · Esc cancels
+ (bez výkresu {0}; starší kopie {1} – výkres má díl v záložce: sestava obnovit)	 (no drawing {0}; older copy {1} – the part in its tab has the drawing: assembly refresh)
+ (starší kopie {0} – výkres má díl v záložce: sestava obnovit)	 (older copy {0} – the part in its tab has the drawing: assembly refresh)

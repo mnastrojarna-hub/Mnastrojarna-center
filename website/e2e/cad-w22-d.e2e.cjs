@@ -90,6 +90,10 @@ async function scenario(args, label) {
   await p.locator('button', { hasText: /^Kusovník/ }).first().click().catch(() => {});
   await p.waitForTimeout(1200);
   ok((await p.locator('[data-bom-note="stale"]').count()) >= 1, `${label}: okno Kusovník – upozornění na zastaralou kopii`);
+  // kolo 6 (22g, recenze): text upozornění v okně = text příkazu `kusovník` – u Desky A rada obnovit, ne „materiál … v dílu“
+  const bomNotes = (await p.locator('[data-bom-note]').allInnerTexts().catch(() => [])).join('\n');
+  ok(/Deska A: v kusovníku chybí číslo DA-001, materiál 1\.2379 – díl v záložce je má, kopie v sestavě je starší: sestava obnovit #1/.test(bomNotes) && !/Deska A[^\n]*– materiál 1\.2379 v dílu/.test(bomNotes) && !/bez čísla výkresu: Deska A/.test(bomNotes), `${label}: okno Kusovník – u starší kopie rada „sestava obnovit #1“ (ne „materiál 1.2379 v dílu“) – ` + bomNotes.replace(/\n/g, ' ¦ ').slice(0, 400));
+  ok(/vyráběné díly bez označení materiálu \(jen třída\): Přidržovač – materiál 1\.2379 v dílu/.test(bomNotes), `${label}: okno Kusovník – Přidržovač (bez materiálu v dílu) dál s radou doplnit v dílu`);
   await closeModal();
   await p.locator('[data-refresh-btn="all"]').first().click();
   await p.waitForTimeout(2500);

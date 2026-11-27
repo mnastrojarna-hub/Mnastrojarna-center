@@ -9,7 +9,7 @@
  */
 import { bomWarnings } from "@/cad/agent-asm";
 import type { BomRow } from "@/cad/assembly";
-import { copyFieldsText, copyState, originName, staleCopies, staleCopyText } from "@/cad/asm-refresh";
+import { copyFieldsText, copyState, originName, staleCopies, staleCopyText, staleHints } from "@/cad/asm-refresh";
 import { defaultSupply, supplyOf, supplyOptions, supplyWord } from "@/cad/bom-model";
 import { tr } from "@/cad/i18n";
 import type { AsmComponent, CadDoc, SupplyInfo, SupplyKind } from "@/cad/types";
@@ -19,10 +19,13 @@ const input = "w-full rounded border border-[#cfd6de] px-2 py-1 text-[12px]";
 
 export type PartLookup = (name: string) => CadDoc | null;
 
-/** upozornění k tabulce Kusovník: zastaralé kopie dílů (s obnovou) a co chybí vyráběným dílům – stejné texty jako příkaz `kusovník` */
+/**
+ * upozornění k tabulce Kusovník: zastaralé kopie dílů (s obnovou) a co chybí vyráběným dílům – stejné texty jako příkaz
+ * `kusovník` (asm-agent.ts: `bomWarnings(rows, staleHints(…))` – u starší kopie rada `sestava obnovit #N`, bod 22g, kolo 6)
+ */
 export function bomNotesOf(doc: CadDoc, rows: BomRow[], partOf: PartLookup): { text: string; stale?: boolean }[] {
   if (doc.kind !== "assembly") return [];
-  return [...staleCopies(doc, partOf).map((s) => ({ text: staleCopyText(s), stale: true })), ...bomWarnings(rows).map((text) => ({ text }))];
+  return [...staleCopies(doc, partOf).map((s) => ({ text: staleCopyText(s), stale: true })), ...bomWarnings(rows, staleHints(doc, partOf)).map((text) => ({ text }))];
 }
 
 /** jedno textové pole údaje druhu (uloží se při opuštění pole / Enter) */

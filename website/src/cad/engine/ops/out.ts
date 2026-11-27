@@ -30,6 +30,7 @@ import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
 import { modelId, sameModel } from "../../doc-outputs";
 import { sheetWarningCode } from "../sheet-eval";
+import { staleCopies, staleCopyText } from "../../asm-refresh";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
 
@@ -215,6 +216,9 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
     const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && !sameModel(s.issued, mid); });
     recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
   }
+  // 22g (kolo 6): výkres sestavy z kopie dílu starší než díl v záložce – řádek exportu to řekne sám (jako `--formats`),
+  // ne jen dřívější řádek změny dílu / listu; ✓ zápisu souboru zůstává, údaje v souboru jsou z vložení
+  if (f && d.kind === "assembly") for (const sc of staleCopies(d, (n) => ctx.ws.findPart(n))) e.code("asm.stale-copy", { text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", FMT, staleCopyText(sc)), indent: "  " });
   // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
   for (const w of p.warnings) e.code(sheetWarningCode(w.text) === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
 }

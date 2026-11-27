@@ -35,6 +35,7 @@
  * 22. „polohy n/n“ – nikdy z kóty, jejíž pomocná čára nevede na osu díry (shodná souřadnice jinde na listu)
  * 23. „Překryvy na listu: 0“ – nikdy, když odkazová čára pozice vede přes kotvu jiné pozice nebo přes kótu (čáry, text)
  * 24. kusovník u zastaralé kopie: nikdy rada „materiál … v dílu“ / „bez výkresu“, když díl v záložce údaj má – rada obnovit
+ *     (24b: totéž u `výkres export pdf vše`, v souhrnu `bom.docs` a v panelu Kusovník – asm-supply.test.ts)
  * 25. „uložena do Nastavení“ – jen kde Nastavení přežije běh (v CLI „jen pro tento běh“)
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
@@ -229,6 +230,30 @@ describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", async ()
     expect(notes2.filter((n) => n.code === "asm.stale-copy")).toEqual([]);
   }, 240_000);
 
+  it("24b (kolo 6, 22g): `výkres export pdf vše` a souhrn dokumentace u zastaralé kopie – rada obnovit, ne „bez výkresu, bez čísla“", async () => {
+    // repro S/w22/rev6d/r22g/d.txt: Deska A dostane po vložení materiál, číslo DA-001 a výkres; Přidržovač má výkres
+    const ws = new MemoryWorkspace();
+    clean(await run(ws, 'nový díl "Deska A"\nkvádr 100 60 20\nnový díl "Přidržovač"\nkvádr 40 30 10\nvýkres A4\nvýkres razítko číslo="PR-002"\nnová sestava "Nástroj"\nvložit "Deska A" ukotvit\nvložit "Přidržovač" v 10 10 20'));
+    const r = await run(ws, 'záložka "Deska A"\nmateriál 1.2379\nvýkres razítko číslo="DA-001"\nzáložka "Nástroj"\nvýkres A3\nvýkres export pdf vše');
+    clean(r);
+    const exp = r.entries.filter((e) => e.line === 6);
+    const miss = exp.filter((e) => /chybí výkres, číslo nebo označení materiálu/.test(e.text ?? "")).map((e) => e.text ?? "");
+    expect(miss).toHaveLength(1);
+    expect(miss[0]).not.toMatch(/Deska A \(bez výkresu/);
+    expect(miss[0]).toMatch(/Deska A \(výkres, číslo má díl v záložce, kopie v sestavě je starší: sestava obnovit #1\)/);
+    // řádek exportu sám řekne, že PDF sestavy je z kopie dílu (dřív jen dřívější řádek listu)
+    expect(exp.filter((e) => e.code === "asm.stale-copy").map((e) => e.text)).toEqual(["PDF sestavy se zapisuje z kopie dílu: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo, materiál, výkres) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení"]);
+    // souhrn dokumentace: starší kopie se nepočítá jako „bez výkresu“
+    const asm = ws.docOf!(ws.tabs().find((t) => t.title === "Nástroj")!.id)!;
+    const notes = asmDocNotes(asm, (n) => ws.findPart(n));
+    expect(notes[0]).toEqual({ code: "bom.docs", args: ["vyráběné 2 (starší kopie 1 – výkres má díl v záložce: sestava obnovit), normálie 0, nakupované 0"] });
+    // po obnově: žádná rada obnovit, žádné asm.stale-copy u exportu
+    const ok = await run(ws, 'záložka "Nástroj"\nsestava obnovit #1\nvýkres export pdf vše');
+    clean(ok);
+    expect(ok.entries.some((e) => e.code === "asm.stale-copy")).toBe(false);
+    expect(txt(ok)).not.toMatch(/sestava obnovit #1\)/);
+  }, 240_000);
+
   it("20 (kolo 3, bod 20): změna jen materiálu – stav, výstupy ani přepočítat vše netvrdí „odpovídá modelu“ / „Zbývá: nic“", async () => {
     const ws = new MemoryWorkspace();
     clean(await run(ws, `${PART}\nvýkres vydat`));
@@ -348,6 +373,25 @@ describe("greens D4 – čitelný výkres sestavy a šablony hlavičky (body 17,
     const ov = sheetOverlaps(s);
     expect(ov.total).toBe(1);
     expect(positionLines(s, {}, ov).join("\n")).not.toMatch(/Překryvy na listu: 0/);
+  });
+
+  it("23 (kolo 6, bod 17): odkaz přes kotvu jiné pozice nebo přes kótu (čára, text) → nikdy „Překryvy na listu: 0“", () => {
+    // repro S/w22/repro/17/repro-100.txt (odkaz 72 0,14 mm od kotvy 82) a repro.txt (odkaz 21 přes pomocnou čáru kóty 245)
+    const anchor = sheet({ balloons: [{ pos: 1, x: 60, y: 60, a: [110, 120], r: 4 }, { pos: 2, x: 40, y: 110, a: [85.1, 90], r: 4 }] });
+    const oa = sheetOverlaps(anchor);
+    expect(oa.byKind["leader-anchor"]).toBe(1);
+    expect(positionLines(anchor, {}, oa).join("\n")).not.toMatch(/Překryvy na listu: 0/);
+    const dimLine = sheet({ polys: [{ layer: "dim", pts: [[230, 40], [230, 140]] }], balloons: [{ pos: 3, x: 260, y: 70, a: [205, 110], r: 4 }] });
+    const od = sheetOverlaps(dimLine);
+    expect(od.byKind["leader-dim"]).toBe(1);
+    expect(positionLines(dimLine, {}, od).join("\n")).not.toMatch(/Překryvy na listu: 0/);
+    const dimText = sheet({ texts: [{ x: 150, y: 90, s: "100", size: 3.5, anchor: "middle", layer: "dim" }] as never, balloons: [{ pos: 4, x: 150, y: 60, a: [150, 110], r: 4 }] });
+    const ot = sheetOverlaps(dimText);
+    expect(ot.byKind["leader-dim"]).toBe(1);
+    expect(positionLines(dimText, {}, ot).join("\n")).not.toMatch(/Překryvy na listu: 0/);
+    // protipříklad: odkaz mimo kotvy i kóty = 0 (kontrola nehlásí falešný nález)
+    const clear = sheet({ polys: [{ layer: "dim", pts: [[330, 40], [330, 140]] }], balloons: [{ pos: 5, x: 60, y: 200, a: [100, 200], r: 4 }] });
+    expect(sheetOverlaps(clear).total).toBe(0);
   });
 
   it("15: „nevešlo se 0“ jen bez ztracených pozic; zámek jen s uloženou polohou", () => {

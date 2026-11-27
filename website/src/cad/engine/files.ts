@@ -393,7 +393,9 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
   }
   const sheets = await documentSheets(env, d);
   // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
-  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source))) : [];
+  // díly v záložkách: zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` jako v `kusovník`
+  // a `--formats` (bod 22g, kolo 6 – i `výkres export pdf vše`)
+  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source)), staleHints(d, (x) => env.ws.findPart(x))) : [];
   const warnings = [...sheetWarnings(sheets), ...(miss.length ? [{ sheet: "", text: tr("vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}", miss.join(", ")) }] : [])];
   if (format === "pdf") {
     const data = await drawingsToPdf(sheets, await hostPdfFonts(env.fonts), d.name, modelId(d).rev);
@@ -492,9 +494,10 @@ export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "draw
 export function asmDocNotes(d: CadDoc, partOf?: (name: string) => CadDoc | null | undefined): OutNote[] {
   if (d.kind !== "assembly" || !d.components?.length) return [];
   const s = docSupply(d, (c) => sourceKey(c.source));
-  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s)] }];
   // díly v záložkách (`partOf`): zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` (bod 22g)
-  const miss = makeIncomplete(s, staleHints(d, partOf));
+  const hints = staleHints(d, partOf);
+  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s, hints)] }];
+  const miss = makeIncomplete(s, hints);
   if (miss.length) out.push({ code: "bom.make-incomplete", args: [miss.join(", ")] });
   return out;
 }
