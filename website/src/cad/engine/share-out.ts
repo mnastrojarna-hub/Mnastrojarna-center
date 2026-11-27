@@ -17,7 +17,7 @@
  * úložiště, na které se šlo.
  */
 import { tr } from "../i18n";
-import { createShareLink, probeSelfStore, SELF_STORE_PATH, selfStoreAnswered, selfStoreBase, selfStoreProbeError, shareStoreConfigured, storeUnavailable, type ShareMode, type ShareOptions, type ShareResult, type ShareView } from "../share";
+import { createShareLink, probeSelfStore, SELF_STORE_PATH, selfStoreBase, selfStoreProbeError, shareStoreConfigured, storeDownText, storeUnavailable, type ShareMode, type ShareOptions, type ShareResult, type ShareView } from "../share";
 import type { CadDoc } from "../types";
 import type { Code, CodeEntryInit } from "./codes";
 import type { ShareInfo } from "./protocol-types";
@@ -79,16 +79,6 @@ export type ShareRequest = {
 export type ShareNote = { code: Code } & Pick<CodeEntryInit, "args" | "text">;
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-/**
- * Proč je úložiště nedostupné: odpovědělo-li `?ping` chybou (HTTP stav + chyba zavaděče index.php – staré PHP, zakázané
- * funkce, chybějící skript, síť), nese text TEN důvod, ne obecné „neodpovídá“ (vlna 22 kolo 6, bod 16 – GUI `withReason`).
- */
-const storeDownText = (where: string): string => {
-  const probe = selfStoreProbeError();
-  if (probe && selfStoreAnswered()) return tr("úložiště krátkých odkazů ({0}) nefunguje – {1}", where, probe);
-  // server neodpověděl vůbec (síť, časový limit): „neodpovídá“ je pravda, důvod z `?ping` se připojí
-  return tr("úložiště krátkých odkazů neodpovídá ({0})", where) + (probe ? ` – ${probe}` : "");
-};
 
 /** text ⚠ share.fallback-link: proč, a jak dlouhý je náhradní odkaz */
 const fallbackText = (r: ShareResult, why: string) =>

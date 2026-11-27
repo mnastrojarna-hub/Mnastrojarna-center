@@ -456,6 +456,36 @@ describe("vlna 22 A4: žádné falešné zelené u ověření odkazu a softwarov
     }
   });
 
+  it("18b. (kolo 6, úplný běh) tatáž HTTP 404 úložiště: `sdílet úložiště` i `export … odkaz` (soubor) hlásí stejný text „nefunguje – HTTP 404“", async () => {
+    // Dřív: sdílení dokumentu „úložiště … (adresa) nefunguje – HTTP 404: …“, sdílení souboru (share-file.ts) pořád „neodpovídá (adresa)“
+    // – server přitom odpověděl. Jedno pravidlo `storeDownText` (share.ts) pro obě cesty.
+    setLang("cs");
+    const { resetShareProbe } = await import("../share");
+    const { shareWithPolicy } = await import("../engine/share-out");
+    const { shareFile } = await import("../share-file");
+    const store = "http://127.0.0.1:9/cad/share/";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<!doctype html><title>404</title>", { status: 404, headers: { "content-type": "text/html" } })));
+    try {
+      resetShareProbe();
+      const notes: { code: string; text?: string }[] = [];
+      expect(await shareWithPolicy(doc, { days: 10, view: "model", want: "store", base: "https://example.test/cad", store }, (n) => notes.push(n))).toBeNull();
+      expect(notes.map((n) => n.code)).toEqual(["share.store-unavailable"]);
+      const docText = notes[0].text ?? "";
+      expect(docText).toMatch(/^úložiště krátkých odkazů \(http:\/\/127\.0\.0\.1:9\/cad\/share\/\) nefunguje – HTTP 404/);
+      resetShareProbe();
+      const err = await shareFile({ name: "Deska.step", mime: "model/step", data: new Uint8Array(16) }, { store }).then(
+        () => null,
+        (e: Error & { unavailable?: boolean }) => e,
+      );
+      expect(err).toMatchObject({ name: "FileStoreError", unavailable: true });
+      expect(err!.message).toBe(docText);
+      expect(err!.message).not.toMatch(/neodpovídá/);
+    } finally {
+      vi.unstubAllGlobals();
+      resetShareProbe();
+    }
+  });
+
   it("19. (kolo 6) poznámka nad softwarově VYKRESLENÝM modelem není chyba: žádné „3D okno nelze spustit“ ani barvy chyby (cs/en/de)", async () => {
     const { createElement } = await import("react");
     const { renderToStaticMarkup } = await import("react-dom/server");

@@ -277,6 +277,24 @@ function probePoint(body: Shape, box: Box): Vec3 {
   return [(box[0][0] + box[1][0]) / 2, (box[0][1] + box[1][1]) / 2, (box[0][2] + box[1][2]) / 2];
 }
 
+const ID12 = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+/** klouzání dokázané zmenšeným A: A zmenšené o `SLIDE_RET` k středu obálky se hranolů ploch plného B (dráha o `v`) nedotkne */
+function slideByA(a: Leaf, movedB: unknown, v: Vec3): boolean {
+  const sa = retracted(a.body.wrapped, a.box, ID12, SLIDE_RET) as { delete(): void } | null;
+  if (!sa) return false;
+  const pr = prismCompound(movedB, v);
+  try {
+    const h = pr ? extrema(sa, pr.comp) : null;
+    return !!h && h.d > 1e-7;
+  } finally {
+    if (pr) {
+      for (const x of pr.parts) x.delete();
+      pr.comp.delete();
+    }
+    sa.delete();
+  }
+}
+
 /**
  * Nejmenší vzdálenost listu A od dráhy listu B posunutého o `v` (vše v souřadnicích A; B v počáteční poloze `m`): hranoly všech
  * ploch B (MakePrism plochy – hranol tělesa jádro neumí spolehlivě) složené do jednoho tvaru; A celé uvnitř dráhy = úsečka
@@ -294,7 +312,11 @@ function leafSweep(a: Leaf, b: Leaf, m: number[], v: Vec3, touching: boolean): L
       try {
         const h2 = pr ? extrema(a.body.wrapped, pr.comp) : null;
         if (!h2) return null;
-        const slide = h2.d > 1e-7;
+        let slide = h2.d > 1e-7;
+        // Zmenšení dutého B (pouzdro, deska s dírou) zúží díru a dráha „zajede“ do A i při čistém klouzání. Stejně platný důkaz
+        // klouzání: A zmenšené o tutéž toleranci se dráhy plného B nedotkne (= obrácené pořadí dvojice, dráha ale z hranolů B,
+        // které ji vystihnou – `sweepSafe`). Bez toho rozhodovalo, který list je „bezpečný“, a ne geometrie (kolo 6).
+        if (!slide) slide = slideByA(a, moved, v);
         return { d: 0, inside: !slide, pen: slide ? 0 : Infinity, ...(h2.p1 ? { p1: h2.p1 } : {}), ...(h2.p2 ? { p2: h2.p2 } : {}) };
       } finally {
         if (pr) {
@@ -374,14 +396,21 @@ function sweepSafe(leaf: Leaf, dir: Vec3): boolean {
         ad = new oc.BRepAdaptor_Surface(oc.TopoDS.Face(exp.Current()), true);
         const t = ad.GetType();
         if (t === T.GeomAbs_Plane) continue;
-        if (t === T.GeomAbs_Cylinder || t === T.GeomAbs_Cone) {
-          const g = t === T.GeomAbs_Cylinder ? ad.Cylinder() : ad.Cone();
+        if (t === T.GeomAbs_Cylinder) {
+          const g = ad.Cylinder();
           const ax = g.Axis();
           const d = ax.Direction();
           safe = along(d);
           d.delete();
           ax.delete();
           g.delete();
+          continue;
+        }
+        if (t === T.GeomAbs_Cone) {
+          // gp_Cone jádro WASM nevydá (`Cone()` hází „unbound types“ – dřív tím bylo každé sražení „nebezpečné“, pořadí dvojice
+          // pevné a pouzdro se sraženým sloupkem se půlilo až do vyčerpání rozpočtu: clash.uncertain v syntetickém nástroji)
+          const a = coneAxis(oc, ad);
+          safe = !!a && along({ X: () => a[0], Y: () => a[1], Z: () => a[2] });
           continue;
         }
         if (t === T.GeomAbs_SurfaceOfExtrusion) {
@@ -403,6 +432,40 @@ function sweepSafe(leaf: Leaf, dir: Vec3): boolean {
   if (safeCache.size >= 4000) safeCache.delete(safeCache.keys().next().value!);
   safeCache.set(key, safe);
   return safe;
+}
+
+/**
+ * Osa kuželové plochy ze tří bodů jedné kružnice v = konst. (rovnoběžka kužele leží v rovině kolmé na osu): normála té roviny.
+ * null = osu nejde spolehlivě určit (úzký rozsah u, vrchol) – volající plochu bere jako nebezpečnou.
+ */
+function coneAxis(oc: Oc, ad: any): Vec3 | null {
+  const u1 = ad.FirstUParameter() as number;
+  const u2 = ad.LastUParameter() as number;
+  const v1 = ad.FirstVParameter() as number;
+  const v2 = ad.LastVParameter() as number;
+  if (![u1, u2, v1, v2].every(Number.isFinite) || !(u2 > u1)) return null;
+  const pnt = new oc.gp_Pnt();
+  try {
+    const P = (u: number, v: number): Vec3 => {
+      ad.D0(u, v, pnt);
+      return [pnt.X(), pnt.Y(), pnt.Z()];
+    };
+    for (const f of [0.5, 0.25, 0.75]) {
+      const v = v1 + (v2 - v1) * f;
+      const a = P(u1, v);
+      const b = P(u1 + (u2 - u1) / 3, v);
+      const c = P(u1 + ((u2 - u1) * 2) / 3, v);
+      const e1: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const e2: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const n: Vec3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      const l = Math.hypot(n[0], n[1], n[2]);
+      // body nesmí ležet na přímce (sin úhlu > 1e-6)
+      if (l > 1e-6 * Math.hypot(e1[0], e1[1], e1[2]) * Math.hypot(e2[0], e2[1], e2[2]) && l > 1e-18) return [n[0] / l, n[1] / l, n[2] / l];
+    }
+    return null;
+  } finally {
+    pnt.delete();
+  }
 }
 
 /** matice 12 čísel [R po řádcích, t] → body: R·p + t */
