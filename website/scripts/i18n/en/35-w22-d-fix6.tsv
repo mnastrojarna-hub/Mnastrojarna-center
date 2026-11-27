@@ -1,0 +1,13 @@
+# vlna 22, fáze 2, kolo 6 (balík D): odkazy přes kotvy a kóty, rada obnovit kopii, Nastavení jen pro běh, nový výběr ztracené kóty
+{0} má díl v záložce, kopie v sestavě je starší: sestava obnovit {1}	{0} is in the part tab, the copy in the assembly is older: assembly refresh {1}
+{0}: v kusovníku chybí {1} – díl v záložce je má, kopie v sestavě je starší: sestava obnovit {2}	{0}: the BOM lacks {1} – the part in its tab has it, the copy in the assembly is older: assembly refresh {2}
+číslo {0}	number {0}
+⚠ vybírám…	⚠ picking…
+⚠ Vybrat znovu	⚠ Pick again
+✓ šablona hlavičky {0} uložena do dokumentu; v Nastavení jen pro tento běh{1}	✓ title template {0} saved to the document; in Settings for this run only{1}
+Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil). Kliknutím vyberete novou geometrii – kóta si ponechá id, toleranci i text.	The edge or circle the dimension is attached to is no longer in the view (the model changed). Click to pick new geometry – the dimension keeps its id, tolerance and text.
+kóta	dimension
+Kóta {0} znovu přichycena ke geometrii pohledu	Dimension {0} re-attached to the view geometry
+odkazová čára × kóta	leader × dimension
+odkazová čára × kotva jiné pozice	leader × another item's anchor
+Vyberte novou geometrii kóty {0} v pohledu (hranu, kružnici nebo dva body) a umístěte ji · Esc zruší	Pick new geometry for dimension {0} in the view (edge, circle or two points) and place it · Esc cancels

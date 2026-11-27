@@ -6,6 +6,8 @@
  * dvojice, které dělají list nečitelným:
  * - balónek × balónek, balónek × text / kóta, balónek × tabulka / razítko, balónek × rám, balónek × geometrie pohledu;
  * - odkazová čára × cizí balónek; křížení odkazových čar (počítá se zvlášť – „křížení odkazů“);
+ * - odkazová čára × kotva jiné pozice (blíž než 1 mm – nejde poznat, ke které komponentě vede) a odkazová čára × kóta
+ *   (kótovací, pomocná čára nebo text kóty / poznámky) – vlna 22, bod 17, kolo 6 (dřív „0“ i s odkazem 0,14 mm od cizí kotvy);
  * - text × text (kóty × kóty, poznámky × kóty …) mimo tabulky; text × geometrie pohledu (poznámka / kóta přes obrys);
  * - tabulka (kusovník, tabulka děr, pružin, revizí, razítko) × geometrie pohledu; text přes rám listu.
  * Výsledek: počty po druzích, místa (obdélníky na listu pro značky v GUI) a rada. „Překryvy 0“ smí hlásit jen tato kontrola
@@ -13,12 +15,14 @@
  */
 import type { DrawingResult, DText } from "./drawing";
 import { textBox } from "./drawing";
-import { countCrossings, segmentHitsCircle } from "./drawing-balloons";
+import { countCrossings, segmentHitsCircle, segmentsCross } from "./drawing-balloons";
 import { tr } from "./i18n";
 import type { Vec2 } from "./types";
 
-export type OverlapKind = "balloon-balloon" | "balloon-text" | "balloon-table" | "balloon-frame" | "balloon-geometry" | "leader-balloon" | "text-text" | "text-geometry" | "table-geometry" | "text-frame" | "table-frame";
-export const OVERLAP_KINDS: OverlapKind[] = ["balloon-balloon", "balloon-text", "balloon-table", "balloon-frame", "balloon-geometry", "leader-balloon", "text-text", "text-geometry", "table-geometry", "text-frame", "table-frame"];
+export type OverlapKind = "balloon-balloon" | "balloon-text" | "balloon-table" | "balloon-frame" | "balloon-geometry" | "leader-balloon" | "leader-anchor" | "leader-dim" | "text-text" | "text-geometry" | "table-geometry" | "text-frame" | "table-frame";
+export const OVERLAP_KINDS: OverlapKind[] = ["balloon-balloon", "balloon-text", "balloon-table", "balloon-frame", "balloon-geometry", "leader-balloon", "leader-anchor", "leader-dim", "text-text", "text-geometry", "table-geometry", "text-frame", "table-frame"];
+/** odkazová čára vede blíž než toto ke kotvě jiné pozice → nejde poznat, ke které komponentě patří [mm listu] */
+export const LEADER_ANCHOR_GAP = 1;
 export type OverlapHit = { kind: OverlapKind; /** obdélník místa na listu [x0, y0, x1, y1] (mm, y dolů) */ at: [number, number, number, number]; /** co se překrývá (číslo pozice, text) */ what: string };
 export type SheetOverlaps = {
   total: number;
@@ -63,6 +67,15 @@ class SegIndex {
       for (let gy = Math.floor(b[1] / this.C); gy <= Math.floor(b[3] / this.C); gy++) for (const i of this.cells.get(`${gx},${gy}`) ?? []) out.add(i);
     return [...out].map((i) => this.segs[i]);
   }
+}
+
+/** vzdálenost bodu `c` od úsečky ab a parametr nejbližšího bodu (0 = a, 1 = b) */
+function segPointDist(a: Vec2, b: Vec2, c: Vec2): { dist: number; t: number } {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const L2 = dx * dx + dy * dy;
+  const t = L2 > 1e-12 ? Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy) / L2)) : 0;
+  return { dist: Math.hypot(a[0] + dx * t - c[0], a[1] + dy * t - c[1]), t };
 }
 
 /** úsečka protíná obdélník (Liang–Barsky) */
@@ -124,6 +137,45 @@ export function sheetOverlaps(res: Pick<DrawingResult, "polys" | "texts" | "ball
   }
   const crossings = countCrossings(balloons.map((b) => ({ x: b.x, y: b.y, a: b.a! })));
 
+  // ---- odkazové čáry × kotvy jiných pozic a × kóty (čáry kót a texty mimo tabulky) – kolo 6
+  const leader = (b: (typeof balloons)[number]): [Vec2, Vec2] => {
+    const dx = b.a![0] - b.x;
+    const dy = b.a![1] - b.y;
+    const l = Math.hypot(dx, dy) || 1;
+    return [[b.x + (dx / l) * R(b), b.y + (dy / l) * R(b)], b.a!];
+  };
+  for (let i = 0; i < balloons.length; i++) {
+    const b = balloons[i];
+    const [p, q] = leader(b);
+    for (let j = 0; j < balloons.length; j++) {
+      const c = balloons[j];
+      if (i === j) continue;
+      const d = segPointDist(p, q, c.a!);
+      if (d.dist >= LEADER_ANCHOR_GAP) continue;
+      // kotva na samém konci odkazu (dvě kotvy u sebe) se počítá jednou za dvojici
+      if (d.t > 0.98 && j < i) continue;
+      push("leader-anchor", [c.a![0] - 1, c.a![1] - 1, c.a![0] + 1, c.a![1] + 1], `${b.pos} → ${c.pos}`);
+    }
+  }
+  // čáry kót: vrstva kót bez balónků (kroužek, odkaz, tečka kotvy) a bez výplní (šipky)
+  const own = (pts: Vec2[]) =>
+    balloons.some((b) => (pts.length > 8 && pts.every((x) => Math.abs(Math.hypot(x[0] - b.x, x[1] - b.y) - R(b)) < 0.05)) || (pts.length === 2 && pts.some((x) => Math.hypot(x[0] - b.a![0], x[1] - b.a![1]) < 1e-6)));
+  const dimSegs: [Vec2, Vec2][] = [];
+  for (const pl of res.polys) {
+    if (pl.layer !== "dim" || pl.fill || pl.img || own(pl.pts)) continue;
+    for (let i = 0; i + 1 < pl.pts.length; i++) dimSegs.push([pl.pts[i], pl.pts[i + 1]]);
+  }
+  for (const b of balloons) {
+    const [p, q] = leader(b);
+    const seg = dimSegs.find(([c, d]) => segmentsCross(p, q, c, d));
+    if (seg) {
+      push("leader-dim", [Math.min(seg[0][0], seg[1][0]), Math.min(seg[0][1], seg[1][1]), Math.max(seg[0][0], seg[1][0]), Math.max(seg[0][1], seg[1][1])], `${b.pos} × ${tr("kóta")}`);
+      continue;
+    }
+    const t = texts.find((x) => segInBox(p, q, shrink(x.box, 0.2)));
+    if (t) push("leader-dim", t.box, `${b.pos} × „${t.t.s}“`);
+  }
+
   // ---- texty
   for (let i = 0; i < texts.length; i++) {
     const a = shrink(texts[i].box, 0.25);
@@ -181,6 +233,8 @@ export function overlapKindText(k: OverlapKind): string {
     case "balloon-frame": return tr("balónek × rám");
     case "balloon-geometry": return tr("balónek × geometrie");
     case "leader-balloon": return tr("odkazová čára × balónek");
+    case "leader-anchor": return tr("odkazová čára × kotva jiné pozice");
+    case "leader-dim": return tr("odkazová čára × kóta");
     case "text-text": return tr("text × text");
     case "text-geometry": return tr("text × geometrie");
     case "table-geometry": return tr("tabulka × pohled");
@@ -193,7 +247,7 @@ export function overlapKindText(k: OverlapKind): string {
 export function overlapAdvice(o: SheetOverlaps): string {
   const k = o.byKind;
   const tips: string[] = [];
-  if (k["balloon-balloon"] || k["balloon-text"] || k["balloon-geometry"] || k["leader-balloon"] || k["balloon-table"] || k["balloon-frame"])
+  if (k["balloon-balloon"] || k["balloon-text"] || k["balloon-geometry"] || k["leader-balloon"] || k["leader-anchor"] || k["leader-dim"] || k["balloon-table"] || k["balloon-frame"])
     tips.push(tr("rozdělte pozice do pohledů (výkres pozice pohled horní 13-30), posuňte a zamkněte pozici (výkres vygenerované posun pos:7 dx dy · výkres pozice zamknout 7) nebo zvolte větší formát"));
   if (k["table-frame"]) tips.push(tr("tabulka přes čáru nebo centrovací značku rámu: kusovník nad razítkem / na samostatném listu (výkres kusovník nad | list) nebo jiný formát"));
   if (k["table-geometry"]) tips.push(tr("kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list) nebo větší formát"));

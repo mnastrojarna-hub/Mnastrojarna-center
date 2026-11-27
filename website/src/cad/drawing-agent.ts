@@ -5,7 +5,7 @@
  * (tolerance, přípona, text) se podle klíče přenesou.
  * Příkazy pracují s aktivním listem (`výkres list N`, záložka listu ve výkresu) – viz `activeSheet`.
  */
-import { applyTemplate, defaultTemplateRec, deleteTemplate, findTemplate, sameName, saveTemplate, templateFromMeta, templatesLine, templateText, withDocTemplate, type TitleTemplateRec } from "./title-templates";
+import { applyTemplate, defaultTemplateRec, deleteTemplate, findTemplate, sameName, saveTemplate, settingsPersist, templateFromMeta, templatesLine, templateText, withDocTemplate, type TitleTemplateRec } from "./title-templates";
 import { overlapIssueText, sheetOverlaps } from "./drawing-overlaps";
 import { positionLines } from "./drawing-pos-agent";
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
@@ -719,7 +719,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
               put({ ...sheet(), meta: { ...sheet().meta, titleTpl: rec.name } });
             }
             doc.titleTemplates = saveTemplate(doc, rec, c.setDefault).titleTemplates;
-            log.push(tr("✓ šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}", templateText(rec), c.setDefault ? tr(" · výchozí pro nové listy") : ""));
+            // CLI / bez úložiště prohlížeče: Nastavení platí jen pro tento běh – neříkat „uložena do Nastavení“ (bod 22j, kolo 6)
+            log.push(settingsPersist() ? tr("✓ šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}", templateText(rec), c.setDefault ? tr(" · výchozí pro nové listy") : "") : tr("✓ šablona hlavičky {0} uložena do dokumentu; v Nastavení jen pro tento běh{1}", templateText(rec), c.setDefault ? tr(" · výchozí pro nové listy") : ""));
             return done({ changed: true, open: false });
           }
           case "use": {

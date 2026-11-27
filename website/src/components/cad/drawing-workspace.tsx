@@ -12,7 +12,7 @@ import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, dimLabel, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
-import { settleDim, userDimAttach } from "@/cad/drawing-dim-attach";
+import { rebindDim, settleDim, userDimAttach } from "@/cad/drawing-dim-attach";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
@@ -266,6 +266,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const [circKind, setCircKind] = useState<CircKind>("auto");
   /** vybraná geometrie rozpracované kóty; `inv` = kružnice vybraná se Shiftem (průměr ↔ poloměr) */
   const [dimSel, setDimSel] = useState<(DimSel & { inv?: boolean })[]>([]);
+  /** ztracená kóta (⚠ geometrie v pohledu není), které uživatel vybírá novou geometrii – další kóta nástroje ji nahradí (kolo 4/6) */
+  const [repickDim, setRepickDim] = useState<string | null>(null);
   /** kurzor nad listem: poloha v mm listu, v px náhledu a stav klávesy Shift */
   const [cursor, setCursor] = useState<{ q: Vec2; x: number; y: number; shift: boolean } | null>(null);
   /** pole u kurzoru po vložení kóty (tolerance / přípona, odsazení); `orig` = kóta tak, jak byla vložena (Esc ji vrátí) */
@@ -365,6 +367,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (annTool === "dim") return;
     setDimSel([]);
     setCursor(null);
+    setRepickDim(null); // nový výběr ztracené kóty končí s nástrojem Kóta (Esc, jiný nástroj)
   }, [annTool]);
   // pole u kurzoru patří existující kótě (po smazání kóty v seznamu zmizí)
   useEffect(() => {
@@ -903,6 +906,18 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       if (dimSel.length > 1) flash(tr("Tuto kombinaci nelze okótovat."));
       return setDimSel([]);
     }
+    // znovu vybraná geometrie ztracené kóty: nahradí ji (stejné id a údaje uživatele), nástroj se vypne
+    const old = repickDim ? ann.find((x): x is DimAnn => x.id === repickDim && x.type === "dim") : undefined;
+    if (old) {
+      const nb = rebindDim(old, { ...st.place, id: old.id } as DimAnn);
+      setAnn((l) => l.map((x) => (x.id === old.id ? nb : x)));
+      markDirty();
+      setDimSel([]);
+      setRepickDim(null);
+      setAnnTool(null);
+      flash(tr("Kóta {0} znovu přichycena ke geometrii pohledu", `a${ann.indexOf(old) + 1}`));
+      return;
+    }
     const a = { ...st.place, id: uid() } as DimAnn;
     addAnn(a);
     setDimSel([]);
@@ -1314,10 +1329,36 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                         ⚠
                       </button>
                     )}
-                    {(annState[a.id] ?? "ok") !== "ok" && (
+                    {(annState[a.id] ?? "ok") !== "ok" && !(a.type === "dim" && annState[a.id] === "lost") && (
                       <span data-ann-flag={annState[a.id]} className="shrink-0 cursor-help text-amber-600" title={annState[a.id] === "noView" ? (a.type === "dim" ? tr("Pohled kóty není na listu – kóta se nekreslí.") : tr("Pohled, ke kterému se poznámka váže, není na listu.")) : tr("Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.")}>
                         ⚠
                       </span>
+                    )}
+                    {a.type === "dim" && annState[a.id] === "lost" && (
+                      // ztracená kóta: jedním klikem výběr nové geometrie (nástroj Kóta; další kóta tuto nahradí – id, tolerance a
+                      // text zůstanou), jako „Vybrat plochu znovu“ u ztracené vazby sestavy (kolo 4 / 6)
+                      <button
+                        type="button"
+                        data-ann-flag="lost"
+                        data-dim-repick={a.id}
+                        data-dim-repicking={repickDim === a.id ? "1" : undefined}
+                        className={cn("shrink-0 cursor-pointer rounded border border-amber-300 bg-white px-1 text-[10.5px] font-semibold text-amber-700 hover:bg-amber-50", repickDim === a.id && "ring-1 ring-blue-400")}
+                        title={tr("Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil). Kliknutím vyberete novou geometrii – kóta si ponechá id, toleranci i text.")}
+                        onClick={() => {
+                          if (repickDim === a.id) {
+                            setRepickDim(null);
+                            setAnnTool(null);
+                            return;
+                          }
+                          setRepickDim(a.id);
+                          setAnnTool("dim");
+                          setAnnPts([]);
+                          setDimSel([]);
+                          flash(tr("Vyberte novou geometrii kóty {0} v pohledu (hranu, kružnici nebo dva body) a umístěte ji · Esc zruší", `a${i + 1}`));
+                        }}
+                      >
+                        {repickDim === a.id ? tr("⚠ vybírám…") : tr("⚠ Vybrat znovu")}
+                      </button>
                     )}
                     {a.type === "dim" && (
                       <>

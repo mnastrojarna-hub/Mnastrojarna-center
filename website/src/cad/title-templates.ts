@@ -93,6 +93,12 @@ export function deleteTemplate(doc: CadDoc, name: string): { doc: CadDoc; found:
   return { doc: inD ? { ...doc, titleTemplates: left.length ? left : undefined } : doc, found: inS || inD };
 }
 
+/** název výchozí šablony hlavičky nových listů z Nastavení (undefined = žádná) */
+export const defaultTemplateName = (): string | undefined => loadSettings().titleTemplateDefault || undefined;
+
+/** Nastavení přežije běh (prohlížeč s úložištěm) – v CLI / testech bez úložiště platí jen pro tento běh */
+export const settingsPersist = (): boolean => typeof localStorage !== "undefined";
+
 /** výchozí šablona hlavičky nových listů z Nastavení (null = žádná) */
 export function defaultTemplateRec(): TitleTemplateRec | null {
   const s = loadSettings();

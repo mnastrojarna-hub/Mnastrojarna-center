@@ -67,7 +67,12 @@ function normalize(text) {
         // krátká revize modelu (vlna 22: otisk obsahu včetně náhodných id prvků) – `r·a1b2c3` → `r·?`
         .replace(/r·[0-9a-f]{6}\b/g, 'r·?')
         .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '????-??-??')
-        .replace(/\b\d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g, '?.?.????'),
+        .replace(/\b\d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g, '?.?.????')
+        // šablona hlavičky (bod 22j, kolo 6): v prohlížeči jde i do Nastavení (úložiště), v Node / CLI jen pro tento běh –
+        // jediný záměrný rozdíl hostitelů v textu této hlášky
+        .replace(/uložena do dokumentu; v Nastavení jen pro tento běh/g, 'uložena do dokumentu i do Nastavení')
+        .replace(/saved to the document; in Settings for this run only/g, 'saved to the document and to Settings')
+        .replace(/im Dokument gespeichert; in den Einstellungen nur für diesen Lauf/g, 'im Dokument und in den Einstellungen gespeichert'),
     )
     .join('\n')
     .replace(/\s+$/, '');

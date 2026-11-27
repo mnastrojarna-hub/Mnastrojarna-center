@@ -316,7 +316,7 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
     }
     // sestava: úplnost výrobní dokumentace i bez výkresového výstupu (vlna 22, bod 19 – vyráběné bez výkresu / čísla)
     if (formatsFor(it.doc, p.formats).length)
-      for (const n of asmDocNotes(it.doc)) {
+      for (const n of asmDocNotes(it.doc, (x) => ws.findPart(x))) {
         // bez výkresového výstupu jen ℹ (přísný běh kvůli tomu nezastaví); výkres / kusovník ji hlásí jako ⚠ (writeDocFormat)
         const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), level: "note" });
         if (!rb.entries.some((x) => x.code === e.code && x.doc === e.doc && x.text === e.text)) rb.add(e);

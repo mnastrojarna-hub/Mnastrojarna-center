@@ -1,0 +1,13 @@
+# vlna 22, fáze 2, kolo 6 (balík D): odkazy přes kotvy a kóty, rada obnovit kopii, Nastavení jen pro běh, nový výběr ztracené kóty
+{0} má díl v záložce, kopie v sestavě je starší: sestava obnovit {1}	{0} hat das Teil im Reiter, die Kopie in der Baugruppe ist älter: baugruppe aktualisieren {1}
+{0}: v kusovníku chybí {1} – díl v záložce je má, kopie v sestavě je starší: sestava obnovit {2}	{0}: in der Stückliste fehlt {1} – das Teil im Reiter hat es, die Kopie in der Baugruppe ist älter: baugruppe aktualisieren {2}
+číslo {0}	Nummer {0}
+⚠ vybírám…	⚠ wähle…
+⚠ Vybrat znovu	⚠ Neu wählen
+✓ šablona hlavičky {0} uložena do dokumentu; v Nastavení jen pro tento běh{1}	✓ Kopfvorlage {0} im Dokument gespeichert; in den Einstellungen nur für diesen Lauf{1}
+Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil). Kliknutím vyberete novou geometrii – kóta si ponechá id, toleranci i text.	Die Kante oder der Kreis, an dem das Maß hängt, ist nicht mehr in der Ansicht (Modell geändert). Klicken, um neue Geometrie zu wählen – das Maß behält ID, Toleranz und Text.
+kóta	Maß
+Kóta {0} znovu přichycena ke geometrii pohledu	Maß {0} wieder an die Ansichtsgeometrie gebunden
+odkazová čára × kóta	Hinweislinie × Maß
+odkazová čára × kotva jiné pozice	Hinweislinie × Ankerpunkt einer anderen Position
+Vyberte novou geometrii kóty {0} v pohledu (hranu, kružnici nebo dva body) a umístěte ji · Esc zruší	Neue Geometrie für Maß {0} in der Ansicht wählen (Kante, Kreis oder zwei Punkte) und platzieren · Esc bricht ab

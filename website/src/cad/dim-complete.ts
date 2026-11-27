@@ -28,7 +28,7 @@ import type { CadDoc, DrawingAnnotation, Feature, FunctionalMark, Vec2, Vec3 } f
 /* ───────────────────────── typy ───────────────────────── */
 
 /** pohled výkresu, jak ho kontrola potřebuje (PlacedView z drawing.ts) */
-export type CheckView = { key: string; x0: number; y0: number; w: number; h: number; cam?: { d: Vec3; x: Vec3 }; brk?: unknown };
+export type CheckView = { key: string; x0: number; y0: number; w: number; h: number; cam?: { d: Vec3; x: Vec3 }; brk?: unknown; /** měřítko pohledu (mm listu / mm modelu) – poloha kótovací čáry z odsazení */ s?: number };
 /** řádek tabulky děr (HoleRow z drawing.ts) – střed v souřadnicích pohledu */
 export type CheckHoleRow = { c: Vec2; view: string; d: number };
 
@@ -59,6 +59,12 @@ export type DimReq = {
    * souřadnici dává roztečná kružnice Ø `d` se středem `center` (osa pole ∥ `dir`) spolu s polohou středu na téže ose
    */
   pcd?: { center: Vec3; d: number; dir: Vec3 };
+  /**
+   * poloha díry: osa díry (osa modelu `ka`), poloměr a rozsah osy v dílu – kóta polohy platí jen, když její pomocná čára vede
+   * na osu díry (bod kóty na kružnici / středu díry, nebo na čáře osy v pohledu z boku), ne libovolná kóta se shodnou
+   * souřadnicí jinde na listu (vlna 22, bod 18, kolo 6)
+   */
+  hole?: { ka: 0 | 1 | 2; r: number; lo: number; hi: number; /** jiné díry (střed, poloměr) se stejnou souřadnicí na ose polohy – na téže osové čáře */ peers?: { c: Vec3; r: number }[] };
   /** jen hodnotou (bez geometrie) – dosavadní kontrola */
   byValue?: boolean;
   functional?: boolean;
@@ -149,7 +155,7 @@ export function viewsBbox(views: readonly CheckView[]): [Vec3, Vec3] | null {
 /* ───────────────────────── kóty na listu jako fakta ───────────────────────── */
 
 /** délková kóta: osa modelu `k`, souřadnice konců `c1`, `c2`; `ko` = druhá osa v rovině pohledu a souřadnice konců na ní (`o1`, `o2`) – kde kóta leží */
-type LinFact = { i: number; k: 0 | 1 | 2; c1: number; c2: number; ko: 0 | 1 | 2 | null; o1: number; o2: number; tol: string; label: string; value: number; dia: boolean; ord: boolean };
+type LinFact = { i: number; k: 0 | 1 | 2; c1: number; c2: number; ko: 0 | 1 | 2 | null; o1: number; o2: number; /** souřadnice kótovací čáry na ose `ko` (kam vedou pomocné čáry; NaN = neznámá) */ line: number; tol: string; label: string; value: number; dia: boolean; ord: boolean };
 type CircFact = { i: number; view: string; cam: { d: Vec3; x: Vec3 }; c: Vec2; r?: number; tip?: Vec2; value: number; kind: DimKind; count: number; depth: number[]; tol: string; label: string; tags?: { c: Vec2; r: number }[] };
 type CenterFact = { k: 0 | 1 | 2; c: number };
 type Facts = { lin: LinFact[]; circ: CircFact[]; centers: CenterFact[]; table: { c: Vec2; view: string; d: number }[]; texts: { kind: DimKind; value: number; text: string; count: number }[] };
@@ -195,7 +201,10 @@ export function sheetFacts(views: readonly CheckView[], anns: readonly DrawingAn
       const c1 = w(a.a);
       const c2 = w(a.b);
       const value = Math.abs(c2 - c1);
-      f.lin.push({ i, k: A.k, c1, c2, ko: O?.k ?? null, o1: wo(a.a), o2: wo(a.b), tol: annTolerance(a), label: factLabel(a, value), value, dia: /^[ØM⌀]/.test(a.prefix ?? "") || /^[ØM⌀]/.test(a.text ?? ""), ord: !!a.ord });
+      // kótovací čára: odsazení [mm listu] od prvního bodu (jako drawing.ts – vodorovná y = a.y + odsazení, svislá x = a.x + …)
+      const sc = v?.s;
+      const line = sc && a.kind !== "aligned" ? wo(dir === "h" ? [a.a[0], a.a[1] + a.offset / sc] : [a.a[0] + a.offset / sc, a.a[1]]) : NaN;
+      f.lin.push({ i, k: A.k, c1, c2, ko: O?.k ?? null, o1: wo(a.a), o2: wo(a.b), line, tol: annTolerance(a), label: factLabel(a, value), value, dia: /^[ØM⌀]/.test(a.prefix ?? "") || /^[ØM⌀]/.test(a.text ?? ""), ord: !!a.ord });
       return;
     }
     if (a.type === "dim" && (a.kind === "diameter" || a.kind === "radius")) {
@@ -224,6 +233,14 @@ export function sheetFacts(views: readonly CheckView[], anns: readonly DrawingAn
   for (const t of presentDims([...bakedTexts])) {
     const cnt = /^\s*(\d+)\s*[×x]\s/.exec(t.text);
     f.texts.push({ ...t, count: cnt ? Number(cnt[1]) : 1 });
+  }
+  // texty listu obsahují i texty délkových kót z poznámek listu – ty mají geometrii (osu, směr), takže se hodnotou znovu
+  // nepárují: vodorovná „60“ v horním pohledu (X) nesmí jako text splnit šířku Y 60 (vlna 22, bod 18, kolo 6). Odebere se
+  // jeden text za každou takovou kótu (souřadnicové kóty a průměry ne – ty se hodnotou párují dál).
+  for (const x of f.lin) {
+    if (x.ord || x.dia) continue;
+    const j = f.texts.findIndex((t) => t.kind === "lin" && Math.abs(t.value - x.value) <= Math.max(0.01, Math.abs(x.value) * 1e-4));
+    if (j >= 0) f.texts.splice(j, 1);
   }
   return f;
 }
@@ -414,7 +431,9 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
           for (const k of [0, 1, 2] as const) {
             if (k === ax.k) continue;
             const pcd = ring ? pcdFor(ring, p, k, ax.k) : null;
-            addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label: tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])), source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p, ...(pcd ? { pcd } : {}) });
+            const r = (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.d ?? f.diameter) : f.diameter) / 2;
+            const hole = { ka: ax.k, r, lo: bbox ? bbox[0][ax.k] : -Infinity, hi: bbox ? bbox[1][ax.k] : Infinity };
+            addReq(c, { id: `holepos:${f.id}:${si}:${k}`, kind: "pos", label: tr("poloha {0} – {1} {2}", f.name, AXN[k], fmt(p[k])), source: f.name, featureId: f.id, dim: "lin", value: p[k], axis: k, at: [p[k]], point: p, hole, ...(pcd ? { pcd } : {}) });
           }
         });
         break;
@@ -457,6 +476,20 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
       default:
         break;
     }
+  }
+  // díry na téže osové čáře (stejná souřadnice na ose polohy, rovnoběžné osy): kóta s pomocnou čárou na ose kterékoli z nich
+  // určuje polohu všech (Chytré kóty kótují řadu děr jednou) – jiný bod se shodnou souřadnicí ne
+  const allHoles = [...groups.values()].flatMap((g) => {
+    const f = g.feats[0];
+    const r = (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.d ?? f.diameter) : f.diameter) / 2;
+    const ax = g.dir ? axisOf(g.dir) : null;
+    return ax ? g.centers.map((c) => ({ c, r, ka: ax.k })) : [];
+  });
+  for (const q of c.reqs) {
+    const h = q.hole;
+    if (!h || q.axis === undefined || !q.point) continue;
+    const peers = allHoles.filter((x) => x.ka === h.ka && eq(x.c[q.axis!], q.point![q.axis!]) && Math.hypot(x.c[0] - q.point![0], x.c[1] - q.point![1], x.c[2] - q.point![2]) > 1e-6).map((x) => ({ c: x.c, r: x.r }));
+    if (peers.length) h.peers = peers;
   }
   // díry po skupinách stejné specifikace: velikost s počtem (n×), hloubka; další rozměry díry (zahloubení, vrták závitu) hodnotou
   let gi = 0;
@@ -594,11 +627,13 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
   const ats = q.at ?? [];
   const own = q.span;
   const isOwn = (x: LinFact) => !!own && ((eq(x.c1, own[0]) && eq(x.c2, own[1])) || (eq(x.c1, own[1]) && eq(x.c2, own[0])));
-  const lf = f.lin.find((x) => x.k === q.axis && ats.some((a) => eq(x.c1, a) || eq(x.c2, a)) && !isOwn(x));
+  // konec kóty na souřadnici `a`, jehož pomocná čára vede na osu díry (u ostatních prvků každý konec se shodnou souřadnicí)
+  const endAt = (x: LinFact, a: number) => (eq(x.c1, a) && onAxis(x, x.o1, q)) || (eq(x.c2, a) && onAxis(x, x.o2, q));
+  const lf = f.lin.find((x) => x.k === q.axis && ats.some((a) => endAt(x, a)) && !isOwn(x));
   if (q.datum) {
     // funkční prvek se základnou na téže ose: kóta od základny (i souřadnicová kóta s počátkem v základně)
     const d = q.datum;
-    const dl = f.lin.find((x) => x.k === q.axis && ats.some((a) => (eq(x.c1, a) && eq(x.c2, d.c)) || (eq(x.c2, a) && eq(x.c1, d.c))));
+    const dl = f.lin.find((x) => x.k === q.axis && ats.some((a) => (eq(x.c1, a) && onAxis(x, x.o1, q) && eq(x.c2, d.c)) || (eq(x.c2, a) && onAxis(x, x.o2, q) && eq(x.c1, d.c))));
     if (dl) {
       take(dl.i, dl.tol);
       return done("ok");
@@ -622,6 +657,26 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
   if (q.point && inTable(f, views, q.point).length) return done("ok", tr("tabulka děr"));
   if (baked) return done("unchecked", tr("kóty zapečené v pohledu – polohu nejde ověřit"));
   return done("missing");
+}
+
+/**
+ * Pomocná čára kóty (od bodu kóty – souřadnice `o` na druhé ose pohledu `x.ko` – ke kótovací čáře) vede na osu díry
+ * požadavku `q`: v pohledu podél osy díry prochází kružnicí / středem (r + 2 mm přesahu osové čáry), v pohledu z boku na čáře osy v rozsahu dílu. Požadavek bez díry → vždy (dosavadní párování
+ * souřadnicí). Druhá osa kóty neznámá → ne (slabší tvrzení).
+ */
+function onAxis(x: LinFact, o: number, q: DimReq): boolean {
+  const h = q.hole;
+  if (!h) return true;
+  if (x.ko === null || !Number.isFinite(o) || !q.point) return false;
+  // pomocná čára vede od bodu kóty ke kótovací čáře (je-li poloha čáry známá); jinak jen bod kóty
+  const lo = Number.isFinite(x.line) ? Math.min(o, x.line) : o;
+  const hi = Number.isFinite(x.line) ? Math.max(o, x.line) : o;
+  // pohled z boku: pomocná čára na čáře osy díry v rozsahu dílu
+  if (x.ko === h.ka) return hi >= h.lo - 0.5 && lo <= h.hi + 0.5;
+  // pohled podél osy: pomocná čára prochází kružnicí / středem díry nebo jiné díry na téže osové čáře (s krátkým přesahem
+  // osové čáry, ISO 128: ~2 mm)
+  const ko = x.ko;
+  return [{ c: q.point, r: h.r }, ...(h.peers ?? [])].some((p) => p.c[ko] >= lo - (p.r + 2) && p.c[ko] <= hi + (p.r + 2));
 }
 
 /**
