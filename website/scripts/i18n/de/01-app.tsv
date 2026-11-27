@@ -411,7 +411,6 @@ Vložit	Einfügen
 Vložit díl / model	Teil / Modell einfügen
 Vodicí pouzdro	Führungsbuchse
 Vodicí sloupek	Führungssäule
-Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Freitext für das Schriftfeld der Zeichnung, z. B. ČSN 11 423 oder 1.0503 – die Dichte stammt aus der Werkstoffklasse oben
 Vyberte dvě rovinné plochy.	Wählen Sie zwei ebene Flächen.
 Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Wählen Sie die zu entfernende Komponente (Klick in der 3D-Ansicht oder im Baum).
 Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Wählen Sie eine Fläche (Filter Fläche) und wiederholen Sie den Befehl.
@@ -552,7 +551,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} Kanten nach Regel „{3}“ – Ergebnis nach der Berechnung unten
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ Dokument „{0}“ ({1} Features) – öffnet sich in einem neuen Tab
 ✓ materiál = {0}	✓ Werkstoff = {0}
-✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ Werkstoff „{0}“ = Bezeichnung für das Schriftfeld; die Dichte bleibt nach Klasse „{1}“ ({2} g/cm³) – für eine andere Dichte eingeben: materiál {3}
 ✓ odstraněn prvek „{0}“	✓ Feature „{0}“ entfernt
 ✓ pohled {0}	✓ Ansicht {0}
 ✓ {0} {1} do skici „{2}“	✓ {0} {1} in Skizze „{2}“

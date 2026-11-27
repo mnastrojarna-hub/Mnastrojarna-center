@@ -12,6 +12,7 @@
  * Plocha komponenty = `F12` (číslo z `sestava plochy`, u podsestavy `F3@Díl`) nebo pravidlo `+Z|-X|horní|spodní|největší|nejmenší|válcová|rovinná|Ø8|R4`.
  * Provedení (jádro, řešič vazeb, záložky): cad/asm-agent.ts.
  */
+import { knownMaterialId } from "./material-designation";
 import { getLang, tr } from "./i18n";
 import { supplyKindOf, supplyWord, supplyWordsHelp, supplyOf, supplySection, kindsIn, bomNotes } from "./bom-model";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -405,14 +406,9 @@ const MOLD_KEYS: [MoldKey, Set<string>, number][] = [
 ];
 const CAVITY = W("dutina", "dutinu", "dutiny", "kapsa", "kapsy", "cavity", "pocket", "nest", "tasche");
 const FORMY = W("formy", "forma", "formu", "mold", "mould");
-const MAT_ALIAS: Record<string, string> = { steel: "ocel", stahl: "ocel", stainless: "nerez", edelstahl: "nerez", inox: "nerez", aluminium: "hlinik", aluminum: "hlinik", alu: "hlinik", brass: "mosaz", messing: "mosaz", copper: "med", kupfer: "med", titanium: "titan", plast: "pom", plastic: "pom", kunststoff: "pom" };
-/** materiál podle id, popisku nebo anglického / německého názvu třídy (null = neznámý) */
-export function materialId(q: string): string | null {
-  const f = fold(q.trim());
-  if (!f) return null;
-  const hit = MATERIALS.find((m) => fold(m.id) === f || fold(m.label) === f || fold(m.label).split(" ")[0] === f || MAT_ALIAS[f] === m.id);
-  return hit?.id ?? null;
-}
+/** materiál podle id, popisku nebo anglického / německého názvu třídy (null = neznámý) – jedno pravidlo s příkazem dílu
+ *  `materiál …` a polem označení v GUI (material-designation.ts `knownMaterialId`) */
+export const materialId = (q: string): string | null => knownMaterialId(q);
 const materialList = () => MATERIALS.map((m) => m.id).join(", ");
 
 function parseMoldBase(c: Cur): AsmCmd {

@@ -2119,7 +2119,8 @@ pixely v 3D okně:
   \`materiál 1.0503\`, \`S235JR\`, \`C45\` → ocel; \`EN AW-6082\` → hliník; \`1.4301\` → nerez; \`CuZn39Pb3\` → mosaz),
   nastaví se i hustota podle ní: \`✓ materiál „ČSN 11 423“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)\` (ℹ
   \`material.class\`). Nepozná-li se (\`materiál XY-123\`), hustota zůstává podle dosavadní třídy a protokol to napíše
-  (⚠ \`material.density-assumed\`). V JSON jsou to pole \`material\` (id třídy) a \`materialName\`.
+  (⚠ \`material.density-assumed\` – nikdy ✓). Totéž pravidlo a tytéž hlášky platí pro \`sestava komponenta "X" materiál "ČSN 11 423"\`
+  i pro pole „Označení materiálu (razítko)“ v aplikaci (ℹ / ⚠ pod polem). V JSON jsou to pole \`material\` (id třídy) a \`materialName\`.
 - Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
   (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
   jen „Rozměry v mm“.

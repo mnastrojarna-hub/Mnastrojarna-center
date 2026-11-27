@@ -1,5 +1,7 @@
 "use client";
 
+import { withDesignation } from "@/cad/material-designation";
+import { MaterialNoteLine } from "./material-note";
 import { softLimitsText, softStatusText } from "@/cad/soft-view";
 import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
@@ -4543,15 +4545,16 @@ export function CadApp() {
                 defaultValue={doc.materialName ?? ""}
                 key={`mn-${doc.materialName ?? ""}`}
                 placeholder={mat.label}
-                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše")}
+                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – pozná-li se z něj třída (ocel, nerez, hliník…), nastaví i hustotu; jinak hustota zůstává podle třídy výše (⚠)")}
                 onBlur={(e) => {
-                  const t = e.target.value.trim();
-                  const next = t && t !== mat.label ? t : undefined;
-                  if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+                  // jedno pravidlo s textovým příkazem `materiál …` (material-designation.ts, vlna 22 kolo 6)
+                  const next = withDesignation(doc, e.target.value);
+                  if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
               />
+              <MaterialNoteLine doc={doc} />
             </label>
             <Row k={tr("Hmotnost")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
             <Row k={tr("Objem")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
@@ -4729,9 +4732,9 @@ export function CadApp() {
             doc={doc}
             onShare={() => openShare()}
             onMaterialChange={(v) => {
-              const t = v.trim();
-              const next = t && t !== mat.label ? t : undefined;
-              if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+              // pole Materiál v razítku výkresu: totéž pravidlo jako příkaz `materiál …` (material-designation.ts)
+              const next = withDesignation(doc, v);
+              if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
             }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? tr("dle kusovníku") : doc.materialName?.trim() || mat.label}

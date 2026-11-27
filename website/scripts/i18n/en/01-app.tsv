@@ -411,7 +411,6 @@ Vložit	Insert
 Vložit díl / model	Insert part / model
 Vodicí pouzdro	Guide bush
 Vodicí sloupek	Guide pillar
-Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Free text for the drawing title block, e.g. ČSN 11 423 or 1.0503 – the density comes from the material class above
 Vyberte dvě rovinné plochy.	Select two planar faces.
 Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Select the component to remove (click in the 3D view or in the tree).
 Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Select a face (Face filter) and repeat the command.
@@ -552,7 +551,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} edges by rule “{3}” – result after computation below
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ document “{0}” ({1} features) – opens in a new tab
 ✓ materiál = {0}	✓ material = {0}
-✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ material “{0}” = designation for the title block; density stays by class “{1}” ({2} g/cm³) – for another density enter: material {3}
 ✓ odstraněn prvek „{0}“	✓ feature “{0}” removed
 ✓ pohled {0}	✓ view {0}
 ✓ {0} {1} do skici „{2}“	✓ {0} {1} into sketch “{2}”

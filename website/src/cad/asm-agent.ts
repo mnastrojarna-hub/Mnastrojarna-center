@@ -96,6 +96,7 @@ import {
   type PartFace,
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
+import { designationNote, withDesignation } from "./material-designation";
 import type { ClashDetail, ClashPair } from "./clash-class";
 import type { ClrReq, ClrRes } from "./clearance-types";
 import type { ProcReq, ProcRes } from "./process-types";
@@ -746,6 +747,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       if (p.fixed === false) doc = releaseComponent(doc, c0.id); // uvolnit zruší i vazbu Ukotvit (jinak by komponentu dál držel řešič)
       let c: AsmComponent = { ...doc.components!.find((x) => x.id === c0.id)!, placement: { position: [...c0.placement.position] as Vec3, rotation: [...c0.placement.rotation] as Vec3 } };
       const what: string[] = [];
+      /** ℹ material.class / ⚠ material.density-assumed k označení materiálu komponenty (jako příkaz dílu `materiál …`) */
+      const matCodes: { code: string; args?: unknown[] }[] = [];
       const moved = !!(p.at || p.move || p.rotation || p.turn);
       if (p.at) c.placement.position = [...p.at] as Vec3;
       if (p.move) c.placement.position = c.placement.position.map((v, k) => Math.round((v + p.move![k]) * 1e6) / 1e6) as Vec3;
@@ -786,15 +789,16 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           if (!id) throw new Error(tr("materiál importované komponenty: jen třída hustoty – {0}", MATERIALS.map((m) => m.id).join(", ")));
           c.material = id;
         } else {
-          const sd = { ...c.source.doc };
-          // známá třída = hustota (a kusovník ukáže třídu); jiný text = označení do razítka a kusovníku, hustota zůstává
-          if (id) {
-            sd.material = id;
-            delete sd.materialName;
-          } else sd.materialName = p.material;
+          // jedno pravidlo s příkazem dílu `materiál …` a polem označení v GUI (material-designation.ts, vlna 22 kolo 6):
+          // známá třída = hustota; označení s rozpoznanou třídou (ČSN 11 423 → ocel) nastaví i třídu – ℹ material.class;
+          // jiné označení = do razítka a kusovníku, hustota zůstává jako PŘEDPOKLAD – ⚠ material.density-assumed (ne ✓)
+          const sd = withDesignation({ ...c.source.doc }, p.material);
           c = { ...c, source: { kind: "part", doc: sd } };
+          const note = designationNote(sd.materialName, sd.material);
+          if (note) matCodes.push({ code: note.code, args: note.args });
         }
-        what.push(tr("materiál {0}", id ? (MATERIALS.find((m) => m.id === id)?.label ?? id) : `„${p.material}“`));
+        const cls = MATERIALS.find((m) => m.id === (c.source.kind === "part" ? c.source.doc.material : id));
+        what.push(tr("materiál {0}", c.source.kind === "part" && c.source.doc.materialName ? tr("„{0}“ (hustota podle: {1})", c.source.doc.materialName, cls?.label ?? "?") : (cls?.label ?? id ?? p.material)));
       }
       if (p.supply) {
         // druh položky kusovníku na komponentě (přepis druhu dílu); kind null = zpět na výchozí druh (bom-model.ts)
@@ -842,7 +846,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
       if (movedOthers.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, movedOthers)));
       if (st && Object.values(st).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
-      return done(doc, true, { ...(st ? { mateStatus: st } : {}), ...(conflict ? { codes: [conflictCode(conflict)] } : {}) });
+      const codes = [...matCodes, ...(conflict ? [conflictCode(conflict)] : [])];
+      return done(doc, true, { ...(st ? { mateStatus: st } : {}), ...(codes.length ? { codes } : {}) });
     }
     case "remove": {
       asmOnly();
