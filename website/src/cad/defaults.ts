@@ -1,5 +1,5 @@
 /** Výchozí parametry prvků, roviny skic a ukázkové modely. */
-import { tr } from "./i18n";
+import { getLang, tr } from "./i18n";
 import { getExt } from "./ext/registry";
 import type { CadDoc, Feature, FeatureType, SketchPlane, Vec2, Vec3 } from "./types";
 import { uid } from "./types";
@@ -110,8 +110,15 @@ export const threadByName = (name?: string): MetricThread | undefined => {
   return Math.abs(pitch - base.pitch) < 1e-9 ? base : fineThread(base, pitch);
 };
 
-/** Označení závitu pro výkres / stav: „M6“, „M18×1,5“. */
-export const threadLabel = (name?: string) => threadByName(name)?.name ?? (name ?? "").trim().toUpperCase();
+/**
+ * Označení závitu pro stav / kontrolu kót: „M6“, „M18×1,5“; v angličtině s desetinnou tečkou „M18×1.5“ (22d kolo 7 – dřív
+ * „M18×1,5 length 18“ v jinak anglickém textu). Jen zobrazení: uložené označení a katalog (`threadByName`) se nemění,
+ * zápis s čárkou i tečkou se načte stejně.
+ */
+export const threadLabel = (name?: string) => {
+  const s = threadByName(name)?.name ?? (name ?? "").trim().toUpperCase();
+  return getLang() === "en" ? s.replace(/(\d),(\d)/g, "$1.$2") : s;
+};
 
 /** Popisek prvku (včetně prvků rozšíření). */
 export function featureLabel(f: Pick<Feature, "type"> & { ext?: string }): string {

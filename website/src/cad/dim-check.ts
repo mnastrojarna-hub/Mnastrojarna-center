@@ -240,7 +240,7 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
           const internal = d.side === "internal";
           const removing = d.mode === "cut" || d.mode === "intersect";
           const major = 2 * ((internal ? removing : !removing) ? d.radius + h : d.radius);
-          push(out, "thread", major, typeof d.turns === "number" ? tr("{0} ({1} dl.)", `M${fmt(major)}×${fmt(d.pitch)}`, fmt(d.turns * d.pitch)) : `M${fmt(major)}×${fmt(d.pitch)}`, src);
+          push(out, "thread", major, typeof d.turns === "number" ? tr("{0} ({1} dl.)", threadLabel(`M${fmt(major)}×${fmt(d.pitch)}`), fmt(d.turns * d.pitch)) : threadLabel(`M${fmt(major)}×${fmt(d.pitch)}`), src);
         }
         break;
       }

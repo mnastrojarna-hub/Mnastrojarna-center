@@ -517,17 +517,41 @@ function pointDistance(shape: r.AnyShape, p: Vec3): number {
   }
 }
 
-/** nejkratší vzdálenost dvou tvarů (BRepExtrema; těleso uvnitř tělesa = 0); -Infinity = nespočítáno (nic se nepotvrdí) */
-function shapeDistance(a: Shape, b: Shape): number {
+/** nejkratší vzdálenost dvou tvarů BRepExtrema (dvě tělesa SOLID: těleso uvnitř tělesa = 0); -Infinity = nespočítáno */
+function extremaDistance(a: unknown, b: unknown): number {
   const oc: OC = r.getOC();
   const q = new oc.BRepExtrema_DistShapeShape();
   try {
-    q.LoadS1(a.wrapped);
-    q.LoadS2(b.wrapped);
+    q.LoadS1(a);
+    q.LoadS2(b);
     q.Perform(new oc.Message_ProgressRange());
     return q.IsDone() ? (q.Value() as number) : -Infinity;
   } finally {
     q.delete();
+  }
+}
+
+/**
+ * Nejkratší vzdálenost objemů dvou tvarů po tělesech (22b kolo 7, oponentura): BRepExtrema pozná „těleso uvnitř tělesa
+ * = 0“ jen u dvou tvarů typu SOLID – u složeného tvaru (COMPOUND, běžné těleso po jakémkoli prvku) měří jen vzdálenost
+ * hranic (koule uvnitř tělesa po odebrání dala 4, ne 0). Proto se měří každá dvojice těles SOLID zvlášť; tvar bez
+ * tělesa nebo nespočítaná dvojice = -Infinity (nic se nepotvrdí).
+ */
+export function solidDistance(a: { wrapped: unknown }, b: { wrapped: unknown }): number {
+  const sa = subShapes(a, "SOLID") as Deletable[];
+  const sb = subShapes(b, "SOLID") as Deletable[];
+  try {
+    if (!sa.length || !sb.length) return -Infinity;
+    let best = Infinity;
+    for (const x of sa)
+      for (const y of sb) {
+        const d = extremaDistance(x, y); // podtvary jsou přímo TopoDS_Solid (fastbox subShapes)
+        if (!(d >= 0)) return -Infinity;
+        best = Math.min(best, d);
+      }
+    return best;
+  } finally {
+    for (const x of [...sa, ...sb]) x.delete();
   }
 }
 
@@ -538,7 +562,7 @@ function shapeDistance(a: Shape, b: Shape): number {
  *   (nutné podmínky, levné) A objem přesného průniku tělesa s nástroji je celý objem tělesa (postačující důkaz – kolo 7: dřív
  *   jen obálka a vrcholy, nástroj s vnitřní dutinou, do níž se vešel vnitřek tělesa bez vrcholů, by prošel);
  * - `"disjoint"` – průnik: obálka nástroje se s obálkou tělesa nepřekrývá, nebo je nejkratší vzdálenost tělesa od každého
- *   nástroje (BRepExtrema, těleso uvnitř tělesa = 0) větší než tolerance;
+ *   nástroje větší než tolerance (BRepExtrema po tělesech SOLID – `solidDistance`; složený tvar by vnitřek neviděl);
  * - `null` – nepotvrzeno (jiná operace, výsledek není z deníku operací, podmínka neplatí nebo průnik nejde spočítat) →
  *   obecná hláška „jádro selhalo“.
  */
@@ -556,7 +580,7 @@ export function emptyResultCause(result: Shape): "covered" | "disjoint" | null {
     const tol = 1e-4 * (Math.hypot(a1x - a0x, a1y - a0y, a1z - a0z) || 1) + 1e-6;
     if (op.kind === "Common") {
       if ([0, 1, 2].some((k) => t1[k] < a0[k] - tol || t0[k] > a1[k] + tol)) return "disjoint";
-      return op.tools.every((t) => shapeDistance(op!.a, t) > tol) ? "disjoint" : null;
+      return op.tools.every((t) => solidDistance(op!.a, t) > tol) ? "disjoint" : null;
     }
     if (op.kind !== "Cut") return null;
     if (![0, 1, 2].every((k) => t0[k] <= a0[k] + tol && t1[k] >= a1[k] - tol)) return null;

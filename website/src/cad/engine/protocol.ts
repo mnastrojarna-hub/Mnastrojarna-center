@@ -431,11 +431,17 @@ export function docKv(d: DocSummary): string {
 /** řádek `D` souhrnu dokumentu */
 export const docLine = (d: DocSummary): string => `D ${quote(d.name)} ${docKv(d)}`;
 
+/**
+ * výsledek kontroly souborů pro řádek F: `fail` = některá selhala, `unchecked` = shoda s modelem bez kontroly platnosti souboru
+ * (nad mezí ploch – 22c kolo 7: dřív `check=ok`, zatímco řádek protokolu i GUI říkaly ℹ „nezkontrolována“), jinak `ok`
+ */
+const checkWord = (files: readonly OutFile[]): "ok" | "fail" | "unchecked" => (files.some((f) => f.check && !f.check.ok) ? "fail" : files.some((f) => f.check?.unchecked) ? "unchecked" : "ok");
+
 /** řádek `F` zapsaného souboru */
 export function fileLine(f: OutFile): string {
   const kv: string[] = [];
   if (f.sheets) kv.push(`sheets=${f.sheets}`);
-  if (f.check) kv.push(`check=${f.check.ok ? "ok" : "fail"}`);
+  if (f.check) kv.push(`check=${checkWord([f])}`);
   if (f.run === "fail") kv.push("run=fail");
   if (f.modelRev) kv.push(`rev=${/^r·[0-9a-f]{6}$/.test(f.modelRev) ? f.modelRev : token(f.modelRev, "-")}`); // revize modelu souboru (vlna 22, bod 12)
   const bytes = Number.isFinite(f.bytes) ? Math.max(0, Math.round(f.bytes)) : 0;
@@ -609,7 +615,7 @@ export function filesSummaryLine(files: readonly OutFile[]): string {
   const bytes = files.reduce((s, f) => s + (Number.isFinite(f.bytes) ? Math.max(0, Math.round(f.bytes)) : 0), 0);
   const kv = [`files=${files.length}`, `formats=${fmts.join(",")}`];
   const checked = files.filter((f) => f.check);
-  if (checked.length) kv.push(`check=${checked.every((f) => f.check!.ok) ? "ok" : "fail"}`);
+  if (checked.length) kv.push(`check=${checkWord(checked)}`);
   if (files.some((f) => f.run === "fail")) kv.push("run=fail");
   return `F ${fmts.length === 1 ? fmts[0] : "mixed"} "*" ${bytes}B ${kv.join(" ")}`;
 }

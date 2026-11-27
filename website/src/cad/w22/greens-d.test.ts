@@ -158,7 +158,9 @@ describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", async ()
   await real.init();
   const run = (ws: MemoryWorkspace, t: string) => runScript(ws, t, { kernel: real as unknown as KernelApi, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
   const clean = (r: RunReport) => expect(r.entries.filter((e) => e.level === "error").map((e) => `L${e.line} ${e.code}: ${e.text}`)).toEqual([]);
-  const PART = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4';
+  // kolo 7 (22i, oponentura): list dílu bez nepředepsaných tolerancí už není „✓ … bez nálezů“ (ℹ „… nezadány“) – čistý list
+  // pro tyto případy je list s nimi (dřív se ✓ tvrdilo i bez nich)
+  const PART = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK';
   it("7: opakované vydání téhož listu z téhož modelu není nové vydání", async () => {
     const ws = new MemoryWorkspace();
     const r1 = await run(ws, `${PART}\nvýkres vydat`);

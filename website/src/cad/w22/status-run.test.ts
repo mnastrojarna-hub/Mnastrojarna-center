@@ -237,9 +237,11 @@ describe("22i – příkazy výkresu: přijetí ℹ, výsledek po vyhodnocení l
     expect(greenThenRed(r.entries)).toEqual([]);
   });
   it("list bez nálezů: ✓ „list … vyhodnocen bez nálezů“ až po vyhodnocení, na posledním řádku bloku", { timeout: 120_000 }, async () => {
-    const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres řez XZ odsazení -20');
+    // kolo 7 (22i, oponentura): čistý list = i s nepředepsanými tolerancemi (bez nich ℹ „… nezadány“, ne ✓) – proto řádek 4
+    const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres řez XZ odsazení -20');
     expect(at(r.entries, 3).map((e) => e.level)).toEqual(["note", "note"]);
-    expect(at(r.entries, 4).map((e) => `${e.level}:${e.text}`)).toEqual(["note:výkres: řez XZ odsazení -20 (rovina Y = 20) – výsledek po vyhodnocení listu níže", "ok:výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)"]);
+    expect(at(r.entries, 4).map((e) => e.level)).toEqual(["note"]);
+    expect(at(r.entries, 5).map((e) => `${e.level}:${e.text}`)).toEqual(["note:výkres: řez XZ odsazení -20 (rovina Y = 20) – výsledek po vyhodnocení listu níže", "ok:výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)"]);
     expect(formatConsole(r)).toContain("✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)");
   });
   it("výkres stav s řezem mimo těleso: výpis = a ✗ hned, žádné ✓", { timeout: 120_000 }, async () => {

@@ -110,13 +110,28 @@ export class DrawingTracker {
       const line = t.lines[t.lines.length - 1];
       try {
         const extras = () => drawExtras(ctx.ws, ctx.host.kernel, d, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
-        for (const x of await evaluateSheet(d, idx, compute, extras, { knownTexts: this.known.get(t.sheetId) ?? [] })) this.addSheet(line, x, d.name, t.lines);
+        // nález listu, který protokol už má na jiném řádku (export listu – 22i kolo 7): řádek toho záznamu
+        let dupLine: number | null = null;
+        for (const x of await evaluateSheet(d, idx, compute, extras, { knownTexts: this.known.get(t.sheetId) ?? [] })) {
+          const at = this.addSheet(line, x, d.name, t.lines);
+          if (at !== undefined && dupLine === null) dupLine = at;
+        }
         // 22g (kolo 3): list sestavy, jejíž komponenta je kopie starší než díl v záložce, ukazuje v kusovníku / razítku údaje
         // z vložení – ⚠ asm.stale-copy (v konečném stavu) a žádné „✓ bez nálezů“, i když ⚠ zazněl dřív na jiném řádku
         const stale = d.kind === "assembly" ? staleCopies(d, (n) => ctx.ws.findPart(n)) : [];
         for (const sc of stale) this.add1(line, "asm.stale-copy", d.name, staleCopyText(sc), t.lines);
-        // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku
-        if (!stale.length && !rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
+        // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku,
+        // žádný nález na jiném řádku (export listu s ⚠ – kolo 7, oponentura: dřív „✓ … bez nálezů“ a pak ⚠ téhož listu
+        // u exportu) a nepředepsané tolerance dílu jsou zadané (export je bez nich hlásí ⚠) – jinak jen ℹ se slabším tvrzením
+        if (!stale.length && !rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) {
+          const label = sheetLabel(d, idx);
+          const at = dupLine ?? this.exported.get(`${t.key}\u0000${t.sheetId}`) ?? null;
+          const sheet = d.drawings![idx]!;
+          if (at !== null) this.sheetNote(line, d.name, tr("výkres: list „{0}“ vyhodnocen – nálezy listu hlásí řádek {1}", label, at), t.lines);
+          // stejná podmínka jako ⚠ exportu (drawing-export.ts `generalTolWarnings`): list dílu bez nepředepsaných tolerancí
+          else if (d.kind !== "assembly" && !(await import("../title-block")).generalTolOf(sheet.meta as Parameters<typeof import("../title-block").generalTolOf>[0])) this.sheetNote(line, d.name, tr("výkres: list „{0}“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)", label), t.lines);
+          else this.sheetOk(line, d.name, label, t.lines);
+        }
       } catch (e) {
         if (isCancelled(e)) throw e;
         this.add1(line, "op.failed", d.name, codeText("op.failed", errMessage(e)), t.lines);
@@ -159,6 +174,25 @@ export class DrawingTracker {
     return at.some((l) => lines.includes(l));
   }
 
+  /**
+   * Export listů `sheetIds` aktivního dokumentu na řádku `line` ohlásil nález listu (⚠ / ✗ pod zápisem nebo místo něj –
+   * 22i kolo 7): vyhodnocení listu na konci běhu pak nepíše „✓ … bez nálezů“, ale ℹ s odkazem na ten řádek.
+   */
+  exportFindings(sheetIds: readonly string[], line: number): void {
+    for (const id of sheetIds) {
+      const k = `${verifyKey(this.ctx)}\u0000${id}`;
+      if (!this.exported.has(k)) this.exported.set(k, line);
+    }
+  }
+  private readonly exported = new Map<string, number>();
+
+  /** ℹ výsledek listu po vyhodnocení, když „✓ bez nálezů“ by tvrdilo víc, než platí (nález jinde, chybí nepředepsané tolerance) */
+  private sheetNote(line: number, doc: string, text: string, lines: number[]): void {
+    const o = { doc, text, data: { lines } };
+    if (this.ctx.log) this.ctx.log.coded(line, "msg.note", o);
+    else this.ctx.report.code("msg.note", { line, ...o });
+  }
+
   /** ✓ listu po vyhodnocení (řádek posledního příkazu bloku): pohledy, řezy a Chytré kóty bez hlášení */
   private sheetOk(line: number, doc: string, sheet: string, lines: number[]): void {
     const text = tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)", sheet);
@@ -167,15 +201,19 @@ export class DrawingTracker {
   }
 
   /** nález listu (hlášení jádra výkresu) na řádku – text s přesným důvodem, úroveň z hlášení (řez mimo těleso = ✗) */
-  private addSheet(line: number, x: SheetIssue, doc: string, lines: number[]): void {
-    this.add1(line, x.code, doc, sheetIssueText(x), lines, x.level);
+  private addSheet(line: number, x: SheetIssue, doc: string, lines: number[]): number | null | undefined {
+    return this.add1(line, x.code, doc, sheetIssueText(x), lines, x.level);
   }
 
-  /** nález na řádku (do konzole i protokolu), pokud ho protokol pro týž dokument ještě nemá; řez mimo těleso = ✗ */
-  private add1(line: number, code: Code, doc: string, text: string, lines: number[], level0?: CodeLevel): void {
+  /**
+   * nález na řádku (do konzole i protokolu), pokud ho protokol pro týž dokument ještě nemá; řez mimo těleso = ✗. Vrací
+   * `undefined` = zapsáno, jinak řádek záznamu, který týž nález už nese (`null` = záznam bez řádku)
+   */
+  private add1(line: number, code: Code, doc: string, text: string, lines: number[], level0?: CodeLevel): number | null | undefined {
     const rb = this.ctx.report;
     const level = level0 ?? (code === "drawing.section-miss" ? ("error" as const) : undefined);
-    if (rb.entries.some((x) => sameSheetFinding(x, { code, doc, text }))) return;
+    const dup = rb.entries.find((x) => sameSheetFinding(x, { code, doc, text }));
+    if (dup) return dup.line ?? null;
     const o = { doc, text, data: { lines }, ...(level ? { level } : {}) };
     if (this.ctx.log) this.ctx.log.coded(line, code, o);
     else rb.code(code, { line, ...o });

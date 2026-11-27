@@ -307,7 +307,8 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
           const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}), ...(n.level ? { level: n.level } : {}) });
           // týž nález listu i s upřesněným důvodem (řez mimo těleso z řádku příkazu: „… : List 1 – rovina řezu Y = …“) – 22i kolo 6
           if (!rb.entries.some((x) => sameSheetFinding(x, e))) rb.add(e);
-        });
+          // přísný běh: platnost souboru STEP bez meze ploch (22c kolo 7 – dřív jen výslovný `export step`)
+        }, { strict: !!strict });
       } catch (e) {
         if (e instanceof OutPathError) rb.code("out.path", { doc: it.doc.name, args: [e.fileName] });
         // chybějící písma PDF / textu modelu (hostitel bez složky fonts) – ✗ host.fonts, ne obecná chyba (5.2 č. 36)

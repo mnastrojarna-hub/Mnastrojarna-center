@@ -277,7 +277,8 @@ function jobText(rec: ExportRecord): string {
   if (!j?.state) return "";
   const st = RUN_STATE_TEXT[j.state]?.() ?? j.state;
   const time = j.ms !== undefined ? ` ${jobTime(j.ms)}` : "";
-  const check = j.check ? ` · ${j.check.ok ? tr("kontrola ✓") : `${tr("kontrola")} ⚠ ${j.check.text}`}` : "";
+  // soubor bez kontroly platnosti (nad mezí ploch, 22c kolo 7) není „kontrola ✓“
+  const check = j.check ? ` · ${j.check.unchecked ? `${tr("kontrola")} ℹ ${j.check.text}` : j.check.ok ? tr("kontrola ✓") : `${tr("kontrola")} ⚠ ${j.check.text}`}` : "";
   return ` · ${tr("úloha: {0}", st)}${time}${check}`;
 }
 const RUN_STATE_TEXT: Record<string, () => string> = { done: () => tr("dokončeno"), cancelled: () => tr("zrušeno"), error: () => tr("chyba") };

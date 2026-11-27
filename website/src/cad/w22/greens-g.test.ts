@@ -426,6 +426,78 @@ describe("kolo 7: „✓ výkres PDF“ nad ⚠ / ✗ listu – zápis výkresu 
   });
 });
 
+describe("kolo 7 (oponentura): přísný běh na ⚠ výchozího listu – soubor se nezapíše a řádek jmenuje tentýž nález (22c)", () => {
+  const run = async (t: string) => {
+    const h = host();
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), t, h, { lang: "cs" }), { full: true });
+    return { r, files: (h.files as MemoryFiles).files };
+  };
+  const BARE = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres export pdf';
+  it("`přísně kromě drawing.warning` + dokument bez listu: STOP na drawing.default-sheet a ŽÁDNÝ soubor (dřív F pdf, files=1)", { timeout: 180_000 }, async () => {
+    const { r, files } = await run(`přísně kromě drawing.warning\n${BARE}`);
+    expect(r.protocol).toMatch(/^MNCAD\/1 STOP /);
+    expect(r.protocol).toMatch(/stop=L4:drawing\.default-sheet/);
+    expect(files.size).toBe(0);
+    expect(r.protocol).not.toMatch(/^F /m);
+    expect(r.protocol).toMatch(/files=0/);
+    expect(r.entries.some((e) => e.code === "msg.note" && /^soubor nezapsán \(přísný režim zastaví běh\) – dokument zatím nemá výkres/.test(e.text))).toBe(true);
+    expect(r.full).not.toMatch(/výkres PDF: Deska/);
+  });
+  it("`přísně` + dokument bez listu: řádek „nezapsán“ jmenuje drawing.default-sheet (jako Σ stop=), ne „nepředepsané tolerance“", { timeout: 180_000 }, async () => {
+    const { r, files } = await run(`přísně\n${BARE}`);
+    expect(r.protocol).toMatch(/stop=L4:drawing\.default-sheet/);
+    expect(files.size).toBe(0);
+    const unwritten = r.entries.filter((e) => /soubor nezapsán/.test(e.text));
+    expect(unwritten).toHaveLength(1);
+    expect(unwritten[0].text).toMatch(/– dokument zatím nemá výkres/);
+    expect(unwritten[0].text).not.toMatch(/nepředepsané tolerance/);
+  });
+});
+
+describe("kolo 7 (oponentura): vyhodnocení listu „✓ … bez nálezů“ nikdy nad nálezem téhož listu (22i)", () => {
+  const run = async (t: string) => finalizeReport(await runReport(new MemoryWorkspace(), t, host(), { lang: "cs" }), { full: true });
+  const sheetOk = (full: string | undefined) => (full ?? "").split("\n").filter((l) => /^✓ L\d+ výkres: list „List 1“ vyhodnocen bez nálezů/.test(l));
+  it("export listu s ⚠ (bez nepředepsaných tolerancí): žádné ✓ listu, ℹ „nálezy listu hlásí řádek 4“", { timeout: 180_000 }, async () => {
+    const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres export pdf');
+    expect(sheetOk(r.full)).toEqual([]);
+    expect(r.entries.some((e) => e.line === 3 && e.code === "msg.note" && e.text === "výkres: list „List 1“ vyhodnocen – nálezy listu hlásí řádek 4")).toBe(true);
+    expect(r.entries.some((e) => e.line === 4 && e.code === "drawing.warning")).toBe(true);
+  });
+  it("funkční plocha bez tolerované kóty hlášená u exportu (repro 79e): žádné ✓ listu, ℹ s řádkem exportu", { timeout: 180_000 }, async () => {
+    const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nfunkční F2 ±0,02\nexport step\nvýkres export pdf');
+    expect(sheetOk(r.full)).toEqual([]);
+    expect(r.entries.some((e) => e.code === "msg.note" && /^výkres: list „List 1“ vyhodnocen – nálezy listu hlásí řádek 7$/.test(e.text))).toBe(true);
+  });
+  it("list dílu bez nepředepsaných tolerancí bez exportu: ℹ „… nepředepsané tolerance nezadány“, ne ✓; s tolerancemi ✓ zůstává", { timeout: 180_000 }, async () => {
+    const r = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4');
+    expect(sheetOk(r.full)).toEqual([]);
+    expect(r.entries.some((e) => e.code === "msg.note" && /^výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány/.test(e.text))).toBe(true);
+    const ok = await run('nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK');
+    expect(sheetOk(ok.full)).toHaveLength(1);
+  });
+});
+
+describe("kolo 7 (oponentura): strojový řádek F souboru bez kontroly platnosti není `check=ok` (22c)", () => {
+  it("fileLine / souhrnný F: `check=unchecked` u souboru, který odpovídá modelu, ale jeho platnost se nezkontrolovala; fail má přednost", async () => {
+    const { fileLine, filesSummaryLine } = await import("../engine/protocol");
+    const f = (check: { ok: boolean; text: string; unchecked?: boolean }) => ({ name: "A.step", format: "step", mime: "model/step", bytes: 10, sha256: "", doc: "A", check });
+    expect(fileLine(f({ ok: true, text: "x", unchecked: true }))).toMatch(/ check=unchecked$/);
+    expect(fileLine(f({ ok: true, text: "x" }))).toMatch(/ check=ok$/);
+    expect(filesSummaryLine([f({ ok: true, text: "x", unchecked: true }), f({ ok: true, text: "y" })])).toMatch(/ check=unchecked$/);
+    expect(filesSummaryLine([f({ ok: true, text: "x", unchecked: true }), f({ ok: false, text: "y" })])).toMatch(/ check=fail$/);
+  });
+  it("záznam úlohy exportu bez kontroly platnosti (výpis `exporty`): „kontrola ℹ …“, ne „kontrola ✓“", async () => {
+    const { exportLine, recordExport } = await import("../doc-outputs");
+    const doc: CadDoc = { ...emptyDoc(), name: "A", features: [{ id: "b", name: "Kvádr 1", type: "box", size: [10, 10, 10], position: [0, 0, 0], mode: "new" } as never] };
+    const rec = (check: { ok: boolean; text: string; unchecked?: boolean }) => recordExport(doc, { what: "model", format: "step", file: "A.step", job: { state: "done", ms: 10, check } }).rec;
+    const text = "kontrola STEP: … → odpovídá modelu; platnost souboru nezkontrolována (3500 ploch > 3000; přísný režim ji zkontroluje)";
+    const un = exportLine(doc, rec({ ok: true, text, unchecked: true }));
+    expect(un).toContain(`kontrola ℹ ${text}`);
+    expect(un).not.toContain("kontrola ✓");
+    expect(exportLine(doc, rec({ ok: true, text: "kontrola STEP: věrná kopie" }))).toContain("kontrola ✓");
+  });
+});
+
 describe("kolo 7: platnost souboru nad 3000 ploch – „✓ … jen rychlou kontrolou“ bez rychlé kontroly (22c)", () => {
   const box: [[number, number, number], [number, number, number]] = [[0, 0, 0], [10, 10, 10]];
   it("soubor nad mez bez jakékoli kontroly platnosti: ℹ „platnost souboru nezkontrolována (3500 ploch > 3000 …)“, ne ✓ a ne „jen rychlou kontrolou“", async () => {
@@ -448,6 +520,28 @@ describe("kolo 7: platnost souboru nad 3000 ploch – „✓ … jen rychlou kon
       const { resetExportChecks } = await import("../engine/files");
       resetExportChecks();
       await runReport(new MemoryWorkspace(), "nový díl Kostka\nkvádr 10 10 10\nexport step", { ...h, kernel: kernel as unknown as KernelApi }, { lang: "cs", strict });
+      return calls;
+    };
+    expect(await run(true)).toEqual([true]);
+    expect(await run(false)).toEqual([false]);
+  });
+  it("oponentura: STEP z `--formats` (finishRun → writeDocFormat) v přísném běhu také bez meze ploch; bez přísného ne (dřív jen výslovný `export step`)", { timeout: 180_000 }, async () => {
+    const { engineRun, finishRun } = await import("../cli/job");
+    const { ReportBuilder } = await import("../engine/protocol");
+    const { resetExportChecks } = await import("../engine/files");
+    const hooks = { opStart: () => undefined, opEnd: () => undefined };
+    const run = async (strict: boolean) => {
+      const h = host();
+      const calls: unknown[] = [];
+      const k = h.kernel as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const kernel = new Proxy(k, { get: (t, p) => (p === "exportStats" ? (...a: unknown[]) => (calls.push(a[3] ?? false), t.exportStats(...a)) : typeof t[p as string] === "function" ? (t[p as string] as (...x: unknown[]) => unknown).bind(t) : t[p as string]) });
+      const hk = { ...h, kernel: kernel as unknown as KernelApi };
+      resetExportChecks();
+      const ws = new MemoryWorkspace();
+      const script = "nový díl Kostka\nkvádr 10 10 10";
+      const rb = new ReportBuilder({ lang: "cs", lines: 2, strict });
+      await engineRun(ws, script, hk, rb, { strict, open: [] }, hooks);
+      await finishRun(ws, hk, rb, { formats: ["step"], allDocs: false, noOutputOnError: false, share: false, strict }, hooks);
       return calls;
     };
     expect(await run(true)).toEqual([true]);

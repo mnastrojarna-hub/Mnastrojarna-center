@@ -13,7 +13,7 @@ Další pole razítka: firma „Firma s.r.o.“ · kontroloval „Novák“
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Šablony hlavičky: v dokumentu „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) [výchozí] · v Nastavení — · list: „Firma“
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 10: výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 ✓ nový díl „Deska U“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
@@ -28,7 +28,7 @@ Razítko bez zkracování textu: všechna pole v nominální velikosti
 → razítko: šablona hlavičky „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) – výsledek po vyhodnocení listu níže
 → šablona hlavičky „Firma“ smazána z dokumentu i z Nastavení (razítka listů zůstávají) – výsledek po vyhodnocení listu níže
 Šablony hlavičky: v dokumentu — · v Nastavení — · list: „Firma“
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 18: výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 ✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 20000 mm³ · těleso platné
 

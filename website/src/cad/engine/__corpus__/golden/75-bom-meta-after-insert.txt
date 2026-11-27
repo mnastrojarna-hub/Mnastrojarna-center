@@ -27,7 +27,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 ⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – v sestavě: sestava obnovit "Deska A"; změna (materiál) se do sestavy sama nepromítne
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → razítko: číslo „DA-001“ – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 4: výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 ✓ záložka „Nástroj“ (sestava) je aktivní – další příkazy pracují s ní
 Kusovník „Nástroj“ (plochý): položek 2, kusů 2, hmotnost Σ 1,036 kg
 Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks

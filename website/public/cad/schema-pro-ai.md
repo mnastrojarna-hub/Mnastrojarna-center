@@ -2702,7 +2702,8 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 - Výsledek prvku se v protokolu vypíše **až po výpočtu**. Řádek „→ … – výsledek po výpočtu níže“ (ℹ `op.accepted`) jen
   potvrzuje přijetí příkazu – u nového prvku, u úpravy (`upravit`, `smazat`, `přesunout`, `proměnná`, `konfigurace`,
   entita / kóta skici, `zpět`), u příkazů výkresu („… – výsledek po vyhodnocení listu níže“; pak ✓ „list … vyhodnocen bez
-  nálezů“ nebo ✗ / ⚠ listu) i u načtení dokumentu s prvky (JSON na řádku, `otevřít`, `--open`: po ověřovací stavbě na
+  nálezů“ nebo ✗ / ⚠ listu; ✓ jen u listu bez nálezu i jinde v běhu a – u dílu – se zadanými nepředepsanými tolerancemi,
+  jinak ℹ „list … vyhodnocen – nálezy listu hlásí řádek N“ / „… nepředepsané tolerance nezadány“) i u načtení dokumentu s prvky (JSON na řádku, `otevřít`, `--open`: po ověřovací stavbě na
   řádku načtení ✗ / ⚠ vadného prvku, nebo ✓ „dokument … postaven: prvků N, bez ⚠ a ✗ · těleso platné“; ℹ `doc.unchecked`,
   když se platnost tělesa nekontrolovala). Běžný (ne přísný) běh staví model jednou na konci – ověřen je tedy stav po
   POSLEDNÍ změně. Řádek, po kterém přišla další změna a který nemá výsledek žádného prvku, dostane ℹ `op.superseded`
@@ -2965,9 +2966,9 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
 - **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem
   těles, obálka); řádek zápisu je ℹ „export STEP: … – zapsáno, kontrola níže“ (konzole „· kontrola níže“), ✓ nese jen
   kontrola; v přísném režimu proběhne kontrola před zápisem a soubor, jehož nález běh zastaví, se nezapíše (ani soubor
-  bez tělesa / s volnými plochami, ani ⚠ `out.reload-invalid` – „soubor nezapsán (přísný režim zastaví běh) – …“): řádek F `check=ok|fail`, při rozdílu ⚠ `out.check-failed` (soubor nejde načíst = ✗). „→ věrná kopie
+  bez tělesa / s volnými plochami, ani ⚠ `out.reload-invalid` – „soubor nezapsán (přísný režim zastaví běh) – …“): řádek F `check=ok|fail|unchecked` (`unchecked` = odpovídá modelu, platnost souboru nezkontrolována), při rozdílu ⚠ `out.check-failed` (soubor nejde načíst = ✗). „→ věrná kopie
   modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
-  modelu; platnost souboru jen rychlou kontrolou …“; nad 3000 ploch se bez přísného režimu neprovede ani rychlá kontrola → ℹ „→ odpovídá modelu; platnost souboru nezkontrolována (N ploch > 3000; přísný režim ji zkontroluje)“, ne ✓ – přísný režim kontroluje platnost souboru bez meze ploch), jinak ⚠ `out.reload-invalid` s počtem vadných ploch, a jen soubor
+  modelu; platnost souboru jen rychlou kontrolou …“; nad 3000 ploch se bez přísného režimu neprovede ani rychlá kontrola → ℹ „→ odpovídá modelu; platnost souboru nezkontrolována (N ploch > 3000; přísný režim ji zkontroluje)“, ne ✓, řádek F `check=unchecked` – přísný režim, `--strict` i řádek `přísně`, kontroluje platnost souboru bez meze ploch u `export step` i u STEP z `--formats`), jinak ⚠ `out.reload-invalid` s počtem vadných ploch, a jen soubor
   s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ `out.no-solid` (i když
   odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ `out.free-surfaces` s počty (u sestavy jména
   komponent). STL / 3MF a `export step bez kontroly` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
@@ -3078,7 +3079,7 @@ O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb7
     `…/cad#r=<cesta>.<klíč>[.p<sůl>]` – úložiště Supabase. V Node odkaz otevře `openShareLink(parseShareHash(hash))`
     (share.ts).
 - Mnoho souborů a málo místa ve stručném protokolu: místo jednotlivých řádků F jeden souhrnný
-  `F <formát|mixed> "*" <bajty>B files=<n> formats=… [check=ok|fail] [run=fail]`; jednotlivé soubory jsou v
+  `F <formát|mixed> "*" <bajty>B files=<n> formats=… [check=ok|fail|unchecked] [run=fail]`; jednotlivé soubory jsou v
   `protocol-full.txt` a v JSON `files`.
 
 ```

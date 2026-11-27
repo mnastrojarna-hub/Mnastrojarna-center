@@ -6,6 +6,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { expectedDims } from "../dim-check";
+import { threadByName, threadLabel } from "../defaults";
 import { setLang } from "../i18n";
 import type { EngineHost } from "../engine/host";
 import { holeTable } from "../engine/check";
@@ -26,6 +27,25 @@ beforeAll(async () => {
 
 const run = async (text: string) => finalizeReport(await runReport(new MemoryWorkspace(), text, host(), { lang: "cs" }), { full: true });
 const helix = (data: Record<string, unknown>): Feature => ({ id: "h1", type: "ext", ext: "surf.helixSweep", name: "Tažení po šroubovici 1", data } as unknown as Feature);
+
+describe("22d kolo 7 (oponentura): označení jemného závitu v angličtině s desetinnou tečkou", () => {
+  it("threadLabel: EN „M18×1.5“, CS / DE „M18×1,5“; uložené označení a katalog beze změny, oba zápisy se načtou", () => {
+    // dřív: EN text „M18×1,5 length 18“ (čárka jen u závitu, jinde v EN desetinná tečka) – odloženo jako „identifikátor“
+    try {
+      setLang("en");
+      expect(threadLabel("M18×1,5")).toBe("M18×1.5");
+      expect(threadLabel("m18 x 1.5")).toBe("M18×1.5");
+      expect(threadLabel("M8")).toBe("M8");
+      expect(threadByName("M18×1,5")?.name).toBe("M18×1,5"); // katalog (ukládané označení) se nemění
+      setLang("de");
+      expect(threadLabel("M18x1.5")).toBe("M18×1,5");
+    } finally {
+      setLang("cs");
+    }
+    expect(threadLabel("M18x1.5")).toBe("M18×1,5");
+    expect(threadByName("M18×1.5")).toBe(threadByName("M18×1,5"));
+  });
+});
 
 describe("22d: Tažení po šroubovici s thread= je závit v kontrole dílu, kontrole kót a výkresu", () => {
   it("kontrola matice: díra Ø16,5 s thread=M18x1.5 tdepth=18, bez nesmyslného zahloubení (repro „Matice B“)", { timeout: 240_000 }, async () => {
@@ -69,8 +89,10 @@ describe("22d: Tažení po šroubovici s thread= je závit v kontrole dílu, kon
       setLang("en");
       const en = [...labels({ ...emptyDoc(), features: [helix({ profile: "thread60", thread: "M18×1,5", side: "internal", turns: 12, mode: "cut" })] }), ...labels({ ...emptyDoc(), features: [thread, legacy, ...holes] })];
       expect(en.join(" | ")).not.toMatch(/délka|hl\.|skrz|dl\./);
-      expect(en).toContain("M18×1,5 length 18");
-      expect(en).toContain("M20×1,5 (length 15)");
+      // kolo 7 (vědomá změna po oponentuře): EN s desetinnou tečkou – dřív test zamykal „M18×1,5 length 18“
+      expect(en).toContain("M18×1.5 length 18");
+      expect(en).toContain("M20×1.5 (length 15)");
+      expect(en.join(" | ")).not.toMatch(/M\d+×\d+,\d/);
       expect(en).toContain("Ø8 thru");
       expect(en).toContain("Ø6 depth 12");
       setLang("de");
@@ -142,7 +164,8 @@ describe("22d: Tažení po šroubovici s thread= je závit v kontrole dílu, kon
       setLang("en");
       const r = finalizeReport(await runReport(new MemoryWorkspace(), text, host(), { lang: "en" }), { full: true });
       const full = r.full ?? "";
-      expect(full).toMatch(/M18×1,5 length 18 \(Helical sweep\)/);
+      expect(full).toMatch(/M18×1\.5 length 18 \(Helical sweep\)/); // kolo 7: EN desetinná tečka (dřív M18×1,5)
+      expect(full).not.toMatch(/M18×1,5/);
       expect(full).not.toMatch(/délka|Tažení po šroubovici/);
     } finally {
       setLang("cs");

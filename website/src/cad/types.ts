@@ -549,7 +549,7 @@ export type ExportRecord = {
   job?: ExportJobRecord;
 };
 /** záznam úlohy exportu v dokumentu (bod 22h): stav, čas, fáze a výsledek kontroly – zůstane s dokumentem i po zavření relace */
-export type ExportJobRecord = { id?: string; state?: string; ms?: number; phases?: { phase: string; ms: number }[]; check?: { ok: boolean; text: string } };
+export type ExportJobRecord = { id?: string; state?: string; ms?: number; phases?: { phase: string; ms: number }[]; check?: { ok: boolean; text: string; unchecked?: boolean } };
 
 // ---------------- vazby sestavy ----------------
 

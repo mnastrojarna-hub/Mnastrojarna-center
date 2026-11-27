@@ -11234,6 +11234,8 @@ export const DE: Record<string, string> = {
  "výkres zóny ano|ne": "zeichnung zonen ja|nein",
  "Výkres: {0}": "Zeichnung: {0}",
  "Výkres: list „{0}“ vydán jako rev. {1} z modelu {2} ({3}) – odpovídá modelu": "Zeichnung: Blatt „{0}“ als Rev. {1} aus Modell {2} freigegeben ({3}) – entspricht dem Modell",
+ "výkres: list „{0}“ vyhodnocen – nálezy listu hlásí řádek {1}": "Zeichnung: Blatt „{0}“ ausgewertet – die Befunde des Blatts meldet Zeile {1}",
+ "výkres: list „{0}“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)": "Zeichnung: Blatt „{0}“ ausgewertet – Ansichten, Schnitte und Smarte Maße ohne Befund, Allgemeintoleranzen nicht angegeben (der Zeichnungsexport meldet sie ⚠; zeichnung allgemein ISO 2768-mK)",
  "výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)": "Zeichnung: Blatt „{0}“ ohne Befund ausgewertet (Ansichten, Schnitte, Smarte Maße)",
  "Výkres: model je prázdný – nejdřív vymodelujte díl": "Zeichnung: das Modell ist leer – zuerst ein Teil modellieren",
  "Výkresová dokumentace": "Zeichnungsdokumentation",

@@ -2,3 +2,6 @@
 zapsáno, nálezy níže	written, findings below
 nálezy níže	findings below
 platnost souboru nezkontrolována ({0} ploch > {1}; přísný režim ji zkontroluje)	file validity not checked ({0} faces > {1}; strict mode checks it)
+# kolo 7, oponentura: vyhodnocení listu bez falešného ✓ (22i)
+výkres: list „{0}“ vyhodnocen – nálezy listu hlásí řádek {1}	drawing: sheet “{0}” evaluated – the sheet's findings are reported on line {1}
+výkres: list „{0}“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)	drawing: sheet “{0}” evaluated – views, sections and Smart dimensions without findings, general tolerances not specified (the drawing export reports them ⚠; drawing general ISO 2768-mK)

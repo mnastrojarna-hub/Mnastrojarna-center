@@ -195,7 +195,8 @@ describe("bod 20 (výkresy a výstupy) – engine se skutečným jádrem", async
     expect(c).toMatch(/Recompute all – document “Plate A”, model revision r·\w{6}:/);
     setLang("de");
     const ws2 = new MemoryWorkspace();
-    const r2 = await runScript(ws2, 'neu teil "Platte A"\nquader 60 40 10\nzeichnung A4\nzeichnung freigeben\nausgaben veraltet\nalles neu berechnen', host);
+    // kolo 7 (22i): Blatt ohne Allgemeintoleranzen ist kein „✓ ohne Befund“ mehr (ℹ) – Eingabe mit Toleranzen, Prüfung unverändert
+    const r2 = await runScript(ws2, 'neu teil "Platte A"\nquader 60 40 10\nzeichnung A4\nzeichnung allgemein ISO 2768-mK\nzeichnung freigeben\nausgaben veraltet\nalles neu berechnen', host);
     const c2 = formatConsole(r2);
     expect(c2).toMatch(/→ Blatt „Blatt 1“ als Rev\. A aus Modell r·\w{6} freigegeben.* – Ergebnis nach der Auswertung des Blatts unten/);
     expect(c2).toMatch(/✓ Zeichnung: Blatt „Blatt 1“ ohne Befund ausgewertet/);

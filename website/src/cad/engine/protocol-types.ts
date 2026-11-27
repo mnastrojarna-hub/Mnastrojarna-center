@@ -102,7 +102,8 @@ export type OutFile = {
   base64?: string;
   url?: string;
   sheets?: number;
-  check?: { ok: boolean; text: string };
+  /** kontrola souboru; `unchecked` = soubor odpovídá modelu, ale jeho platnost se nezkontrolovala (řádek F `check=unchecked`, 22c kolo 7) */
+  check?: { ok: boolean; text: string; unchecked?: boolean };
   run?: "fail";
   /** revize modelu, ze které soubor vznikl (`r·a1b2c3` – řádek F `rev=`; vlna 22, bod 12) */
   modelRev?: string;

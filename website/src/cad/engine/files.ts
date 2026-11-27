@@ -507,9 +507,10 @@ export function asmDocNotes(d: CadDoc, partOf?: (name: string) => CadDoc | null 
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
  * `check=ok|fail` v řádku F), STL, výkres = všechny listy dokumentu i výkresy dílů z komponent (PDF jedno vícestránkové,
  * DXF / DWG / SVG soubor na list), CSV = kusovník sestavy. Názvy podle dokumentu (`Deska 1.step`, `Deska 1 výkres.pdf`).
- * Vrací zapsané soubory; hlášky (varování listů, kontrola STEP, formát jen v aplikaci) předá `note`.
+ * Vrací zapsané soubory; hlášky (varování listů, kontrola STEP, formát jen v aplikaci) předá `note`. `o.strict` = přísný běh
+ * (platnost souboru STEP se kontroluje bez meze ploch).
  */
-export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" | "phase"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions } = {}): Promise<OutFile[]> {
+export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" | "phase"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions; strict?: boolean } = {}): Promise<OutFile[]> {
   const base = d.name.trim() || "model";
   const write = (name: string, mime: string, data: Uint8Array, format: string) => host.files.write({ name, mime, data, doc: d.name, format });
   if (fmt === "mncad") {
@@ -530,9 +531,10 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
     const ms = await modelSolids(host.kernel, ws, d, o.hooks ?? {});
     // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ; model bez tělesa ne
     const pre = fmt === "step" && ms?.solids !== 0 && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
-    // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením
+    // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením; přísný běh
+    // (`o.strict`) kontroluje platnost souboru bez meze ploch jako výslovný `export step` (22c kolo 7 – oponentura: dřív jen tam)
     const { runExportJob } = await import("./export-job");
-    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase, write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) });
+    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase, write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false, fullCheck: o.strict === true, ...(ms?.parts ? { parts: ms.parts } : {}) });
     const f = job.out;
     f.modelRev = job.modelRev;
     f.phases = job.phases;
@@ -540,7 +542,7 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
     else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
     if (job.check) {
       const c = job.check;
-      f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗ℹ]\s*/, "") };
+      f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗ℹ]\s*/, ""), ...(c.ok && c.level === "note" ? { unchecked: true } : {}) };
       if (!c.ok) note({ code: c.code ?? "out.check-failed", text: f.check.text, level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
       else if (c.level === "note") note({ code: "msg.note", text: f.check.text, level: "note" }); // platnost souboru nezkontrolována (22c kolo 7)
     } else if (ms) {

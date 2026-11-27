@@ -85,7 +85,8 @@ export interface OpCtx {
    * bloky příkazů výkresu běhu (engine/drawing-track.ts): export listu, který běh měnil, ohlásí jeho nálezy (řez mimo těleso)
    * na řádky příkazů výkresu, ne podruhé na řádku exportu (22i kolo 6)
    */
-  draw?: { reportNow(sheetId: string, codes: readonly string[]): Promise<boolean> };
+  /** bloky výkresu a vyhodnocení listů (engine/drawing-track.ts); `exportFindings` = export listů ohlásil nález listu (22i kolo 7) */
+  draw?: { reportNow(sheetId: string, codes: readonly string[]): Promise<boolean>; exportFindings?(sheetIds: readonly string[], line: number): void };
 }
 
 export type OpHandler<K extends OpKind> = (op: OpOf<K>, ctx: OpCtx) => Promise<void>;

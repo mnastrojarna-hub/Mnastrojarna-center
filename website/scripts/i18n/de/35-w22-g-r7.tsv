@@ -2,3 +2,6 @@
 zapsáno, nálezy níže	geschrieben, Befunde unten
 nálezy níže	Befunde unten
 platnost souboru nezkontrolována ({0} ploch > {1}; přísný režim ji zkontroluje)	Gültigkeit der Datei nicht geprüft ({0} Flächen > {1}; der strenge Modus prüft sie)
+# kolo 7, oponentura: vyhodnocení listu bez falešného ✓ (22i)
+výkres: list „{0}“ vyhodnocen – nálezy listu hlásí řádek {1}	Zeichnung: Blatt „{0}“ ausgewertet – die Befunde des Blatts meldet Zeile {1}
+výkres: list „{0}“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)	Zeichnung: Blatt „{0}“ ausgewertet – Ansichten, Schnitte und Smarte Maße ohne Befund, Allgemeintoleranzen nicht angegeben (der Zeichnungsexport meldet sie ⚠; zeichnung allgemein ISO 2768-mK)

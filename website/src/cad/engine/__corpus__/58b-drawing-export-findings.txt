@@ -1,5 +1,7 @@
 # vlna 22, body 22i a 22c (kolo 7): zápis výkresu je ✓ jen u listu bez nálezu – list bez nepředepsaných tolerancí a funkční
-# plocha bez tolerované kóty dají ℹ „· nálezy níže“ a ⚠ pod ním; čistý list (Deska B) zůstává ✓
+# plocha bez tolerované kóty dají ℹ „· nálezy níže“ a ⚠ pod ním; čistý list (Deska B) zůstává ✓. Kolo 7 (oponentura):
+# vyhodnocení listu s nálezem u exportu je ℹ „nálezy listu hlásí řádek N“, ne ✓; přísný běh na ⚠ výchozího listu (výjimka
+# jen drawing.warning) soubor nezapíše a řádek jmenuje drawing.default-sheet (Deska C)
 nový díl "Deska A"
 kvádr 60 40 10
 výkres A4
@@ -13,4 +15,9 @@ nový díl "Deska B"
 kvádr 60 40 10
 výkres A4
 výkres nepředepsané ISO 2768-mK
+výkres export pdf
+#--- run
+přísně kromě drawing.warning
+nový díl "Deska C"
+kvádr 60 40 10
 výkres export pdf

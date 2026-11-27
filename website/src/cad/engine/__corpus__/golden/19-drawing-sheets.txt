@@ -12,7 +12,7 @@ Prvky:
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A4, na výšku – výsledek po vyhodnocení listu níže
 → razítko: název „Čep“, číslo „MN-001“, kreslil „AI“, revize „A“ – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 2: výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 → nový list 2 „Detail“ (Chytré kóty) – další příkazy výkresu pracují s ním – výsledek po vyhodnocení listu níže
 → výkres: A4, měřítko 2:1, pohledy přední · list 2 „Detail“ – výsledek po vyhodnocení listu níže
 → poznámka: Kalit 58 HRC · list 2 „Detail“ – výsledek po vyhodnocení listu níže
@@ -55,7 +55,7 @@ Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
   přední (x = X, y = Z): x −20…20, y 0…60 mm · 2:1 · na listu x 34…114, y 66…186
-✓ výkres: list „Detail“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 7: výkres: list „Detail“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 
 Dokument: „Listy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 40 × 40 × 60 mm (X -20…20, Y -20…20, Z 0…60) · objem 75,40 cm³ · ploch 3 · hran 3

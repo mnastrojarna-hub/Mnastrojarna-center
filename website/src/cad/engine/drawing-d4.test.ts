@@ -181,7 +181,7 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><rect width="40" height="40" fill="#e03930"/></svg>');
     const ws = new MemoryWorkspace();
     const host = hostOf({ "logo.png": png, "znak.svg": svg });
-    const r = await runScript(ws, 'nový díl "Deska L"\nkvádr 100 60 20\nvýkres A4 na šířku pohledy přední,horní\nvýkres razítko logo="logo.png"\nvýkres hlavička uložit "Firma" logo="znak.svg" firma="F s.r.o."\nvýkres hlavička použít "Firma"\nvýkres export svg\nexport mncad "L"', host);
+    const r = await runScript(ws, 'nový díl "Deska L"\nkvádr 100 60 20\nvýkres A4 na šířku pohledy přední,horní\nvýkres nepředepsané ISO 2768-mK\nvýkres razítko logo="logo.png"\nvýkres hlavička uložit "Firma" logo="znak.svg" firma="F s.r.o."\nvýkres hlavička použít "Firma"\nvýkres export svg\nexport mncad "L"', host);
     const txt = formatConsole(r);
     expect(txt).toMatch(/→ razítko: logo „logo\.png“ .* – výsledek po vyhodnocení listu níže/);
     expect(txt).toMatch(/→ šablona hlavičky „Firma“ .*logo SVG.* – výsledek po vyhodnocení listu níže/);

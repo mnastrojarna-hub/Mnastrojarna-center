@@ -5,7 +5,7 @@
 ℹ řádek 5: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → razítko: číslo „DA-001“ – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+ℹ řádek 6: výkres: list „List 1“ vyhodnocen – pohledy, řezy a Chytré kóty bez nálezů, nepředepsané tolerance nezadány (export výkresu je hlásí ⚠; výkres nepředepsané ISO 2768-mK)
 ✓ nový díl „Přidržovač“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Pouzdro“ – nová záložka

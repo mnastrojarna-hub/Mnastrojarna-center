@@ -209,7 +209,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   // záznam exportu s revizí modelu (bod 20) a záznamem úlohy (22h: stav, čas, fáze, kontrola – trvale v dokumentu); kontrola
   // zpětným načtením se doplní níže, až je známá (záznam téhož formátu a souboru se přepíše)
   const jobMs = job.phases.reduce((a, p) => a + p.ms, 0);
-  const note = (check?: { ok: boolean; text: string }) => recordOutput(ctx, { what: "model", format: fmt, file: f.name, job: { state: "done", ms: jobMs, phases: job.phases, ...(check ? { check } : {}) } });
+  const note = (check?: { ok: boolean; text: string; unchecked?: boolean }) => recordOutput(ctx, { what: "model", format: fmt, file: f.name, job: { state: "done", ms: jobMs, phases: job.phases, ...(check ? { check } : {}) } });
   note();
   f.modelRev = job.modelRev;
   f.phases = job.phases;
@@ -227,7 +227,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   }
   const c = job.check!;
   const text = c.line.replace(/^[✓⚠✗ℹ]\s*/, "");
-  f.check = { ok: c.ok, text };
+  f.check = { ok: c.ok, text, ...(c.ok && c.level === "note" ? { unchecked: true } : {}) };
   note(f.check);
   if (c.ok && c.level === "note") e.code("msg.note", { text, indent: "  " }); // platnost souboru nezkontrolována – ℹ, ne ✓
   else if (c.ok) {
@@ -245,12 +245,14 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   if (cmd.format === "png" && typeof document === "undefined") return coded(ctx, "host.app-only", { args: [tr("výkres export png")] });
   // „vše“ u sestavy s výkresy dílů v komponentách = všechny listy dokumentu (files.ts `sheetScope`)
   const scope = sheetScope(d, cmd.sheet);
+  // nálezy tohoto exportu od prvního řádku: i ⚠ výchozího listu (22c kolo 7 – oponentura: dřív se `before` bralo až za ním,
+  // takže přísný běh zastavil na drawing.default-sheet, a soubor se přesto zapsal / řádek „nezapsán“ jmenoval jiný nález)
+  const before = ctx.report.entries.length;
   if (!d.drawings?.length && !(scope === "doc" && hasDrawings(d))) e.code("drawing.default-sheet");
   const env: DrawEnv = { kernel: ctx.host.kernel, ws: ctx.ws, flat: ctx.host.ui?.bomFlat?.() ?? true, hooks: asmHooks(ctx), ...(ctx.host.fonts ? { fonts: ctx.host.fonts } : {}) };
   const p = await drawingOutput(env, d, cmd.format, cmd.sheet, cmd.name);
   // vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → ⚠ drawing.stale, přísně ✗ bez zápisu (bod 20)
   const ids = await exportedSheetIds(d, scope);
-  const before = ctx.report.entries.length;
   warnStaleExport(ctx, d, ids);
   if (ctx.report.entries.slice(before).some((x) => x.code === "drawing.stale" && x.level === "error")) return;
   const FMT = cmd.format.toUpperCase();
@@ -294,18 +296,30 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
     findings.push({ code: wc === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", init: { text }, unwritten: text });
   }
   const unwritten = (text: string) => tr("soubor nezapsán (přísný režim zastaví běh) – {0}", text);
+  // vyhodnocení listu na konci běhu nesmí nad nálezy listu z tohoto exportu napsat „✓ … bez nálezů“ (22i kolo 7)
+  // (u více listů jen listy, které text nálezu jmenuje – „List 2: …“ / „(listy: „List 2“)“; bez jména všechny listy exportu)
+  if (findings.length && ctx.line) {
+    const named = ids.filter((_, i) => findings.some((x) => x.unwritten.startsWith(`${labels[i]}: `) || x.unwritten.includes(`„${labels[i]}“`)));
+    const all = findings.some((x) => !labels.some((l) => x.unwritten.startsWith(`${l}: `) || x.unwritten.includes(`„${l}“`)));
+    ctx.draw?.exportFindings?.(ids.length > 1 && !all ? named : ids, ctx.line);
+  }
+  const rest = (skip?: Finding) => {
+    for (const x of findings) if (x !== skip) e.code(x.code, { ...(x.code === "asm.stale-copy" ? { text: x.unwritten } : x.init), indent: "  " });
+  };
+  // nález, který tento export už ohlásil (⚠ výchozího listu, řez mimo těleso na řádku příkazu výkresu, ⚠ zastaralého listu
+  // s výjimkou) a přísný běh na něm zastaví: soubor se nezapíše a řádek jmenuje TENTÝŽ nález, na kterém běh stojí
+  // (první ⚠/✗ záznamů exportu – stejně jako hlavička STOP / Σ stop=); nálezy listu pod ním beze změny
+  const fresh = ctx.strict?.hit(ctx.report.entries.slice(before), ctx.line);
+  if (fresh) {
+    e.code("msg.note", { text: unwritten(fresh.text) });
+    rest();
+    return;
+  }
   const stopper = findings.find((x) => !!ctx.strict?.escalates(x.code, ctx.line));
   if (stopper) {
     // přísný režim: soubor se nezapíše, nález, který běh zastaví, to řekne; ostatní nálezy listu beze změny
     e.code(stopper.code, { text: unwritten(stopper.unwritten), ...(stopper.init.level ? { level: stopper.init.level } : {}) });
-    for (const x of findings) if (x !== stopper) e.code(x.code, { ...(x.code === "asm.stale-copy" ? { text: x.unwritten } : x.init), indent: "  " });
-    return;
-  }
-  // nález, který tento export ohlásil na jiném řádku (řez mimo těleso na řádku příkazu výkresu, ⚠ zastaralého listu
-  // s výjimkou), a přísný běh na něm zastaví: soubor se také nezapíše
-  const fresh = ctx.strict?.hit(ctx.report.entries.slice(before), ctx.line);
-  if (fresh) {
-    e.code("msg.note", { text: unwritten(fresh.text) });
+    rest(stopper);
     return;
   }
   const weak = findings.length ? ("findings" as const) : elsewhere ? ("note" as const) : false;

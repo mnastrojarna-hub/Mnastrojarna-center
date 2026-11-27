@@ -158,6 +158,20 @@ describe("příčina prázdného výsledku je ověřená proti tělesu před ope
     const overlap = body.intersect(r.makeSphere(4).translate([6, 6, 11]) as never) as never as r.Shape3D; // roh kvádru v kouli
     expect(emptyResultCause(overlap)).toBeNull();
   });
+  it("kolo 7 (oponentura): průnik s nástrojem UVNITŘ složeného tělesa (COMPOUND po odebrání) NENÍ „disjoint“ – vzdálenost po tělesech SOLID", { timeout: 60_000 }, async () => {
+    // dřív BRepExtrema nad celým složeným tvarem: koule r = 1 uvnitř tělesa po odebrání dala vzdálenost 4 (jen hranice),
+    // takže prázdný průnik ze selhání jádra by dostal nepravdivou příčinu „nástroj se tělesa nedotýká“
+    const { beginFeatureOps, emptyResultCause, solidDistance } = await import("../shape-health");
+    const cutBody = (r.makeBaseBox(10, 10, 10) as never as r.Shape3D).cut(r.makeBox([3, 3, 8], [4, 4, 10]) as never) as never as r.Shape3D;
+    const inside = r.makeSphere(1).translate([0, 0, 5]) as never as r.Shape3D;
+    expect(cutBody.wrapped.ShapeType()).not.toBe(r.getOC().TopAbs_ShapeEnum.TopAbs_SOLID); // opravdu složený tvar
+    expect(solidDistance(cutBody, inside)).toBe(0);
+    beginFeatureOps();
+    expect(emptyResultCause(cutBody.intersect(inside as never) as never as r.Shape3D)).toBeNull();
+    // vzdálené těleso u složeného tvaru zůstává „disjoint“ (koule u rohu, √27 − 4 = 1,196 mm)
+    beginFeatureOps();
+    expect(emptyResultCause(cutBody.intersect(r.makeSphere(4).translate([8, 8, 13]) as never) as never as r.Shape3D)).toBe("disjoint");
+  });
 });
 
 describe("konečné těleso – nezkontrolováno není ✓", () => {

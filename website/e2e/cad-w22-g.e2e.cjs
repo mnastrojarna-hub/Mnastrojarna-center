@@ -380,6 +380,15 @@ const start = async (p, url) => {
     ok(/^MNCAD\/1 STOP /.test(sCliD) && !/^F pdf /m.test(sCliD) && /files=0/.test(sCliD) && /^⚠ L5 drawing\.warning "Deska D": soubor nezapsán \(přísný režim zastaví běh\) – Výkres nemá/m.test(sCliD) && /soubor nezapsán \(přísný režim zastaví běh\)/.test(sFullD) && !/výkres PDF: /.test(sFullD), '7d: `přísně` + výkres s ⚠ → STOP, soubor nezapsán (CLI files=0, prohlížeč bez řádku zápisu)');
     const cCli = norm(cli('přísně\nnový díl "Deska D"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres export pdf', ['--full']));
     ok(/^✓ L6 výkres PDF: /m.test(cCli) && /^F pdf /m.test(cCli) && !/STOP/.test(cCli), '7d: čistý list v přísném úseku → ✓ zápisu a soubor (F pdf)');
+    // 7e) kolo 7 (oponentura): vyhodnocení listu s nálezem u exportu není „✓ … bez nálezů“ (ℹ s řádkem exportu, prohlížeč = CLI);
+    //     `přísně kromě drawing.warning` + dokument bez listu: STOP na ⚠ drawing.default-sheet a soubor se NEZAPÍŠE (dřív F pdf, files=1)
+    const sheetNote = /^ℹ L3 msg\.note "Deska D": výkres: list „List 1“ vyhodnocen – nálezy listu hlásí řádek 4$/m;
+    ok(sheetNote.test(dFull) && sheetNote.test(dCli) && !/^✓ L3 výkres: list „List 1“ vyhodnocen bez nálezů/m.test(dFull) && !/vyhodnocen bez nálezů/.test(dCli), '7e: list s ⚠ u exportu → ℹ „nálezy listu hlásí řádek 4“, žádné ✓ listu (prohlížeč i CLI)');
+    const BARE = 'přísně kromě drawing.warning\nnový díl "Deska E"\nkvádr 60 40 10\nvýkres export pdf';
+    const eCli = norm(cli(BARE, ['--full']));
+    const eFull = norm(await runFresh(BARE, { protocol: 'full' }));
+    fs.writeFileSync(S + 'w22g-22c-default-sheet-cli.txt', eCli + '\n');
+    ok(/^MNCAD\/1 STOP /.test(eCli) && /stop=L4:drawing\.default-sheet/.test(eCli) && !/^F pdf /m.test(eCli) && /files=0/.test(eCli) && /^ℹ L4 msg\.note "Deska E": soubor nezapsán \(přísný režim zastaví běh\) – dokument zatím nemá výkres/m.test(eCli) && /soubor nezapsán \(přísný režim zastaví běh\) – dokument zatím nemá výkres/.test(eFull) && !/výkres PDF: /.test(eFull), '7e: `přísně kromě drawing.warning` bez listu → STOP drawing.default-sheet, soubor nezapsán (CLI files=0, prohlížeč bez zápisu)');
     await gc.close();
   }
 
