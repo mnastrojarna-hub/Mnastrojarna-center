@@ -90,8 +90,14 @@ export type ExtTab = "create" | "surface" | "sheet" | "weld" | "tools" | "asm" |
 export type ExtDef = {
   /** jedinečné id, např. "surf.extrude" */
   ext: string;
-  /** český popisek (pás karet, historie, formulář) */
+  /**
+   * popisek (pás karet, historie, formulář) – při čtení přeložený do AKTUÁLNÍHO jazyka (`registerExt` z něj udělá getter):
+   * `label: tr("…")` se vyhodnotí při načtení modulu, v CLI / HTTP ještě před `--lang` – bez getteru by výchozí název
+   * prvku zůstal česky (vlna 22, bod 22d, kolo 6)
+   */
   label: string;
+  /** popisek, jak ho modul zapsal (bez překladu – CLI: český zdroj); hledání prvku podle popisku přijme i ten */
+  readonly labelSrc?: string;
   /** ikona: název z cad-icons nebo ikona zaregistrovaná přes registerIcon() v UI modulu */
   icon?: string;
   tone?: "sketch" | "create" | "feature" | "cut" | "pattern" | "ref" | "view" | "tool" | "file";
@@ -154,6 +160,11 @@ const defs = new Map<string, ExtDef>();
 
 export function registerExt(def: ExtDef) {
   if (defs.has(def.ext)) throw new Error(tr("Prvek rozšíření {0} je už zaregistrovaný.", def.ext));
+  // popisek se přeloží až při čtení: jazyk běhu (CLI --lang, HTTP `lang`) se nastaví až po načtení modulů; v prohlížeči
+  // (jazyk nastavený před načtením aplikace) je zdroj už přeložený a tr() ho vrátí beze změny
+  const src = def.labelSrc ?? def.label;
+  Object.defineProperty(def, "labelSrc", { value: src, enumerable: false, configurable: true });
+  Object.defineProperty(def, "label", { get: () => tr(src), set: () => undefined, enumerable: true, configurable: true });
   defs.set(def.ext, def);
   return def;
 }

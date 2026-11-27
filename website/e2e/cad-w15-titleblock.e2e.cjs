@@ -203,6 +203,27 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   await p.locator('[data-title-panel]').scrollIntoViewIfNeeded();
   ok((await p.locator('[data-title-template]').inputValue()) === 'toolmaker', 'GUI: šablona razítka „nástrojářská“ podle textového příkazu');
   ok((await p.locator('[data-title-field="checkedBy"]').inputValue()) === 'EN check' && (await p.locator('[data-title-field="customer"]').inputValue()) === 'Kunde GmbH', 'GUI: pole Kontroloval a Zákazník z textových příkazů');
+  // vlna 22 kolo 6 (oponent): pole Materiál v razítku = totéž pravidlo jako příkaz `materiál …` a pole v Hmotnostních
+  // vlastnostech – pod polem ℹ material.class / ⚠ material.density-assumed (dřív bez hlášky: „Hardox 400“ tiše předpokládal hustotu)
+  {
+    const mf = p.locator('[data-title-panel] [data-title-field="material"]');
+    const mnote = () => p.locator('[data-title-panel] [data-material-note]').first().getAttribute('data-material-note', { timeout: 2000 }).catch(() => null);
+    const prevMat = await mf.inputValue();
+    const waitNote = (code) => p.waitForFunction((c) => { const e = document.querySelector('[data-title-panel] [data-material-note]'); return c === null ? !e : !!e && e.getAttribute('data-material-note') === c; }, code, { timeout: 15000 }).catch(() => {});
+    await mf.fill('Hardox 400');
+    await mf.press('Tab');
+    await waitNote('material.density-assumed');
+    const wtxt = await p.locator('[data-title-panel] [data-material-note]').first().textContent({ timeout: 2000 }).catch(() => '');
+    ok((await mnote()) === 'material.density-assumed' && /^⚠/.test(wtxt || '') && !/✓/.test(wtxt || ''), `GUI razítko: Materiál „Hardox 400“ → ⚠ hustota předpokládaná pod polem (${wtxt})`);
+    await mf.fill('ČSN 11 423');
+    await mf.press('Tab');
+    await waitNote('material.class');
+    ok((await mnote()) === 'material.class' && /ČSN 11 423 \(hustota podle: Ocel\)/.test(await p.evaluate(() => window.mncad.status())), `GUI razítko: Materiál „ČSN 11 423“ → ℹ třída Ocel pod polem (${await mnote()})`);
+    await mf.fill(prevMat);
+    await mf.press('Tab');
+    if (!prevMat.trim()) await waitNote(null);
+    ok(prevMat.trim() ? true : (await p.locator('[data-title-panel] [data-material-note]').count()) === 0, 'GUI razítko: prázdné pole Materiál = bez označení, bez hlášky');
+  }
   ok((await p.locator('[data-title-tol-mode]').inputValue()) === 'iso2768' && (await p.locator('[data-title-tol-lin]').inputValue()) === 'f' && (await p.locator('[data-title-tol-geo]').inputValue()) === 'H', 'GUI: nepředepsané tolerance ISO 2768 f / H');
   // přepnutí listu: režim tolerancí se nepřenáší (dřív na „Detail“ zůstalo ISO 2768 + třída a zároveň ⚠ bez tolerancí)
   const tab = (name) => p.locator('[data-drawing-workspace] button[title="Dvojklik = přejmenovat"]', { hasText: name }).first();

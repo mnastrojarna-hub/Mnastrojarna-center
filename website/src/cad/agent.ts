@@ -56,7 +56,8 @@ import { parseReferenceLine, REFERENCE_COMMANDS, type RefCmd } from "./reference
 import { parseOpenLine, type OpenOp } from "./agent-open";
 import { CHECK_COMMANDS, parseCheckLine, type CheckOp } from "./agent-check";
 import { polylineClose, takeCloseWords } from "./poly-close";
-import { CodedParseError, materialClass, parseStrictLine, trackOpts } from "./agent-strict";
+import { CodedParseError, parseStrictLine, trackOpts } from "./agent-strict";
+import { designationPatch } from "./material-designation";
 import { literalTokens } from "./agent-quoted";
 import { parseSupplyTokens } from "./bom-model";
 import { outputsStatusLines } from "./doc-outputs";
@@ -370,20 +371,7 @@ syn("closetab", "zavřít", "zavrit");
 // ── pohybová studie sestavy (agent-motion.ts) ──
 syn("motion", "pohyb", "pohybová", "simulace", "bewegung", "bewegungsstudie", "kinematik");
 export const canon = (t: string) => SYN[fold(t)] ?? fold(t);
-/** anglické a německé názvy tříd materiálu → id (hustota); jiné texty jdou do razítka jako označení */
-const MATERIAL_ALIASES: Record<string, string> = Object.fromEntries(
-  (
-    [
-      ["ocel", "steel", "stahl", "mild steel", "baustahl"],
-      ["nerez", "stainless", "stainless steel", "inox", "edelstahl", "rostfrei", "nirosta"],
-      ["hlinik", "aluminium", "aluminum", "alu", "alloy"],
-      ["mosaz", "brass", "messing"],
-      ["med", "copper", "kupfer"],
-      ["titan", "titanium"],
-      ["pom", "plastic", "plast", "kunststoff", "delrin", "acetal"],
-    ] as const
-  ).flatMap(([id, ...names]) => names.map((n) => [fold(n), id] as const)),
-);
+/* názvy tříd materiálu (EN / DE) → id: material-designation.ts `knownMaterialId` (jedno pravidlo s komponentou a GUI) */
 
 const PLANES: Record<string, PlaneName> = { xy: "XY", xz: "XZ", yz: "YZ", "pudorys": "XY", "narys": "XZ", "bokorys": "YZ", top: "XY", front: "XZ", right: "YZ", oben: "XY", draufsicht: "XY", vorne: "XZ", vorderansicht: "XZ", seite: "YZ", seitenansicht: "YZ" };
 const AXES: Record<string, Axis> = { x: "X", y: "Y", z: "Z" };
@@ -560,7 +548,7 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
   const pairs = keyValues(mergeThreadText(m[5] ?? "")); // thread=M18 x 1,5 → jedno slovo (thread-spec.ts)
   const fw = fold(word);
   const base = FEATURE_TYPES.find((t) => fold(t) === fw) ?? (Object.entries(FEATURE_LABEL).find(([, l]) => fold(l) === fw)?.[0] as (typeof FEATURE_TYPES)[number] | undefined);
-  const ext = base ? undefined : allExt().find((d) => fold(d.ext) === fw || fold(d.label) === fw);
+  const ext = base ? undefined : allExt().find((d) => fold(d.ext) === fw || fold(d.label) === fw || fold(d.labelSrc ?? "") === fw);
   if (!base && !ext) throw new Error(tr("neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}", word, FEATURE_TYPES.join(", "), allExt().map((d) => d.ext).join(", ")));
   if (ext?.action) throw new Error(tr("„{0}“ není prvek, ale akce (bez prvku v historii) – spusťte ji příkazem: akce {1}", ext.label, ext.ext));
   const nameAt = pairs.findIndex(([k]) => ["name", "nazev"].includes(fold(k)));
@@ -898,11 +886,10 @@ export function parseAgentText(text: string): AgentProgram {
           return;
         case "material": {
           // známá třída (hustota) → material; cokoli jiného (ČSN 11 423, 1.0503, EN AW-6082) = označení do razítka
+          // označení s rozpoznanou třídou (EN AW-6082 → hliník, 1.4301 → nerez…) nastaví i hustotu (ℹ material.class, 5.2 č. 37);
+          // totéž pravidlo jako komponenta sestavy a pole označení v GUI (material-designation.ts, vlna 22 kolo 6)
           const q = tokens.join(" ").trim();
-          const known = MATERIALS.find((x) => fold(x.id) === fold(q) || fold(x.label) === fold(q) || MATERIAL_ALIASES[fold(q)] === x.id);
-          // označení s rozpoznanou třídou (EN AW-6082 → hliník, 1.4301 → nerez…) nastaví i hustotu (ℹ material.class, 5.2 č. 37)
-          const cls = known ? null : materialClass(q);
-          ops.push({ k: "meta", patch: known ? { material: known.id } : cls ? { materialName: q, material: cls } : { materialName: q }, line: no });
+          ops.push({ k: "meta", patch: designationPatch(q), line: no });
           return;
         }
         case "color":
