@@ -104,8 +104,13 @@ async function open(b, path) {
   if (SHOTS) await p.screenshot({ path: SHOTS + `w22-m-motor-form${NOGL ? '-nogl' : ''}.png` });
   await setField('to', -5);
   ok(/^20 → -5 mm ↓ zdvih 25 mm$/.test(await txt('[data-motor-computed]')), `bod 11: vypočtený zdvih a směr vedle polí – ${await txt('[data-motor-computed]')}`);
-  await mp.locator('[data-motor-end="stroke"]').click().catch(() => {});
-  await p.waitForTimeout(150);
+  // přepnutí čeká na skutečný stav (pole zdvihu ve formuláři), ne na pevnou pauzu – bez WebGL a pod zátěží se klik zpracuje později
+  // (kolo 6: nestabilní FAIL „přepnutí na zadání zdvihem … – NaN“); klik se nepolyká, chyba kliku = FAIL kroku
+  await mp.locator('[data-motor-end="stroke"]').click();
+  await mp.locator('[data-motor-field="stroke"] input').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  // pole se po přepnutí přerenderuje (týž prvek input dostane hodnotu zdvihu o snímek později): čekat na ustálený stav formuláře –
+  // vypočtený řádek a pole zdvihu se shodují (selže-li přepnutí, zůstane jiná hodnota a krok níže je FAIL)
+  await p.waitForFunction(() => { const i = document.querySelector('[data-motor-field="stroke"] input'); return !!i && Number(String(i.value).replace(',', '.')) === -25; }, null, { timeout: 15000 }).catch(() => {});
   ok((await val('stroke')) === -25, `bod 11: přepnutí na zadání zdvihem zachová průběh (zdvih −25) – ${await val('stroke')}`);
   await setField('stroke', -10);
   ok(/^20 → 10 mm ↓ zdvih 10 mm$/.test(await txt('[data-motor-computed]')), `bod 11: zadání „začátek + relativní posun“ −10 → konec 10 – ${await txt('[data-motor-computed]')}`);
@@ -116,7 +121,11 @@ async function open(b, path) {
   await p.waitForTimeout(200);
   ok((await val('from')) === 20 && !(await mp.locator('[data-motor-warning]').count()), `bod 11: „Začít od aktuální hodnoty“ → začátek 20, varování zmizelo (${await val('from')})`);
   // rozsah × rychlost (bod 9): doba se počítá, záporná rychlost proti rostoucímu rozsahu je chyba
-  await mp.locator('[data-motor-mode="ranged"]').click().catch(() => {});
+  const computedBefore = await txt('[data-motor-computed]');
+  await mp.locator('[data-motor-mode="ranged"]').click();
+  // režim rozsah × rychlost: pole rychlosti ve formuláři (skutečný stav), pak teprve zadání
+  await mp.locator('[data-motor-field="speed"] input').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  ok((await field('speed').count()) > 0, `bod 9: přepnutí na rozsah × rychlost ukáže pole rychlosti (vypočteno předtím: ${computedBefore})`);
   await setField('speed', 5);
   ok(/^20 → 10 mm ↓ zdvih 10 mm · 5 mm\/s · 2 s$/.test(await txt('[data-motor-computed]')), `bod 9: rozsah × rychlost – směr, konec a doba ve formuláři – ${await txt('[data-motor-computed]')}`);
   await setField('speed', 2);
@@ -147,10 +156,18 @@ async function open(b, path) {
   await openPanel();
   ok(await waitState('ok'), `po výpočtu: stav „ok“ (${await state()})`);
   let status = await txt('[data-motion-status]');
-  ok(/Výsledek platí pro „Sestava A“ v nynějším stavu · 2 komponent · 10 kroků · spočítáno \d/.test(status), `stav uvádí dokument, počet komponent a kroky – ${status}`);
+  ok(/Výsledek platí pro „Sestava A“ v nynějším stavu · 2 komponent · 10 kroků · r·[0-9a-f]{6} · výpočet v\d+ · spočítáno \d/.test(status), `stav uvádí dokument, počet komponent, kroky, revizi modelu a id výpočtu – ${status}`);
+  // revize modelu výsledku (táž funkce jako panel Kolize) a id výpočtu ve sdíleném modelu výpočtů (body 1 a 12 – kolo 6)
+  const mRev = await mp.locator('[data-motion-status]').getAttribute('data-motion-rev');
+  const mRun = await mp.locator('[data-motion-status]').getAttribute('data-motion-run-id');
+  ok(/^r·[0-9a-f]{6}$/.test(mRev || '') && status.includes(mRev) && /^v\d+$/.test(mRun || ''), `bod 1/12: data-motion-rev ${mRev}, data-motion-run-id ${mRun}`);
   ok(GREEN.test(await txt('[data-motion-summary]')) && /Pohybová studie: 10 kroků/.test(await txt('[data-motion-summary]')), 'platný výsledek má souhrn (10 kroků, kolize v pohybu)');
   let api = await p.evaluate(() => window.mncad.motion());
   ok(api.collision && api.steps.length === 11, `mncad.motion(): kolize v kroku ${api.collision && api.collision.step}`);
+  // výpočet pohybu je záznam sdíleného modelu výpočtů: mncad.motion() vrací týž běh, computes() ho vypíše (bod 12 – kolo 6)
+  const comps12 = await p.evaluate(() => window.mncad.computes());
+  const mEntry = (comps12 || []).find((e) => e.id === (api.run && api.run.id));
+  ok(!!api.run && api.run.id === mRun && /@r·[0-9a-f]{6}$/.test(api.run.inputRev) && api.run.inputRev.endsWith(mRev) && api.run.state === 'done' && !!mEntry && mEntry.what === 'motion', `bod 12: mncad.motion().run ${JSON.stringify(api.run)} · computes() ${mEntry ? mEntry.id + ' ' + mEntry.what + ' ' + mEntry.state : 'bez záznamu pohybu'}`);
 
   // změna geometrie dílu (polohy, vazby i studie beze změny): deska se zkrátí, pod přidržovačem už není
   log = await run('sestava upravit "Deska A"\nupravit "Kvádr 1" size=30;40;10\nsestava hotovo');

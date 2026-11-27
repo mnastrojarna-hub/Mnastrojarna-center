@@ -117,7 +117,12 @@ export function phaseLines(runs: PhaseRun[], doc: CadDoc, study: Pick<MotionStud
     const ph = study.phases?.find((p) => p.id === r.id);
     const cond = condText(ph?.start, doc, study, r.index);
     if (!r.reached) {
-      out.push(tr("⚠ fáze {0} „{1}“ nenastala – podmínka {2} do konce studie nesplněna{3}", r.index + 1, r.name, cond, r.value !== undefined ? tr(" (nejblíž {0})", motorNum(r.value)) : ""));
+      const before = runs.find((x) => x.index === r.index - 1);
+      out.push(
+        before && !before.reached
+          ? tr("⚠ fáze {0} „{1}“ nenastala – čeká na fázi {2} „{3}“, která nezačala (podmínka {4} se nevyhodnocovala)", r.index + 1, r.name, before.index + 1, before.name, cond)
+          : tr("⚠ fáze {0} „{1}“ nenastala – podmínka {2} do konce studie nesplněna{3}", r.index + 1, r.name, cond, r.value !== undefined ? tr(" (nejblíž {0})", motorNum(r.value)) : ""),
+      );
       continue;
     }
     // fáze bez vlastního kroku (začala i skončila mezi dvěma kroky): jen krok začátku
@@ -139,6 +144,14 @@ export function phaseFindings(runs: PhaseRun[], doc: CadDoc, study: Pick<MotionS
     .filter((r) => !r.reached)
     .map((r) => {
       const cond = condText(study.phases?.find((p) => p.id === r.id)?.start, doc, study, r.index);
+      // fáze čeká na předchozí, která nezačala: její podmínka se vůbec nevyhodnocovala – skutečná příčina je předchozí fáze (kolo 6)
+      const before = runs.find((x) => x.index === r.index - 1);
+      if (before && !before.reached)
+        return {
+          code: "motion.phase-unreached" as const,
+          args: [r.name, cond, before.name],
+          text: tr("fáze „{0}“ nenastala: čeká na předchozí fázi „{1}“, která nezačala – podmínka {2} se nevyhodnocovala; opravte nejdřív fázi „{1}“", r.name, before.name, cond),
+        };
       const near = r.value !== undefined ? motorNum(r.value) : "?";
       return {
         code: "motion.phase-unreached",
@@ -195,12 +208,23 @@ export function removePhase(study: MotionStudy, i: number): { study: MotionStudy
   return { study: out, motors: n };
 }
 
+/**
+ * Typy vazeb, jejichž hodnotu umí výpočet studie změřit pro podmínku fáze (motion.ts `mateNow`): hodnota vazby (Vzdálenost, Drážka
+ * s polohou), posuv / natočení od výchozí polohy (Souosost, Šroub, Závěs, Dráha, Úhel) a mezera meze (Mez vzdálenosti, Mez úhlu,
+ * Drážka bez polohy). Zámek, Shoda, Rovnoběžnost … hodnotu nemají – podmínka na nich by nikdy nenastala (vlna 22, bod 3 – kolo 6).
+ */
+const MEASURABLE = new Set<Mate["type"]>(["distance", "slot", "path", "concentric", "screw", "hinge", "angle", "limitDistance", "limitAngle"]);
+export const condMeasurable = (m: Pick<Mate, "type">): boolean => MEASURABLE.has(m.type);
+
 /** Kontrola definice fází (text i panel): neznámé vazby / motory podmínek, dynamika ve fázi kinematické studie. */
 export function phaseProblems(study: MotionStudy, mates: Mate[]): string[] {
   const out: string[] = [];
   (study.phases ?? []).forEach((ph, i) => {
     const c = ph.start;
     if (c && "mate" in c && !mates.some((m) => m.id === c.mate)) out.push(tr("fáze {0} „{1}“: vazba podmínky v sestavě není", i + 1, ph.name));
+    const cm = c && "mate" in c ? mates.find((m) => m.id === c.mate) : undefined;
+    if (cm && !condMeasurable(cm))
+      out.push(tr("fáze {0} „{1}“: hodnotu vazby „{2}“ ({3}) nejde měřit – podmínka by nikdy nenastala; podmínku dejte na vazbu Vzdálenost, Mez vzdálenosti, Souosost, Úhel / Mez úhlu, na motor (při motor N …) nebo na čas (od T s)", i + 1, ph.name, cm.name ?? tr(MATE_LABEL[cm.type]), tr(MATE_LABEL[cm.type])));
     if (c && "motor" in c && !study.motors.some((m) => m.id === c.motor)) out.push(tr("fáze {0} „{1}“: motor podmínky ve studii není", i + 1, ph.name));
     for (const id of [...(ph.enable ?? []), ...(ph.suppress ?? [])]) if (!mates.some((m) => m.id === id)) out.push(tr("fáze {0} „{1}“: vazba {2} v sestavě není", i + 1, ph.name, id));
     if (ph.mode === "dynamic" || (study.mode === "dynamic" && (study.phases?.length ?? 0) > 0))

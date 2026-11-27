@@ -97,7 +97,6 @@ Pohybová studie	Bewegungsstudie
 pohybová studie nemá žádný motor – pohyb motor rotační "Klika" 0..360	die Bewegungsstudie hat keinen Antrieb – bewegung antrieb dreh "Kurbel" 0..360
 pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor	die Bewegungsstudie hat keinen Antrieb – fügen Sie einen Dreh- oder Linearantrieb hinzu
 pohybová studie sestavy: motor na vazbě Závěs / Souosost / Šroub (°) nebo Vzdálenost / Drážka / Dráha (mm), řešič spočítá polohy všech komponent v každém kroku (mechanické vazby, meze), volitelně kolize a stopa bodu; tabulka poloh CSV, přehrání v 3D okně; window.mncad.motion()	Bewegungsstudie der Baugruppe: Antrieb an Scharnier / Konzentrisch / Schraube (°) oder Abstand / Langloch / Pfad (mm), der Löser berechnet die Lage aller Komponenten in jedem Schritt (mechanische Verknüpfungen, Grenzen), optional Kollisionen und Punktspur; Lagetabelle CSV, Wiedergabe im 3D-Fenster; window.mncad.motion()
-Pohybová studie: {0} kroků · {1} s · motory: {2}	Bewegungsstudie: {0} Schritte · {1} s · Antriebe: {2}
 Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav	Bewegungsstudie: {0} Antriebe · {1} Schritte · {2} s{3} – bewegung status
 Pohybová studie: motorů {0} · kroků {1} · {2} s{3}{4}	Bewegungsstudie: {0} Antriebe · {1} Schritte · {2} s{3}{4}
 Pohybová studie: žádná – pohyb motor rotační "Klika" 0..360 [krok 5] [kolize]	Bewegungsstudie: keine – bewegung antrieb dreh "Kurbel" 0..360 [schritt 5] [kollisionen]

@@ -401,9 +401,10 @@ export function docKv(d: DocSummary): string {
     if (d.volume_union_mm3 !== undefined) kv.push(`V.union=${volCm3(d.volume_union_mm3)}`);
     if (d.mass_kg !== undefined) kv.push(`m=${fmtNum(d.mass_kg, 2)}kg`);
     if (d.bbox) kv.push(`bbox=${bboxSize(d.bbox)}`);
-    if (d.clashes) kv.push(`clash=${clashD(d.clashes)}`);
-    // pružina se ztracenou dosedací plochou (vlna 22, bod 20): délka a síla nezkontrolovány – na konci skupiny sestavy, jen nenulové
+    // pružina se ztracenou dosedací plochou (vlna 22, bod 20): délka a síla nezkontrolovány – jen nenulové; PŘED `clash=`, ať je pořadí
+    // polí stejné v řádku D i ve výpisu `= … status` (ten připojuje `clash=-` za souhrn dokumentu – kolo 6)
     if (d.springs?.lost) kv.push(`springs.lost=${d.springs.lost}`);
+    if (d.clashes) kv.push(`clash=${clashD(d.clashes)}`);
   } else if (d.kind === "part") {
     if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
     kv.push(`V=${volCm3(d.volume_mm3)}`);

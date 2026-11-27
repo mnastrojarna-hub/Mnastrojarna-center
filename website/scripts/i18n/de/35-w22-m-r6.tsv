@@ -1,0 +1,30 @@
+# vlna 22 – kolo 6 (balík M): tvary čísel kroků, otočení u rotačního motoru, fáze na mezích, pružiny, konflikty motorů
+{0} krok	{0} Schritt
+{0} kroky	{0} Schritte
+{0} kroků	{0} Schritte
+Pohybová studie: {0} · {1} s · motory: {2}	Bewegungsstudie: {0} · {1} s · Antriebe: {2}
+motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo otočení Δ	Antrieb {0}: der Anfang {1} ist nicht 0 – bei der Verknüpfung „{2}“ ist der Antriebswert eine Drehung ab Ausgangslage, in Schritt 0 springt das Teil um {3}; ohne Sprung: 0..Δ oder drehung Δ
+{0} pohání stejný stupeň volnosti {1} jako {2} – časy činnosti se překrývají (motor po konci svého okna dál drží koncovou hodnotu), díl nemůže splnit oba motory a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo pohyb dílu zadejte jedním motorem s úseky (… pak …, navázat)	{0} treibt denselben Freiheitsgrad {1} wie {2} – die Wirkzeiten überlappen sich (ein Antrieb hält nach dem Ende seines Fensters seinen Endwert), das Teil kann nicht beide Antriebe erfüllen und die Berechnung teilt die Differenz auf (Antrieb an der Grenze / nicht erfüllte Verknüpfungen); löschen Sie einen Antrieb oder geben Sie die Bewegung des Teils einem Antrieb mit Abschnitten (… dann …, anschließen)
+motor {0} ({1}) – tentýž stupeň volnosti	Antrieb {0} ({1}) – derselbe Freiheitsgrad
+→ motor {0} přijat, ale je v konfliktu (motion.motor-conflict): {1}{2}	→ Antrieb {0} übernommen, aber im Konflikt (motion.motor-conflict): {1}{2}
+fáze {0} „{1}“: hodnotu vazby „{2}“ ({3}) nejde měřit – podmínka by nikdy nenastala; podmínku dejte na vazbu Vzdálenost, Mez vzdálenosti, Souosost, Úhel / Mez úhlu, na motor (při motor N …) nebo na čas (od T s)	Phase {0} „{1}“: der Wert der Verknüpfung „{2}“ ({3}) lässt sich nicht messen – die Bedingung würde nie eintreten; setzen Sie die Bedingung auf eine Verknüpfung Abstand, Abstandsgrenze, Konzentrisch, Winkel / Winkelgrenze, auf einen Antrieb (bei antrieb N …) oder auf die Zeit (ab T s)
+fáze „{0}“ nenastala: čeká na předchozí fázi „{1}“, která nezačala – podmínka {2} se nevyhodnocovala; opravte nejdřív fázi „{1}“	Phase „{0}“ ist nicht eingetreten: sie wartet auf die vorherige Phase „{1}“, die nicht begonnen hat – die Bedingung {2} wurde nicht ausgewertet; korrigieren Sie zuerst die Phase „{1}“
+⚠ fáze {0} „{1}“ nenastala – čeká na fázi {2} „{3}“, která nezačala (podmínka {4} se nevyhodnocovala)	⚠ Phase {0} „{1}“ ist nicht eingetreten – sie wartet auf Phase {2} „{3}“, die nicht begonnen hat (Bedingung {4} wurde nicht ausgewertet)
+drží ji u {0}	hält sie bei {0}
+hodnota {0}	Wert {0}
+preference se neuplatnila (pružina tlačí k {0}; {1})	Präferenz nicht angewendet (die Feder drückt zu {0}; {1})
+preference se neuplatnila (jiné vazby; {0})	Präferenz nicht angewendet (andere Verknüpfungen; {0})
+po celou studii stlačená na doraz Ln (blok) – síla {0} N je jen odvozená z polohy; zkontrolujte polohu dílů (kinematika pružinou netlačí: pohyb kvazistatika)	während der ganzen Studie bis zum Anschlag Ln (Block) gedrückt – die Kraft {0} N ist nur aus der Lage abgeleitet; prüfen Sie die Lage der Teile (Kinematik drückt nicht mit Federn: bewegung quasistatik)
+výpočet drží preferovanou stranu meze „{0}“ ({1}), v sestavě ji přebila rovnováha pružiny / vazby – kinematika pružinou netlačí; fyzikální poloha = pohyb kvazistatika, jinak sestava vazba {2} preferovat ne	die Berechnung hält die bevorzugte Seite der Grenze „{0}“ ({1}), in der Baugruppe überwiegt das Federgleichgewicht / die Verknüpfungen – Kinematik drückt nicht mit Federn; physikalische Lage = bewegung quasistatik, sonst baugruppe verknüpfung {2} bevorzugen nein
+vazby sestavy v uložené poloze nesplněné nebo neurčené – sestava (přepočet) a pak pohyb spustit	die Verknüpfungen der Baugruppe sind in der gespeicherten Lage nicht erfüllt oder nicht bestimmt – baugruppe (Neuberechnung), dann bewegung starten
+krok 0 se liší od polohy v sestavě: {0} – studie nezačíná v poloze, kterou sestava ukazuje; {1}	Schritt 0 weicht von der Lage in der Baugruppe ab: {0} – die Studie beginnt nicht in der Lage, die die Baugruppe zeigt; {1}
+⚠ vazby splněny ve všech krocích, ale krok 0 je jinde než poloha v sestavě ({0}) – motion.start-jump	⚠ Verknüpfungen in allen Schritten erfüllt, aber Schritt 0 weicht von der Lage in der Baugruppe ab ({0}) – motion.start-jump
+moment pružiny „{0}“	das Moment der Feder „{0}“
+rovnováha měkkých členů	das Gleichgewicht der weichen Glieder
+díl „{0}“ není veden – {1} ho v krocích {2} posouval v rovině / natáčel (až {3} mm · {4}°); posuv v rovině a natočení vazby neurčují, poloha drží nejmenší změnu od předchozího kroku a v těchto směrech není fyzikální – přidejte vedení (souosost, zarovnání, drážka)	das Teil „{0}“ ist nicht geführt – {1} hat es in den Schritten {2} in der Ebene verschoben / verdreht (bis {3} mm · {4}°); Verschiebung in der Ebene und Drehung bestimmen die Verknüpfungen nicht, die Lage hält die kleinste Änderung zum vorigen Schritt und ist in diesen Richtungen nicht physikalisch – fügen Sie eine Führung hinzu (konzentrisch, bündig, Nut)
+brání:	blockiert durch:
+Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} · {3}{4} · spočítáno {5}	Das Ergebnis gilt für „{0}“ im jetzigen Zustand · {1} Komponenten · {2} · {3}{4} · berechnet {5}
+ · výpočet {0}	 · Berechnung {0}
+pohybová studie	Bewegungsstudie
+#!dynamic – texty kódů registru (engine/codes.ts spring.lost)
+pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}	Feder „{0}“: verlorene Auflagefläche {1} – Länge und Kraft nicht geprüft; Korrektur: {2}

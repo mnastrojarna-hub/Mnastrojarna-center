@@ -37,7 +37,7 @@ kinematika ji nechává, kde byla (posune ji jen doraz meze), a výsledek závis
 konflikt:	conflict:
 kvazistatika	quasi-statics
 Kvazistatika	Quasi-statics
-motor {0} stojí na mezi v krocích {1}: žádáno {2}, dosaženo {3} – brání: {4}; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)	motor {0} stopped at a limit in steps {1}: requested {2}, reached {3} – blocked by: {4}; cause: the motor requests a value that the hard conditions (limits, stops, fixed mates) do not allow – the parts stay physical (motor at limit: stop; invalid steps instead of stopping: motion motor … at limit error)
+motor {0} stojí na mezi v krocích {1}: žádáno {2}, dosaženo {3} – brání: {4}; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly stojí v poslední dosažitelné poloze (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)	motor {0} stopped at a limit in steps {1}: requested {2}, reached {3} – blocked by: {4}; cause: the motor requests a value that the hard conditions (limits, stops, fixed mates) do not allow – the parts stay in the last reachable pose (motor at limit: stop; invalid steps instead of stopping: motion motor … at limit error)
 Motor na mezi	Motor at limit
 Motor na mezi: stop = stojí na poslední dosažitelné hodnotě · neplatný krok = kroky za mezí se neřeší, zůstane poslední platná poloha	Motor at limit: stop = stays at the last reachable value · invalid step = steps beyond the limit are not solved, the last valid position remains
 motor stojí na mezi: {0}	motor stopped at a limit: {0}

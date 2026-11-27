@@ -886,6 +886,11 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   kvazistatika, když na pohyblivou komponentu dosedá pružina, jinak kinematika. Každý protokol studie má řádek `Úroveň simulace:
   kvazistatika – … (zvoleno automaticky: …)` a strojový řádek končí `level=kin|quasi|dyn` (`anim`, `+geo` doplní fáze / procesní
   vrstva). JSON: `motion.mode: "kinematic" | "quasistatic" | "dynamic"` (chybí = automaticky).
+  Kolo 6: kinematika s preferovanou stranou meze, kterou v sestavě přebila rovnováha pružiny, začne jinde než sestava → ⚠
+  `motion.start-jump` „krok 0 se liší od polohy v sestavě: „Přidržovač“ 11 mm …“ (a souhrn bez „Vazby splněny“); pružina na
+  dorazu Ln ve všech krocích = ⚠, ne ✓. Nevedený díl (jen rovinné vazby – posuv v rovině a natočení nic neurčuje), který moment
+  mimoosé pružiny v kvazistatice posouval / natáčel, drží nejmenší změnu od předchozího kroku → ⚠ `motion.undetermined` „díl „X“
+  není veden – moment pružiny …“. Dynamika startuje z kvazistatické rovnováhy v okamžiku začátku motorů (krok 0 = krok 0 kvazistatiky).
 - **Priorita podmínek a motor na mezi (bod 8):** tvrdé podmínky (ukotvení, zámky, kontakty, zarovnání, souosost, pevné vzdálenosti,
   meze, Ln pružin) > hodnota motoru > preference. Nesplnitelný krok se nikdy nevyřeší kompromisem (ujetí a naklopení desek):
   `na mezi stop` (výchozí; EN `at limit stop`, DE `an grenze stopp`) = motor stojí na poslední dosažitelné hodnotě, krok má
@@ -896,6 +901,10 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   vypíše nejvýš tři odchylky, `pohyb krok N` všechny („konflikt: …“). Strojově `stopped=N invalid=N undetermined=N` před `level=`.
   Panel: krok „motor stojí na mezi“ / „NEŘEŠITELNÝ krok – zobrazen krok 7“, 3D okno neplatného kroku červeně orámované
   (`data-motion-invalid`). Délka pružiny na doraz Ln je doraz i v kinematice (dřív pružina „prošla“ a jen řádek pružiny byl ✗).
+  „Nesplněné vazby: N“ a `motion.conflict` počítají jen skutečně porušené vazby a pohony; vazba, která motor zastavila a je splněná
+  (pevná vzdálenost, mez na dorazu), je v `pohyb krok N` „brání: …“. V **dynamice** platí `na mezi stop` (výchozí) i `chyba` také:
+  mez porušená předepsaným pohybem motoru zastaví motory na poslední platné hodnotě (⚠ `motion.motor-limit`), resp. snímky za mezí
+  jsou neplatné (⚠ `motion.invalid`, zobrazena poslední platná poloha).
 - **Preferovaná strana meze:** `sestava vazba "Mez" preferovat max` (EN `prefer`, DE `bevorzugen`; `ne` = zrušit; JSON
   `prefer: "min" | "max"`) u Meze vzdálenosti / úhlu a Drážky bez polohy: kinematika i přepočet vazeb drží díl u této meze, když ho
   ostatní vazby neurčují; pevnou vazbu, ukotvení, kontakt ani motor nepřebije. Výpis vazby končí „· preferuje max“.
@@ -918,6 +927,8 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `pohyb fáze N upravit|smazat|nahoru|dolů`, `pohyb fáze` = výpis, `pohyb událost při …` = fáze bez názvu. Protokol po fázích:
   `Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0`; fáze, která
   nenastala = ⚠ `motion.phase-unreached`; motor fáze, jehož začátek nesedí na hodnotu vazby v okamžiku začátku = ⚠ `motion.start-jump`.
+  Podmínka na Mezi vzdálenosti / úhlu měří mezeru meze; podmínku na vazbě bez hodnoty (zámek, shoda, rovnoběžnost …) odmítne už
+  `pohyb fáze` (✗ „nejde měřit“). Fáze, která čeká na předchozí nezačatou fázi, to řekne („čeká na předchozí fázi „X“, která nezačala“).
   Strojově na konci řádku `phases=<nastalé>/<všechny>`, motor s úseky `m1=keys:80>50>40>37>80:---+`. Dynamika po fázích zatím není.
   Restart = vždy z dokumentu (studie dokument nemění); fáze a úseky jdou i do převodu dokument → skript.
 - **Procesní vrstva – střih a otisk řízený pohybem (vlna 22, bod 4):** `pohyb proces střih "Razník" "Plech"` (EN `motion process cut`,
@@ -941,7 +952,9 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   (EN `motion level`) vypíše úroveň; úroveň se příkazem nevolí (geometrická aproximace = procesní operace).
 - **Motory při definici (bod 10):** po `pohyb motor …` řádek `pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
   „Šroub M12“ · směr −Z` (zkušební posun řešičem); druhý motor na tomtéž stupni volnosti = ⚠ `motion.motor-conflict` hned při zadání
-  (ne až ve výpočtu); motor, kterým nejde pohnout (stupeň volnosti drží vazby), také. Panel: „+ Nový motor“ × „Upravit motor N“
+  (ne až ve výpočtu) – i když mají motory jiná časová okna / fáze (motor po konci okna dál drží svou hodnotu); přijetí takového motoru
+  je `→ motor 2 přijat, ale je v konfliktu (motion.motor-conflict)` (ℹ), ne ✓, a `motion.motor-limit` uvede „brání: motor 1 (ZDVIH) –
+  tentýž stupeň volnosti“; motor, kterým nejde pohnout (stupeň volnosti drží vazby), také. Panel: „+ Nový motor“ × „Upravit motor N“
   (klik na motor v seznamu), řízené díly zvýrazněné a osa se šipkou směru ve 3D okně (i bez WebGL).
 - **Souhrn po tuhých skupinách (bod 15):** výchozí výpis pohybu = jeden řádek na skupinu dílů se stále stejnou vzájemnou polohou
   (tolerance, žádné „58 + 1“ ze zaokrouhlení): ` „Horní deska“ + 20 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm`, pak
@@ -1000,6 +1013,8 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (`vl
   `seat` v JSON jsou jen odvozená mezipaměť. Po načtení dokumentu (řádek JSON, `otevřít`, CLI `--open`, `window.mncad.setDocument`,
   Soubor › Otevřít v aplikaci) se délka odvodí z ploch v nynějších polohách; rozpor nad 0,01 mm = ⚠ `spring.stale` „pružina „P“:
   uložená délka 25 mm neodpovídá dosedacím plochám (15 mm) – délka odvozena z ploch“ a oprava jedním krokem historie (zpět ji vrátí).
+  Dosedací plocha, kterou díl nemá (číslo plochy mimo díl), se při načtení označí jako ztracená: ⚠ `spring.lost` na řádku načtení
+  i při každém `stav` (přísný režim zastaví), řádek D / `= … status` / Σ nesou `springs.lost=1`.
   `stav` ověří délku proti plochám: `Pružiny: „P“ 15 mm (L0 32 · Ln 14) · F 340 N ✓ – délka odvozená z dosedacích ploch (řídí
   polohy komponent)`, rozpor ⚠ s oběma délkami, bez geometrie „uložená délka, s dosedacími plochami nezkontrolováno“ (bez ✓).
   Kolize, STEP, výkres i 3D pracují s délkou z ploch.

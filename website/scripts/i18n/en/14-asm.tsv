@@ -97,7 +97,6 @@ Pohybová studie	Motion study
 pohybová studie nemá žádný motor – pohyb motor rotační "Klika" 0..360	the motion study has no motor – motion motor rotary "Crank" 0..360
 pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor	the motion study has no motor – add a rotary or linear motor
 pohybová studie sestavy: motor na vazbě Závěs / Souosost / Šroub (°) nebo Vzdálenost / Drážka / Dráha (mm), řešič spočítá polohy všech komponent v každém kroku (mechanické vazby, meze), volitelně kolize a stopa bodu; tabulka poloh CSV, přehrání v 3D okně; window.mncad.motion()	assembly motion study: motor on a Hinge / Concentric / Screw mate (°) or a Distance / Slot / Path mate (mm), the solver computes the positions of all components in every step (mechanical mates, limits), optionally interference and a point trace; position table CSV, playback in the 3D view; window.mncad.motion()
-Pohybová studie: {0} kroků · {1} s · motory: {2}	Motion study: {0} steps · {1} s · motors: {2}
 Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav	Motion study: {0} motors · {1} steps · {2} s{3} – motion status
 Pohybová studie: motorů {0} · kroků {1} · {2} s{3}{4}	Motion study: {0} motors · {1} steps · {2} s{3}{4}
 Pohybová studie: žádná – pohyb motor rotační "Klika" 0..360 [krok 5] [kolize]	Motion study: none – motion motor rotary "Crank" 0..360 [step 5] [collisions]

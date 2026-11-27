@@ -11,6 +11,7 @@ import { F_CIRCLE, F_LINE, F_POINT, F_SPHERE, faceArgWords, findComp, findMate, 
 import type { MotionCmd } from "./agent-motion";
 import type { MotorLeg } from "./motor-model";
 import { conflictCode, ensureBuilt, faceInfo, geoProvider, leafId, movedText, partFaces, pathNames, solveAsm, solveNotes, STATUS_WORD, type AsmEnv, type AsmResult } from "./asm-agent";
+import { modelRev } from "./engine/result-key";
 import { tr } from "./i18n";
 // kolize pohybu podle tříd (vlna 22, bod 5): zařazení při výpočtu kroku, souhrny a `pohyb krok` – cad/clash-motion.ts, clash-report.ts
 import { classifyStepClashes, collideClassified, motionClashLines, stepClashLines } from "./clash-motion";
@@ -448,12 +449,14 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
   const study: MotionStudy = d.motion ? { ...d.motion, motors: [...d.motion.motors] } : defaultStudy();
   const codes: NonNullable<AsmResult["codes"]> = [];
   let kv: string | undefined;
+  // definice studie (studyLines) už vypsaná → souhrn výpočtu nezačíná druhým řádkem „Pohybová studie: …“ (vlna 22, bod 15)
+  let listed = false;
   const runLog = async (doc: CadDoc, detail = false) => {
     const res = await motionRun(doc, env);
     const cl = res.collisionsChecked ? await motionClashLines(res, doc, env) : null;
     // upozornění k motorům jdou do protokolu jako záznamy s kódem (stručný protokol nemá výpis) – ve výpisu by byla podruhé;
     // pohyb dílů po tuhých skupinách, po dílech jen `pohyb detail` (vlna 22, bod 15)
-    log.push(...motionSummary(res, doc, { ...(cl ? { collisionLines: cl.lines } : {}), notes: false, detail }));
+    log.push(...motionSummary(res, doc, { ...(cl ? { collisionLines: cl.lines } : {}), notes: false, detail, head: !listed }));
     log.push(...processLines(res, doc)); // procesní vrstva: úroveň, operace, stav výrobku (vlna 22, bod 4)
     if (cl) codes.push(...cl.codes);
     codes.push(...processCodes(res, doc));
@@ -473,6 +476,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
     if (st.state === "stale") codes.push({ code: "motion.recomputed", args: [st.changed.join("; ")] });
   };
   const studyLines = (doc: CadDoc) => {
+    listed = true;
     const s = doc.motion;
     if (!s) return [tr("Pohybová studie: žádná – pohyb motor rotační \"Klika\" 0..360 [krok 5] [kolize]")];
     const tc = s.trace ? doc.components?.find((c) => c.id === s.trace!.compId) : null;
@@ -499,7 +503,10 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
   };
   switch (cmd.op) {
     case "status": {
-      log.push(...studyLines(d));
+      // revize modelu, pro který definice / výsledek platí (táž funkce jako panel Kolize a panel Pohyb – vlna 22, bod 1)
+      const sl = studyLines(d);
+      if (d.motion) sl[0] = `${sl[0]} · ${modelRev(d)}`;
+      log.push(...sl);
       if (d.motion?.motors.length || d.motion?.mode === "dynamic") {
         // stav = hlášení, ne výpočet: výsledek, který pro nynější sestavu neplatí, se nevypíše (žádný starý souhrn) ani tiše
         // nepřepočítá – ⚠ motion.stale řekne, co se změnilo; strojový řádek nese jen definici studie a `motion.stale=1`
@@ -561,9 +568,10 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       if (cmd.step !== undefined) study.steps = Math.max(1, Math.min(2000, Math.round(motorSpan(mo, study.duration).stroke / cmd.step)));
       const doc = { ...d, motion: study };
       const side = !invert ? "" : abs ? tr(" (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)") : tr(" (komponenta je B vazby – hodnoty s opačným znaménkem)");
-      log.push(tr("✓ motor {0}: {1}{2}", idx + 1, motorText(mo, doc), side));
       // co motor pohání a konflikt s jiným motorem na stejném stupni volnosti – při definici, ne až ve výpočtu (bod 10)
       const chk = await motorCheck(doc, env, idx);
+      // motor, který kontrola označila za konfliktní, je jen přijatý (ℹ), ne zelený – ⚠ motion.motor-conflict řekne proč (kolo 6)
+      log.push(chk.conflicts.length ? tr("→ motor {0} přijat, ale je v konfliktu (motion.motor-conflict): {1}{2}", idx + 1, motorText(mo, doc), side) : tr("✓ motor {0}: {1}{2}", idx + 1, motorText(mo, doc), side));
       if (chk.reach) log.push(` ${reachText(chk.reach, doc)}`);
       for (const c of chk.conflicts) codes.push({ code: "motion.motor-conflict", args: [String(c.a + 1), c.b === null ? "-" : String(c.b + 1)], text: c.text });
       await runLog(doc);
@@ -696,7 +704,8 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       log.push(tr("Krok {0} (t = {1} s, motory {2}):", s.i, fmt(s.t, 4), s.motors.map((v) => fmt(v, 3)).join("; ")));
       for (const c of d.components ?? []) {
         const pl = s.place[c.id];
-        if (pl) log.push(` ${c.name} ${pt(pl.position, 4)}${pl.rotation.some((x) => Math.abs(x) > 1e-9) ? ` ∠${pt(pl.rotation, 4)}` : ""}`);
+        // instance / přezdívka („Šroub M12 [S1]“) – dvě kopie téhož dílu jinak nejdou rozlišit (vlna 22, bod 5)
+        if (pl) log.push(` ${c.name}${c.alias ? ` [${c.alias}]` : ""} ${pt(pl.position, 4)}${pl.rotation.some((x) => Math.abs(x) > 1e-9) ? ` ∠${pt(pl.rotation, 4)}` : ""}`);
       }
       if (s.trace) log.push(tr(" stopa {0}", pt(s.trace, 4)));
       // kolize kroku podle tříd (v poloze kroku, pravidla dokumentu): šroub v závitu bez ⚠ (jako `kolize`), skutečné ⚠ po dvojicích s instancí a místem
@@ -713,7 +722,8 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       // detail konfliktu kroku (bod 8): stav, dosažené hodnoty motorů a VŠECHNY odchylky konfliktní množiny
       if (s.status === "stopped") log.push(tr(" ⚠ motor stojí na mezi: dosaženo {0} (žádáno {1})", (s.reached ?? []).map((v) => fmt(v, 4)).join("; "), s.motors.map((v) => fmt(v, 4)).join("; ")));
       if (s.status === "invalid") log.push(tr(" ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok {0}), žádný kompromis", s.shows ?? 0));
-      for (const x of s.devs ?? []) log.push(`  ${tr("konflikt:")} ${devText(x)}`);
+      // vazba, která motor zastavila, ale v poloze kroku je splněná: „brání:“, ne „konflikt:“ (kolo 6)
+      for (const x of s.devs ?? []) log.push(`  ${s.status === "stopped" && x.motor === undefined && Math.abs(x.dev) <= 1e-3 ? tr("brání:") : tr("konflikt:")} ${devText(x)}`);
       return signal(d, log, false, { open: true, step: s.i }, [...codes, ...stepCodes]);
     }
     case "export": {

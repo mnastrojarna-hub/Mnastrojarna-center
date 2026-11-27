@@ -19,7 +19,7 @@ import type { AsmEnv } from "@/cad/asm-agent";
 import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
-import { defaultStudy, motionFindings, motionMotorNotes, type MotionResult } from "@/cad/motion";
+import { defaultStudy, motionFindings, motionMotorNotes, stepsWord, type MotionResult } from "@/cad/motion";
 import { levelLine, levelOf, studyMode } from "@/cad/motion-mode";
 import { devText } from "@/cad/motion-quasi";
 import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
@@ -44,6 +44,8 @@ import { studySpan } from "@/cad/motion-video";
 import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
 import { MotionPlayer, type PlayerHost } from "./motion-player";
 import { appRuns } from "./run-host";
+import { motionRunOf, trackedMotion } from "./motion-runs";
+import { modelRev } from "@/cad/engine/result-key";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
@@ -303,7 +305,8 @@ export function MotionPanel({
     setBusy({ k: 0, n });
     try {
       // výsledek se uloží pod otiskem `d`; platí-li pak pro zobrazený dokument, panel ho ukáže sám (stav z úložiště)
-      return await motionRun(d, e0, { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current });
+      // záznam ve sdíleném modelu výpočtů (id v…, revize vstupu, stavy – vlna 22, bod 12): týž jako window.mncad.motion()
+      return (await trackedMotion(d, () => motionRun(d, e0, { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current }))).res;
     } catch (e) {
       // chyba patří dokumentu a stavu, pro který se počítalo – nad jinou sestavou / po změně se neukáže
       if (!(e instanceof MotionSuperseded)) setErr({ ...at, text: (e as Error).message });
@@ -724,11 +727,13 @@ export function MotionPanel({
               </div>
               {draft.mode !== "open" && !draft.legs?.length &&
                 (draft.end === "stroke" ? (
-                  <div data-motor-field="stroke">
+                  // key: pole zdvihu a konce jsou různá pole – bez klíče React znovu použije číselné pole konce i s jeho
+                  // rozepsaným textem (po přepnutí ukázalo −5 místo zdvihu −25; kolo 6, nestabilní e2e bodu 11)
+                  <div key="stroke" data-motor-field="stroke">
                     <Num label={rot ? tr("Otočení (od začátku, ±)") : tr("Zdvih (od začátku, ±)")} value={dStroke} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, stroke: v })} />
                   </div>
                 ) : (
-                  <div data-motor-field="to">
+                  <div key="to" data-motor-field="to">
                     <Num label={toLabel} value={dTo} step={rot ? 15 : 1} suffix={unit} onChange={(v) => setDraft({ ...draft, to: v })} />
                   </div>
                 ))}
@@ -894,11 +899,12 @@ export function MotionPanel({
           </p>
         )}
         {/* stav výsledku: pro který dokument a stav platí – nebo že neplatí / nepočítalo se (nikdy starý souhrn) */}
-        <p data-motion-status className={cn("rounded px-2 py-1 text-[11px] leading-snug", state === "ok" ? "bg-[#eef7ee] text-[#2f6b35]" : state === "stale" ? "bg-[#fff4e5] text-[#8a5300]" : "bg-[#f3f6f9] text-[#4a5664]")}>
+        <p data-motion-status data-motion-rev={st.state === "ok" ? modelRev(doc) : ""} data-motion-run-id={st.state === "ok" ? (motionRunOf(st.entry.sig)?.id ?? "") : ""} className={cn("rounded px-2 py-1 text-[11px] leading-snug", state === "ok" ? "bg-[#eef7ee] text-[#2f6b35]" : state === "stale" ? "bg-[#fff4e5] text-[#8a5300]" : "bg-[#f3f6f9] text-[#4a5664]")}>
           {state === "running"
             ? tr("Počítám pohyb sestavy „{0}“…", doc.name)
             : st.state === "ok"
-              ? tr("Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} kroků · spočítáno {3}", st.entry.doc, st.entry.comps, st.entry.res.steps.length - 1, time(st.entry.at))
+              ? // revize modelu (táž funkce jako panel Kolize – engine/result-key.ts) a id výpočtu (vlna 22, body 1 a 12)
+                tr("Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} · {3}{4} · spočítáno {5}", st.entry.doc, st.entry.comps, stepsWord(st.entry.res.steps.length - 1), modelRev(doc), motionRunOf(st.entry.sig) ? tr(" · výpočet {0}", motionRunOf(st.entry.sig)!.id) : "", time(st.entry.at))
               : st.state === "stale"
                 ? tr("Výsledek neplatí – od výpočtu se změnilo: {0}. Nezkontrolováno; spusťte Vypočítat pohyb znovu.", st.changed.join("; "))
                 : study.motors.length || study.mode === "dynamic"

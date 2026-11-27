@@ -78,8 +78,8 @@ Vazby splněny ve všech krocích
 Krok 12 (t = 1,6 s, motory 52):
  Základ [0; 0; 0]
  Deska A [0; 0; 62]
- Šroub M12 [20; 30; 74]
- Šroub M12 [80; 30; 74]
+ Šroub M12 [S1] [20; 30; 74]
+ Šroub M12 [S2] [80; 30; 74]
  Doraz [75; 20; 100]
  kolize šroub v závitu: Deska A × Šroub M12 [S1], Deska A × Šroub M12 [S2]
 ⚠ řádek 11: kolize „Šroub M12 [S2]“ × „Doraz“ (681,0 mm³) – místo [80; 30; 102] · obálka 10 × 18 × 4 mm

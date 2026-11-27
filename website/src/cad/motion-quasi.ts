@@ -225,6 +225,10 @@ export function solveStep<T = unknown>(
   if (soft) {
     settle(poses, vars, T.hard, (H) => () => [...vec(H, K)(), ...vec(T.drive, K)(), ...vec(T.soft)()], { maxIter: it + 60, groups });
     solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
+    // úklid jednostrannými mezemi nedokonverguje přesně, když měkký člen (pružina stovek N) tlačí díl přes mez, která se právě stala
+    // aktivní (přidržovač dosedá na rám): zbytek ~1e-3 mm a krok by vyšel jako „motor na mezi – žádáno 32,208, dosaženo 32,209“.
+    // Úklid s aktivní množinou mezí (rovnost na dosažené mezi) bez měkkých členů dá přesnou polohu (kolo 6)
+    if (worst(T.hard) > CONFLICT_TOL || worst(T.drive) > CONFLICT_TOL) settle(poses, vars, T.hard, (H) => () => [...vec(H)(), ...drive()], { maxIter: it + 60, groups });
   } else solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
   if (worst(T.hard) <= CONFLICT_TOL && worst(T.drive) <= CONFLICT_TOL) {
     // měkké členy neurčují volné stupně volnosti: poloha = nejmenší změna od počátečního odhadu na tytéž hodnoty měkkých členů

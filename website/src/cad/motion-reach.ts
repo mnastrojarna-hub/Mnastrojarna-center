@@ -7,7 +7,8 @@
  * - `axis` = osa a směr pohybu ve světových souřadnicích (posuv: směr posunutí řízeného dílu; otáčení: osa šroubového pohybu) –
  *   panel ji kreslí šipkou ve 3D okně (WebGL i softwarový náhled);
  * - `motorConflicts` = dvojice motorů, které ve stejném čase pohánějí tentýž stupeň volnosti (zkušební posun jednoho motoru, druhý
- *   drží svou hodnotu → posun se nedá splnit), motor na téže vazbě se stejným začátkem a motor, jehož stupeň volnosti drží vazby
+ *   drží svou hodnotu → posun se nedá splnit; motory na různých vazbách jsou od začátku pozdějšího činné oba), motor na téže vazbě
+ *   se stejným začátkem a motor, jehož stupeň volnosti drží vazby
  *   samy. Hlásí se už při definici (⚠ `motion.motor-conflict`), ne až ve výpočtu.
  */
 import { rotMatrix } from "./assembly";
@@ -93,8 +94,8 @@ function axisOf(p0: Placement, p1: Placement, rotary: boolean): { origin: Vec3; 
 
 /** sestava s potlačenými vazbami `ids` (vazby, jejichž hodnotu určuje jiný motor) */
 const freeOf = (doc: CadDoc, ids: string[]): CadDoc => (ids.length ? { ...doc, mates: (doc.mates ?? []).map((m) => (ids.includes(m.id) ? { ...m, suppressed: true } : m)) } : doc);
-/** vazby ostatních motorů se stejným začátkem – jejich hodnotu určuje motor, ne vazba */
-const otherMates = (study: Pick<MotionStudy, "motors">, i: number) => study.motors.filter((m, k) => k !== i && m.mate !== study.motors[i].mate && sameStart(m, study.motors[i])).map((m) => m.mate);
+/** vazby ostatních motorů činných ve stejném čase – jejich hodnotu určuje motor, ne vazba */
+const otherMates = (study: Pick<MotionStudy, "motors">, i: number) => study.motors.filter((m, k) => k !== i && m.mate !== study.motors[i].mate && overlaps(m, study.motors[i])).map((m) => m.mate);
 
 /**
  * Co pohání motor `i` studie (zkušební posun 1 mm / 1° ve směru pohybu motoru, při zablokování opačně). Vazby ostatních motorů
@@ -125,8 +126,15 @@ export async function motorReach(doc0: CadDoc, geo: GeoProvider, study: Pick<Mot
   return { motor: i, mate: mo.mate, comps: [], locked: [], blocked: true };
 }
 
-/** časy činnosti motoru se překrývají (stejný začátek – žádný nepřevezme vazbu od druhého) */
+/** stejný začátek (okno / fáze) – motor na téže vazbě nepřevezme vazbu od druhého */
 const sameStart = (a: MotionMotor, b: MotionMotor) => (a.phase ?? "") === (b.phase ?? "") && Math.abs(motorStartTime(a) - motorStartTime(b)) < 1e-9;
+/**
+ * Časy činnosti dvou motorů se překrývají. Motor od svého začátku pohání (po konci okna drží koncovou hodnotu), dokud jeho vazbu
+ * nepřevezme pozdější motor NA TÉŽE vazbě – motory na RŮZNÝCH vazbách jsou tedy od začátku pozdějšího z nich činné oba, ať se jejich
+ * okna dotýkají, překrývají, nebo jdou po sobě (vlna 22, bod 10 – kolo 6: dřív se zkoušel jen stejný začátek). Na téže vazbě se
+ * překrývají jen se stejným začátkem (jinak pozdější převezme vazbu).
+ */
+const overlaps = (a: MotionMotor, b: MotionMotor) => a.mate !== b.mate || sameStart(a, b);
 
 /**
  * Konflikty motorů studie (definice): stejná vazba se stejným začátkem, tentýž stupeň volnosti (zkušební posun motoru `a`, motor `b`
@@ -145,7 +153,7 @@ export async function motorConflicts(doc: CadDoc, geo: GeoProvider, study: Pick<
     for (let b = 0; b < study.motors.length; b++) {
       if (b === a || (only === undefined && b < a)) continue;
       const B = study.motors[b];
-      if (!sameStart(A, B)) continue;
+      if (!overlaps(A, B)) continue;
       if (A.mate === B.mate) {
         out.push({ a, b, kind: "same-mate", text: tr("{0} a {1} pohánějí tutéž vazbu od stejného okamžiku – výpočet je nesplní oba; navazující úseky zapište jedním motorem (… pak …, navázat), nebo motoru dejte jiné časové okno / fázi", label(a), label(b)) });
         continue;
@@ -166,12 +174,24 @@ export async function motorConflicts(doc: CadDoc, geo: GeoProvider, study: Pick<
         if (alone && !alone.blocked) {
           const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
           const who = alone.comps[0] ? `„${nm(alone.comps[0])}“` : tr("tentýž díl");
-          out.push({ a, b, kind: "same-dof", text: tr("{0} pohání stejný stupeň volnosti {1} jako {2} – díl nemůže splnit oba motory najednou a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo je rozdělte do fází / časových oken", label(a), who, label(b)) });
+          out.push({
+            a,
+            b,
+            kind: "same-dof",
+            text: sameStart(A, B)
+              ? tr("{0} pohání stejný stupeň volnosti {1} jako {2} – díl nemůže splnit oba motory najednou a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo je rozdělte do fází / časových oken", label(a), who, label(b))
+              : // jiný začátek nepomůže: dřívější motor po konci svého okna dál drží koncovou hodnotu (kolo 6)
+                tr("{0} pohání stejný stupeň volnosti {1} jako {2} – časy činnosti se překrývají (motor po konci svého okna dál drží koncovou hodnotu), díl nemůže splnit oba motory a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo pohyb dílu zadejte jedním motorem s úseky (… pak …, navázat)", label(a), who, label(b)),
+          });
         }
       }
     }
+    // motor zablokovaný: vazby ostatních motorů činných ve stejném čase jsou při zkoušce uvolněné (motorReach), takže „blocked“
+    // = drží ho vazby sestavy samy. Motor, který blokuje JINÝ motor, už nahlásila větev same-dof výše – žádné druhé, nepravdivé
+    // „zámek, ukotvení, mez“ (kolo 6)
     const reach = await motorReach(doc, geo, study, a);
-    if (reach?.blocked) out.push({ a, b: null, kind: "blocked", text: tr("{0} se nemůže pohnout ani jedním směrem – jeho stupeň volnosti drží vazby (zámek, ukotvení, mez); potlačte blokující vazbu nebo zvolte jinou vazbu", label(a)) });
+    if (reach?.blocked && !out.some((c) => c.kind === "same-dof" && (c.a === a || c.b === a)))
+      out.push({ a, b: null, kind: "blocked", text: tr("{0} se nemůže pohnout ani jedním směrem – jeho stupeň volnosti drží vazby (zámek, ukotvení, mez); potlačte blokující vazbu nebo zvolte jinou vazbu", label(a)) });
   }
   return out;
 }

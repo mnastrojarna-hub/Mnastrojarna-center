@@ -91,9 +91,8 @@ Kolize v pohybu: kroků s kolizí 11 z 49 · šroub v závitu 0 dvojic · skute�
  kontrolováno spojitě i mezi polohami (49 poloh + 46 mezipoloh ze zjemnění; úseky: mez posunu 2, dráha posuvu 10, průnik už v poloze 12)
 Vazby splněny ve všech krocích
 ⚠ řádek 15: v pohybu „Plech“ × „Razník“ od kroku 19 (t = 0,792 s): kroků 11, dvojic komponent 1, největší průnik 314,159 mm³ – místo [50; 50; 10,75] v kroku 19
-Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize
+Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize · r·?
  1. lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
-Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Razník“: ΔZ −12 mm · na konci zpět ve výchozí poloze
  stojí: 2 („Deska A“, „Plech“)

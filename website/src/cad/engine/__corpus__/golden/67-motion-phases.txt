@@ -81,7 +81,6 @@ Fáze studie: 5
   3. Střih · vazba „ZDVIH“ ≤ 40
   4. Značení · vazba „ZDVIH“ ≤ 38
   5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
-Pohybová studie: 70 kroků · 1,39 s · motory: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Fáze 1 „Nájezd“: kroky 0–30 · t = 0–0,596 s · začátek: od začátku studie · kinematika · nesplněné vazby 0
  Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0
@@ -100,7 +99,6 @@ Fáze studie: 5
   3. Střih · vazba „ZDVIH“ ≤ 40
   4. Značení · vazba „ZDVIH“ ≤ 38
   5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
-Pohybová studie: 70 kroků · 1,39 s · motory: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Fáze 1 „Nájezd“: kroky 0–30 · t = 0–0,596 s · začátek: od začátku studie · kinematika · nesplněné vazby 0
  Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0

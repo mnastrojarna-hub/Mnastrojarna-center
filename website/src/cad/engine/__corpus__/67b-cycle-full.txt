@@ -1,0 +1,47 @@
+# vlna 22, bod 3 (kolo 6): celý cyklus v jednom dokumentu – nájezd, přidržení (sevření), střih, značení (otisk), návrat;
+# fáze na podmínkách vazeb, procesní vrstva střih + otisk, kolize. Druhý běh = týž dokument znovu otevřený (řádek JSON uloženého
+# .mncad) a nový výpočet: phases=5/5, „Plech“: 2 operací, celkem odebráno 322,642 mm³, na konci zpět ve výchozí poloze.
+nový díl Deska A
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl Plech
+kvádr 80 80 1
+nový díl Horní deska
+kvádr 100 100 10
+nový díl Razník
+válec 20 40
+nový díl Značka
+válec 6 39.5
+nový díl Přidržovač
+kvádr 30 30 8
+nová sestava Cyklus
+vložit "Deska A" ukotvit
+vložit "Plech" v 10 10 10 ukotvit
+vložit "Horní deska" v 0 0 81
+vložit "Razník" v 50 50 31
+vložit "Značka" v 25 75 31.5
+vložit "Přidržovač" v 5 5 30
+sestava vazba vzdálenost "Horní deska" spodní "Deska A" horní hodnota 71 název "ZDVIH"
+sestava vazba zarovnat "Horní deska" +X "Deska A" +X
+sestava vazba zarovnat "Horní deska" +Y "Deska A" +Y
+sestava vazba zámek "Razník" "Horní deska"
+sestava vazba zámek "Značka" "Horní deska"
+sestava vazba zámek "Přidržovač" "Horní deska" název "NESENÍ"
+sestava vazba vzdálenost "Přidržovač" spodní "Plech" horní hodnota 19 název "MEZERA"
+sestava vazba "MEZERA" potlačit
+pohyb fáze "Nájezd"
+pohyb fáze "Sevření" při vazba "MEZERA" <= 0 potlačit vazba "NESENÍ" zapnout vazba "MEZERA"
+pohyb fáze "Střih" při vazba "ZDVIH" <= 51
+pohyb fáze "Značení" při vazba "ZDVIH" <= 49.8
+pohyb fáze "Návrat" při vazba "ZDVIH" >= 52 zapnout vazba "NESENÍ" potlačit vazba "MEZERA"
+pohyb motor lineární vazba "ZDVIH" 71..49.5 pak 71 kroky 60 kolize
+pohyb proces střih "Razník" "Plech"
+pohyb proces otisk "Značka" "Plech" hloubka 0.3 fáze "Značení"
+pohyb fáze
+pohyb proces
+pohyb krok 60
+#--- run
+{"app":"mnastrojarna-cad","version":2,"name":"Cyklus","material":"ocel","features":[],"kind":"assembly","components":[{"id":"s4l24b7","name":"Deska A","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Deska A","material":"ocel","features":[{"id":"4n0ctrd","name":"Kvádr 1","type":"box","size":[100,100,10],"position":[0,0,0],"centered":false,"mode":"new"},{"id":"cqapsya","name":"Díra 1","type":"hole","position":[50,50,10],"axis":"Z","flip":false,"diameter":20.2,"depth":0,"cbDiameter":0,"cbDepth":0}],"kind":"part"}},"placement":{"position":[0,0,0],"rotation":[0,0,0]},"fixed":true,"origin":{"part":"Deska A","sig":"yclecf1spl857h","material":"ocel"}},{"id":"s5q5jcq","name":"Plech","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Plech","material":"ocel","features":[{"id":"3cb7jqk","name":"Kvádr 2","type":"box","size":[80,80,1],"position":[0,0,0],"centered":false,"mode":"new"}],"kind":"part"}},"placement":{"position":[10,10,10],"rotation":[0,0,0]},"fixed":true,"origin":{"part":"Plech","sig":"1b5bhuw1hxmqh23c","material":"ocel"}},{"id":"y569iau","name":"Horní deska","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Horní deska","material":"ocel","features":[{"id":"vclxu38","name":"Kvádr 3","type":"box","size":[100,100,10],"position":[0,0,0],"centered":false,"mode":"new"}],"kind":"part"}},"placement":{"position":[0,0,81],"rotation":[0,0,0]},"origin":{"part":"Horní deska","sig":"qitqnl1va14z73f","material":"ocel"}},{"id":"do5jo0s","name":"Razník","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Razník","material":"ocel","features":[{"id":"lnbsmmk","name":"Válec 1","type":"cylinder","radius":10,"height":40,"position":[0,0,0],"mode":"new","axis":"Z"}],"kind":"part"}},"placement":{"position":[50,50,31],"rotation":[0,0,0]},"origin":{"part":"Razník","sig":"87kmuis8c1h83i","material":"ocel"}},{"id":"22mpeuv","name":"Značka","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Značka","material":"ocel","features":[{"id":"zgs6nm9","name":"Válec 2","type":"cylinder","radius":3,"height":39.5,"position":[0,0,0],"mode":"new","axis":"Z"}],"kind":"part"}},"placement":{"position":[25,75,31.5],"rotation":[0,0,0]},"origin":{"part":"Značka","sig":"1b0b9i01q2ivn63j","material":"ocel"}},{"id":"ylqau8c","name":"Přidržovač","source":{"kind":"part","doc":{"app":"mnastrojarna-cad","version":2,"name":"Přidržovač","material":"ocel","features":[{"id":"c8dcqqk","name":"Kvádr 4","type":"box","size":[30,30,8],"position":[0,0,0],"centered":false,"mode":"new"}],"kind":"part"}},"placement":{"position":[5,5,30],"rotation":[0,0,0]},"origin":{"part":"Přidržovač","sig":"p3tghh19jz4bn3c","material":"ocel"}}],"mates":[{"id":"96j8wan","type":"distance","a":{"compId":"y569iau","face":4},"b":{"compId":"s4l24b7","face":2},"value":71,"name":"ZDVIH"},{"id":"rc0s2ap","type":"flush","a":{"compId":"y569iau","face":1},"b":{"compId":"s4l24b7","face":5}},{"id":"eqsc1ts","type":"flush","a":{"compId":"y569iau","face":3},"b":{"compId":"s4l24b7","face":3}},{"id":"yt87jv0","type":"lock","a":{"compId":"do5jo0s","face":-1},"b":{"compId":"y569iau","face":-1},"rel":{"position":[50,50,-50],"rotation":[0,0,0]}},{"id":"wpv77qj","type":"lock","a":{"compId":"22mpeuv","face":-1},"b":{"compId":"y569iau","face":-1},"rel":{"position":[25,75,-49.5],"rotation":[0,0,0]}},{"id":"vl96k2o","type":"lock","a":{"compId":"ylqau8c","face":-1},"b":{"compId":"y569iau","face":-1},"name":"NESENÍ","rel":{"position":[5,5,-51],"rotation":[0,0,0]}},{"id":"zbjhfrh","type":"distance","a":{"compId":"ylqau8c","face":4},"b":{"compId":"s5q5jcq","face":5},"value":19,"name":"MEZERA","suppressed":true}],"motion":{"motors":[{"id":"iq4tgid","kind":"linear","mate":"96j8wan","from":71,"to":71,"legs":[{"to":49.5},{"to":71}]}],"duration":2,"steps":60,"phases":[{"id":"8dwcbgw","name":"Nájezd"},{"id":"wmn0mvi","name":"Sevření","start":{"mate":"zbjhfrh","op":"<=","value":0},"enable":["zbjhfrh"],"suppress":["vl96k2o"]},{"id":"vfx5dbx","name":"Střih","start":{"mate":"96j8wan","op":"<=","value":51}},{"id":"sppw7om","name":"Značení","start":{"mate":"96j8wan","op":"<=","value":49.8}},{"id":"0gu380j","name":"Návrat","start":{"mate":"96j8wan","op":">=","value":52},"enable":["vl96k2o"],"suppress":["zbjhfrh"]}],"collisions":true,"process":[{"id":"lsluwkp","kind":"cut","tool":"do5jo0s","target":"s5q5jcq"},{"id":"dasciak","kind":"imprint","tool":"22mpeuv","target":"s5q5jcq","depth":0.3,"at":{"phase":"sppw7om"}}]},"modelRev":"r·9a4b79"}
+pohyb spustit
+pohyb proces
+pohyb krok 60

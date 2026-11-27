@@ -1,0 +1,30 @@
+# vlna 22 – kolo 6 (balík M): tvary čísel kroků, otočení u rotačního motoru, fáze na mezích, pružiny, konflikty motorů
+{0} krok	{0} step
+{0} kroky	{0} steps
+{0} kroků	{0} steps
+Pohybová studie: {0} · {1} s · motory: {2}	Motion study: {0} · {1} s · motors: {2}
+motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo otočení Δ	motor {0}: the start {1} is not 0 – with mate “{2}” the motor value is a rotation from the initial pose, in step 0 the part jumps by {3}; without a jump: 0..Δ or turn Δ
+{0} pohání stejný stupeň volnosti {1} jako {2} – časy činnosti se překrývají (motor po konci svého okna dál drží koncovou hodnotu), díl nemůže splnit oba motory a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo pohyb dílu zadejte jedním motorem s úseky (… pak …, navázat)	{0} drives the same degree of freedom {1} as {2} – their active times overlap (a motor keeps holding its end value after its window ends), the part cannot satisfy both motors and the solver splits the difference (motor at limit / unsatisfied mates); delete one motor, or give the part's motion to one motor with segments (… then …, append)
+motor {0} ({1}) – tentýž stupeň volnosti	motor {0} ({1}) – same degree of freedom
+→ motor {0} přijat, ale je v konfliktu (motion.motor-conflict): {1}{2}	→ motor {0} accepted, but in conflict (motion.motor-conflict): {1}{2}
+fáze {0} „{1}“: hodnotu vazby „{2}“ ({3}) nejde měřit – podmínka by nikdy nenastala; podmínku dejte na vazbu Vzdálenost, Mez vzdálenosti, Souosost, Úhel / Mez úhlu, na motor (při motor N …) nebo na čas (od T s)	phase {0} “{1}”: the value of mate “{2}” ({3}) cannot be measured – the condition would never occur; put the condition on a Distance, Distance limit, Concentric, Angle / Angle limit mate, on a motor (when motor N …) or on time (from T s)
+fáze „{0}“ nenastala: čeká na předchozí fázi „{1}“, která nezačala – podmínka {2} se nevyhodnocovala; opravte nejdřív fázi „{1}“	phase “{0}” did not occur: it waits for the previous phase “{1}”, which did not start – condition {2} was not evaluated; fix phase “{1}” first
+⚠ fáze {0} „{1}“ nenastala – čeká na fázi {2} „{3}“, která nezačala (podmínka {4} se nevyhodnocovala)	⚠ phase {0} “{1}” did not occur – it waits for phase {2} “{3}”, which did not start (condition {4} was not evaluated)
+drží ji u {0}	held at {0}
+hodnota {0}	value {0}
+preference se neuplatnila (pružina tlačí k {0}; {1})	preference not applied (the spring pushes towards {0}; {1})
+preference se neuplatnila (jiné vazby; {0})	preference not applied (other mates; {0})
+po celou studii stlačená na doraz Ln (blok) – síla {0} N je jen odvozená z polohy; zkontrolujte polohu dílů (kinematika pružinou netlačí: pohyb kvazistatika)	compressed to the Ln stop (solid) for the whole study – the force {0} N is only derived from the pose; check the part positions (kinematics does not push with springs: motion quasistatic)
+výpočet drží preferovanou stranu meze „{0}“ ({1}), v sestavě ji přebila rovnováha pružiny / vazby – kinematika pružinou netlačí; fyzikální poloha = pohyb kvazistatika, jinak sestava vazba {2} preferovat ne	the solver holds the preferred side of limit “{0}” ({1}), in the assembly the spring equilibrium / mates override it – kinematics does not push with springs; physical pose = motion quasistatic, otherwise asm mate {2} prefer no
+vazby sestavy v uložené poloze nesplněné nebo neurčené – sestava (přepočet) a pak pohyb spustit	the assembly mates are not satisfied or not determined in the stored pose – asm (recompute), then motion run
+krok 0 se liší od polohy v sestavě: {0} – studie nezačíná v poloze, kterou sestava ukazuje; {1}	step 0 differs from the assembly pose: {0} – the study does not start in the pose the assembly shows; {1}
+⚠ vazby splněny ve všech krocích, ale krok 0 je jinde než poloha v sestavě ({0}) – motion.start-jump	⚠ mates satisfied in all steps, but step 0 differs from the assembly pose ({0}) – motion.start-jump
+moment pružiny „{0}“	the moment of spring “{0}”
+rovnováha měkkých členů	the equilibrium of soft terms
+díl „{0}“ není veden – {1} ho v krocích {2} posouval v rovině / natáčel (až {3} mm · {4}°); posuv v rovině a natočení vazby neurčují, poloha drží nejmenší změnu od předchozího kroku a v těchto směrech není fyzikální – přidejte vedení (souosost, zarovnání, drážka)	part “{0}” is not guided – {1} shifted it in the plane / rotated it in steps {2} (up to {3} mm · {4}°); the mates do not determine the in-plane shift and rotation, the pose keeps the least change from the previous step and is not physical in these directions – add a guide (concentric, align, slot)
+brání:	blocked by:
+Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} · {3}{4} · spočítáno {5}	The result is valid for “{0}” in its current state · {1} components · {2} · {3}{4} · computed {5}
+ · výpočet {0}	 · computation {0}
+pohybová studie	motion study
+#!dynamic – texty kódů registru (engine/codes.ts spring.lost)
+pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}	spring “{0}”: lost seat face {1} – length and force not checked; fix: {2}

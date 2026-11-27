@@ -34,7 +34,6 @@ Vazby splněny ve všech krocích
 ✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)
 Pohybová studie: motorů 1 · kroků 12
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 40 mm ↓ zdvih 17,5 mm
-Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 40 mm ↓ zdvih 17,5 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl
  „Deska A“: ΔZ −17,5 mm
  stojí: 2 („Rám“, „Přidržovač“)
@@ -56,10 +55,9 @@ Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 �
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 3 ===
-✓ vazba 3 (Mez „Přidržovač“ F6 → „Deska A“ F5 · ⟨5; 25⟩ mm · preferuje min): preferovaná strana min · ok
+⚠ vazba 3 (Mez „Přidržovač“ F6 → „Deska A“ F5 · ⟨5; 25⟩ mm · preferuje min): preferovaná strana min, preference se neuplatnila (jiné vazby; drží ji u max) · ok
 Pohybová studie: motorů 1 · kroků 12
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 40 mm ↓ zdvih 17,5 mm
-Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 40 mm ↓ zdvih 17,5 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl
  „Deska A“: ΔZ −17,5 mm
  stojí: 2 („Rám“, „Přidržovač“)

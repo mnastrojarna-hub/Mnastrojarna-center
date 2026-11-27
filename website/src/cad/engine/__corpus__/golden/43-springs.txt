@@ -83,7 +83,6 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 Pohybová studie: motorů 0 · kroků 36
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
-Pohybová studie: 334 kroků · 0,5 s · motory: 
  stojí: 7 („Spodní deska“, „Stírací deska“, „Horní deska“ a další)
 Vazby splněny ve všech krocích
  ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 35 · L0 41 · Ln 16) · síla 30,4 N (max 30,4 N) (4×)
@@ -100,7 +99,7 @@ Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horn
  „Stírací deska“: ΔZ −15 mm · na konci zpět ve výchozí poloze
  stojí: 1 („Spodní deska“)
 Vazby splněny ve všech krocích
- ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
+ ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 N (max 107 N) (4×)
 Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
  „Horní deska“ 5,5844 kg (z objemu × hustoty): zdvih Z 30 mm · v max 0,188 m/s · a max 2,37 m/s² (bez rázů na dorazech)
  „Stírací deska“ 2,4 kg (zadaná): zdvih Z 15 mm · v max 0,226 m/s · a max 63,02 m/s² (bez rázů na dorazech)
@@ -110,15 +109,14 @@ Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05
  doraz „Matrice Stírací deska → Spodní deska“ (min 0 mm): dotyk 0,125–0,375 s · nárazy 0,188 m/s (t = 0,125 s)
   první dotyk v t = 0,125 s
  Energie: na začátku 0,365 J, na konci 0,365 J (motor koná práci – bilance se nekontroluje)
-Pohybová studie: motorů 1 · kroků 36
+Pohybová studie: motorů 1 · kroků 36 · 0,5 s · r·?
  1. lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
 Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
-Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
  „Horní deska“ + 4 díly (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm · na konci zpět ve výchozí poloze
  „Stírací deska“: ΔZ −15 mm · na konci zpět ve výchozí poloze
  stojí: 1 („Spodní deska“)
 Vazby splněny ve všech krocích
- ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
+ ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 N (max 107 N) (4×)
 Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
  „Horní deska“ 5,5844 kg (z objemu × hustoty): zdvih Z 30 mm · v max 0,188 m/s · a max 2,37 m/s² (bez rázů na dorazech)
  „Stírací deska“ 2,4 kg (zadaná): zdvih Z 15 mm · v max 0,226 m/s · a max 63,02 m/s² (bez rázů na dorazech)
