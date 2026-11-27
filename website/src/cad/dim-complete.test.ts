@@ -81,10 +81,11 @@ describe("bod 18 – polohy a počty podle geometrie, ne podle čísla", () => {
     const d = reproA();
     const anns = [
       ...overall(),
-      hdim("top", top(0, 5), top(15, 5)), // X díry 1 od levé hrany
-      hdim("top", top(15, 5), top(85, 5)), // řetěz k díře 2
-      vdim("top", top(-5, 0), top(-5, 15)), // Y díry 1
-      vdim("top", top(-5, 15), top(-5, 45)), // Y díry 2
+      // kolo 6: pomocné čáry poloh děr vedou na osu díry (bod kóty ve středu díry), ne odjinud se shodnou souřadnicí
+      hdim("top", top(0, 15), top(15, 15)), // X díry 1 od levé hrany
+      hdim("top", top(15, 15), top(85, 45)), // řetěz k díře 2
+      vdim("top", top(15, 0), top(15, 15)), // Y díry 1
+      vdim("top", top(15, 15), top(85, 45)), // Y díry 2
       hdim("top", top(35, 20), top(65, 20)), // okno 30
       vdim("top", top(35, 20), top(35, 40)), // okno 20
       centerline(top(50, -5), top(50, 65)), // osa souměrnosti X = 50 (střed okna)
@@ -129,11 +130,62 @@ describe("bod 18 – polohy a počty podle geometrie, ne podle čísla", () => {
   });
 });
 
+describe("bod 18 (kolo 6) – směr kóty a pomocná čára na osu díry", () => {
+  // repro S/w22/ver6/draw/p18/b2.txt: deska 100×60×20 jen s kótou 100, vodorovnou 60 v horním pohledu (= osa X) a vodorovnou
+  // 20 v předním pohledu (= osa X); texty listu nesou i texty těchto kót (withAnnotations) – dřív je fallback „hodnotou“
+  // započetl jako šířku Y 60 a výšku Z 20 → „velikosti 4/4“, --strict exit 0
+  it("celkový rozměr: kóta jiného směru (osy modelu) ho nesplní ani svým textem", () => {
+    const d = doc([plate(), hole("Díra 1", 15, 15)]);
+    const anns = [hdim("top", top(0, 0), top(100, 0)), hdim("top", top(20, 30), top(80, 30)), hdim("front", front(40, 5), front(60, 5)), dia(top(15, 15), 4)];
+    const texts = [{ s: "100", layer: "dim" }, { s: "60", layer: "dim" }, { s: "20", layer: "dim" }, { s: "Ø8", layer: "dim" }];
+    const r = checkSheet({ doc: d, views: VIEWS, annotations: anns, dimensions: "smart", texts });
+    expect(r.items.filter((q) => q.id.startsWith("overall:")).map((q) => [q.id, q.status])).toEqual([["overall:0", "ok"], ["overall:1", "missing"], ["overall:2", "missing"]]);
+    expect(dimCheckLine(r)).toContain("chybí: 60 (šířka Y) (celkové rozměry); 20 (výška Z) (celkové rozměry)");
+    // se svislou 60 (horní = Y) a svislou 20 (přední = Z) jsou splněné
+    const ok = checkSheet({ doc: d, views: VIEWS, annotations: [...anns, vdim("top", top(0, 0), top(0, 60)), vdim("front", front(0, 0), front(0, 20))], dimensions: "smart", texts: [...texts, { s: "60", layer: "dim" }, { s: "20", layer: "dim" }] });
+    expect(ok.items.filter((q) => q.id.startsWith("overall:")).every((q) => q.status === "ok")).toBe(true);
+    // zapečená kóta celkového rozměru (jen text, bez poznámky listu) se hodnotou páruje dál
+    const baked = checkSheet({ doc: d, views: VIEWS, annotations: [hdim("top", top(0, 0), top(100, 0))], dimensions: "smart", texts: [{ s: "100", layer: "dim" }, { s: "60", layer: "dim" }, { s: "20", layer: "dim" }] });
+    expect(baked.items.filter((q) => q.id.startsWith("overall:")).every((q) => q.status === "ok")).toBe(true);
+  });
+  // repro S/w22/ver6/draw/p18/a.txt: kóta „15“ z [0; 45] do [15; 45] splnila „poloha Díra 1 – X 15“ (díra je na [15; 15])
+  it("poloha díry jen kótou, jejíž pomocná čára vede na osu díry – ne kótou se shodnou souřadnicí jinde", () => {
+    const d = doc([plate(), hole("Díra 1", 15, 15), hole("Díra 2", 85, 45)]);
+    const px = (r: ReturnType<typeof checkSheet>) => r.items.find((q) => q.id.startsWith(`holepos:${d.features[1].id}`) && q.axis === 0)!.status;
+    expect(px(checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(0, 45), top(15, 45))], dimensions: "smart" }))).toBe("missing");
+    expect(px(checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(15, 30), top(100, 30))], dimensions: "smart" }))).toBe("missing");
+    // bod kóty ve středu díry, na kružnici, nebo v pohledu z boku na čáře osy díry (přední pohled, Z v desce)
+    expect(px(checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(0, 15), top(15, 15))], dimensions: "smart" }))).toBe("ok");
+    expect(px(checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("top", top(0, 11), top(15, 11))], dimensions: "smart" }))).toBe("ok");
+    expect(px(checkSheet({ doc: d, views: VIEWS, annotations: [...overall(), hdim("front", front(0, 10), front(15, 10))], dimensions: "smart" }))).toBe("ok");
+  });
+});
+
+describe("bod 18 (kolo 6) – pomocná čára ke kótovací čáře přes osu díry", () => {
+  // pomocná čára vede od bodu kóty ke kótovací čáře; prochází-li osou díry, poloha díry je okótovaná – kótovací čára na
+  // druhé straně ne
+  const TOP1: CheckView = { ...TOP, s: 1 };
+  const one = doc([plate(), hole("Díra 1", 15, 15)]);
+  const vd = (x: number, offset: number): DrawingAnnotation => ({ id: id(), view: "top", type: "dim", kind: "vertical", a: top(x, 0), b: top(x, 15), offset });
+  const y1 = (d: CadDoc, r: ReturnType<typeof checkSheet>) => r.items.find((q) => q.id.startsWith(`holepos:${d.features[1].id}`) && q.axis === 1)!.status;
+  it("bod kóty na pravé hraně: kótovací čára vlevo (pomocná čára přes Díru 1) splní Y Díry 1; vpravo ne", () => {
+    expect(y1(one, checkSheet({ doc: one, views: [FRONT, TOP1], annotations: [...overall(), vd(100, -110)], dimensions: "smart" }))).toBe("ok");
+    expect(y1(one, checkSheet({ doc: one, views: [FRONT, TOP1], annotations: [...overall(), vd(100, 15)], dimensions: "smart" }))).toBe("missing");
+  });
+  // díry v řadě (Chytré kóty kótují řadu jednou – tahák pro agenty, Díra 4 – Y 10): kóta s bodem ve středu jiné díry na téže
+  // osové čáře splní polohu obou; bod jinde se shodnou souřadnicí (repro p18/a.txt) ne
+  it("řada děr: bod kóty ve středu Díry 2 (stejné Y) splní Y Díry 1 i bez polohy kótovací čáry", () => {
+    const two = doc([plate(), hole("Díra 1", 15, 15), hole("Díra 2", 60, 15)]);
+    expect(y1(two, checkSheet({ doc: two, views: VIEWS, annotations: [...overall(), vd(60, 15)], dimensions: "smart" }))).toBe("ok");
+    expect(y1(two, checkSheet({ doc: two, views: VIEWS, annotations: [...overall(), vd(40, 15)], dimensions: "smart" }))).toBe("missing");
+  });
+});
+
 describe("bod 18 – funkční prvky, základny, tolerance", () => {
   const anns = (suffix?: string) => [
     ...overall(),
-    hdim("top", top(0, 5), top(15, 5)),
-    vdim("top", top(-5, 0), top(-5, 15)),
+    hdim("top", top(0, 15), top(15, 15)),
+    vdim("top", top(15, 0), top(15, 15)),
     dia(top(15, 15), 4, suffix),
   ];
   it("funkční díra s předepsanou H7: bez tolerance ⚠ drawing.tolerance-missing, s H7 ok, jiná tolerance „liší se“", () => {
@@ -151,7 +203,7 @@ describe("bod 18 – funkční prvky, základny, tolerance", () => {
   });
   it("přetolerování: přesná tolerance na nefunkční kótě = ℹ drawing.tol-nonfunctional (jen když jsou funkční prvky vyznačené)", () => {
     const base = doc([plate(), hole("Díra 1", 15, 15)]);
-    const tight = [...anns("H7").slice(0, 3), hdim("top", top(0, 5), top(15, 5), "±0,01"), vdim("top", top(-5, 0), top(-5, 15)), dia(top(15, 15), 4, "H7")];
+    const tight = [...anns("H7").slice(0, 3), hdim("top", top(0, 15), top(15, 15), "±0,01"), vdim("top", top(15, 0), top(15, 15)), dia(top(15, 15), 4, "H7")];
     const unmarked = checkSheet({ doc: base, views: VIEWS, annotations: tight, dimensions: "smart" });
     expect(unmarked.tol.over).toEqual([]);
     expect(dimCheckLine(unmarked)).toContain("tolerance neověřeny (funkční prvky nevyznačeny)");
@@ -169,11 +221,11 @@ describe("bod 18 – funkční prvky, základny, tolerance", () => {
       { id: "f1", kind: "datum", label: "A", face: { index: 0 }, geom: { t: "plane", n: [-1, 0, 0], c: [0, 30, 10] } },
       { id: "f2", kind: "functional", feature: base.features[2].id },
     ];
-    const chain = [...overall(), hdim("top", top(15, 5), top(85, 5)), vdim("top", top(-5, 15), top(-5, 45)), callout(top(15, 15), 4, ["2× Ø8 skrz"])];
+    const chain = [...overall(), hdim("top", top(15, 15), top(85, 45)), vdim("top", top(15, 15), top(85, 45)), callout(top(15, 15), 4, ["2× Ø8 skrz"])];
     const r = checkSheet({ doc: { ...base, functional: marks }, views: VIEWS, annotations: chain, dimensions: "smart" });
     const px = r.items.find((q) => q.id.startsWith(`holepos:${base.features[2].id}`) && q.axis === 0)!;
     expect([px.status, px.why, px.datum?.label]).toEqual(["partial", "kóta polohy není od základny A", "A"]);
-    const fromA = checkSheet({ doc: { ...base, functional: marks }, views: VIEWS, annotations: [...chain, hdim("top", top(0, 50), top(85, 50))], dimensions: "smart" });
+    const fromA = checkSheet({ doc: { ...base, functional: marks }, views: VIEWS, annotations: [...chain, hdim("top", top(0, 45), top(85, 45))], dimensions: "smart" });
     expect(fromA.items.find((q) => q.id === px.id)!.status).toBe("ok");
   });
   it("funkční rovinná plocha (F) = poloha plochy na listu", () => {

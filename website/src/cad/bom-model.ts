@@ -263,16 +263,39 @@ export function docSupply(asm: CadDoc, key: (c: AsmComponent) => string): DocSup
   return { make: [...make.values()], standard: std.size, buy: buy.size };
 }
 
-/** jednořádkový souhrn dokumentace: „vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“ */
-export function docSupplyLine(s: DocSupply): string {
-  const missing = s.make.filter((m) => !m.drawing).length;
-  return tr("vyráběné {0}{1}, normálie {2}, nakupované {3}", s.make.length, missing ? tr(" (bez výkresu {0})", missing) : "", s.standard, s.buy);
+/** zastaralá kopie dílu v sestavě (asm-refresh.ts `staleHints`): co díl v záložce má a jak kopii obnovit */
+type StaleHintLike = { ref: string; number?: string; drawing: boolean };
+
+/**
+ * Jednořádkový souhrn dokumentace: „vyráběné 2 (bez výkresu 1), normálie 2, nakupované 0“. Kopie v sestavě bez výkresu,
+ * jejíž díl v záložce výkres má (`hints`), se nepočítá jako „bez výkresu“, ale zvlášť jako starší kopie (bod 22g, kolo 6) –
+ * výkres do výstupu sestavy přibude až po `sestava obnovit`.
+ */
+export function docSupplyLine(s: DocSupply, hints?: ReadonlyMap<string, StaleHintLike>): string {
+  const noDrw = s.make.filter((m) => !m.drawing);
+  const stale = noDrw.filter((m) => hints?.get(m.name)?.drawing).length;
+  const missing = noDrw.length - stale;
+  const paren = stale
+    ? missing
+      ? tr(" (bez výkresu {0}; starší kopie {1} – výkres má díl v záložce: sestava obnovit)", missing, stale)
+      : tr(" (starší kopie {0} – výkres má díl v záložce: sestava obnovit)", stale)
+    : missing
+      ? tr(" (bez výkresu {0})", missing)
+      : "";
+  return tr("vyráběné {0}{1}, normálie {2}, nakupované {3}", s.make.length, paren, s.standard, s.buy);
 }
 /** vyráběné díly, kterým chybí výkres nebo číslo: „Přidržovač (bez výkresu, bez čísla)“ */
-export function makeIncomplete(s: DocSupply): string[] {
+export function makeIncomplete(s: DocSupply, hints?: ReadonlyMap<string, StaleHintLike>): string[] {
   return s.make
     .filter((m) => !m.drawing || !m.number)
-    .map((m) => `${m.name} (${[!m.drawing ? tr("bez výkresu") : "", !m.number ? tr("bez čísla") : ""].filter(Boolean).join(", ")})`);
+    .map((m) => {
+      // díl v záložce výkres / číslo má, jen kopie v sestavě je starší: neradit „bez výkresu“, ale obnovit (bod 22g, kolo 6)
+      const h = hints?.get(m.name);
+      const fromTab = [!m.drawing && h?.drawing ? tr("výkres") : "", !m.number && h?.number ? tr("číslo") : ""].filter(Boolean);
+      const miss = [!m.drawing && !h?.drawing ? tr("bez výkresu") : "", !m.number && !h?.number ? tr("bez čísla") : ""].filter(Boolean);
+      if (fromTab.length && h) miss.push(tr("{0} má díl v záložce, kopie v sestavě je starší: sestava obnovit {1}", fromTab.join(", "), h.ref));
+      return `${m.name} (${miss.join(", ")})`;
+    });
 }
 
 /** volby druhu pro GUI (hodnota "" = výchozí podle původu) */

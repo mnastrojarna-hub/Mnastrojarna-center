@@ -19,7 +19,7 @@ import { embedBlobs, missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
-import { staleCopies, staleCopyText } from "../asm-refresh";
+import { staleCopies, staleCopyText, staleHints } from "../asm-refresh";
 import type { PdfFonts } from "../pdf";
 import { sketchToDxf } from "../sketch";
 import type { AsmComponent, CadDoc, ExportFormat, Feature } from "../types";
@@ -393,7 +393,9 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
   }
   const sheets = await documentSheets(env, d);
   // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
-  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source))) : [];
+  // díly v záložkách: zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` jako v `kusovník`
+  // a `--formats` (bod 22g, kolo 6 – i `výkres export pdf vše`)
+  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source)), staleHints(d, (x) => env.ws.findPart(x))) : [];
   const warnings = [...sheetWarnings(sheets), ...(miss.length ? [{ sheet: "", text: tr("vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}", miss.join(", ")) }] : [])];
   if (format === "pdf") {
     const data = await drawingsToPdf(sheets, await hostPdfFonts(env.fonts), d.name, modelId(d).rev);
@@ -489,11 +491,13 @@ export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "draw
  * nakupované 0“ a ⚠ vyráběné díly bez výkresu nebo čísla – výkresy normálií a nakupovaných položek se nepřibalují.
  * Díl / sestava bez komponent → nic.
  */
-export function asmDocNotes(d: CadDoc): OutNote[] {
+export function asmDocNotes(d: CadDoc, partOf?: (name: string) => CadDoc | null | undefined): OutNote[] {
   if (d.kind !== "assembly" || !d.components?.length) return [];
   const s = docSupply(d, (c) => sourceKey(c.source));
-  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s)] }];
-  const miss = makeIncomplete(s);
+  // díly v záložkách (`partOf`): zastaralá kopie, jejíž díl výkres / číslo má, dostane radu `sestava obnovit #N` (bod 22g)
+  const hints = staleHints(d, partOf);
+  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s, hints)] }];
+  const miss = makeIncomplete(s, hints);
   if (miss.length) out.push({ code: "bom.make-incomplete", args: [miss.join(", ")] });
   return out;
 }
@@ -558,7 +562,7 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
   }
   const env: DrawEnv = { kernel: host.kernel, ws, ...(host.fonts ? { fonts: host.fonts } : {}), flat: o.flat ?? true, ...(o.hooks ? { hooks: o.hooks } : {}) };
   // úplnost dokumentace sestavy (ℹ souhrn + ⚠ vyráběné bez výkresu / čísla) – u výkresu a kusovníku; job.ts opakování vynechá
-  for (const n of asmDocNotes(d)) note(n);
+  for (const n of asmDocNotes(d, (x) => ws.findPart(x))) note(n);
   // 22g (kolo 3): kusovník / výkres sestavy z kopie dílu starší než díl v záložce – export to řekne vždy (dřív jen řádek změny
   // dílu nebo `kusovník`; CSV s prázdným číslem a „— (třída Ocel)“ se zapsal bez ⚠)
   if (d.kind === "assembly") for (const sc of staleCopies(d, (n) => ws.findPart(n))) note({ code: "asm.stale-copy", text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", fmt.toUpperCase(), staleCopyText(sc)), level: "warn" });

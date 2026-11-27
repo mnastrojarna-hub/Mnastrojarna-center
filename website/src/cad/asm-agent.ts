@@ -59,7 +59,7 @@ import {
 } from "./agent-asm";
 import { getLang, tr } from "./i18n";
 import { csvCaption, supplyWord } from "./bom-model";
-import { copyFieldsText, refreshPlan, staleCopies, staleCopyText } from "./asm-refresh";
+import { copyFieldsText, refreshPlan, staleCopies, staleCopyText, staleHints } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
@@ -1097,7 +1097,7 @@ export async function bomData(d: CadDoc, env: AsmEnv, structured: boolean): Prom
 export function bomCodes(d: CadDoc, rows: BomRow[], env: Pick<AsmEnv, "partOf">): { code: string; text: string }[] {
   const out: { code: string; text: string }[] = [];
   for (const s of staleCopies(d, env.partOf)) out.push({ code: "asm.stale-copy", text: staleCopyText(s) });
-  for (const w of bomWarnings(rows)) out.push({ code: "bom.make-incomplete", text: w });
+  for (const w of bomWarnings(rows, staleHints(d, env.partOf))) out.push({ code: "bom.make-incomplete", text: w });
   return out;
 }
 

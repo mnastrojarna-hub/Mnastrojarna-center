@@ -148,3 +148,35 @@ describe("značky skupin děr nevedou přes hrany pohledu (fáze 2 – akceptač
     expect(sheetOverlaps(s).total).toBe(0);
   });
 });
+
+describe("odkazové čáry × kotvy jiných pozic a × kóty (bod 17, kolo 6)", () => {
+  // repro S/w22/repro/17/repro-100.txt: odkaz 72 vedl 0,14 mm od kotvy 82 a 0,28 mm od kotvy 92, odkaz přes kótovací čáru –
+  // „Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry …)“
+  it("odkaz blíž než 1 mm od kotvy jiné pozice = leader-anchor; dál ne", () => {
+    const s = base();
+    withNum(s, balloon(1, 60, 60, [110, 120]));
+    withNum(s, balloon(2, 40, 110, [85.1, 90])); // kotva 0,08 mm od odkazu 1 (střed odkazu)
+    const o = sheetOverlaps(s);
+    expect(o.byKind["leader-anchor"]).toBe(1);
+    expect(o.hits.find((h) => h.kind === "leader-anchor")!.what).toBe("1 → 2");
+    expect(overlapSummary(o)).toMatch(/odkazová čára × kotva jiné pozice 1/);
+    const far = base();
+    withNum(far, balloon(1, 60, 60, [110, 120]));
+    withNum(far, balloon(2, 40, 110, [88, 88])); // ~1,6 mm od odkazu
+    expect(sheetOverlaps(far).byKind["leader-anchor"]).toBeUndefined();
+  });
+  it("odkaz přes kótovací / pomocnou čáru nebo text kóty = leader-dim; čáry balónků se nepočítají", () => {
+    const s = base();
+    s.polys.push({ layer: "dim", pts: [[230, 40], [230, 140]] }); // pomocná čára kóty
+    withNum(s, balloon(3, 260, 70, [205, 110])); // odkaz přes x = 230
+    withNum(s, balloon(4, 150, 60, [150, 110])); // odkaz svisle přes text „100“ (150; 90)
+    // kroužek, odkaz a tečka balónku 4 jako v listu – vlastní čáry se nepočítají
+    s.polys.push({ layer: "dim", pts: Array.from({ length: 33 }, (_, i) => [150 + 4 * Math.cos((i * Math.PI) / 16), 60 + 4 * Math.sin((i * Math.PI) / 16)] as [number, number]) });
+    s.polys.push({ layer: "dim", pts: [[150, 64], [150, 110]] });
+    const o = sheetOverlaps(s);
+    expect(o.byKind["leader-dim"]).toBe(2);
+    expect(o.hits.filter((h) => h.kind === "leader-dim").map((h) => h.what).sort()).toEqual(["3 × kóta", "4 × „100“"]);
+    expect(overlapIssueText(o)).toMatch(/odkazová čára × kóta 2/);
+  });
+});
+

@@ -32,7 +32,8 @@ type Parity = {
   readCrossGolden(name: string): string | null;
   writeCrossGolden(name: string, text: string): void;
   joinRuns(outputs: string[]): string;
-  normalize(text: string): string;
+  /** `node: true` = výstup Node (přepíše jediný záměrný rozdíl hostitelů na text prohlížeče, bod 22j) */
+  normalize(text: string, o?: { node?: boolean }): string;
   readGolden(name: string): string | null;
   compareNode(golden: string, actual: string): { ok: boolean; subst: number; text: string };
 };
@@ -77,7 +78,7 @@ describe("parita enginu v Node (korpus vs. zlaté snímky z prohlížeče)", asy
         expect(greenThenRed(r.entries), `${sc.name}: řádky s ✓ i ✗`).toEqual(RED_GREEN[sc.name] ?? []);
         outs.push(formatConsole(r));
       }
-      const norm = P.normalize(P.joinRuns(outs));
+      const norm = P.normalize(P.joinRuns(outs), { node: true });
       if (out) fs.writeFileSync(path.join(out, `${sc.name}.node.txt`), norm + "\n");
       const golden = P.readGolden(sc.name);
       expect(golden, "zlatý snímek").not.toBeNull();
@@ -93,7 +94,7 @@ describe("parita enginu v Node (korpus vs. zlaté snímky z prohlížeče)", asy
       const host: EngineHost = { kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() };
       const outs: string[] = [];
       for (const text of sc.runs) outs.push(formatConsole(await runScript(ws, text, host)));
-      const norm = P.normalize(P.joinCross(outs, ws.tabs().filter((t) => t.kind !== "drawing").map((t) => t.title)));
+      const norm = P.normalize(P.joinCross(outs, ws.tabs().filter((t) => t.kind !== "drawing").map((t) => t.title)), { node: true });
       if (out) fs.writeFileSync(path.join(out, `${sc.name}.cross.txt`), norm + "\n");
       if (process.env.CROSS_UPDATE) P.writeCrossGolden(sc.name, norm);
       const golden = P.readCrossGolden(sc.name);

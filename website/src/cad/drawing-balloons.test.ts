@@ -102,3 +102,43 @@ describe("rozmístění pozic (bod 17)", () => {
     expect(segmentsCross([0, 0], [10, 0], [0, 1], [10, 1])).toBe(false);
   });
 });
+
+describe("kotva a délka odkazu (bod 17, kolo 6)", () => {
+  const segDist = (a: [number, number], b: [number, number], c: [number, number]) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(a[0] + dx * t - c[0], a[1] + dy * t - c[1]);
+  };
+  // repro S/w22/repro/17/repro-100.txt: desky nad sebou (stejné x, jiné z) – v předním pohledu kotvy v jedné svislé řadě,
+  // odkaz spodní desky vedl přes kotvy horních (0,14 mm)
+  it("desky v řadě nad sebou: žádný odkaz nevede blíž než 1 mm ke kotvě jiné pozice", () => {
+    const items: BItem[] = Array.from({ length: 12 }, (_, i) => ({ pos: i + 1, boxes: [[[(i % 4) * 25, 0, Math.floor(i / 4) * 12], [(i % 4) * 25 + 20, 10, Math.floor(i / 4) * 12 + 5]]] }));
+    // přední pohled: x → list x, z → list y dolů (obráceně)
+    const front: BView = { key: "front", rect: { x: 100, y: 100, w: 95, h: 29 }, project: (p: Vec3) => [100 + p[0], 129 - p[2]] };
+    const lay = layoutBalloons({ items, views: [front], obstacles: [], bounds: { x: 22, y: 12, w: 386, h: 273 }, R });
+    expect(lay.placed).toHaveLength(12);
+    for (const b of lay.placed)
+      for (const c of lay.placed) if (b !== c) expect(segDist([b.x, b.y], b.a as [number, number], c.a as [number, number])).toBeGreaterThanOrEqual(1);
+  });
+  // repro S/w22/repro/17/repro.txt (A3, 30 dílů): odkaz 21 z [287; 17,8] do [44; 29,5] – 243 mm (první řada kolem pohledu měla
+  // přednost před délkou odkazu)
+  it("široký nízký pohled s plnou první řadou: odkaz nikdy přes půl listu – nejvýš 0,3 × (š + v) pohledu, aspoň 40 mm", () => {
+    const items: BItem[] = Array.from({ length: 30 }, (_, i) => ({ pos: i + 1, boxes: [[[(i % 10) * 25, 0, Math.floor(i / 10) * 9], [(i % 10) * 25 + 20, 10, Math.floor(i / 10) * 9 + 5]]] }));
+    const front: BView = { key: "front", rect: { x: 40, y: 30, w: 245, h: 26 }, project: (p: Vec3) => [40 + p[0], 56 - p[2]] };
+    // nad pohledem rám (sloty nahoře nejsou volné), vlevo kóta
+    const lay = layoutBalloons({ items, views: [front], obstacles: [{ x: 0, y: 0, w: 420, h: 22 }, { x: 22, y: 22, w: 14, h: 40 }], bounds: { x: 22, y: 12, w: 386, h: 273 }, R });
+    const longest = Math.max(...lay.placed.map((b) => Math.hypot(b.a[0] - b.x, b.a[1] - b.y)));
+    expect(longest).toBeLessThanOrEqual(Math.max(40, 0.3 * (245 + 26)) + 1e-6);
+  });
+  it("odkaz nekříží kótovací čáru, když jde balónek položit jinam", () => {
+    const items: BItem[] = [{ pos: 1, boxes: [[[10, 0, 0], [20, 10, 10]]] }];
+    const front: BView = { key: "front", rect: { x: 100, y: 100, w: 60, h: 30 }, project: (p: Vec3) => [100 + p[0], 130 - p[2]] };
+    // svislá kótovací čára vlevo od pohledu přes celou výšku a vodorovná pod ním (nejbližší místa balónku jsou vlevo a dole)
+    const lines: [[number, number], [number, number]][] = [[[95, 60], [95, 170]], [[80, 136], [200, 136]]];
+    const lay = layoutBalloons({ items, views: [front], obstacles: [], bounds: { x: 22, y: 12, w: 386, h: 273 }, R, lines });
+    const b = lay.placed[0];
+    expect(lines.some(([p, q]) => segmentsCross([b.x, b.y], b.a, p, q))).toBe(false);
+  });
+});
+

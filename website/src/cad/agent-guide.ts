@@ -1989,8 +1989,8 @@ kontrola proběhla nad tímto listem; bez ní se píše „nezkontrolováno“. 
 ### Šablony hlavičky s logem (vlna 22, bod 22j)
 
 \`výkres hlavička uložit "Firma" výchozí\` uloží razítko aktivního listu (druh, logo, firma, kreslil / kontroloval / schválil,
-nepředepsané tolerance) jako pojmenovanou šablonu – do Nastavení i do dokumentu (jde s ním do .mncad, sdíleného odkazu a
-skriptu); s poli (\`… šablona=nástrojářská logo="logo.svg" firma="…"\`) vznikne šablona z polí. \`výkres hlavička použít "Firma"\`
+nepředepsané tolerance) jako pojmenovanou šablonu – do Nastavení (v CLI jen pro tento běh) i do dokumentu (jde s ním do
+.mncad, sdíleného odkazu a skriptu; skript zapíše u výchozí šablony i \`výchozí\`); s poli (\`… šablona=nástrojářská logo="logo.svg" firma="…"\`) vznikne šablona z polí. \`výkres hlavička použít "Firma"\`
 nebo \`výkres razítko šablona="Firma"\` dá razítko listu podle šablony, nové listy převezmou výchozí. Logo SVG zůstane vektorem
 (SVG / PDF výkresu), náhled a obrys pro DXF / DWG se spočítají i bez prohlížeče; v CLI se logo bere názvem souboru ze \`--files\`.
 
@@ -2610,7 +2610,7 @@ třídí. Nejčastější:
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
 | \`drawing.section-legacy\` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (\`dnes pište: …\` v hlášce) |
 | \`drawing.tolerance-missing\` ⚠ | \`výkres kontrola tolerancí\`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | \`výkres tolerance aN …\` |
-| \`drawing.bom-overflow\` ⚠ | kusovník se na list nevejde ani ve sloupcích (počet chybějících řádků); \`drawing.overlap\` ⚠ navíc hlásí překryvy celého listu (balónky, odkazové čáry, texty, kóty, geometrie, tabulky, rám) s počtem po druzích | větší formát, \`výkres kusovník list\`, \`výkres pozice pohled …\`, \`výkres pozice zamknout …\` |
+| \`drawing.bom-overflow\` ⚠ | kusovník se na list nevejde ani ve sloupcích (počet chybějících řádků); \`drawing.overlap\` ⚠ navíc hlásí překryvy celého listu (balónky, odkazové čáry × balónky, kotvy jiných pozic pod 1 mm a kóty, texty, kóty, geometrie, tabulky, rám) s počtem po druzích | větší formát, \`výkres kusovník list\`, \`výkres pozice pohled …\`, \`výkres pozice zamknout …\` |
 | \`drawing.dims-incomplete\` ⚠ | kontrola kót (bod 18): na listu chybí velikost nebo poloha prvku výsledného dílu (díra, skupina děr s počtem, kapsa / okno, obrys skici) – \`výkres stav\`, konec běhu, export listu | \`výkres doplnit kóty\`, \`výkres kóta …\`, podrobně \`výkres kontrola kót\` |
 | \`drawing.dim-detached\` ⚠ | ruční kóta (ne Chytré kóty) po změně modelu neodpovídá geometrii pohledu: hrana / kružnice / vrcholy zmizely (kóta visí podle uložených bodů), nebo se kóta přichytila ke změněné geometrii (\`výkres stav\` ukáže „30 (zadáno 60) * ⚠“); pohled kóty není na listu – \`výkres stav\`, konec bloku / běhu (místo „✓ list vyhodnocen bez nálezů“), export listu | potvrdit přichycenou kótu \`výkres upravit aN odsazení=…\`, jinak \`výkres smazat aN\` |
 | \`drawing.tol-nonfunctional\` ℹ | přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na kótě, která nesplňuje žádný vyznačený funkční prvek (přetolerování) | vyznačit prvek \`funkční …\`, nebo toleranci uvolnit |

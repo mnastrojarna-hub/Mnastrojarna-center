@@ -22,6 +22,7 @@ import { springStatusLine, type SpringCheck } from "./asm-spring";
 import { lostSpringComps, springFixCmd } from "./spring-lost";
 import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, CadDoc, LostRef, Mate, MateRef, SupplyKind, Vec3 } from "./types";
+import type { StaleHint } from "./asm-refresh";
 
 /* ───────────────────────── typy ───────────────────────── */
 
@@ -1412,11 +1413,21 @@ export function bomText(rows: BomRow[], docName: string, structured: boolean): s
  * Upozornění kusovníku jako řádky ⚠ (kód `bom.make-incomplete`): vyráběné díly bez čísla výkresu a bez označení materiálu.
  * Prázdný seznam = nic nechybí v TĚCHTO řádcích – kusovník nic dalšího netvrdí (výkresy hlídá `docSupply`).
  */
-export function bomWarnings(rows: BomRow[]): string[] {
+export function bomWarnings(rows: BomRow[], hints?: ReadonlyMap<string, StaleHint>): string[] {
   const n = bomNotes(rows);
   const out: string[] = [];
-  if (n.noNumber.length) out.push(tr("vyráběné díly bez čísla výkresu: {0} – číslo: výkres razítko číslo=\"…\" v dílu, nebo sestava komponenta \"…\" číslo \"…\"", n.noNumber.join(", ")));
-  if (n.noMaterial.length) out.push(tr("vyráběné díly bez označení materiálu (jen třída): {0} – materiál 1.2379 v dílu", n.noMaterial.join(", ")));
+  // údaj, který má díl v záložce, ale kopie v sestavě je starší: neradit „v dílu“, ale obnovit kopii (bod 22g, kolo 6)
+  const num = (x: string) => hints?.get(x)?.number;
+  const mat = (x: string) => hints?.get(x)?.material;
+  const noNumber = n.noNumber.filter((x) => !num(x));
+  const noMaterial = n.noMaterial.filter((x) => !mat(x));
+  if (noNumber.length) out.push(tr("vyráběné díly bez čísla výkresu: {0} – číslo: výkres razítko číslo=\"…\" v dílu, nebo sestava komponenta \"…\" číslo \"…\"", noNumber.join(", ")));
+  if (noMaterial.length) out.push(tr("vyráběné díly bez označení materiálu (jen třída): {0} – materiál 1.2379 v dílu", noMaterial.join(", ")));
+  for (const x of [...new Set([...n.noNumber.filter(num), ...n.noMaterial.filter(mat)])]) {
+    const h = hints!.get(x)!;
+    const what = [n.noNumber.includes(x) && h.number ? tr("číslo {0}", h.number) : "", n.noMaterial.includes(x) && h.material ? tr("materiál {0}", h.material) : ""].filter(Boolean).join(", ");
+    out.push(tr("{0}: v kusovníku chybí {1} – díl v záložce je má, kopie v sestavě je starší: sestava obnovit {2}", x, what, h.ref));
+  }
   return out;
 }
 
