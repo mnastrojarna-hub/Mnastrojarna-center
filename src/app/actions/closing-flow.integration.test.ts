@@ -148,13 +148,20 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     if (customerId) await svc.from("customers").delete().eq("id", customerId);
   }, 60_000);
 
-  it("DL → faktura bez potvrzeného DL: PDF (FV), invoices + položky, Dokumenty, datum + splatnost i na zakázce, stav Vyfakturováno", async () => {
+  it("DL → stav zůstává; faktura až po potvrzeném DL (27. 11.): PDF (FV), invoices + položky, Dokumenty, datum + splatnost, Vyfakturováno", async () => {
     as("sales");
     const j = await newJob("dodano_k_nam", [{ qty: 10, price: 100 }, { qty: 4, price: 250 }]);
     const res = await dn.recordDelivery(j.id, [{ itemId: j.items[0], from: 0, to: 10 }, { itemId: j.items[1], from: 0, to: 4 }], { issueNote: true });
     expect(res.ok, res.error).toBe(true);
+    // vystavený DL stav neposune (zboží může být ještě na cestě) a faktura bez potvrzeného DL nevznikne
+    expect((await order(j.id)).status).toBe("dodano_k_nam");
+    const c0 = await counter("FV");
+    const early = await docs.generateJobDocument(j.id, "faktura", { reuse: true });
+    expect(early).toMatchObject({ ok: false, code: "delivery" });
+    expect(early.error).toMatch(/potvrzení dodání/);
+    expect(await counter("FV")).toBe(c0);
+    expect((await prod.confirmDeliveryNote(j.id)).ok).toBe(true);
     expect((await order(j.id)).status).toBe("dodano_zakaznikovi");
-    expect((await order(j.id)).delivery_note_confirmed_at).toBeNull(); // potvrzený DL není podmínka
     const fv = await docs.generateJobDocument(j.id, "faktura", { reuse: true });
     expect(fv.ok, fv.error).toBe(true);
     expect(fv.number).toMatch(/^FV-/);
@@ -208,6 +215,7 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     as("sales");
     const j = await newJob("dodano_k_nam", [{ qty: 2, price: 500 }]);
     expect((await dn.recordDelivery(j.id, [{ itemId: j.items[0], from: 0, to: 2 }], { issueNote: true })).ok).toBe(true);
+    expect((await prod.confirmDeliveryNote(j.id)).ok).toBe(true);
     const fv = await docs.generateJobDocument(j.id, "faktura");
     expect(fv.ok, fv.error).toBe(true);
     expect(fv.existing).toBe(false);
@@ -310,6 +318,7 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     as("sales");
     const j = await newJob("dodano_k_nam", [{ qty: 5, price: 3000 }, { qty: 10, price: 1000 }]);
     const res = await dn.recordDelivery(j.id, [{ itemId: j.items[0], from: 0, to: 5 }, { itemId: j.items[1], from: 0, to: 10 }], { issueNote: true });
+    expect((await prod.confirmDeliveryNote(j.id)).ok).toBe(true);
     expect(res.ok, res.error).toBe(true);
     const dep = await flow.recordJobPayment(j.id, { date: "2026-10-12", amount: 3_000 });
     expect(dep.ok, dep.error).toBe(true);
@@ -391,6 +400,7 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     as("sales");
     const j = await newJob("dodano_k_nam", [{ qty: 1, price: 900 }]);
     expect((await dn.recordDelivery(j.id, [{ itemId: j.items[0], from: 0, to: 1 }], { issueNote: true })).ok).toBe(true);
+    expect((await prod.confirmDeliveryNote(j.id)).ok).toBe(true);
     const fv = await docs.generateJobDocument(j.id, "faktura");
     expect(fv.ok, fv.error).toBe(true);
     const { getJob } = await import("@/lib/data/jobs");

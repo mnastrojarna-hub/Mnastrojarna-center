@@ -57,7 +57,7 @@ type View = "record" | "correct" | "closeShort" | "partialNote" | "result" | "no
  * Zapsat dodání zákazníkovi po položkách „Dodávám teď" (předvyplněno celým zbytkem — dílčí dodávku
  * uživatel jen sníží) + dodací list TÉTO dodávky (zaškrtnuto „Vystavit dodací list" — vlastní číslo
  * DL, jen dodané množství, bez cen) → výsledek: Stáhnout PDF, Vytisknout, Poslat zákazníkovi. Když
- * DL selže, dodání zůstane zapsané a dialog nabídne „Vystavit dodací list znovu" (stejné číslo). Při 100 % posune zakázku na Dodáno zákazníkovi DB. Dál uzavřít
+ * DL selže, dodání zůstane zapsané a dialog nabídne „Vystavit dodací list znovu" (stejné číslo). Stav zůstává — Dodáno zákazníkovi až potvrzený DL (27. 11.). Dál uzavřít
  * položku s menším množstvím, opravit zapsané množství (bez DL), u zakázky bez položek částečná
  * dodávka / dodáno vše (s DL celé zakázky).
  */

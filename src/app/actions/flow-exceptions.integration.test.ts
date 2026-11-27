@@ -194,7 +194,10 @@ describe.skipIf(!ENABLED)("výjimky v toku ↔ lokální Supabase", () => {
     await setStage(jobId, "ve_vyrobe");
     await svc.from("order_items").update({ delivered_quantity: 10 }).eq("id", item);
     j = await job(jobId);
-    expect(j.status).toBe("dodano_zakaznikovi");
+    // dodání samo stav neposune (27. 11.) — až potvrzený DL; s fakturou → zpět Vyfakturováno
+    expect(j.status).toBe("ve_vyrobe");
+    await svc.from("orders").update({ status: "dodano_zakaznikovi" }).eq("id", jobId);
+    j = await job(jobId);
     expect(j.invoice_number).toBe(`${PREFIX}-FV`);
     const close = await x.closeClaim(jobId, { note: "opraveno" });
     expect(close).toMatchObject({ ok: true, stage: "fakturovano" });

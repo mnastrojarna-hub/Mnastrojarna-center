@@ -174,7 +174,7 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(done).toContain('value="dl_potvrzen"');
     expect(done).not.toContain('value="k_expedici"');
     const empty = render(<BookEmpty segment="dokoncene" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
-    expect(empty).toContain("vystavíš dodací list na celou dodávku");
+    expect(empty).toContain("nahraješ potvrzený dodací list na celou dodávku");
     // Archiv: dlaždice hodnoty podle záložky, bez filtru = popis záložky; jediný stav = bez chipů
     const archive = render(
       <>

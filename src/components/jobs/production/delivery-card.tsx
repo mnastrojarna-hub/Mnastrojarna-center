@@ -19,7 +19,7 @@ import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 /**
  * Dodání zákazníkovi po položkách: „2/3 položek" (nikdy součet kusů různých dílů), u každé
  * položky dodáno / objednáno, tlačítko Zapsat dodání / Dodat zbytek. Zakázka bez položek má
- * částečnou dodávku poznámkou. Při 100 % posune zakázku na Dodáno zákazníkovi DB.
+ * částečnou dodávku poznámkou. Stav zůstává — Dodáno zákazníkovi až potvrzený DL (27. 11.).
  */
 export function DeliveryCard({ job, className }: { job: JobDetail; className?: string }) {
   const flow = useFlowActions();

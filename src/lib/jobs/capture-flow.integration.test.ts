@@ -198,7 +198,8 @@ describe.skipIf(!ENABLED)("foto dokladu → podrobné stavy a autor (lokální S
     const r2 = await recordPhotoDelivery(db as never, admin.id as string, jobId, [item("A-2", 5)], { documentNumber: "DL-2" });
     expect(r2).toMatchObject({ recorded: 1, complete: true });
     const j = await job(jobId);
-    expect(j).toMatchObject({ status: "dodano_zakaznikovi", stage_changed_by: admin.id, stage_change_cause: "dodani" });
+    // dodáno vše z fotky DL → stav zůstává (Dodáno zákazníkovi až potvrzený DL, 27. 11.)
+    expect(j.status).toBe("ve_vyrobe");
     expect(await captureStageGuard(db as never, jobId, "fakturovano")).toEqual({ ok: true });
     const { data: ev } = await svc.from("job_events").select("message, entity, actor_id").eq("job_id", jobId).eq("entity", "delivery");
     expect(((ev ?? []) as Row[]).map((e) => e.message).join("\n")).toMatch(/A-1 10\/10 ks · 1 z 2 položek/);
