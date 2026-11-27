@@ -10,7 +10,6 @@
 „{0}“ není tolerance úhlů (např. „±0°30′“, „±0,5°“)	„{0}“ is not an angle tolerance (e.g. „±0°30′“, „±0.5°“)
 atribut razítka {0}: {1}	title block attribute {0}: {1}
 buňka razítka {0} „{1}“: {2}	title block cell {0} „{1}“: {2}
-dokument „{0}“ je jen nosič textu (holé těleso z primitiv, víc řádků poznámek ({1}) než kót) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	document „{0}“ is only a text carrier (bare primitive body, more note lines ({1}) than dimensions) – no notes-only drawing is created; put the data in the title block of the part drawing
 dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}	agent document (JSON / setDocument in this run, or a file with text saved by an agent): {0}{1}
 export odmítnut – {0}	export refused – {0}
 geometrická tolerance „{0}“ je pokyn („{1}“) – rámeček nese jen značku, hodnotu a základny	geometric tolerance „{0}“ is an instruction („{1}“) – the frame carries only the symbol, value and datums

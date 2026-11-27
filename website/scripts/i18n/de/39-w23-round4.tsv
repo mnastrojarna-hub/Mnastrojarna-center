@@ -10,7 +10,6 @@
 „{0}“ není tolerance úhlů (např. „±0°30′“, „±0,5°“)	„{0}“ ist keine Winkeltoleranz (z. B. „±0°30′“, „±0,5°“)
 atribut razítka {0}: {1}	Schriftfeldattribut {0}: {1}
 buňka razítka {0} „{1}“: {2}	Schriftfeld {0} „{1}“: {2}
-dokument „{0}“ je jen nosič textu (holé těleso z primitiv, víc řádků poznámek ({1}) než kót) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	Dokument „{0}“ ist nur ein Textträger (nackter Grundkörper, mehr Hinweiszeilen ({1}) als Maße) – keine Zeichnung nur mit Hinweisen; Angaben ins Schriftfeld der Teilzeichnung
 dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}	Dokument des Agenten (JSON / setDocument in diesem Lauf oder Datei mit vom Agenten gespeichertem Text): {0}{1}
 export odmítnut – {0}	Export abgelehnt – {0}
 geometrická tolerance „{0}“ je pokyn („{1}“) – rámeček nese jen značku, hodnotu a základny	Form- und Lagetoleranz „{0}“ ist eine Anweisung („{1}“) – der Rahmen trägt nur Symbol, Wert und Bezüge

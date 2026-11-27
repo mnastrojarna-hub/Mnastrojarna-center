@@ -1,3 +1,17 @@
 # vlna 23, 5. kolo – bezeztrátový přesun do razítka, název = jmenná fráze, nálezy celého dokumentu
 „{0}“: přesun do razítka by údaj změnil („{1}“ by se ztratilo nebo rozdělilo do jiné buňky) – nepřesouvá se nic; zapište ho do razítka celý: {2}	„{0}“: die Übernahme ins Schriftfeld würde die Angabe ändern („{1}“ ginge verloren oder käme in ein anderes Feld) – es wird nichts übernommen; tragen Sie sie vollständig ins Schriftfeld ein: {2}
 (hodnoty doplňte celé – nic z poznámky nesmí chybět)	(Werte vollständig eintragen – nichts aus dem Hinweis darf fehlen)
+, těleso do 10 mm	, Körper bis 10 mm
+„{0}“ je pokyn („{1}“) – kusovník nese název, číslo a označení, pokyny pro výrobu a expedici na výkres nepatří	„{0}“ ist eine Anweisung („{1}“) – die Stückliste enthält Benennung, Nummer und Bezeichnung; Fertigungs- und Versandanweisungen gehören nicht auf die Zeichnung
+„{0}“ obsahuje údaj razítka ({1}) – v kusovníku jen označení materiálu (např. „1.2379“); tepelné zpracování, tvrdost a povrch patří do razítka výkresu dílu: {2}	„{0}“ enthält eine Schriftfeldangabe ({1}) – in der Stückliste nur die Werkstoffbezeichnung (z. B. „1.2379“); Wärmebehandlung, Härte und Oberfläche gehören ins Schriftfeld der Teilezeichnung: {2}
+„{0}“: {1} – buňka kusovníku nese krátký údaj (název, číslo, označení)	„{0}“: {1} – ein Stücklistenfeld enthält eine kurze Angabe (Benennung, Nummer, Bezeichnung)
+datum je zápis data (např. „27. 11. 2026“), ne „{0}“	das Datum ist ein Datum (z. B. „27. 11. 2026“), nicht „{0}“
+dokument „{0}“ je jen nosič textu ({1} řádků poznámek, kót {2}{3}) – výkres jen s poznámkami nevzniká; díl okótujte (kótovat chytře), údaje dejte do razítka výkresu dílu	Dokument „{0}“ ist nur ein Textträger ({1} Hinweiszeilen, {2} Maße{3}) – eine Zeichnung nur mit Hinweisen entsteht nicht; bemaßen Sie das Teil (kótovat chytře) und tragen Sie die Angaben ins Schriftfeld der Teilezeichnung ein
+komponenta „{0}“	Komponente „{0}“
+kusovník – komponenta „{0}“ ({1}): {2}	Stückliste – Komponente „{0}“ ({1}): {2}
+název pohledu modelu „{0}“ – {1}; pohled jiného modelu nese jeho název (jmenná fráze, např. „Čep“, „Deska A“)	Name der Modellansicht „{0}“ – {1}; die Ansicht eines anderen Modells trägt dessen Namen (Substantivgruppe, z. B. „Bolzen“, „Platte A“)
+počet kusů je číslo (např. „4 ks“, „2 + 1“), ne „{0}“	die Stückzahl ist eine Zahl (z. B. „4 Stk“, „2 + 1“), nicht „{0}“
+pokyn („{0}“)	Anweisung („{0}“)
+popisek pohledu „{0}“ – detail / pomocný pohled / řez se označí jen písmenem (např. „B“, „A-A“, „Detail C“); text u pohledu není kanál poznámek	Ansichtsbeschriftung „{0}“ – Einzelheit / Hilfsansicht / Schnitt werden nur mit einem Buchstaben bezeichnet (z. B. „B“, „A-A“, „Detail C“); Text an einer Ansicht ist kein Hinweiskanal
+revize je krátké označení (např. „A“, „B1“), ne „{0}“	der Änderungsstand ist ein kurzes Zeichen (z. B. „A“, „B1“), nicht „{0}“
+výkres „{0}“ je druhý výkres dílu „{1}“ (číslo s příponou, totéž těleso) s dalšími poznámkami – výkres se nedělí; poznámky patří na výkres dílu „{1}“ (nejvýš 5 řádků), údaje do jeho razítka	Zeichnung „{0}“ ist eine zweite Zeichnung des Teils „{1}“ (Nummer mit Suffix, derselbe Körper) mit weiteren Hinweisen – eine Zeichnung wird nicht geteilt; Hinweise gehören auf die Zeichnung von „{1}“ (höchstens 5 Zeilen), Angaben in deren Schriftfeld

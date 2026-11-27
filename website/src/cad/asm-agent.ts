@@ -58,6 +58,8 @@ import {
   type TabInfo,
 } from "./agent-asm";
 import { getLang, tr } from "./i18n";
+import { bomCellIssue, type BomField } from "./drawing-notes-rules";
+import { scopedError } from "./engine/codes";
 import { csvCaption, supplyWord } from "./bom-model";
 import { copyFieldsText, refreshPlan, staleCopies, staleCopyText, staleHints } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
@@ -752,6 +754,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         log.push(componentLines(d).slice(1)[i].trim());
         return done(d, false);
       }
+      // vlna 23, kolo 5 (bypass-F6 / correct-F2): buňky kusovníku z textové cesty = text agenta – věta, pokyn nebo tepelné
+      // zpracování / tvrdost / povrch v materiálu = ✗ (sestava se nezmění); zapsané pole nese původ „agent“
+      const cells: [BomField, string | undefined][] = [["name", p.name], ["number", p.number], ["group", p.group], ["material", p.material], ["alias", p.alias], ["catalog", p.supply?.catalog], ["vendor", p.supply?.vendor], ["size", p.supply?.size], ["grade", p.supply?.grade]];
+      for (const [f, v] of cells) {
+        const bi = v ? bomCellIssue(f, v) : null;
+        if (bi) throw scopedError(bi.code, tr("komponenta „{0}“", c0.name), bi.text);
+      }
+      const textSet = cells.some(([, v]) => !!v?.trim());
       let doc = d;
       if (p.fixed === false) doc = releaseComponent(doc, c0.id); // uvolnit zruší i vazbu Ukotvit (jinak by komponentu dál držel řešič)
       let c: AsmComponent = { ...doc.components!.find((x) => x.id === c0.id)!, placement: { position: [...c0.placement.position] as Vec3, rotation: [...c0.placement.rotation] as Vec3 } };
@@ -846,6 +856,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           what.push(tr("přezdívka „{0}“", c.alias));
         }
       }
+      if (textSet) (c as AsmComponent & { textBy?: string }).textBy = "agent";
       doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? c : x)) };
       let st: Record<string, MateStatus> | undefined;
       let movedOthers: string[] = [];

@@ -1,3 +1,17 @@
 # vlna 23, 5. kolo – bezeztrátový přesun do razítka, název = jmenná fráze, nálezy celého dokumentu
 „{0}“: přesun do razítka by údaj změnil („{1}“ by se ztratilo nebo rozdělilo do jiné buňky) – nepřesouvá se nic; zapište ho do razítka celý: {2}	„{0}“: moving it into the title block would change the value („{1}“ would be lost or split into another cell) – nothing is moved; write it into the title block in full: {2}
 (hodnoty doplňte celé – nic z poznámky nesmí chybět)	(write the values in full – nothing from the note may be missing)
+, těleso do 10 mm	, body up to 10 mm
+„{0}“ je pokyn („{1}“) – kusovník nese název, číslo a označení, pokyny pro výrobu a expedici na výkres nepatří	„{0}“ is an instruction („{1}“) – the parts list carries name, number and designation; manufacturing and shipping instructions do not belong on the drawing
+„{0}“ obsahuje údaj razítka ({1}) – v kusovníku jen označení materiálu (např. „1.2379“); tepelné zpracování, tvrdost a povrch patří do razítka výkresu dílu: {2}	„{0}“ contains title block data ({1}) – the parts list carries only the material designation (e.g. „1.2379“); heat treatment, hardness and surface belong in the title block of the part drawing: {2}
+„{0}“: {1} – buňka kusovníku nese krátký údaj (název, číslo, označení)	„{0}“: {1} – a parts list cell carries a short item (name, number, designation)
+datum je zápis data (např. „27. 11. 2026“), ne „{0}“	the date is a date (e.g. „27. 11. 2026“), not „{0}“
+dokument „{0}“ je jen nosič textu ({1} řádků poznámek, kót {2}{3}) – výkres jen s poznámkami nevzniká; díl okótujte (kótovat chytře), údaje dejte do razítka výkresu dílu	document „{0}“ is only a text carrier ({1} note lines, {2} dimensions{3}) – a drawing with only notes is not created; dimension the part (kótovat chytře) and put the data in the title block of the part drawing
+komponenta „{0}“	component „{0}“
+kusovník – komponenta „{0}“ ({1}): {2}	parts list – component „{0}“ ({1}): {2}
+název pohledu modelu „{0}“ – {1}; pohled jiného modelu nese jeho název (jmenná fráze, např. „Čep“, „Deska A“)	model view name „{0}“ – {1}; a view of another model carries its name (a noun phrase, e.g. „Pin“, „Plate A“)
+počet kusů je číslo (např. „4 ks“, „2 + 1“), ne „{0}“	the quantity is a number (e.g. „4 pcs“, „2 + 1“), not „{0}“
+pokyn („{0}“)	instruction („{0}“)
+popisek pohledu „{0}“ – detail / pomocný pohled / řez se označí jen písmenem (např. „B“, „A-A“, „Detail C“); text u pohledu není kanál poznámek	view label „{0}“ – a detail / auxiliary view / section is marked only with a letter (e.g. „B“, „A-A“, „Detail C“); text at a view is not a notes channel
+revize je krátké označení (např. „A“, „B1“), ne „{0}“	the revision is a short mark (e.g. „A“, „B1“), not „{0}“
+výkres „{0}“ je druhý výkres dílu „{1}“ (číslo s příponou, totéž těleso) s dalšími poznámkami – výkres se nedělí; poznámky patří na výkres dílu „{1}“ (nejvýš 5 řádků), údaje do jeho razítka	drawing „{0}“ is a second drawing of part „{1}“ (number with a suffix, the same body) with more notes – a drawing is not split; notes belong on the drawing of part „{1}“ (at most 5 lines), data in its title block
