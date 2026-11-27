@@ -131,6 +131,13 @@ describe("drážka, která povrch neřeže → ⚠ s kódem (22a, 22b-H, 22b-E);
     expect(st.warning).toMatch(/špička profilu závitu je tečná k povrchu Ø16,4/);
     expect(st.warning).toMatch(/side=internal a radius=8,2\b/);
   });
+  it("C′ (kolo 6): hloubka 0,81 – špička 0,01 mm od stěny díry Ø16,4 → rada podle SKUTEČNÉHO povrchu (Ø16,4, radius 8,2), ne podle poloměru špičky (Ø16,38 / 8,19)", { timeout: 180_000 }, async () => {
+    const st = await run(T(30, 16.4), { radius: 9, depth: 0.81 });
+    expect(st.warnCode).toBe("thread.tip-tangent");
+    expect(st.warning).toMatch(/tečná k povrchu Ø16,4 /);
+    expect(st.warning).toMatch(/Závit v díře Ø16,4: zadejte side=internal a radius=8,2 /);
+    expect(st.warning).not.toMatch(/16,38|8,19/);
+  });
   it("H: vnitřní strana, radius 9 v díře Ø16,4 – drážka celá ve stěně → ⚠ thread.no-reach („nezasahuje do válcové plochy díry“)", { timeout: 180_000 }, async () => {
     const st = await run(T(30, 16.4), { radius: 9, depth: 0.8, side: "internal" });
     expect(st.warnCode).toBe("thread.no-reach");

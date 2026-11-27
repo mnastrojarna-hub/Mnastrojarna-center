@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { docStatusText } from "../agent";
-import { buildDoc, buildShape, clearBuildCache } from "../build";
+import { buildDoc, buildShape, clearBuildCache, noSolidError } from "../build";
 import { statusKv } from "../engine/kv";
 import { registerExt } from "../ext/registry";
 import { featureState, levelsText } from "../feature-levels";
@@ -77,6 +77,29 @@ describe("účinek booleovské operace (22b)", () => {
     expect(e.level).toBe("partial"); // skutečný, i když proti nástroji nepatrný úběr – ne „žádný“
     expect(levelsText(of(r2, sliver))).toMatch(/^úběr 0,04 mm³ \(<1 % nástroje\)/);
     expect(of(r2, sliver).warning).toBeUndefined();
+  });
+});
+
+describe("odebrání celého tělesa (22b, kolo 6)", () => {
+  it("kvádr 10 10 10 a pak kvádr 10 10 10 odebrat: ✗ „nástroj ubral celé těleso“, ne věta o dráze a profilu tažení", { timeout: 60_000 }, async () => {
+    const b = box([10, 10, 10]);
+    const all = box([10, 10, 10], [0, 0, 0], "cut");
+    clearBuildCache();
+    const res = await buildDoc(doc(b, all));
+    expect(of(res, all).ok).toBe(false);
+    expect(of(res, all).error).toMatch(/^Nástroj ubral celé těleso – po odebrání nezůstal žádný materiál/);
+    expect(of(res, all).error).not.toMatch(/dráha|profil|jádro selhalo/);
+    expect(res.metrics?.solids).toBe(1); // těleso před prvkem zůstane
+  });
+  it("věta o dráze a profilu jen u tažení; průnik bez překryvu = prázdný průnik; jiný prvek = obecná věta", () => {
+    const empty = { solids: 0, shells: 0, faces: 0, valid: false } as never;
+    const shellOnly = { solids: 0, shells: 1, faces: 3, valid: false } as never;
+    expect(noSolidError(ext("surf.sweep", { mode: "cut" }), shellOnly)).toMatch(/dráha se nesmí protínat/);
+    expect(noSolidError({ ...box([1, 1, 1]), mode: "intersect" } as Feature, empty)).toMatch(/^Průnik s nástrojem je prázdný/);
+    expect(noSolidError(hole(0, 0), empty)).toMatch(/^Nástroj ubral celé těleso/);
+    const other = noSolidError(box([1, 1, 1], [0, 0, 0], "add"), shellOnly);
+    expect(other).toMatch(/^Operace nevrátila objemové těleso \(žádné objemové těleso – jen 1 plášť \(3 ploch\)\)/);
+    expect(other).not.toMatch(/dráha|profil/);
   });
 });
 

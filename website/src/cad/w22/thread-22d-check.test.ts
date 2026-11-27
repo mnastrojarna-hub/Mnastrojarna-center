@@ -57,6 +57,47 @@ describe("22d: Tažení po šroubovici s thread= je závit v kontrole dílu, kon
     expect(th[0].label).toMatch(/^M18×1,5/);
   });
 
+  it("kolo 6: popisky kontroly kót v jazyce běhu – EN bez „délka“, „hl.“, „skrz“, „dl.“ (dřív natvrdo česky mimo tr())", () => {
+    const thread: Feature = { id: "t1", type: "thread", name: "Thread 1", designation: "M18×1,5", length: 18 } as unknown as Feature;
+    const legacy = helix({ profile: "thread60", radius: 10, pitch: 1.5, depth: 0.9, side: "external", turns: 10, mode: "cut" });
+    const holes: Feature[] = [
+      { id: "d1", type: "hole", name: "Hole 1", diameter: 8, depth: 0, through: true, position: [0, 0, 10], axis: "Z" } as unknown as Feature,
+      { id: "d2", type: "hole", name: "Hole 2", diameter: 6, depth: 12, through: false, position: [20, 0, 10], axis: "Z" } as unknown as Feature,
+    ];
+    const labels = (d: CadDoc) => expectedDims(d, null).map((e) => e.label);
+    try {
+      setLang("en");
+      const en = [...labels({ ...emptyDoc(), features: [helix({ profile: "thread60", thread: "M18×1,5", side: "internal", turns: 12, mode: "cut" })] }), ...labels({ ...emptyDoc(), features: [thread, legacy, ...holes] })];
+      expect(en.join(" | ")).not.toMatch(/délka|hl\.|skrz|dl\./);
+      expect(en).toContain("M18×1,5 length 18");
+      expect(en).toContain("M20×1,5 (length 15)");
+      expect(en).toContain("Ø8 thru");
+      expect(en).toContain("Ø6 depth 12");
+      setLang("de");
+      expect(labels({ ...emptyDoc(), features: [thread] })).toContain("M18×1,5 Länge 18");
+    } finally {
+      setLang("cs");
+    }
+    const cs = labels({ ...emptyDoc(), features: [thread, legacy, ...holes] });
+    expect(cs).toContain("M18×1,5 délka 18");
+    expect(cs).toContain("Ø8 skrz");
+    expect(cs).toContain("Ø6 hl. 12");
+    expect(cs).toContain("M20×1,5 (15 dl.)");
+  });
+
+  it("kolo 6: EN běh „feature surf.helixSweep … drawing check dims“ – řádek kontroly kót celý anglicky (délka i název prvku)", { timeout: 300_000 }, async () => {
+    const text = 'new part "Nut E"\ntube 30 16.5 20\nfeature surf.helixSweep profile=thread60 thread=M18x1.5 side=internal turns=12 mode=cut\ndrawing A4\ndrawing dimension\ndrawing check dims';
+    try {
+      setLang("en");
+      const r = finalizeReport(await runReport(new MemoryWorkspace(), text, host(), { lang: "en" }), { full: true });
+      const full = r.full ?? "";
+      expect(full).toMatch(/M18×1,5 length 18 \(Helical sweep\)/);
+      expect(full).not.toMatch(/délka|Tažení po šroubovici/);
+    } finally {
+      setLang("cs");
+    }
+  });
+
   it("kóty výkresu: vnější závit šroubovicí z označení má kótu „M18×1,5“, ne „Ø18“", { timeout: 300_000 }, async () => {
     const r = await run('nový díl "Čep C"\nválec 18 30\nprvek surf.helixSweep profile=thread60 thread=M18×1,5 side=external turns=10 mode=cut position=0,0,10\nvýkres A3\nkótovat\nvýkres stav');
     expect(r.full ?? "").toMatch(/M18×1,5/);

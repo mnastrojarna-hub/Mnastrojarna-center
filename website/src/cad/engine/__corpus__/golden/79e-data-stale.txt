@@ -8,7 +8,7 @@
 ✓ základna A = F1 (rovina, normála -1; 0; 0, bod 0; 20; 5) – polohy funkčních prvků se kontrolují od ní
 → list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
-✓ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 24 000 mm³ (rozdíl 0,0000 %), obálka 60,00 × 40,00 × 10,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 ✓ výkres PDF: Deska_A_vykres.pdf · 78 kB · výkres PDF – staženo (bez dialogu)

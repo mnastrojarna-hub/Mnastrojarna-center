@@ -130,10 +130,10 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
         const cnt = n > 1 ? `${n}× ` : "";
         if (f.kind === "tapped" && f.thread) {
           const t = threadByName(f.thread);
-          push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${threadLabel(f.thread)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}`, src);
+          push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${f.depth > 0 ? tr("{0} hl. {1}", threadLabel(f.thread), fmt(f.depth)) : threadLabel(f.thread)}`, src);
           // vrták jiný než tabulkový (jádro D1, zadaný průměr) patří na výkres – výroba ho jinak nepozná
           if (f.tapDrill === "minor" || f.tapDrill === "custom") push(out, "dia", holeDrillD(f), tr("Ø{0} (vrták závitu {1})", String(Math.round(holeDrillD(f) * 1000) / 1000).replace(".", ","), threadLabel(f.thread)), src);
-        } else push(out, "dia", f.diameter, `${cnt}Ø${fmt(f.diameter)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"}`, src);
+        } else push(out, "dia", f.diameter, `${cnt}${f.depth > 0 ? tr("{0} hl. {1}", `Ø${fmt(f.diameter)}`, fmt(f.depth)) : tr("{0} skrz", `Ø${fmt(f.diameter)}`)}`, src);
         if (f.depth > 0) push(out, "lin", f.depth, tr("{0} (hloubka díry)", fmt(f.depth)), src);
         // zahloubení – i u závitové díry se zahloubením (zahloubení + vrták + závit); vrták pod zahloubením patří na výkres
         const hd = holeHeadOf(f);
@@ -226,7 +226,7 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
       }
       case "thread": {
         const t = threadByName(f.designation);
-        push(out, "thread", t?.d ?? 0, `${threadLabel(f.designation)}${f.length > 0 ? ` délka ${fmt(f.length)}` : ""}`, src);
+        push(out, "thread", t?.d ?? 0, f.length > 0 ? tr("{0} délka {1}", threadLabel(f.designation), fmt(f.length)) : threadLabel(f.designation), src);
         break;
       }
       case "ext": {
@@ -234,13 +234,13 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux
         const d = f.data ?? {};
         // katalogové označení (thread=M18×1,5) má přednost: poloměr / hloubku / stoupání doplní až stavba (22d)
         const tv = f.ext === "surf.helixSweep" ? threadOfFeature(f) : null;
-        if (tv) push(out, "thread", tv.t.d, `${threadLabel(tv.designation)}${tv.length > 0 ? ` délka ${fmt(tv.length)}` : ""}`, src);
+        if (tv) push(out, "thread", tv.t.d, tv.length > 0 ? tr("{0} délka {1}", threadLabel(tv.designation), fmt(tv.length)) : threadLabel(tv.designation), src);
         else if (f.ext === "surf.helixSweep" && d.profile === "thread60" && typeof d.radius === "number" && typeof d.pitch === "number") {
           const h = typeof d.depth === "number" ? d.depth : 0;
           const internal = d.side === "internal";
           const removing = d.mode === "cut" || d.mode === "intersect";
           const major = 2 * ((internal ? removing : !removing) ? d.radius + h : d.radius);
-          push(out, "thread", major, `M${fmt(major)}×${fmt(d.pitch)}${typeof d.turns === "number" ? ` (${fmt(d.turns * d.pitch)} dl.)` : ""}`, src);
+          push(out, "thread", major, typeof d.turns === "number" ? tr("{0} ({1} dl.)", `M${fmt(major)}×${fmt(d.pitch)}`, fmt(d.turns * d.pitch)) : `M${fmt(major)}×${fmt(d.pitch)}`, src);
         }
         break;
       }
