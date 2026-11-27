@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ReasonDialog } from "@/components/flow-status/reason-dialog";
 import {
   closeClaim, closeJobAsLost, correctOrder, openClaim, pauseJob, recordDrawingRevision, recordProductionFailure,
-  registerCustomerPo, reopenLostJob, resolveClaim, resumeJob, startWithoutCustomerPo, type CorrectionResult,
+  registerCustomerPo, reopenLostJob, resolveClaim, resumeJob, startWithoutCustomerPo, allowInvoiceBeforeDelivery, type CorrectionResult,
 } from "@/app/actions/flow-exceptions";
 import { uploadJobFile } from "@/lib/jobs/upload-client";
 import {
@@ -37,6 +37,7 @@ import { DialogHead, ErrorBox } from "./confirm-dialog";
 export const EXCEPTION_DIALOG_KEYS: readonly FlowActionKey[] = [
   "job.notOrdered", "job.decline", "job.reopenLost", "job.pause", "job.resume", "production.failed", "claim.open",
   "claim.resolve", "claim.close", "order.startWithoutPo", "order.poArrived", "order.correct", "drawing.update",
+  "invoice.beforeDelivery",
 ];
 
 interface Props {
@@ -246,6 +247,25 @@ export function FlowExceptionDialog(p: Props) {
           onConfirm={async ({ note }) => {
             const res = await startWithoutCustomerPo(job.id, { note });
             if (res.ok) switchTo("production.handoff", "Vyrábí se bez objednávky — předej do výroby (kdo a do kdy).");
+            return res;
+          }}
+        />
+      );
+    case "invoice.beforeDelivery":
+      return (
+        <ReasonDialog
+          open
+          onOpenChange={reasonClose}
+          title="Fakturovat před dodáním"
+          description="Fakturu půjde vystavit hned — bez čekání na potvrzený dodací list. Stav zakázky se nemění; dodání a potvrzený DL zapíšeš jako obvykle."
+          reasons={[]}
+          destructive={false}
+          noteLabel="Proč dřív"
+          quickNotes={["Zákazník chce fakturu předem", "Záloha / platba předem", "Fakturace ke konci měsíce", "Dohoda s obchodníkem"]}
+          confirmLabel="Povolit fakturu — vystavit"
+          onConfirm={async ({ note }) => {
+            const res = await allowInvoiceBeforeDelivery(job.id, { note });
+            if (res.ok) switchTo("payment.invoice", "Faktura před dodáním povolena — vystav ji.");
             return res;
           }}
         />

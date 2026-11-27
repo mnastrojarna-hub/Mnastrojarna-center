@@ -438,12 +438,15 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
     expect((await job(jobId)).status).toBe("ve_vyrobe");
 
     as("worker");
-    await svc.from("orders").update({ delivery_note_confirmed_at: "2026-10-20" }).eq("id", jobId);
+    // potvrzený DL až po poslední dodávce → uzavření zbytku s menším množstvím posune samo (27. 11.)
+    await svc.from("orders").update({ delivery_note_confirmed_at: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }).eq("id", jobId);
     expect(await a.closeItemDelivery(jobId, i2.id, { reason: "4 ks zmetky, zákazník souhlasí" })).toMatchObject({ ok: true, stage: "dodano_zakaznikovi" });
     expect(await job(jobId)).toMatchObject({ stage_change_cause: "dodani", stage_changed_via: "automaticky", stage_changed_by: id("worker"), items_delivered: 2 });
     const { data: closed } = await svc.from("order_items").select("delivery_closed, delivery_closed_by, delivery_closed_reason").eq("id", i2.id).single();
     expect(closed).toEqual({ delivery_closed: true, delivery_closed_by: id("worker"), delivery_closed_reason: "4 ks zmetky, zákazník souhlasí" });
-    // DL potvrzený 20. 10., poslední dodávka dnes → jen „dodáno“
+    // DL potvrzený po poslední dodávce → „DL potvrzen“; potvrzení starší než nová dodávka neplatí
+    expect((await flow(jobId)).delivery_key).toBe("dl_potvrzen");
+    await svc.from("orders").update({ delivery_note_confirmed_at: "2026-10-20" }).eq("id", jobId);
     expect((await flow(jobId)).delivery_key).toBe("dodano");
   });
 

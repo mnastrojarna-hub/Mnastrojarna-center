@@ -298,6 +298,16 @@ let probeStatus = 0;
 export const selfStoreProbeError = (): string => probeError;
 /** Odpověděl server na poslední neúspěšný `?ping` (HTTP stav ≠ 0)? Pak úložiště „nefunguje“, ne „neodpovídá“. */
 export const selfStoreAnswered = (): boolean => !!probeError && probeStatus > 0;
+/**
+ * Proč je úložiště `where` nedostupné – JEDNO pravidlo pro sdílení dokumentu (`sdílet`, engine/share-out.ts) i souboru
+ * (`export … odkaz`, share-file.ts): odpověděl-li `?ping` chybou (HTTP stav + chyba zavaděče index.php – staré PHP, zakázané
+ * funkce, chybějící skript), „… (adresa) nefunguje – důvod“; neodpověděl-li server vůbec (síť, časový limit), „neodpovídá
+ * (adresa)“ + důvod. Dřív tytéž HTTP 404 hlásily `sdílet úložiště` „nefunguje“ a `export step odkaz` „neodpovídá“ (vlna 22, bod 16).
+ */
+export function storeDownText(where: string): string {
+  if (probeError && selfStoreAnswered()) return tr("úložiště krátkých odkazů ({0}) nefunguje – {1}", where, probeError);
+  return tr("úložiště krátkých odkazů neodpovídá ({0})", where) + (probeError ? ` – ${probeError}` : "");
+}
 /** „… neodpovídá.“ + důvod z posledního `?ping` → „… neodpovídá (HTTP 500: …).“ */
 const withReason = (msg: string): string => (probeError ? `${msg.replace(/\.$/, "")} (${probeError}).` : msg);
 /** Text chyby z odpovědi úložiště (zavaděč index.php vrací JSON i při chybě PHP – stará verze, zakázané funkce, pád). */

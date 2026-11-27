@@ -13,7 +13,7 @@ import {
   QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
   quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent, sendViewerOf, userNeedsQuoteApproval,
   QUOTE_PENDING_LABEL, mayManageQuoteApproval, quoteApproverWho, quoteApproverWhoFor, quoteAwaitsText, quoteSendAfterText,
-  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META, canIssueInvoice, invoiceDeliveryOf,
+  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META, canIssueInvoice, invoiceDeliveryOf, exceptionActions,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
 import { STAGES, STAGE_ORDER, stageRank } from "./stages";
@@ -1176,5 +1176,30 @@ describe("konec toku: faktura po DL bez potvrzení, DL z Ve výrobě, jedna cest
     expect(s(part).payment).toBe("po_splatnosti");
     expect(menu(part)).toContain("payment.record");
     expect(menu(part)).not.toContain("payment.invoice");
+  });
+});
+
+describe("dodání a faktura až po potvrzeném DL; výjimka Fakturovat před dodáním (27. 11.)", () => {
+  const snapOf = (f: FlowFacts) => deriveFlow(f, [], TODAY);
+  const delivered = facts({
+    stage: "dodano_k_nam", orderStatus: "potvrzena", itemsCount: 2, itemsPriced: 2, itemsDelivered: 2, lastDeliveryAt: "2026-11-20T10:00:00Z",
+  });
+  it("DL vystaven, nepotvrzen: stav zůstává, další krok Nahrát potvrzený DL, faktura nejde", () => {
+    expect(canIssueInvoice(delivered)).toBe(false);
+    expect(nextAction(delivered, snapOf(delivered), ADMIN)?.key).toBe("delivery.confirmNote");
+  });
+  it("potvrzený DL po dodání → faktura jde", () => {
+    expect(canIssueInvoice({ ...delivered, deliveryNoteConfirmedAt: "2026-11-22T08:00:00Z" })).toBe(true);
+    expect(canIssueInvoice({ ...delivered, stage: "dodano_zakaznikovi" })).toBe(true);
+  });
+  it("výjimka: Fakturovat před dodáním v menu (od objednávky do U nás), pak faktura hned jako hlavní krok", () => {
+    const vv = facts({ stage: "ve_vyrobe", orderStatus: "potvrzena", itemsCount: 1, itemsPriced: 1 });
+    expect(exceptionActions(vv, ADMIN)).toContain("invoice.beforeDelivery");
+    expect(canIssueInvoice(vv)).toBe(false);
+    const early = { ...vv, invoiceBeforeDelivery: true };
+    expect(exceptionActions(early, ADMIN)).not.toContain("invoice.beforeDelivery");
+    expect(canIssueInvoice(early)).toBe(true);
+    expect(nextAction(early, snapOf(early), ADMIN)?.key).toBe("payment.invoice");
+    expect(canIssueInvoice({ ...early, invoiceNumber: "FV-1" })).toBe(false);
   });
 });

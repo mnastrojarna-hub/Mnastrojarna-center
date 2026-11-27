@@ -123,6 +123,55 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     }
   }, 300_000);
 
+  it("kolo 6 · oprava: sražený (kužel) i zaoblený (anuloid) sloupek v pouzdře bez vůle – úsek dokázán v OBOU pořadích, žádné „nepotvrzeno“", async () => {
+    // Úplný běh kola 6: syntetický nástroj ⚠ clash.uncertain „nepotvrzeny v 764 úsecích“. Příčina: `sweepSafe` volal `Cone()`,
+    // které jádro WASM nevydá („unbound types“) → každé sražení „nebezpečné“ → pevné pořadí dvojice, zmenšovalo se duté pouzdro →
+    // dráha „zajela“ do sloupku → půlení vyčerpalo rozpočet. Zaoblený sloupek (anuloid) je nebezpečný doopravdy – klouzání pak
+    // dokáže zmenšené A proti dráze plného B (obrácené pořadí z hranolů bezpečného listu).
+    for (const [label, edge] of [["sražení", "srazit 1"], ["zaoblení", "zaoblit 2"]] as const) {
+      const ws = new MemoryWorkspace();
+      await runReport(ws, ["nový díl Sloupek", "válec 24 100", edge, "nový díl Pouzdro", "kvádr 40 40 30", "díra 24 skrz v 20 20", "nová sestava Vedení", 'vložit "Pouzdro" v -20 -20 0', 'vložit "Sloupek" ukotvit v 0 0 -50'].join("\n"), host());
+      const d = ws.present();
+      const src = (n: string) => d.components!.find((c) => c.name === n)!;
+      for (const [sl, po] of [["a-sloupek", "z-pouzdro"], ["z-sloupek", "a-pouzdro"]] as const) {
+        const doc: CadDoc = { ...d, components: [{ ...src("Sloupek"), id: sl }, { ...src("Pouzdro"), id: po }], mates: [] };
+        const at = (t: number): Record<string, Placement> => ({ [po]: { ...src("Pouzdro").placement, position: [-20, -20, 20 * t] } });
+        const tr = clearanceTracker(doc, { motors: [], duration: 1, steps: 4 } as never, { clearance: (q) => kernel.clearance(q), collide: async () => [] }, { collisions: true, steps: 4 })!;
+        const steps: MotionStep[] = [];
+        for (let k = 0; k <= 4; k++) {
+          const row = { i: k, t: k / 4, motors: [k / 4], place: at(k / 4), conflicts: [], clashes: [] } as unknown as MotionStep;
+          const poseAt: PoseAt = (tm) => ({ place: at(tm), motors: [tm], t: tm });
+          await tr.step(row, steps[steps.length - 1] ?? null, poseAt);
+          steps.push(row);
+        }
+        const res = tr.finish({ steps, comps: [], motors: [], collision: null, collisionsChecked: true, conflictSteps: 0 } as unknown as MotionResult);
+        const why = `${label}: ${sl} × ${po}`;
+        expect(res.sweep, why).toMatchObject({ mode: "continuous", unproven: 0 });
+        expect(res.sweep!.swept, why).toBe(4);
+        expect(res.sweep!.refined, why).toBeLessThanOrEqual(4);
+        expect(res.between ?? [], why).toEqual([]);
+      }
+    }
+    // skutečný průchod tělesem pořád najde (pojistka, že zmenšené A klouzání „nevyrobí“): pouzdro s dírou Ø20 na sloupku Ø24
+    const ws = new MemoryWorkspace();
+    await runReport(ws, ["nový díl Sloupek", "válec 24 100", "srazit 1", "nový díl Pouzdro", "kvádr 40 40 30", "díra 20 skrz v 20 20", "nová sestava Vedení", 'vložit "Pouzdro" v -20 -20 0', 'vložit "Sloupek" ukotvit v 0 0 -50'].join("\n"), host());
+    const d = ws.present();
+    const id = (n: string) => d.components!.find((c) => c.name === n)!.id;
+    const po = d.components!.find((c) => c.name === "Pouzdro")!;
+    const r = await kernel.clearance({
+      doc: d,
+      poses: [{ [po.id]: { ...po.placement, position: [-20, -20, 20] } }],
+      sweep: [
+        { a: id("Sloupek"), b: id("Pouzdro"), from: 0, to: 1, touch: true },
+        { a: id("Pouzdro"), b: id("Sloupek"), from: 0, to: 1, touch: true },
+      ],
+    });
+    for (const sw of r.sweep!) {
+      expect(sw).toMatchObject({ ok: true, d: 0 });
+      expect(sw.pen).toBe(Infinity);
+    }
+  }, 300_000);
+
   it("kolo 6 · jádro: dráha posuvu kolíku napříč pohybu v OBOU pořadích dvojice 0,03 mm (dřív „Nůž“ × „Kolík“ 1,03 mm) a poloha minima", async () => {
     const ws = new MemoryWorkspace();
     const setup = corpus("74h-clearance-pin-side").split("\n").filter((l) => !/^(#|pohyb|stav)/.test(l)).join("\n");

@@ -1840,7 +1840,7 @@ async function applyDoc(
       }
       if (draft.type === "dodaci_list_my") {
         if (number) await filled(db.from("orders").update({ delivery_note_number: number } as never).eq("id", jobId).is("delivery_note_number", null).select("id"), `číslo dodacího listu ${number}`);
-        // dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi"; částečně = stav zůstává)
+        // dodané množství po položkách (stav neposouvá — „Dodáno zákazníkovi" až potvrzený DL, 27. 11.)
         const dl = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: number, extra: { captureId: session.captureId, docId: draft.id } });
         if (dl.recorded) summary.push(dl.complete ? "dodáno vše" : `dodáno částečně (${dl.lines.join("; ")})`);
         // vyfocený náš DL → delivery_notes (jediný zdroj čísla DL; dodávka má svůj DL)
@@ -1853,7 +1853,8 @@ async function applyDoc(
         }
         if (dl.unmatched.length) warnings.push(`Na dodacím listu jsou položky, které zakázka nemá: ${dl.unmatched.slice(0, 5).join(", ")}.`);
         if (st.confirmDelivered) {
-          const r = await confirmDeliveryNoteCore(db, user.id, jobId, { date: st.documentDate || undefined, fileId: fileIds[0], stage: false, extra: { captureId: session.captureId, docId: draft.id } });
+          // potvrzený DL (foto / e-mail) → Dodáno zákazníkovi, je-li dodáno vše (27. 11.; částečně stav zůstává)
+          const r = await confirmDeliveryNoteCore(db, user.id, jobId, { date: st.documentDate || undefined, fileId: fileIds[0], extra: { captureId: session.captureId, docId: draft.id } });
           if (r.ok) summary.push("potvrzený zákazníkem");
           else warnings.push(r.error);
         }
