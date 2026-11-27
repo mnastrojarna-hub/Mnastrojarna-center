@@ -22,12 +22,13 @@ import type { MotionCollision, MotionResult, MotionStep } from "./motion";
 import type { MotionEvent } from "./motion-phases";
 import { condText } from "./motion-phases";
 import { PROC_MAX_SUB, type ProcReq, type ProcRes, type ProcStep } from "./process-types";
+import { motorKeys, motorStartTime, profileAt, type MotorProfile } from "./motor-model";
 import type { CadDoc, MotionCond, MotionStudy, Placement, ProcessOp, Vec3 } from "./types";
 
 /* ───────────────────────── výsledek ───────────────────────── */
 
 /** krok a čas události operace; `between` = událost v mezipoloze úseku (k0 → k1), `step` je pak k1 (kolo 6) */
-export type ProcAt = { step: number; t: number; between?: [number, number] };
+export type ProcAt = { step: number; t: number; between?: [number, number]; est?: true };
 /**
  * mezipoloha procesní vrstvy (kolo 6): v úseku před krokem `k` (čas `t`) umístění komponent z řešiče studie – razník, který mezi
  * dvěma kroky projde plechem, se tak spočítá jako střih (dřív „bez záběru – nezasáhl“ vedle ℹ clash.work 314 mm³ mezi kroky)
@@ -73,9 +74,10 @@ export type ProcOpResult = {
   /**
    * proč nezjištěn (kolo 6 oprava): `pose` = řešič mezipolohu nedal (výchozí), `cap` = úsek by potřeboval víc než PROC_MAX_SUB
    * mezipoloh (tenký nástroj, dlouhý krok – 64 poloh by nástroj obrobkem stále „proskočil“), `clash` = spojitá kontrola kolizí
-   * našla průnik nástroj × obrobek mezi kroky, procesní vrstva v polohách žádný záběr
+   * našla průnik nástroj × obrobek mezi kroky, procesní vrstva v polohách žádný záběr; `start` = podmínka začátku mohla nastat mezi
+   * kroky (průběh motoru mezi kroky neznámý – profil nesedí na kroky, kolo 7 oprava)
    */
-  unresolvedWhy?: "pose" | "cap" | "clash";
+  unresolvedWhy?: "pose" | "cap" | "clash" | "start";
   ms: number;
 };
 export type ProcessResult = {
@@ -117,32 +119,129 @@ export function relMatrix(target: Placement, tool: Placement): number[] {
 const placeAt = (doc: CadDoc, s: Pick<MotionStep, "place">, id: string): Placement | null => s.place[id] ?? doc.components?.find((c) => c.id === id)?.placement ?? null;
 
 /**
- * Začátek operace v krocích studie: bez podmínky krok 0 (pak rozhoduje dotyk); čas → první krok s t ≥ T; motor → první krok,
- * kde hodnota motoru splní podmínku; vazba → hodnota motoru, který ji pohání (jinak nelze – chyba s nápovědou); fáze → krok
- * začátku fáze. Okamžik mezi kroky se odhadne lineárně (jako začátek fáze, motion-phases.ts `crossTime`). null = nenastal.
+ * Začátek operace: bez podmínky krok 0 (pak rozhoduje dotyk); čas → první krok s t ≥ T; motor → první okamžik, kdy hodnota
+ * motoru splní podmínku; vazba → hodnota motoru, který ji pohání (jinak nelze – chyba s nápovědou); fáze → krok začátku fáze.
+ * `step` = krok, který úsek se začátkem uzavírá; `t` = okamžik začátku. null = nenastal.
+ *
+ * Kolo 7 oprava (oponent): hodnota motoru MEZI kroky se počítá z profilu motoru (cad/motor-model.ts `motorKeys` – tentýž profil,
+ * ze kterého řešič počítá kroky: okno, začátek fáze z výsledku, tam a zpět s kosinovým průběhem), ne z hodnot v krocích. Dřív se
+ * podmínka zkoušela jen v krocích: „tam a zpět“ s dolní úvratí mezi kroky (`při motor 1 <= -45`) „nenastal“ – obrobek „plný“ a
+ * ⚠ process-miss, ač razník plechem prošel – a okamžik začátku se odhadoval lineárně (kotva mezipolohy mimo hodnotu podmínky).
+ * Profil se napřed porovná s hodnotami motoru ve všech krocích; nesedí-li (dynamika se zastaveným motorem …), průběh mezi kroky
+ * znám není: okamžik mezi kroky je jen lineární odhad (`est`) a úsek, ve kterém podmínka v žádném z obou kroků neplatí, je
+ * `unsure` – začátek tam nejde vyloučit (slabší tvrzení „nezjištěn“, nikdy „nenastal“).
  */
-export function opStart(op: Pick<ProcessOp, "at">, res: Pick<MotionResult, "steps" | "phases">, study: Pick<MotionStudy, "motors">): ProcAt | null {
+export type StartCheck = { start: ProcAt | null; unsure?: number };
+type StartStudy = Pick<MotionStudy, "motors"> & Partial<Pick<MotionStudy, "duration" | "steps">>;
+export function opStartCheck(op: Pick<ProcessOp, "at">, res: Pick<MotionResult, "steps" | "phases">, study: StartStudy): StartCheck {
   const S = res.steps;
-  if (!S.length) return null;
+  if (!S.length) return { start: null };
   const c = op.at;
-  if (!c) return { step: S[0].i, t: S[0].t };
+  if (!c) return { start: { step: S[0].i, t: S[0].t } };
   if ("phase" in c) {
     const ph = res.phases?.find((p) => p.id === c.phase);
-    if (!ph?.reached || ph.step === undefined) return null;
-    return { step: ph.step, t: ph.t ?? S.find((s) => s.i === ph.step)?.t ?? 0 };
+    if (!ph?.reached || ph.step === undefined) return { start: null };
+    return { start: { step: ph.step, t: ph.t ?? S.find((s) => s.i === ph.step)?.t ?? 0 } };
   }
   const val = condValueAt(c, study);
+  if ("t" in c) {
+    for (const s of S) if (s.t >= c.t - 1e-9) return { start: { step: s.i, t: Math.max(c.t, S[0].t) } };
+    return { start: null };
+  }
+  const met = (v: number) => (c.op === "<=" ? v <= c.value + 1e-9 : v >= c.value - 1e-9);
+  const tr0 = motorTrack(study, res, condMotor(c, study));
+  let unsure: number | undefined;
   for (let k = 0; k < S.length; k++) {
     const v = val(S[k]);
-    if (v === null) continue;
-    const met = "t" in c ? v >= c.t - 1e-9 : c.op === "<=" ? v <= c.value + 1e-9 : v >= c.value - 1e-9;
-    if (!met) continue;
-    let t = S[k].t;
-    if (k > 0 && !("t" in c)) {
-      const v0 = val(S[k - 1]);
-      if (v0 !== null && Math.abs(v - v0) > 1e-12) t = S[k - 1].t + Math.min(1, Math.max(0, (c.value - v0) / (v - v0))) * (S[k].t - S[k - 1].t);
-    } else if ("t" in c) t = Math.max(c.t, S[0].t);
-    return { step: S[k].i, t };
+    if (k === 0 || !tr0) {
+      if (v !== null && met(v)) {
+        if (k === 0) return { start: { step: S[0].i, t: S[0].t } };
+        // bez profilu jen lineární odhad okamžiku (kotva mezipolohy se z něj nebere – planSub)
+        const v0 = val(S[k - 1]);
+        let t = S[k].t;
+        if (v0 !== null && Math.abs(v - v0) > 1e-12) t = S[k - 1].t + Math.min(1, Math.max(0, (c.value - v0) / (v - v0))) * (S[k].t - S[k - 1].t);
+        return { start: { step: S[k].i, t, ...(t < S[k].t - 1e-9 ? { est: true as const } : {}) }, ...(unsure !== undefined ? { unsure } : {}) };
+      }
+      // úsek bez profilu, podmínka v žádném z obou kroků: mezi nimi ji vyloučit nejde
+      if (k > 0 && unsure === undefined) unsure = S[k].i;
+      continue;
+    }
+    const tau = crossIn(tr0, S[k - 1].t, S[k].t, met, (v) => (c.op === "<=" ? v <= c.value : v >= c.value));
+    if (tau !== null) return { start: { step: S[k].i, t: tau > S[k].t - 1e-9 ? S[k].t : tau } };
+  }
+  return { start: null, ...(unsure !== undefined ? { unsure } : {}) };
+}
+export function opStart(op: Pick<ProcessOp, "at">, res: Pick<MotionResult, "steps" | "phases">, study: StartStudy): ProcAt | null {
+  return opStartCheck(op, res, study).start;
+}
+/** index motoru podmínky (motor, nebo motor, který vazbu pohání); −1 = žádný */
+function condMotor(c: MotionCond, study: Pick<MotionStudy, "motors">): number {
+  if ("t" in c || "phase" in c) return -1;
+  return "motor" in c ? study.motors.findIndex((m) => m.id === c.motor) : study.motors.findIndex((m) => m.mate === c.mate);
+}
+/**
+ * Průběh hodnoty motoru `i` v čase (kolo 7 oprava): profil z cad/motor-model.ts stejně jako řešič (motion.ts – před začátkem fáze
+ * profil od 0, od začátku fáze profil posunutý na okamžik začátku; krok `frac` jako mezipoloha `poseAtTime`). `breaks` = okamžiky,
+ * mezi kterými je průběh monotónní (klíče úseků, obrat „tam a zpět“, začátek fáze). null = profil nesedí na hodnoty v krocích.
+ */
+type Track = { at: (t: number) => number; breaks: number[] };
+function motorTrack(study: StartStudy, res: Pick<MotionResult, "steps" | "phases">, i: number): Track | null {
+  const mo = study.motors[i];
+  if (!mo || study.duration === undefined) return null;
+  const D = study.duration > 0 ? study.duration : 1;
+  const n = Math.max(1, Math.min(2000, Math.round(study.steps || 1)));
+  let tPh: number | null = null;
+  if (mo.phase) {
+    const ph = res.phases?.find((p) => p.id === mo.phase);
+    tPh = ph?.reached && ph.t !== undefined ? ph.t : null;
+  }
+  let p0: MotorProfile;
+  let p1: MotorProfile | null;
+  try {
+    p0 = motorKeys(mo, D, mo.phase ? 0 : motorStartTime(mo));
+    p1 = tPh !== null ? motorKeys(mo, D, tPh) : null;
+  } catch {
+    return null;
+  }
+  const at = (t: number) => profileAt(p1 && t >= tPh! - 1e-12 ? p1 : p0, t, { k: (t / D) * n, n });
+  // shoda s hodnotami motoru v krocích (řešič je počítá z téhož profilu – jinak průběh mezi kroky neznáme)
+  for (const s of res.steps) {
+    const v = s.motors[i];
+    if (v === undefined) continue;
+    if (!(Math.abs(at(s.t) - v) <= 1e-6 * (1 + Math.abs(v)))) return null;
+  }
+  const breaks = [p0, ...(p1 ? [p1] : [])].flatMap((p) => [...p.segments.flatMap((g) => [g.t0, g.t1]), ...(p.back ? [p.duration / 2] : [])]);
+  if (tPh !== null) breaks.push(tPh);
+  return { at, breaks };
+}
+/** zlomy profilu uvnitř (a, b), ve kterých motor mění směr nebo se zastaví / rozjede (krajní hodnoty; jen jiná rychlost ne) */
+function turnsIn(tr0: Track, a: number, b: number): number[] {
+  const e = Math.max(1e-6, (b - a) * 1e-4);
+  return tr0.breaks.filter((x) => x > a + e && x < b - e).filter((x) => {
+    const d0 = tr0.at(x) - tr0.at(x - e);
+    const d1 = tr0.at(x + e) - tr0.at(x);
+    // stejný směr před i za zlomem (jen jiná rychlost) ani stání = žádný obrat; začátek / konec prodlevy ano (krajní hodnota)
+    const s0 = Math.abs(d0) > 1e-12 ? Math.sign(d0) : 0;
+    const s1 = Math.abs(d1) > 1e-12 ? Math.sign(d1) : 0;
+    return s0 !== s1;
+  });
+}
+/** první okamžik v (a, b], kdy hodnota splní podmínku (průběh je mezi zlomy monotónní – půlení intervalu); null = v úseku ne */
+function crossIn(tr0: Track, a: number, b: number, met: (v: number) => boolean, exact?: (v: number) => boolean): number | null {
+  const pts = [a, ...tr0.breaks.filter((x) => x > a + 1e-12 && x < b - 1e-12).sort((x, y) => x - y), b];
+  for (let j = 1; j < pts.length; j++) {
+    let lo = pts[j - 1];
+    let hi = pts[j];
+    if (!met(tr0.at(hi))) continue;
+    if (met(tr0.at(lo))) return lo;
+    // okamžik přesného přechodu hodnoty (tolerance 1e-9 jen pro uznání podmínky v krajním bodě – úvrať přesně na hodnotě)
+    const f = exact && exact(tr0.at(hi)) ? exact : met;
+    for (let q = 0; q < 80 && hi - lo > 1e-12; q++) {
+      const m = (lo + hi) / 2;
+      if (f(tr0.at(m))) hi = m;
+      else lo = m;
+    }
+    return hi;
   }
   return null;
 }
@@ -386,11 +485,31 @@ type Unresolved = { k: number; why: NonNullable<ProcOpResult["unresolvedWhy"]>; 
 type Seg = { j: number; ta: number; tb: number; n: number };
 async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[], starts: Map<string, ProcAt | null>, env: Required<ProcessEnv>, poseAt: ProcessPoseAt | undefined): Promise<{ sub: SubPose[]; unresolved: Map<string, Unresolved> }> {
   const S = res.steps;
+  const study = doc.motion;
   const jOf = new Map(S.map((s, j) => [s.i, j] as const));
   const sub: SubPose[] = [];
   const unresolved = new Map<string, Unresolved>();
   const segs = new Map<string, Seg>(); // úsek (index kroku + začátek) → nejvíc potřebných mezipoloh
   const opSegs = new Map<string, { key: string; j: number; capped: boolean }[]>();
+  // obraty motorů uvnitř úseků (kolo 7 oprava): plán jádra posuzuje dráhu nástroje mezi DVĚMA polohami (obálka obou poloh) – motor
+  // „tam a zpět“, který se otočí mezi kroky (1 krok přes celou studii: obě polohy nahoře, razník mezi nimi plechem projde), by úsek
+  // přeskočil. Poloha v každém obratu motoru (zlom profilu uvnitř úseku) se proto přidá jako mezipoloha – mezi sousedními polohami
+  // je pak hodnota každého motoru monotónní. Obrat bez polohy z řešiče = úsek nezjištěn pro operace, které v něm mohou zasáhnout.
+  const turns: SubPose[] = [];
+  const turnFail = new Set<number>(); // index úseku j (S[j−1] → S[j]), kde řešič polohu obratu nedal
+  if (poseAt && study) {
+    const tracks = study.motors.map((_m, i) => motorTrack(study, res, i)).filter((x): x is Track => !!x);
+    for (let j = 1; j < S.length; j++) {
+      const a = S[j - 1].t;
+      const b = S[j].t;
+      const ts = [...new Set(tracks.flatMap((x) => turnsIn(x, a, b)).map((t) => Math.round(t * 1e9) / 1e9))].sort((x, y) => x - y).slice(0, PROC_MAX_SUB);
+      for (const t of ts) {
+        const m = poseAt(S[j].i, t);
+        if (m) turns.push({ k: S[j].i, t, place: m.place });
+        else turnFail.add(j);
+      }
+    }
+  }
   for (const op of ops) {
     const start = starts.get(op.id) ?? null;
     // začátek uprostřed úseku j−1 → j: kotva = poloha v okamžiku začátku
@@ -399,14 +518,17 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
     let anchor: SubPose[] = [];
     let planStart = start;
     if (mid) {
-      const m = poseAt?.(S[js].i, start!.t);
+      // okamžik jen lineárně odhadnutý (profil motoru nesedí na kroky): poloha v odhadu by nebyla polohou začátku – bez kotvy
+      const m = start!.est ? null : poseAt?.(S[js].i, start!.t);
       if (m) anchor = [{ k: S[js].i, t: start!.t, place: m.place }];
       // bez kotvy: plán z polohy předchozího kroku (nadmnožina dráhy) – zda nástroj v úseku obrobek vůbec může zasáhnout
       else planStart = { step: S[js - 1].i, t: S[js - 1].t };
     }
+    // obraty před začátkem operace (poloha neaktivní) ani v okamžiku kotvy nepřidávat
+    const pre = [...anchor, ...turns.filter((x) => !anchor.some((y) => Math.abs(y.t - x.t) < 1e-9))];
     let req: ProcReq;
     try {
-      req = processRequest(doc, res, op, planStart, undefined, anchor);
+      req = processRequest(doc, res, op, planStart, undefined, pre);
     } catch {
       continue; // chybu požadavku ohlásí výpočet operace
     }
@@ -416,10 +538,18 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
     } catch {
       continue;
     }
-    const pos = procPositions(res, anchor);
+    const pos = procPositions(res, pre);
     // kotva jen tam, kde dráha nástroje v úseku začátku zasahuje obrobek (jinak poloha v okamžiku začátku na výsledku nic nemění)
     const nearStart = (plan.near ?? []).some((i) => jOf.get(pos[i]?.k ?? -1) === js);
     if (anchor.length && nearStart) sub.push(...anchor);
+    // obrat jen tam, kde dráha nástroje k němu nebo od něj zasahuje obrobek
+    const nearIdx = new Set(plan.near ?? []);
+    for (let i = 0; i < pos.length; i++) {
+      const p = pos[i];
+      if (!p.sub || !(nearIdx.has(i) || nearIdx.has(i + 1))) continue;
+      const tp = turns.find((x) => x.k === p.k && Math.abs(x.t - p.t) < 1e-9);
+      if (tp) sub.push(tp);
+    }
     const list: { key: string; j: number; capped: boolean }[] = [];
     for (const g of plan.gaps ?? []) {
       const p0 = pos[g.i - 1];
@@ -434,6 +564,11 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
       const key = `${j}|${p0.t}`;
       if (!g.capped) segs.set(key, { j, ta: p0.t, tb: p1.t, n: Math.max(segs.get(key)?.n ?? 0, g.n) });
       list.push({ key, j, capped: !!g.capped });
+    }
+    // obrat motoru bez polohy z řešiče v činném úseku operace, jehož obálka kroků obrobek zasahuje: nezjištěn
+    for (const j of turnFail) {
+      const act = !!start && S[j].i >= start.step;
+      if (act && (plan.near ?? []).some((i) => jOf.get(pos[i]?.k ?? -1) === j)) list.push({ key: "", j, capped: false });
     }
     opSegs.set(op.id, list);
     // bez kotvy a bez potřeby mezipoloh: dráha úseku začátku přes obrobek – bez záběru v polohách výsledek nezjištěn (ne „nezasáhl“)
@@ -469,6 +604,13 @@ async function planSub(doc: CadDoc, res: MotionResult, ops: readonly ProcessOp[]
   return { sub: uniq.map((x) => ({ ...x, place: Object.fromEntries(Object.entries(x.place).filter(([id]) => keep.has(id))) })), unresolved };
 }
 
+/** nejistý začátek (`StartCheck.unsure`) před nalezeným začátkem → výsledek nezjištěn od toho úseku (`why: "start"`) */
+function startUnsure(c: StartCheck | undefined, k: number | undefined): Pick<ProcOpResult, "unresolved" | "unresolvedWhy"> | Record<string, never> {
+  const u = c?.unsure;
+  if (u === undefined || (c!.start && u >= c!.start.step) || (k !== undefined && k <= u)) return {};
+  return { unresolved: u, unresolvedWhy: "start" };
+}
+
 /**
  * Procesní vrstva nad hotovým výsledkem studie (volá `motionRun` po výpočtu poloh – výsledek se uloží s ním): pro každou operaci
  * okno, jádro, výsledek; pracovní kontakt nástroj × obrobek v okně = třída `work`; úroveň + geometrická aproximace; hloubka
@@ -482,7 +624,8 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
   const t0 = Date.now();
   const out: ProcOpResult[] = [];
   let unavailable: string | undefined;
-  const starts = new Map(ops.map((op) => [op.id, opStart(op, res, study)] as const));
+  const checks = new Map(ops.map((op) => [op.id, opStartCheck(op, res, study)] as const));
+  const starts = new Map([...checks].map(([id, c]) => [id, c.start] as const));
   const { sub, unresolved } = env.process ? await planSub(doc, res, ops, starts, env as Required<ProcessEnv>, opts.poseAt) : { sub: [] as SubPose[], unresolved: new Map<string, Unresolved>() };
   const pos = procPositions(res, sub);
   const idx = stepIndexes(pos);
@@ -493,6 +636,11 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
   for (const op of ops) {
     const start = starts.get(op.id) ?? null;
     const base = { id: op.id, kind: op.kind, tool: op.tool, target: op.target, start, scrapRule: op.scrap ?? "fall" } as const;
+    // podmínka v žádném kroku, mezi kroky nezjištěna: bez výpočtu jádra (není začátek), výsledek od úseku nezjištěn – ne „nenastal“
+    if (!start && checks.get(op.id)?.unsure !== undefined && env.process) {
+      out.push({ ...base, contact: null, through: null, steps: res.steps.map(() => ({ contact: false, depth: 0, through: false, state: 0 })), states: [{ removed: 0, volume: 0, scrap: [] }], toolAt: res.steps.map(() => null), dir: null, thickness: null, volume0: 0, depth: 0, removed: 0, scrap: [], ms: 0, ...startUnsure(checks.get(op.id), undefined) });
+      continue;
+    }
     const empty: ProcOpResult = { ...base, contact: null, through: null, steps: res.steps.map(() => ({ contact: false, depth: 0, through: false, state: 0 })), states: [{ removed: 0, volume: 0, scrap: [] }], toolAt: res.steps.map(() => null), dir: null, thickness: null, volume0: 0, depth: 0, removed: 0, scrap: [], ms: 0 };
     if (!env.process) {
       unavailable = tr("jádro bez procesní operace");
@@ -543,6 +691,8 @@ export async function processRun<R extends MotionResult>(doc: CadDoc, res: R, en
       ...(req.others?.length ? { combined: k.combined ? { steps: idx.map((i) => k.combined!.steps[i] ?? 0), states: k.combined.states.map((x) => ({ removed: x.removed, volume: x.volume, scrap: x.scrap })), ...(k.combined.error ? { error: k.combined.error } : {}) } : { missing: true as const } } : {}),
       // bez kotvy začátku (kolo 7): nezjištěn jen tehdy, když vrstva v polohách záběr nenašla
       ...(un && !(un.ifMiss && k.steps.some((s) => s.contact)) ? { unresolved: un.k, unresolvedWhy: un.why } : {}),
+      // začátek mohl nastat mezi kroky dřív, než ho vrstva našla (průběh motoru mezi kroky neznámý – kolo 7 oprava)
+      ...startUnsure(checks.get(op.id), un && !(un.ifMiss && k.steps.some((s) => s.contact)) ? un.k : undefined),
       ms: k.ms,
     });
   }
@@ -654,6 +804,10 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
       out.push(` ${head}: ${tr("nespočítáno – {0}", o.error)}`);
       continue;
     }
+    if (!o.start && o.unresolvedWhy === "start") {
+      out.push(` ${head}: ${unresolvedText(o)}`);
+      continue;
+    }
     if (!o.start) {
       out.push(` ${head}: ${tr("začátek operace nenastal – obrobek beze změny")}`);
       continue;
@@ -694,6 +848,10 @@ export function processLines(res: MotionResult, doc: CadDoc): string[] {
 }
 /** proč je výsledek operace nezjištěn (protokol): řešič bez mezipolohy / strop mezipoloh / průnik jen v kontrole kolizí */
 function unresolvedText(o: ProcOpResult): string {
+  if (o.unresolvedWhy === "start")
+    return o.start
+      ? tr("začátek operace mohl nastat už mezi kroky před krokem {0} (průběh motoru mezi kroky neznámý) – výsledek procesu nezjištěn", o.unresolved)
+      : tr("začátek operace nenastal v žádném kroku, mezi kroky od kroku {0} nezjištěn (průběh motoru mezi kroky neznámý) – výsledek procesu nezjištěn", o.unresolved);
   if (o.unresolvedWhy === "cap") return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (úsek před krokem {0} by potřeboval víc než {1} mezipoloh)", o.unresolved, PROC_MAX_SUB);
   if (o.unresolvedWhy === "clash") return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (kontrola kolizí našla průnik před krokem {0}, procesní vrstva v polohách ne)", o.unresolved);
   return tr("záběr jen mezi kroky – výsledek procesu nezjištěn (mezipolohy od kroku {0} nešly spočítat)", o.unresolved);
@@ -749,7 +907,9 @@ export function processCodes(res: MotionResult, doc: CadDoc): ProcessCode[] {
         code: "motion.process-between",
         args: [name, P, T],
         text:
-          o.unresolvedWhy === "cap"
+          o.unresolvedWhy === "start"
+            ? tr("procesní operace {0}: začátek operace mohl nastat mezi kroky (průběh motoru mezi kroky neznámý) – výsledek procesu „{1}“ → „{2}“ nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T)
+            : o.unresolvedWhy === "cap"
             ? tr("procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – úsek by potřeboval víc než {3} mezipoloh, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T, PROC_MAX_SUB)
             : o.unresolvedWhy === "clash"
               ? tr("procesní operace {0}: kontrola kolizí našla průnik nástroje „{1}“ s obrobkem „{2}“ mezi kroky, procesní vrstva v polohách ne – výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)", name, P, T)

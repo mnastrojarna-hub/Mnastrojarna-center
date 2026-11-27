@@ -261,6 +261,29 @@ describe("vlna 22 C3: procesní vrstva – střih a otisk během pohybu (bod 4)"
     expect(con).not.toMatch(/celkem odebráno/);
   }, 240_000);
 
+  it("kolo 7 oprava · 74p: začátek v dolní úvrati mezi kroky (tam a zpět, 21 kroků) – ne „nenastal“ / „plný“ / ⚠ process-miss", async () => {
+    // oponent kola 7: `<= -45` v žádném kroku (úvrať t = 1 s mezi kroky 10 a 11) → proc=1 removed=0, „začátek operace nenastal“
+    const { short, con } = await run("74p", corpus("74p-process-start-turn"));
+    expect(short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+    expect(short).toMatch(/^= L\d+ asm "Lis" motion .* proc=1 removed=314\.1\d* scrap=1 through=13$/m);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(kroky 0–12\) → děrovaný \(kroky 13–21\)/);
+    // s kolizemi: týž výsledek (dřív „nenastal“ a jen ⚠ clash.real)
+    const kol = await run("74p-kolize", corpus("74p-process-start-turn").replace(/tam a zpět$/m, "tam a zpět kolize"));
+    expect(kol.short).toMatch(/ proc=1 removed=314\.1\d* scrap=1 through=13$/m);
+    expect(kol.short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+  }, 240_000);
+
+  it("kolo 7 oprava · 74q: jediný krok tam a zpět – obrat motoru je mezipolohou, začátek z kosinového průběhu", async () => {
+    const { short, con } = await run("74q", corpus("74q-process-turn-one-step"));
+    expect(short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+    expect(short).toMatch(/^= L\d+ asm "Lis" motion .* proc=1 removed=314\.1\d* scrap=1 through=1$/m);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(krok 0\) → děrovaný \(krok 1\)/);
+    // bez podmínky (dřív plán z obálky kroků 0 a 1 – obě polohy nahoře – úsek přeskočil: „nezasáhl“)
+    const bez = await run("74q-bez", corpus("74q-process-turn-one-step").replace(/ při motor 1 <= 5$/m, ""));
+    expect(bez.short).toMatch(/ proc=1 removed=314\.1\d* scrap=1 through=1$/m);
+    expect(bez.short).not.toMatch(/motion\.process-miss|nezasáhl/);
+  }, 240_000);
+
   it("kolo 7 · text: pracovní kontakt v jediném kroku „v kroku 6“ (dřív „v krocích 6“), jedna skutečná kolize „v kroku 6“", async () => {
     const { short, con } = await run("74j-r7", corpus("74j-process-imprint-depth"));
     expect(short).not.toMatch(/v krocích 6 \(/);

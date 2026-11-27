@@ -953,7 +953,9 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm`); strop 48 booleovských operací na operaci = ℹ `motion.process-approx`. Krok delší
   než polovina nástroje ve směru pohybu (razník projde plechem mezi dvěma kroky): procesní vrstva doplní mezipolohy z řešiče
   (`záběr od mezipolohy mezi kroky 0 a 1 (t = 0,667 s)`); začátek operace uprostřed kroku (`při motor 1 <= 5`) = úsek od polohy
-  v okamžiku začátku, strop mezipoloh se posuzuje pro každou operaci zvlášť (jiná operace obrobku nezjištěna → `odebráno nejméně …`, kv `removed=…+`); nejdou-li spočítat (dynamika, řešič bez řešení), úsek by potřeboval víc než 64 mezipoloh
+  v okamžiku začátku; hodnota motoru mezi kroky se bere z profilu motoru (kosinus u `tam a zpět`), takže začátek v úvrati mezi kroky
+  (`kroky 21 tam a zpět` + `při motor 1 <= -45`) nastane v t = 1 s, ne „nenastal“; obrat motoru uvnitř kroku je vždy mezipolohou (jediný krok
+  tam a zpět: razník plechem projde); profil nesedí na kroky = „začátek … mezi kroky nezjištěn“ (⚠ `motion.process-between`), strop mezipoloh se posuzuje pro každou operaci zvlášť (jiná operace obrobku nezjištěna → `odebráno nejméně …`, kv `removed=…+`); nejdou-li spočítat (dynamika, řešič bez řešení), úsek by potřeboval víc než 64 mezipoloh
   (tenký nástroj, dlouhý krok) nebo spojitá kontrola kolizí najde nástroj × obrobek mezi kroky a procesní vrstva ne = ⚠ `motion.process-between`
   „výsledek procesu nezjištěn“ s důvodem a stav výrobku `nezjištěn`, nikdy „plný“ ani „nezasáhl“. Víc operací: hotový výsledek má přednost – `děrovaný + v záběru`. `pohyb krok N` vypíše stav výrobku a hloubku zásahu; `stav` stav na konci. Dokument se NEMĚNÍ:
   krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
