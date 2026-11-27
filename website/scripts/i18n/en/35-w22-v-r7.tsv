@@ -11,3 +11,16 @@ poškozený soubor	damaged file
 {0} snímků místo {1}	{0} frames instead of {1}
 délka {0} s místo {1} s	length {0} s instead of {1} s
 Prohlížeč neumí kódovat WebM – uloženo animované PNG (APNG) se stejným časováním: {0}; soubor má délku {1} s a {2} snímků	The browser cannot encode WebM – saved an animated PNG (APNG) with the same timing: {0}; the file is {1} s long with {2} frames
+✗ Video neuloženo: pohybová studie nemá žádný krok	✗ Video not saved: the motion study has no step
+✗ Video neuloženo: sestava nemá žádnou síť k vykreslení (díly se nepostavily)	✗ Video not saved: the assembly has no mesh to render (the parts were not built)
+anotace polohy jen v aplikaci (CLI ji do obrazu nekreslí; časy snímků v protokolu a v casovani.txt)	position annotation only in the app (the CLI does not draw it into the image; frame times in the log and in casovani.txt)
+CLI neumí kódovat WebM (kodér VP8 / VP9 je jen v prohlížeči) – uloženo animované PNG (APNG) se stejným časováním: {0}; soubor má délku {1} s a {2} snímků	the CLI cannot encode WebM (the VP8 / VP9 encoder is only in the browser) – saved an animated PNG (APNG) with the same timing: {0}; the file is {1} s long with {2} frames
+pohled: „{0}“	view: “{0}”
+pohled: izometrie (studie nemá aktivní pohled)	view: isometric (the study has no active view)
+pohybová studie není spočítaná – pohyb spustit	the motion study is not computed – pohyb spustit
+Pohledy videa (pohyb video pohled …) synchronně s polohou v okně – kamera a řez pohledu	Video views (pohyb video pohled …) in sync with the position in the window – camera and section of each view
+Živé pohledy ({0})	Live views ({0})
+#!dynamic
+# kódy protokolu (engine/codes.ts) – překládá je codeText, ne tr() v kódu
+video studie: {0}	study video: {0}
+video studie neuloženo: {0}	study video not saved: {0}

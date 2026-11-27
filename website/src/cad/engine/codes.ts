@@ -161,6 +161,9 @@ export const CODES = [
   { code: "spring.lost", level: "warn", key: "pružina „{0}“: ztracená dosedací plocha {1} – délka a síla nezkontrolovány; oprava: {2}" },
   // výsledek studie jen pro stav sestavy, pro který vznikl (vlna 22, bod 1); motory: rozsah × rychlost a začátek (body 9, 11) – cad/motor-model.ts
   { code: "motion.stale", level: "warn", key: "výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“" },
+  // export snímků / videa studie bez prohlížeče (kolo 7b, bod 13 – cad/motion-frames.ts): APNG místo WebM, nebo nic
+  { code: "motion.video-format", level: "warn", key: "video studie: {0}" },
+  { code: "motion.video-failed", level: "error", key: "video studie neuloženo: {0}" },
   { code: "motion.recomputed", level: "note", key: "pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}" },
   { code: "motion.start-jump", level: "warn", key: "motor {0}: začátek {1} neodpovídá aktuální hodnotě vazby {2} – v kroku 0 díl přeskočí" },
   { code: "motion.motor-short", level: "warn", key: "motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s" },

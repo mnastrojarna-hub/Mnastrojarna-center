@@ -291,6 +291,21 @@ function capMask(n: number): Uint16Array {
   return CAPM;
 }
 
+let tlN = 0;
+let TLZ = new Float32Array(0);
+let TLF = new Uint8Array(0);
+/**
+ * Místní hloubka jedné průhledné položky s řezem (kolo 7, oprava oponenta): nejbližší zachovaná stěna položky v pixelu
+ * (TLZ) a její strana (TLF: 0 = nic, 1 = přivrácená, 2 = odvrácená). Pole se po položce nuluje jen v jejím obdélníku.
+ */
+function transLocal(n: number) {
+  if (n > tlN) {
+    tlN = n;
+    TLZ = new Float32Array(n).fill(-Infinity);
+    TLF = new Uint8Array(n);
+  }
+}
+
 let nbN = 0;
 let NB_MIN = new Float32Array(0);
 let NB_TMP = new Float32Array(0);
@@ -465,7 +480,14 @@ export function softRender(o: SoftOptions): SoftResult {
       data[o4 + 2] = (sb * a + data[o4 + 2] * k) / outA;
       data[o4 + 3] = outA * 255;
     };
-    const drawItem = (ii: number, alpha: number) => {
+    /**
+     * pass 0 = běžné kreslení (neprůhledná položka, průhledná bez řezu); pass 1 = jen místní hloubka průhledné položky
+     * s řezem (TLZ/TLF, bez barvy); pass 2 = přivrácené stěny průhledné položky s řezem (prolnutí, odvrácené se nekreslí –
+     * čelo dokreslí `transCap` jen tam, kde je nejbližší zachovaná stěna položky odvrácená, tj. paprsek protne rovinu řezu
+     * uvnitř tělesa)
+     */
+    let lbX0 = W, lbY0 = H, lbX1 = -1, lbY1 = -1;
+    const drawItem = (ii: number, alpha: number, pass: 0 | 1 | 2 = 0) => {
       const it = o.items[ii];
       const V = it.vertices;
       const T = it.triangles;
@@ -475,8 +497,6 @@ export function softRender(o: SoftOptions): SoftResult {
       // čelo řezu této položky: vlastní barva (komponenta sestavy) nebo barva řezu scény; značka v masce čel = index + 1
       const itemCap = it.capColor ? pack(it.capColor[0], it.capColor[1], it.capColor[2]) : capCol;
       const capTag = ii + 1 < CAP_TAG_MAX ? ii + 1 : CAP_TAG_MAX;
-      // průhledné čelo: šrafy a hloubka roviny se počítají hned (neprůhledná čela až v průchodu po plochách)
-      const tHatch = trans ? hatchOf(it) : null;
       ensureScratch(nv);
       const p = project(it);
       for (let i = 0, j = 0; i < nv; i++, j += 3) {
@@ -542,17 +562,16 @@ export function softRender(o: SoftOptions): SoftResult {
           }
           // přivrácená plocha: proti směru hodin při pohledu od kamery (osa y obrazu míří dolů → záporná plocha)
           const front = area < 0 !== flip;
-          if (!front && cull) continue;
+          if (!front && (cull || pass === 2)) continue;
           const z0 = SZ[a], z1 = SZ[b], z2 = SZ[c];
           const dzdx = ((z1 - z0) * (y2 - y0) - (z2 - z0) * (y1 - y0)) * inv;
           const dzdy = ((z2 - z0) * (x1 - x0) - (z1 - z0) * (x2 - x0)) * inv;
           let constCol = 0;
           const isCap = !front && clip ? capTag : 0;
-          // průhledné čelo s hloubkou v rovině řezu (jako gl_FragDepth ve 3D okně: jen když rovina leží před stěnou)
-          const tCap = trans && !front && !!clip;
           let useG = false;
           let i0 = 0, didx = 0, didy = 0;
-          if (!front && clip) constCol = itemCap;
+          if (pass === 1) constCol = 0;
+          else if (!front && clip) constCol = itemCap;
           else if (o.flatColor) constCol = flatCol;
           else if (front && gouraud) {
             i0 = VI[a];
@@ -623,21 +642,17 @@ export function softRender(o: SoftOptions): SoftResult {
             if (xe > bX1) bX1 = xe;
             let z = z0 + dzdx * (xs + 0.5 - x0) + dzdy * (py - y0);
             let idx = y * W + xs;
-            if (tCap) {
-              const yq = py - hy;
+            if (pass === 1) {
+              if (y < lbY0) lbY0 = y;
+              if (y > lbY1) lbY1 = y;
+              if (xs < lbX0) lbX0 = xs;
+              if (xe > lbX1) lbX1 = xe;
+              const side = front ? 1 : 2;
               for (let x = xs; x <= xe; x++, z += dzdx, idx++) {
-                let zc = z;
-                if (cp!.depthOk) {
-                  const zp = -(cp!.k0 + cp!.nr * (x + 0.5 - hx) - cp!.nu * yq) / cp!.nd;
-                  if (zp >= z) zc = zp;
+                if (z > TLZ[idx]) {
+                  TLZ[idx] = z;
+                  TLF[idx] = side;
                 }
-                if (!(zc > ZB[idx])) continue;
-                let cc = constCol;
-                if (tHatch) {
-                  const v = tHatch.A0 + tHatch.Ax * (x + 0.5 - hx) + tHatch.Ay * yq + tHatch.Az * zc;
-                  if (v - Math.floor(v) < tHatch.w) cc = tHatch.col;
-                }
-                blend(idx, cc, alpha);
               }
             } else if (useG) {
               let ii2 = i0 + didx * (xs + 0.5 - x0) + didy * (py - y0);
@@ -672,6 +687,49 @@ export function softRender(o: SoftOptions): SoftResult {
           }
         }
       }
+    };
+    /**
+     * Čelo průhledné položky (kolo 7, oprava nálezu oponenta – dřív se čelem barvila každá odvrácená stěna, tedy celá
+     * silueta v šikmém pohledu): pixel je čelo, jen když nejbližší ZACHOVANÁ stěna položky je odvrácená (paprsek protne
+     * rovinu řezu uvnitř tělesa) – stejné pravidlo jako maska čel neprůhledných položek. Hloubka = rovina řezu, test proti
+     * neprůhledné scéně, prolnutí barvou a šrafami čela; místní hloubka se v obdélníku položky vynuluje.
+     */
+    const transCap = (ii: number, alpha: number) => {
+      if (lbX1 < lbX0 || lbY1 < lbY0) return;
+      const it = o.items[ii];
+      const col = it.capColor ? pack(it.capColor[0], it.capColor[1], it.capColor[2]) : capCol;
+      const h = hatchOf(it);
+      for (let y = lbY0; y <= lbY1; y++) {
+        const yq = y + 0.5 - hy;
+        for (let x = lbX0, idx = y * W + lbX0; x <= lbX1; x++, idx++) {
+          const f = TLF[idx];
+          if (f === 0) continue;
+          const zb = TLZ[idx];
+          TLF[idx] = 0;
+          TLZ[idx] = -Infinity;
+          if (f !== 2) continue;
+          let zc = zb;
+          if (cp && cp.depthOk) {
+            const zp = -(cp.k0 + cp.nr * (x + 0.5 - hx) - cp.nu * yq) / cp.nd;
+            if (zp >= zb) zc = zp;
+          }
+          if (!(zc > ZB[idx])) continue;
+          let cc = col;
+          if (h) {
+            const v = h.A0 + h.Ax * (x + 0.5 - hx) + h.Ay * yq + h.Az * zc;
+            if (v - Math.floor(v) < h.w) cc = h.col;
+          }
+          blend(idx, cc, alpha);
+        }
+      }
+      if (lbY0 < bY0) bY0 = lbY0;
+      if (lbY1 > bY1) bY1 = lbY1;
+      if (lbX0 < bX0) bX0 = lbX0;
+      if (lbX1 > bX1) bX1 = lbX1;
+      lbX0 = W;
+      lbY0 = H;
+      lbX1 = -1;
+      lbY1 = -1;
     };
     const alphaOf = (it: SoftItem) => (it.opacity !== undefined && it.opacity !== null && it.opacity < 1 && it.opacity >= 0 ? it.opacity : 1);
     for (let ii = 0; ii < o.items.length; ii++) {
@@ -716,7 +774,12 @@ export function softRender(o: SoftOptions): SoftResult {
       const it = o.items[ii];
       const a = alphaOf(it);
       if (it.wire || !(a < 1) || !(a > 0)) continue;
-      drawItem(ii, a);
+      if (clip) {
+        transLocal(n);
+        drawItem(ii, a, 1);
+        drawItem(ii, a, 2);
+        transCap(ii, a);
+      } else drawItem(ii, a);
     }
   } else {
     for (const it of o.items) tris += Math.floor(it.triangles.length / 3);

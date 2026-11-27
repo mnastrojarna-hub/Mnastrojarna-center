@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { capStyle, hatchWorld } from "@/cad/section-cap";
 import { contourLength } from "@/cad/section-contour";
-import { CAP_OUTLINE_PX, CAP_SHADER_ANCHORS, capHatchView, capMaterial, capMesh, capOutline, capOutlineSegments, isCapObject, patchCapShader, syncCapCamera, updateCapOutline } from "./section-cap-gl";
+import { CAP_OUTLINE_PX, CAP_SHADER_ANCHORS, capHatchView, capMaterial, capMesh, capMeshes, capOrder, capOutline, capOutlineSegments, isCapObject, isCapStencil, patchCapShader, syncCapCamera, updateCapOutline } from "./section-cap-gl";
 
 const style = capStyle({ id: "deska-a", color: "#b9c2cc" }, "shadedEdges", 0)!;
 const fakeUniforms = () => ({ capProj: { value: new THREE.Matrix4() }, capHatch: { value: new THREE.Vector4(1, 0, 0, 0) }, capHatchWidth: { value: 1 }, capHatchColor: { value: new THREE.Color() } });
@@ -221,5 +221,89 @@ describe("kolo 7 – šrafy čela vázané na model a obrys (3D okno)", () => {
     updateCapOutline(l);
     const b = capOutlineSegments(l)!;
     for (let j = 1; j < b.length; j += 3) expect(b[j]).toBeCloseTo(9.99, 4);
+  });
+
+  /**
+   * Kolo 7, nález oponenta (šikmý pohled): hloubka v rovině řezu dostávala každý fragment rubu stěn – čelo přebarvilo
+   * přední stěny zachované části, kudy paprsek protne rovinu mimo těleso. Emulace jednoho pixelu podle nastavení šablony
+   * a hloubky materiálů (stejná pravidla jako WebGL): paprsek = seznam zachovaných stěn komponenty (hloubka, strana).
+   */
+  const stencilOp = (op: number, v: number, ref: number, wm: number) => {
+    const nv = op === THREE.ZeroStencilOp ? 0 : op === THREE.InvertStencilOp ? ~v & 0xff : op === THREE.ReplaceStencilOp ? ref : v;
+    return (v & ~wm) | (nv & wm);
+  };
+  const stencilPass = (m: THREE.Material, v: number) => {
+    if (!m.stencilWrite) return true;
+    const a = m.stencilRef & m.stencilFuncMask, b = v & m.stencilFuncMask;
+    return m.stencilFunc === THREE.AlwaysStencilFunc || (m.stencilFunc === THREE.EqualStencilFunc && a === b) || (m.stencilFunc === THREE.NotEqualStencilFunc && a !== b);
+  };
+  /** pixel: neprůhledné těleso (přední stěny zapisují hloubku; menší = blíž), pak objekty čela v pořadí renderOrder */
+  function pixel(objs: THREE.Mesh[], wall: { z: number; front: boolean }[], planeZ: number) {
+    let depth = 1, stencil = 0, color = "pozadí";
+    for (const w of wall) if (w.front && w.z < depth) { depth = w.z; color = "těleso"; }
+    for (const o of [...objs].sort((a, b) => a.renderOrder - b.renderOrder)) {
+      const m = o.material as THREE.MeshBasicMaterial;
+      for (const w of wall) {
+        const drawn = m.side === THREE.DoubleSide || (m.side === THREE.BackSide ? !w.front : w.front);
+        if (!drawn) continue;
+        // hloubka čela: rovina řezu, když leží mezi kamerou a fragmentem (CAP_DEPTH), jinak fragment
+        const z = m.userData.capStencil ? w.z : planeZ <= w.z ? planeZ : w.z;
+        if (!stencilPass(m, stencil)) {
+          if (m.stencilWrite) stencil = stencilOp(m.stencilFail, stencil, m.stencilRef, m.stencilWriteMask);
+          continue;
+        }
+        const zok = !m.depthTest || z < depth;
+        if (m.stencilWrite) stencil = stencilOp(zok ? m.stencilZPass : m.stencilZFail, stencil, m.stencilRef, m.stencilWriteMask);
+        if (!zok) continue;
+        if (m.colorWrite) color = "čelo";
+        if (m.depthWrite) depth = z;
+      }
+    }
+    return { color, stencil };
+  }
+
+  it("čelo se šablonou: v šikmém pohledu nepřebarví přední stěnu zachované části (dřív ano), v ploše řezu ano", () => {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -15);
+    const objs = capMeshes(geo, style, plane, new THREE.Matrix4(), { id: "a", topId: "a", key: "a" }, 0);
+    // paprsek protne rovinu mimo těleso (hloubka 0,2), pak vstoupí přední stěnou (0,4) a vystoupí zadní (0,7)
+    const outside = [{ z: 0.4, front: true }, { z: 0.7, front: false }];
+    // paprsek protne rovinu uvnitř tělesa (0,3): přední část je odříznutá, zbývá zadní stěna (0,7)
+    const inside = [{ z: 0.7, front: false }];
+    expect(pixel(objs, outside, 0.2)).toEqual({ color: "těleso", stencil: 0 });
+    expect(pixel(objs, inside, 0.3)).toEqual({ color: "čelo", stencil: 0 });
+    // vydutý tvar: vstup a výstup za rovinou + zadní stěna (lichý počet = uvnitř), šablona po sobě vynulovaná
+    expect(pixel(objs, [{ z: 0.5, front: false }, { z: 0.6, front: true }, { z: 0.8, front: false }], 0.3)).toEqual({ color: "čelo", stencil: 0 });
+    // starý stav (jen čelo bez šablony): přední stěnu přebarvilo – emulace vadu ukazuje
+    const old = capMesh(geo, style, plane, new THREE.Matrix4(), { id: "a", topId: "a", key: "a" });
+    (old.material as THREE.Material).stencilWrite = false;
+    expect(pixel([old], outside, 0.2).color).toBe("čelo");
+    // průhledné čelo: tytéž průchody v seznamu průhledných objektů, šablona stejná
+    const tst = capStyle({ id: "b", color: "#4678c8", dim: true }, "shaded", 3)!;
+    const tobjs = capMeshes(geo, tst, plane, new THREE.Matrix4(), { id: "b", topId: "b", key: "b" }, 1);
+    expect(tobjs.every((o) => (o.material as THREE.Material).transparent)).toBe(true);
+    expect(pixel(tobjs, outside, 0.2).color).toBe("těleso");
+    expect(pixel(tobjs, inside, 0.3).color).toBe("čelo");
+  });
+
+  it("průchody šablony: pořadí count → čelo → clear za tělesy a před překryvy, nesou id, nejsou cílem zásahu čela", () => {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const a = capMeshes(geo, style, plane, new THREE.Matrix4().makeTranslation(3, 0, 0), { id: "a", topId: "t", key: "k" }, 0);
+    const b = capMeshes(geo, style, plane, new THREE.Matrix4(), { id: "b", topId: "b", key: "k2" }, 1);
+    const orders = [...a, ...b].map((o) => o.renderOrder);
+    expect(orders).toEqual([...orders].sort((x, y) => x - y));
+    expect(orders[0]).toBeGreaterThan(0);
+    expect(capOrder(9999, 2)).toBeLessThan(4); // překryvy okna mají renderOrder 4 a víc
+    expect(a.map((o) => o.userData.capStencil ?? "cap")).toEqual(["count", "cap", "clear"]);
+    for (const o of a) {
+      expect(isCapObject(o)).toBe(true);
+      expect(o.userData.id).toBe("a");
+      expect(o.userData.topId).toBe("t");
+      expect(o.matrix.elements[12]).toBe(3);
+    }
+    expect(isCapStencil(a[0]) && !isCapStencil(a[1]) && isCapStencil(a[2])).toBe(true);
+    const cm = a[0].material as THREE.Material;
+    expect(cm.colorWrite || cm.depthWrite || cm.depthTest).toBe(false);
   });
 });

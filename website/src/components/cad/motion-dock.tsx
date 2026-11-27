@@ -39,9 +39,30 @@ const subscribe = (f: () => void) => {
   return () => void subs.delete(f);
 };
 
-/** aktuální ukotvení panelu studie (sdílené mezi panelem a rozvržením aplikace) */
+/**
+ * Nejmenší šířka okna (CSS px) pro ukotvení – stejná mez jako `md` v Tailwindu, pod kterou se tlačítko Ukotvit skrývá.
+ * Kolo 7b (nález oponenta): uložené „right“ platilo na každé šířce, ale tlačítko pro uvolnění bylo pod `md` skryté – na
+ * úzkém okně nebo otočeném tabletu stál 352px sloupec vedle 3D okna bez ovládání. Pod mezí je panel vždy plovoucí.
+ */
+export const MOTION_DOCK_MIN_WIDTH = 768;
+/** skutečné ukotvení: uložená volba platí jen na dost širokém okně (jinak plovoucí – tlačítko by nebylo vidět) */
+export function effectiveMotionDock(stored: MotionDock, width: number | null | undefined): MotionDock {
+  return stored === "right" && typeof width === "number" && width >= MOTION_DOCK_MIN_WIDTH ? "right" : "float";
+}
+const WIDE_Q = `(min-width: ${MOTION_DOCK_MIN_WIDTH}px)`;
+const subscribeWide = (f: () => void) => {
+  if (typeof window === "undefined" || !window.matchMedia) return () => undefined;
+  const mq = window.matchMedia(WIDE_Q);
+  mq.addEventListener?.("change", f);
+  return () => mq.removeEventListener?.("change", f);
+};
+const readWidth = () => (typeof window === "undefined" ? null : window.matchMedia ? (window.matchMedia(WIDE_Q).matches ? MOTION_DOCK_MIN_WIDTH : 0) : window.innerWidth);
+
+/** aktuální ukotvení panelu studie (sdílené mezi panelem a rozvržením aplikace; na úzkém okně vždy plovoucí) */
 export function useMotionDock(): MotionDock {
-  return useSyncExternalStore(subscribe, read, () => "float");
+  const stored = useSyncExternalStore(subscribe, read, () => "float" as MotionDock);
+  const width = useSyncExternalStore(subscribeWide, readWidth, () => null);
+  return effectiveMotionDock(stored, width);
 }
 
 /** id sloupce pro ukotvený panel (cad-app ho vykreslí vedle `<main>`) */

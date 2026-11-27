@@ -222,6 +222,60 @@ describe("kolo 7 – průhlednost v softwarovém náhledu (tlumená komponenta, 
     expect(r.depth[y * W + x]).toBeCloseTo(want, 3); // přední stěna A (y = 0), ne tlumená komponenta před ní
   });
 
+  /**
+   * Oprava po oponentovi kola 7: průhledná komponenta barvila čelem a šrafami celou siluetu v šikmém pohledu (každá
+   * odvrácená stěna dostala hloubku roviny řezu, kde rovina ležela před ní – i mimo plochu řezu). Kvádr řezaný y = 15,
+   * izometrie, dvě barvy čela: pixely závislé na barvě čela musí být jen plocha řezu – stejně jako u neprůhledné komponenty.
+   */
+  it("průhledná komponenta v izometrii: čelo jen na ploše řezu, ne přes celou siluetu (nález oponenta)", () => {
+    const mk = (cap: RGB, op: number | null): SoftItem[] => [{ ...box([0, 0, 0], [40, 30, 20], [120, 120, 120]), capColor: cap, capHatch: null, opacity: op }];
+    const cam = fitCamera(mk([255, 0, 0], null), basisOf(VIEW_ANGLES.iso), W, H);
+    const capPixels = (op: number | null) => {
+      const a = softRender({ width: W, height: H, items: mk([255, 0, 0], op), camera: cam, clip, edges: false, background: [255, 255, 255] });
+      const b = softRender({ width: W, height: H, items: mk([0, 0, 255], op), camera: cam, clip, edges: false, background: [255, 255, 255] });
+      let diff = 0;
+      for (let i = 0; i < W * H; i++) if (Math.abs(a.data[i * 4] - b.data[i * 4]) > 3 || Math.abs(a.data[i * 4 + 2] - b.data[i * 4 + 2]) > 3) diff++;
+      return { diff, a, b };
+    };
+    const opaque = capPixels(null);
+    const trans = capPixels(0.3);
+    expect(opaque.diff).toBeGreaterThan(5000); // plocha řezu je v obraze
+    // průhledné čelo zabírá tutéž plochu (±2 % na hranách), dřív skoro dvojnásobek (celá silueta)
+    expect(Math.abs(trans.diff - opaque.diff)).toBeLessThan(opaque.diff * 0.02);
+    // bod horní stěny zachované části (z = 20, y = 25): paprsek protne rovinu y = 15 mimo těleso → žádná barva čela
+    const [tx, ty] = toScreen(cam, [20, 25, 20]);
+    expect(same(px(trans.a.data, tx, ty), px(trans.b.data, tx, ty), 1)).toBe(true);
+    // bod plochy řezu: barva čela se prolne (červená × modrá se liší)
+    const [cx, cy] = toScreen(cam, [20, 15, 10]);
+    expect(same(px(trans.a.data, cx, cy), px(trans.b.data, cx, cy), 20)).toBe(false);
+  });
+
+  it("dvě průhledné komponenty v izometrii: čela obou jen na jejich plochách řezu (žádné čelo přes cizí siluetu)", () => {
+    const mk = (cap: RGB): SoftItem[] => [
+      { ...box([0, 0, 0], [40, 30, 20], [120, 120, 120]), capColor: cap, capHatch: null, opacity: 0.3 },
+      { ...box([50, 0, 0], [90, 30, 20], [120, 120, 120]), capColor: cap, capHatch: null, opacity: 0.18 },
+    ];
+    const opq = (cap: RGB): SoftItem[] => mk(cap).map((i) => ({ ...i, opacity: null }));
+    const cam = fitCamera(mk([255, 0, 0]), basisOf(VIEW_ANGLES.iso), W, H);
+    const diff = (f: (c: RGB) => SoftItem[]) => {
+      const a = softRender({ width: W, height: H, items: f([255, 0, 0]), camera: cam, clip, edges: false, background: [255, 255, 255] });
+      const b = softRender({ width: W, height: H, items: f([0, 0, 255]), camera: cam, clip, edges: false, background: [255, 255, 255] });
+      const m = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) if (Math.abs(a.data[i * 4] - b.data[i * 4]) > 3 || Math.abs(a.data[i * 4 + 2] - b.data[i * 4 + 2]) > 3) m[i] = 1;
+      return m;
+    };
+    const mt = diff(mk);
+    const mo = diff(opq);
+    let extra = 0, total = 0;
+    for (let i = 0; i < W * H; i++) {
+      total += mo[i];
+      if (mt[i] && !mo[i]) extra++;
+    }
+    expect(total).toBeGreaterThan(5000);
+    // průhledná čela leží uvnitř ploch řezu neprůhledných (rozdíl jen na hraně čela)
+    expect(extra).toBeLessThan(total * 0.02);
+  });
+
   it("seznam omezení softwarového náhledu už neuvádí průhlednost tělesa", () => {
     expect(SOFT_LIMITS.map((l) => l.key)).not.toContain("bodyOpacity");
   });

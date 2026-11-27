@@ -97,6 +97,8 @@ import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
 import { MotionDockSlot, useMotionDock } from "./motion-dock";
+import { MotionLiveViews } from "./motion-live-views"; // živé pohledy studie (kolo 7b, bod 14)
+import { findView as findStudyView } from "@/cad/motion-views";
 import { processView, useProcessMeshVer } from "./process-meshes"; // procesní vrstva: obrobek po střihu / otisku a odpad v kroku (vlna 22, bod 4)
 import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
@@ -4292,6 +4294,8 @@ export function CadApp() {
                 onDoc={commit}
                 onClose={() => setMotionOpen(false)}
                 flash={flash}
+                // kolo 7b, bod 14: pohledy videa živě a synchronně v panelu (softwarový vykreslovač, WebGL i bez něj)
+                liveViews={<MotionLiveViews views={(doc.motion?.video?.views ?? []).map((r) => findStudyView(doc.motion, r)).filter((v): v is NonNullable<typeof v> => !!v)} scene={{ mesh: null, assembly: asmViews, display: prefs.display === "wireframe" ? "shadedEdges" : prefs.display }} />}
                 // vlna 22 (body 13–14): pohledy studie a export snímků – kamera a řez okna, sejmutí plátna 3D okna / softwarového náhledu
                 player={{
                   camera: () => vp.current?.viewState?.() ?? null,

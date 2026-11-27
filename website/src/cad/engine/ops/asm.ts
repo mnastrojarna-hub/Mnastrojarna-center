@@ -44,11 +44,13 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
   if (res.mateStatus) setMateStatus(ctx.ws, docKeyOf(ctx), res.mateDoc ?? r.doc, res.mateStatus);
   if (res.motion) {
     // pohybová studie: panel aplikace vyzvedne pokyn (přehrát, krok, export snímků); bez 3D okna: `pohyb export csv` =
-    // soubor (FileSink → řádek F), přehrání ℹ ui.no-view, snímky PNG / video ✗ host.app-only
+    // soubor (FileSink → řádek F), snímky PNG / video softwarovým vykreslovačem (kolo 7b, bod 13 – cad/motion-frames.ts),
+    // přehrání ℹ ui.no-view
     const ui = ctx.host.ui?.motion;
     if (ui) ui(res.motion);
     else if (res.motion.export === "csv") await writeMotionCsv(ctx, r.doc, env);
-    else if (res.motion.play || res.motion.export === "png" || res.motion.export === "webm") coded(ctx, res.motion.play ? "ui.no-view" : "host.app-only", { args: [res.motion.play ? tr("přehrání pohybu") : tr("export snímků pohybu {0}", res.motion.export!.toUpperCase())] });
+    else if (res.motion.export === "png" || res.motion.export === "webm") await writeMotionVideo(ctx, r.doc, env, res.motion.export, res.motion.video ?? {});
+    else if (res.motion.play) coded(ctx, "ui.no-view", { args: [tr("přehrání pohybu")] });
     // aktivní pohled studie se uloží do dokumentu; zobrazit ho (kamera, řez) bez 3D okna nejde (vlna 22, bod 14)
     else if (res.motion.view) coded(ctx, "ui.no-view", { args: [tr("zobrazení pohledu studie")] });
   }
@@ -77,4 +79,32 @@ async function writeMotionCsv(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc, e
   if (!res) return;
   const data = new TextEncoder().encode(studyCsv(res, d));
   await ctx.host.files.write({ name: `${d.name || tr("sestava")}-pohyb.csv`, mime: "text/csv;charset=utf-8", data, doc: d.name, format: "csv" });
+}
+
+/**
+ * `pohyb export png | webm` bez aplikace (kolo 7b, bod 13): snímky studie softwarovým vykreslovačem v Node se stejným
+ * časovým plánem, polohami a pohledy jako aplikace (cad/motion-frames.ts). PNG = ZIP se snímky, WebM = animované PNG (APNG)
+ * se stejným časováním a ⚠ `motion.video-format` (kodér WebM je jen v prohlížeči); nehybný nebo neodpovídající soubor = ✗
+ * `motion.video-failed`, nic se nezapíše.
+ */
+async function writeMotionVideo(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc, env: AsmEnv, kind: "png" | "webm", video: NonNullable<import("../../asm-agent-kin").MotionSignal["video"]>): Promise<void> {
+  const [{ motionCached }, { renderMotionVideoNode }, { flattenLeaves }, { studyCsv }] = await Promise.all([import("../../asm-agent-kin"), import("../../motion-frames"), import("../../asm-flatten"), import("../../motion-dynamic-report")]);
+  const res = motionCached(d, env);
+  if (!res) {
+    coded(ctx, "motion.video-failed", { args: [tr("pohybová studie není spočítaná – pohyb spustit")] });
+    return;
+  }
+  // sítě dílů z jádra (stavba dílů sestavy; podsestavy rozložené na listy)
+  const leaves = flattenLeaves(d);
+  const seen = new Set<string>();
+  const list = leaves.filter((l) => l.comp.source.kind !== "asm" && !seen.has(l.key) && (seen.add(l.key), true)).map((l) => ({ key: l.key, source: l.comp.source }));
+  const built = new Map((await env.parts(list)).map((b) => [b.key, b.result?.mesh ?? null]));
+  const out = await renderMotionVideoNode({ doc: d, res, kind, video, meshOf: (l) => built.get(l.key) ?? null, name: d.name, csv: kind === "png" ? studyCsv(res, d) : undefined });
+  if (!out.ok || !out.file) {
+    coded(ctx, "motion.video-failed", { args: [out.text.replace(/^✗\s*/, "")] });
+    return;
+  }
+  await ctx.host.files.write({ name: out.file.name, mime: out.file.mime, data: out.file.data, doc: d.name, format: out.file.format });
+  if (out.level === "warn" && kind === "webm") coded(ctx, "motion.video-format", { args: [out.text.replace(/^⚠\s*/, "")] });
+  else say(ctx, out.text);
 }

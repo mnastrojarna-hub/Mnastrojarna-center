@@ -7,6 +7,5 @@ barva plochy	face colour
 zobrazení	view style
 smrštění	shrinkage
 přehrání pohybu	motion playback
-export snímků pohybu {0}	motion frame export {0}
 písma se nečetla od hostitele	the fonts were not read from the host
 otevře dokument ze vstupních souborů v nové záložce (CLI: --files a složka skriptu, HTTP: files, v prohlížeči přiložené soubory): .mncad / JSON, STEP (velká sestava se rozdělí na díly), BREP, STL, OBJ, 3MF, DXF jako skica; chybějící soubor = ✗ file.missing se seznamem dostupných	opens a document from the input files in a new tab (CLI: --files and the script folder, HTTP: files, in the browser: attached files): .mncad / JSON, STEP (a large assembly is split into parts), BREP, STL, OBJ, 3MF, DXF as a sketch; a missing file = ✗ file.missing with the list of available files

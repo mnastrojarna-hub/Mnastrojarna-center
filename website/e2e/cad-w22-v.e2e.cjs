@@ -278,6 +278,18 @@ async function v1(b) {
   // panel Řez modelem je otevřený z kontroly výše (klávesa x) – s ukotveným panelem studie se vrátí vlevo nahoru
   const secD = await p.locator('div.absolute', { hasText: 'Řez modelem' }).last().boundingBox().catch(() => null);
   ok(!!secD && secD.x < main1.x + 40, `bod 14: s ukotveným panelem je panel Řez modelem vlevo nahoře (x ${secD && Math.round(secD.x)})`);
+  // kolo 7b (nález oponenta): na úzkém okně (pod 768 px, tlačítko Ukotvit je skryté) se uložené ukotvení neuplatní – panel
+  // je plovoucí a nezůstane sloupec bez ovládání; po rozšíření okna je zase ukotvený
+  const vp0 = p.viewportSize();
+  await p.setViewportSize({ width: 700, height: vp0.height });
+  await p.waitForTimeout(700);
+  const narrowDocked = await p.locator('[data-float-docked]').count();
+  // sloupec ukotvení zůstává v rozvržení prázdný (bez panelu má nulovou šířku – `empty:hidden`)
+  const narrowSlot = await p.locator('#mncad-motion-dock > *').count();
+  ok(narrowDocked === 0 && narrowSlot === 0 && (await panel.isVisible()), `bod 14: úzké okno 700 px – panel plovoucí (ukotvených ${narrowDocked}, sloupců ${narrowSlot}), viditelný`);
+  await p.setViewportSize(vp0);
+  await p.waitForTimeout(700);
+  ok((await p.locator('#mncad-motion-dock [data-float-docked] [data-motion-panel]').count()) === 1, 'bod 14: po rozšíření okna je panel zase ukotvený (uložená volba)');
   await p.locator('[data-motion-dock]').click();
   await p.waitForTimeout(700);
   const main2 = await p.locator('main').boundingBox();
@@ -326,7 +338,25 @@ async function v1(b) {
       : rep.videoLevel === 'warn' && rep.videoVerdict === 'partial' && /^⚠/.test(rep.text) && !/mění ve všech/.test(rep.text) && (!still || (still === 'Shora' && /v pohledu „Shora“/.test(rep.text)));
     ok(repOk, `dva pohledy – zpráva (${rep.videoLevel}/${rep.videoVerdict}, nehybný pohled: ${still || 'žádný'}): ${rep.text}`);
   } else ok(false, `dva pohledy: soubor nestažen – ${(r.rep && r.rep.text) || r.log.trim().split('\n').pop()}`);
+  // ── kolo 7b, bod 14: pohledy videa živě v panelu studie (synchronně s polohou, každý svou kamerou a řezem) ──
+  {
+    await p.waitForTimeout(500);
+    const lv = p.locator('[data-live-view]');
+    const names = await lv.evaluateAll((els) => els.map((e) => e.getAttribute('data-live-view')));
+    const sig = () => p.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-live-view]')].map((e) => [e.getAttribute('data-live-view'), e.dataset.liveSig || ''])));
+    await p.locator('[data-player-scrub]').fill('0');
+    await p.waitForTimeout(500);
+    const s0 = await sig();
+    const lastStep = await p.locator('[data-player-scrub]').getAttribute('max');
+    await p.locator('[data-player-scrub]').fill(String(lastStep));
+    await p.waitForTimeout(700);
+    const s1 = await sig();
+    ok(names.length === 2 && names.includes('Řez A') && names.includes('Shora'), `bod 14: živé pohledy v panelu studie: ${JSON.stringify(names)}`);
+    ok(!!s0['Řez A'] && !!s1['Řez A'] && s0['Řez A'] !== s1['Řez A'] && s0['Řez A'] !== s0['Shora'], 'bod 14: živý pohled „Řez A“ sleduje polohu (obraz kroku 0 ≠ poslední krok) a liší se od pohledu „Shora“');
+    await p.locator('[data-player-scrub]').fill('0');
+  }
   await run('pohyb video pohledy vyp');
+  ok((await p.locator('[data-live-view]').count()) === 0, 'bod 14: bez pohledů videa žádné živé pohledy');
 
   // ── PNG s anotací (vypálená do obrazu) ──
   r = await exportVia('pohyb export png', 'snimky');
@@ -412,13 +442,32 @@ function capPatch(im, cx, cy, fill, hatch, bg, r = 6, tol = 10) {
 
 /** kolo 7: pixely obrysu kolem čela – prstenec u hranice obdélníku čela (± 3 px) a vnitřek (o 6 px dovnitř) */
 function capRing(im, fill, hatch, outline, tol = 10, otol = 34) {
+  // kolo 7b: obdélník čela = SOUVISLÁ oblast barvy čela (výplň, šrafa, rozhraní) od těžiště čela. Dřív obálka všech pixelů
+  // barvy čela v obraze – s opravenou WebGL vadou (čelo už nepřebarví spodní stěnu horní komponenty, kudy paprsek rovinu
+  // protne mimo těleso) má tenký proužek té stěny náhodou barvu šrafy čela A a obálka by sahala až k jiné komponentě.
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (let y = Math.floor(im.h * 0.08); y < Math.ceil(im.h * 0.95); y++)
-    for (let x = Math.floor(im.w * 0.15); x < Math.ceil(im.w * 0.85); x++) {
-      const o = (y * im.w + x) * 4;
-      const px = [im.px[o], im.px[o + 1], im.px[o + 2]];
-      if (dist(px, fill) <= tol || dist(px, hatch) <= tol) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const c = capPixels(im, fill, hatch, tol);
+  if (c.n) {
+    const seen = new Uint8Array(im.w * im.h);
+    const isCap = (x, y) => { const o = (y * im.w + x) * 4; return segDist([im.px[o], im.px[o + 1], im.px[o + 2]], fill, hatch) <= tol; };
+    // start: nejbližší pixel čela k těžišti
+    let sx = -1, sy = -1, best = Infinity;
+    for (let y = Math.round(c.y) - 15; y <= Math.round(c.y) + 15; y++)
+      for (let x = Math.round(c.x) - 15; x <= Math.round(c.x) + 15; x++)
+        if (x >= 0 && y >= 0 && x < im.w && y < im.h && isCap(x, y) && Math.hypot(x - c.x, y - c.y) < best) { best = Math.hypot(x - c.x, y - c.y); sx = x; sy = y; }
+    const st = sx >= 0 ? [[sx, sy]] : [];
+    if (sx >= 0) seen[sy * im.w + sx] = 1;
+    while (st.length) {
+      const [x, y] = st.pop();
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= im.w || ny >= im.h || seen[ny * im.w + nx]) continue;
+        seen[ny * im.w + nx] = 1;
+        if (isCap(nx, ny)) st.push([nx, ny]);
+      }
     }
+  }
   if (!(x1 > x0 && y1 > y0)) return { ring: 0, inner: 0, perim: 0 };
   let ring = 0, inner = 0;
   for (let y = y0 - 3; y <= y1 + 3; y++)
@@ -502,6 +551,27 @@ async function v2(b) {
   if (O.length === 2) for (const k of [0, 1]) {
     const r = capRing(im, F[k], Hh[k], O[k]);
     ok(r.perim > 40 && r.ring >= r.perim * 0.4 && r.inner === 0, `V2 kolo 7: obrys čela ${k ? 'B' : 'A'} – ${r.ring} px obrysu na hranici (obvod ${r.perim} px), uvnitř ${r.inner}`);
+  }
+
+  // ── kolo 7 (nález oponenta): šikmý pohled – čelo jen v ploše řezu, ne přes celou siluetu komponenty. Ve 3D okně dostával
+  // hloubku roviny řezu každý fragment rubu stěn, před kterým rovina leží, i kudy paprsek protne rovinu MIMO těleso → čelo
+  // přebarvilo přední stěny zachované části (podíl barvy čela v siluetě ~1). Kvádr 40 × 15 × 20 (zachovaná část) v izometrii:
+  // plocha řezu 40 × 20 je asi polovina siluety. ──
+  {
+    const isoShot = await p.evaluate(() => window.mncad.screenshot({ view: 'iso', background: 'white' }));
+    const iso = readPng(Buffer.from(isoShot.base64, 'base64'));
+    fs.writeFileSync(OUT + `v2-iso${NOGL ? '-nogl' : ''}.png`, Buffer.from(isoShot.base64, 'base64'));
+    let sil = 0, capN = 0;
+    for (let y = 0; y < iso.h; y++)
+      for (let x = 0; x < iso.w; x++) {
+        const o = (y * iso.w + x) * 4;
+        const q = [iso.px[o], iso.px[o + 1], iso.px[o + 2]];
+        if (dist(q, [255, 255, 255]) <= 12) continue;
+        sil++;
+        if ([0, 1].some((k) => dist(q, F[k]) <= 10 || dist(q, Hh[k]) <= 10)) capN++;
+      }
+    const frac = sil ? capN / sil : 1;
+    ok(sil > 2000 && capN > 300 && frac < 0.7, `V2 kolo 7 izometrie: čela jen v ploše řezu – ${capN} px čel z ${sil} px siluety (${Math.round(frac * 100)} %, plocha řezu ≈ ½ siluety; přes celou siluetu by bylo ≈ 100 %)`);
   }
 
   // ── 2) živé okno: najetí myší a klik na čelo nic nevybere ──

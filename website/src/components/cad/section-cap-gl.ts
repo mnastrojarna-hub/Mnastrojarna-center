@@ -16,6 +16,13 @@
  * zlomková část < tloušťka × |∇| (`dFdx`/`dFdy` – tloušťka v pixelech v každém přiblížení). Obrys čela = `LineSegments`
  * průsečnice roviny řezu se sítí (`@/cad/section-contour`) v místních souřadnicích komponenty, přepočtený před snímkem,
  * když se rovina vůči komponentě pohne (`updateCapOutline`).
+ *
+ * Kolo 7, oprava po oponentovi: hloubka v rovině řezu se dřív dávala KAŽDÉMU fragmentu rubu stěn, před kterým rovina leží –
+ * v šikmém pohledu tak čelo (s hloubkou bližší než přední stěna zachované části) přebarvilo celou siluetu komponenty, kudy
+ * paprsek protne rovinu MIMO těleso. Teď se čelo kreslí jen tam, kde bod roviny na paprsku leží UVNITŘ tělesa: šablona
+ * (stencil) se nejdřív přepne každou zachovanou stěnou komponenty na paprsku (lichý počet průchodů = uvnitř, `capMeshes`
+ * průchod „count“), čelo se kreslí jen s lichou šablonou a šablonu po sobě nuluje, zbytek vynuluje průchod „clear“. Totéž
+ * pravidlo jako softwarový náhled (`soft-render.ts`: čelo jen tam, kde je nejbližší zachovaná stěna odvrácená).
  */
 import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -113,6 +120,16 @@ export function capMaterial(st: CapStyle, plane: THREE.Plane, pixelRatio = 1): T
     transparent,
     opacity: st.opacity,
     depthWrite: !transparent,
+    // čelo jen tam, kde je bod roviny uvnitř tělesa (lichá šablona z průchodu „count“); po prvním fragmentu se šablona
+    // vynuluje (průhledné čelo se v pixelu prolne jen jednou, další komponenta začíná od nuly)
+    stencilWrite: true,
+    stencilRef: 1,
+    stencilFunc: THREE.EqualStencilFunc,
+    stencilFuncMask: 1,
+    stencilWriteMask: 0xff,
+    stencilFail: THREE.KeepStencilOp,
+    stencilZFail: THREE.ZeroStencilOp,
+    stencilZPass: THREE.ZeroStencilOp,
   });
   const h = st.hatch;
   const u: CapUniforms = {
@@ -167,6 +184,59 @@ export function capMesh(geo: THREE.BufferGeometry, st: CapStyle, plane: THREE.Pl
   cap.onBeforeRender = (_r, _s, camera) => syncCapCamera(cap, camera);
   return cap;
 }
+
+/** pořadí kreslení čel: za tělesy a hranami (0), před překryvy okna (4+); komponenta k → count, čelo, clear po sobě */
+export const CAP_ORDER_BASE = 1;
+export const capOrder = (k: number, pass: 0 | 1 | 2): number => CAP_ORDER_BASE + (Math.max(0, Math.min(9999, Math.floor(k))) * 3 + pass) * 1e-4;
+
+/**
+ * Pomocný průchod šablony čela (bez barvy a hloubky): „count“ přepne bit 0 šablony každou zachovanou stěnou komponenty
+ * (obě strany, bez hloubkového testu – lichý počet = bod roviny na paprsku je uvnitř uzavřeného tělesa), „clear“ šablonu
+ * po čele vynuluje (pixely, kde čelo nemělo fragment). Průhledné čelo má průchody v seznamu průhledných objektů.
+ */
+export function capStencilMaterial(plane: THREE.Plane, pass: "count" | "clear", transparent: boolean): THREE.MeshBasicMaterial {
+  const m = new THREE.MeshBasicMaterial({
+    side: THREE.DoubleSide,
+    clippingPlanes: [plane],
+    colorWrite: false,
+    depthWrite: false,
+    depthTest: false,
+    transparent,
+    stencilWrite: true,
+    stencilFunc: THREE.AlwaysStencilFunc,
+    stencilRef: 0,
+    stencilFuncMask: 0xff,
+    stencilWriteMask: pass === "count" ? 1 : 0xff,
+    stencilFail: THREE.KeepStencilOp,
+    stencilZFail: pass === "count" ? THREE.InvertStencilOp : THREE.ZeroStencilOp,
+    stencilZPass: pass === "count" ? THREE.InvertStencilOp : THREE.ZeroStencilOp,
+  });
+  m.userData = { cap: true, capStencil: pass };
+  return m;
+}
+
+/**
+ * Čelo řezu komponenty k se šablonou: [count, čelo, clear] ve správném pořadí kreslení (`capOrder`). Všechny tři nesou
+ * id komponenty (gizmo a přehrávání je posunou s tělem) a `cap: true` (nevybírají se); pomocné průchody navíc
+ * `capStencil` (nejsou cílem zásahu čela). 3D okno potřebuje kontext se šablonou (`stencil: true`).
+ */
+export function capMeshes(geo: THREE.BufferGeometry, st: CapStyle, plane: THREE.Plane, matrix: THREE.Matrix4, ids: { id: string; topId: string; key: string }, k: number, pixelRatio = 1): THREE.Mesh[] {
+  const transparent = st.opacity < 1;
+  const helper = (pass: "count" | "clear") => {
+    const h = new THREE.Mesh(geo, capStencilMaterial(plane, pass, transparent));
+    h.matrixAutoUpdate = false;
+    h.matrix.copy(matrix);
+    h.userData = { ...ids, cap: true, capStencil: pass };
+    h.renderOrder = capOrder(k, pass === "count" ? 0 : 2);
+    return h;
+  };
+  const cap = capMesh(geo, st, plane, matrix, ids, pixelRatio);
+  cap.renderOrder = capOrder(k, 1);
+  return [helper("count"), cap, helper("clear")];
+}
+
+/** pomocný průchod šablony čela (ne samo čelo) */
+export const isCapStencil = (o: THREE.Object3D | null | undefined): boolean => !!o?.userData?.capStencil;
 
 /** objekt je čelo řezu (ne těleso komponenty) – nevybírá se, nepočítá se do rozměru scény */
 export const isCapObject = (o: THREE.Object3D | null | undefined): boolean => !!o?.userData?.cap;

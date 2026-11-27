@@ -22,6 +22,7 @@ import type { SpringMark } from "./drawing-doc";
 import { inSpringEnvelope, springWireLines } from "./drawing-springs";
 import { drawSpringTables, springTableHeight, type SpringDrawTable } from "./drawing-springtable";
 import { layoutBalloons, type BView } from "./drawing-balloons";
+import { sectionHatch, sectionHatchPlan, solidComponentKeys } from "./drawing-section-hatch";
 
 // ---------------------------------------------------------------- typy
 
@@ -1136,8 +1137,11 @@ function sectionCam(plane: PlaneName, rot: ViewRotation): Cam {
 /** dělicí přímka polovičního řezu v obraze (osa souměrnosti): `axis` 0 = svislá přímka u = c, 1 = vodorovná v = c */
 type SplitLine = { axis: 0 | 1; c: number };
 /** `loops` = obrysy řezných ploch po plochách (šrafují se po plochách – překrývající se tělesa se navzájem nevyruší) */
-/** `loopSolid[i]` = pořadí tělesa (komponenty sestavy) řezné plochy `loops[i]` – šrafy sousedních komponent se liší (kolo 7) */
-type SectionData = { view: View; loops: FaceLoops; split?: SplitLine; loopSolid?: number[] };
+/**
+ * `loopSolid[i]` = pořadí tělesa řezné plochy `loops[i]`, `solidBoxes[k]` = obálka tělesa k (svět) – šrafy po komponentách
+ * sestavy (kolo 7, `drawing-section-hatch.ts`)
+ */
+type SectionData = { view: View; loops: FaceLoops; split?: SplitLine; loopSolid?: number[]; solidBoxes?: ([Vec3, Vec3] | null)[] };
 
 /** Osy, na kterých leží 3 a více různých průměrů (soustružený díl): směr, bod osy nejblíž počátku a počet kružnic. */
 function turnedAxes(circles: Circle[]): { a: Vec3; base: Vec3; n: number }[] {
@@ -1227,6 +1231,13 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
     solids = [];
   }
   const groups: [Iterable<r.Face>, number][] = solids.length > 1 ? solids.map((sd, k) => [sd.faces, k] as [Iterable<r.Face>, number]) : [[cut.faces, 0]];
+  const solidBoxes: ([Vec3, Vec3] | null)[] = (solids.length > 1 ? solids : [cut]).map((sd) => {
+    try {
+      return sd.boundingBox.bounds as [Vec3, Vec3];
+    } catch {
+      return null;
+    }
+  });
   for (const [faces, solidK] of groups)
   for (const f of faces) {
     try {
@@ -1253,7 +1264,7 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
     }
   }
   if (!cutFaces) return null;
-  return { view, loops, split, loopSolid };
+  return { view, loops, split, loopSolid, solidBoxes };
 }
 
 const onLine = (p: Vec2, l: SplitLine, tol = 1e-4) => Math.abs(p[l.axis] - l.c) < tol;
@@ -1969,8 +1980,10 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // řez: šrafy + označení
   const sec = placed.get("section");
   if (section && sec && opts.section) {
-    // sestava (kusovník na listu): šrafy po komponentách – sousední komponenty jiný směr / rozteč (kolo 7); díl beze změny
-    hatchView(sec, section.loops, polys, meta.bom?.length ? section.loopSolid : undefined);
+    // sestava: šrafy po komponentách (jedna komponenta = jeden vzor, sousední komponenty různé – kolo 7, ISO 128-50); výkres
+    // dílu (bez komponent a kusovníku) beze změny jedním vzorem
+    const asmSec = !!(meta.components?.length || meta.bom?.length) && section.loopSolid;
+    hatchView(sec, section.loops, polys, asmSec ? sectionHatchPlan(section.loops, section.loopSolid!, solidComponentKeys(section.solidBoxes ?? [], meta.components)) : undefined);
     // označení nad řezem (nad řadou kót, leží-li nad pohledem)
     const above = stacks.filter((q) => q.key === "section" && q.side === "t").reduce((m, q) => Math.max(m, q.base0 + q.items.length * STACK_PITCH + 2), 0);
     texts.push({ x: sec.px + (sec.w * scale) / 2, y: sec.py - 6 - above, s: "A–A", size: 5, anchor: "middle", bold: true, layer: "text" });
@@ -2305,19 +2318,15 @@ function faceDir(shape: r.Shape3D, face: number): Vec3 | null {
 }
 
 /** Šrafy řezných ploch pohledu (obrysy v souřadnicích obrazu); u přerušeného pohledu se šrafy v mezeře vynechají. */
-/** vzor šraf komponenty sestavy v řezu (ISO 128-50): k-té těleso – směr 45° / 135° a rozteč ×1 / ×1,6 se střídají */
-export function solidHatch(k: number): { angle: number; factor: number } {
-  return { angle: k % 2 ? 135 : 45, factor: Math.floor(k / 2) % 2 ? 1.6 : 1 };
-}
-
-function hatchView(p: Placed, faces: FaceLoops, polys: Poly[], solidOf?: number[]) {
+/** `patOf[i]` = vzor šraf řezné plochy i (`sectionHatchPlan`); bez něj výchozí 45° */
+function hatchView(p: Placed, faces: FaceLoops, polys: Poly[], patOf?: number[]) {
   const s = p.s;
   const spacing = Math.max(1.5, Math.min(4, Math.sqrt(p.w * p.h * s * s) / 25));
   // po plochách: sudo-liché pravidlo přes všechny obrysy by vyrušilo šrafy tam, kde se řezné plochy dvou těles překrývají
   // (šrafy leží na společné mřížce listu, sousední plochy na sebe navazují)
   for (const [fi, loops] of faces.entries()) {
     const big = loops.map((l) => l.map((q): Vec2 => [q[0] * s, q[1] * s]));
-    const pat = solidOf ? solidHatch(solidOf[fi] ?? 0) : { angle: 45, factor: 1 };
+    const pat = patOf ? sectionHatch(patOf[fi] ?? 0) : { angle: 45, factor: 1 };
     for (const h of hatch(big, spacing * pat.factor, pat.angle)) {
       const hv = h.map((q): Vec2 => [q[0] / s, q[1] / s]);
       for (const part of clipBreaks(hv, p.brk)) polys.push({ layer: "hatch", pts: part.map((q) => toSheet(p, q)) });

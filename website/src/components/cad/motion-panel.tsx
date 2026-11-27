@@ -175,6 +175,7 @@ export function MotionPanel({
   onDoc,
   onClose,
   flash,
+  liveViews,
   engineBusy,
   player,
 }: {
@@ -188,6 +189,8 @@ export function MotionPanel({
   /** plátno 3D okna – od vlny 22 nepoužito (dřív záznam videa v reálném čase) */
   canvas?: () => HTMLCanvasElement | null;
   flash: (t: string) => void;
+  /** živé pohledy studie (kolo 7b, bod 14 – `motion-live-views.tsx`): vykreslí je aplikace, panel je jen umístí */
+  liveViews?: import("react").ReactNode;
   /** běží běh textových příkazů (dokument běhu se zapisuje až na jeho konci) – pokyny a výpočet panelu na něj počkají */
   engineBusy?: () => boolean;
   /** okno pro pohledy studie a export snímků (kamera, řez, sejmutí plátna – WebGL i softwarový náhled) */
@@ -609,6 +612,7 @@ export function MotionPanel({
     {!compact && (
     <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose} dock={dockTarget} extra={<MotionDockButton />}>
       <div data-motion-panel data-motion-state={state} data-motion-verdict={verdict} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
+        {liveViews}
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
         <MotionModeSwitch study={study} onStudy={setStudy} doc={doc} />
         {/* úroveň simulace: kinematika × kvazistatika × dynamika (vlna 22, bod 2) – co výpočet počítá a proč */}

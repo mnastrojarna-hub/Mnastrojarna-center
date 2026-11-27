@@ -974,8 +974,8 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   řádku `groups=21:z-30,1:z-24.75` (počet dílů : osy ± posunutí v kroku největšího vychýlení).
 - `pohyb` / `pohyb stav` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
-  `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci; prohlížeč bez kodéru WebM = animované PNG se
-  stejným časováním a ⚠);
+  `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video; prohlížeč bez kodéru WebM = animované PNG se
+  stejným časováním a ⚠; v CLI/HTTP softwarovým vykreslovačem: PNG = ZIP, WebM = animované PNG ⚠ `motion.video-format`);
   `pohyb kroky 48 čas 2 kolize vyp`, `pohyb motor smazat 1`, `pohyb smazat`.
 - API: `await window.mncad.motion('motor rotační "Klika" 0..360 krok 5')` (text = volitelný příkaz `pohyb …` předem) vrátí
   `{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }`;
@@ -1115,12 +1115,16 @@ ostatní snímky `pohyb krok` / CSV označí „nekontrolováno“. Kinematická
   moment`, motor `tam a zpět` a `pohyb stav` běží v enginu; stručný protokol má strojový řádek studie
   `= … motion … mode=dyn bodies=2 spring.max=107N@0.24s stops=2 return=0.375s [drift=…%]`, `pohyb export csv` zapíše soubor se
   sloupci dynamiky a STEP sestavy obsahuje pružiny jako skutečná tělesa v aktuální délce. Jen v aplikaci zůstává panel s grafem,
-  přehrání a snímky (`pohyb přehrát` ℹ `ui.no-view`, `pohyb export png|webm` ✗ `host.app-only`).
+  přehrání (`pohyb přehrát` ℹ `ui.no-view`). `pohyb export png|webm` v CLI/HTTP vykreslí snímky softwarovým vykreslovačem
+  (stejný plán, polohy, pohledy a řez jako aplikace; bez anotace v obraze): PNG = ZIP `<sestava>-pohyb-snimky.zip`, WebM =
+  animované PNG `<sestava>-pohyb-video.png` se stejným časováním a ⚠ `motion.video-format` (kodér WebM má jen prohlížeč);
+  nehybný nebo neodpovídající soubor = ✗ `motion.video-failed`, nic se nezapíše.
 - Pohledy studie a video s pevným časováním (vlna 22): `pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední` uloží do studie
   pohled (kamera: pojmenovaný pohled, nebo `směr dx dy dz cíl x y z výška H`; řez osou, `řez normála …`, nebo `bez řezu`),
   `pohyb pohled "Řez pružinami"` ho zvolí pro přehrávání a export (v CLI ℹ `ui.no-view`, dokument si volbu pamatuje),
   `pohyb pohledy` vypíše uložené. `pohyb video rychlost 0,25 fps 30` (nebo `délka 5`, `pohled "A" "B"` = synchronní dlaždice,
-  `anotace vyp`) uloží volby a vypíše plán `video 2,6 s = 4 × délka studie 0,65 s · rychlost 0,25× · 30 fps · 78 snímků
+  `anotace vyp`; pohledy videa se v aplikaci kreslí i živě a synchronně v panelu studie – „Živé pohledy“, každý svou kamerou
+  a řezem) uloží volby a vypíše plán `video 2,6 s = 4 × délka studie 0,65 s · rychlost 0,25× · 30 fps · 78 snímků
   (tolerance ±1 snímek = ±0,033 s)` se strojovým řádkem `= … video seconds=2.6 study=0.65 fps=30 frames=78 speed=0.25 ratio=4`.
   `pohyb export webm|png [tytéž volby]` exportuje snímky s časovou značkou i/fps (žádný záznam obrazovky): délka videa = délka
   studie / rychlost ± 1 snímek nezávisle na počtu kroků a rychlosti vykreslení; aplikace soubor zpětně přečte a obraz zkontroluje
@@ -2845,8 +2849,8 @@ v hostiteli:
 - **Výstupy textem** (`uložit`, `export …`, `výkres export …`, `skica export dxf`, `sdílet`, `odkaz`) fungují v CLI/HTTP
   stejně jako v aplikaci: soubor jde do `--out` (HTTP `files`), řádek F – viz „Výstupy textem – soubory, PDF všech
   listů, base64, odkazy“ na konci. Navíc volby `--formats step,pdf,…` a `--share` (HTTP `formats`, `share`).
-- **Akce jen pro aplikaci** (`akce …`, `barva plochy`, analýzy a formařské nástroje, `výkres export png`, export snímků
-  pohybu) dávají v CLI/HTTP ✗ `host.app-only` – nikdy tiše. Výjimka: `pružina tabulka …` (= `akce spring.table`) čte jen
+- **Akce jen pro aplikaci** (`akce …`, `barva plochy`, analýzy a formařské nástroje, `výkres export png`) dávají
+  v CLI/HTTP ✗ `host.app-only` – nikdy tiše (snímky a video pohybu CLI vykreslí samo, viz Pohybová studie). Výjimka: `pružina tabulka …` (= `akce spring.table`) čte jen
   dokument, provádí ji engine i v CLI/HTTP (řádek `= … api … springs=1 name=… R=…N/mm Ln=…mm …`).
 - **Úlohy HTTP** (`mncad serve`): každý `POST /run` je úloha s id (`j<n>`, nebo vlastní `"id": "…"` v těle – pak ji lze
   zrušit ještě před odpovědí); `GET /runs` a `GET /run/<id>` vrátí stav (čeká ve frontě relace / počítá / dokončeno /

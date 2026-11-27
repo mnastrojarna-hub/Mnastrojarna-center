@@ -21,7 +21,7 @@ import type { BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, mouseButtons, queryBox, type BoxMode, type BoxResolve, type BoxSceneOf, type DragAction, type LeftDrag } from "./box-pick-3d";
 import { bodyOpacity, capModule, capStyles } from "@/cad/section-cap";
-import { capMesh, capOutline, isCapObject, updateCapOutline } from "./section-cap-gl";
+import { capMeshes, capOutline, isCapObject, isCapStencil, updateCapOutline } from "./section-cap-gl";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -397,7 +397,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     let renderer: THREE.WebGLRenderer;
     try {
       if (!probe.ok) throw new Error(probe.reason ?? tr("WebGL není dostupné"));
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      // šablona (stencil) pro čela řezu sestavy – čelo jen tam, kde je rovina řezu uvnitř tělesa (section-cap-gl `capMeshes`)
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true, stencil: true });
     } catch (e) {
       propsRef.current.onRenderError?.({ error: e instanceof Error ? e : new Error(String(e)), probe });
       return;
@@ -648,7 +649,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const capTargets = (): THREE.Mesh[] => {
       const s = S.current!;
       if (!isAsm() || !propsRef.current.section) return [];
-      return s.asmGroup.children.filter((o) => isCapObject(o) && !o.userData.capOutline && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
+      return s.asmGroup.children.filter((o) => isCapObject(o) && !o.userData.capOutline && !isCapStencil(o) && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
     };
     const edgeTargets = (): THREE.LineSegments[] => {
       const s = S.current!;
@@ -1606,7 +1607,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       const st = caps?.[ci];
       if (st) {
         // nese id komponenty (gizmo ho posune s tělem), ale `cap: true` ho vyřadí z výběru, najetí myší, okna a rozměru scény
-        s.asmGroup.add(capMesh(g.geo, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, pr));
+        // + průchody šablony (čelo jen tam, kde je rovina řezu uvnitř tělesa – ne přes celou siluetu v šikmém pohledu)
+        s.asmGroup.add(...capMeshes(g.geo, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, ci, pr));
         // obrys čela: průsečnice roviny se sítí, nepatrně před čelem (do odebrané strany), aby s ním nezápasil o hloubku
         s.asmGroup.add(capOutline(c.mesh, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, -Math.max(1e-3, s.radius * 2e-4)));
         capCount++;

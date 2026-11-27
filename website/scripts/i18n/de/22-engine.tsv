@@ -7,6 +7,5 @@ barva plochy	Flächenfarbe
 zobrazení	Darstellung
 smrštění	Schwindung
 přehrání pohybu	Bewegung abspielen
-export snímků pohybu {0}	Export der Bewegungsbilder {0}
 písma se nečetla od hostitele	die Schriften wurden nicht vom Host gelesen
 otevře dokument ze vstupních souborů v nové záložce (CLI: --files a složka skriptu, HTTP: files, v prohlížeči přiložené soubory): .mncad / JSON, STEP (velká sestava se rozdělí na díly), BREP, STL, OBJ, 3MF, DXF jako skica; chybějící soubor = ✗ file.missing se seznamem dostupných	öffnet ein Dokument aus den Eingabedateien in einer neuen Registerkarte (CLI: --files und Skriptordner, HTTP: files, im Browser: angehängte Dateien): .mncad / JSON, STEP (große Baugruppe wird in Teile zerlegt), BREP, STL, OBJ, 3MF, DXF als Skizze; fehlende Datei = ✗ file.missing mit Liste der verfügbaren Dateien
