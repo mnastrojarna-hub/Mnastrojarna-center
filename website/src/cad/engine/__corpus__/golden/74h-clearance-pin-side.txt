@@ -57,9 +57,8 @@ Kolize: žádný průnik v 37 polohách
 Vůle „Kolík“ × „Nůž“: nejmenší 0,03 mm mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188) – místo [100; 40,03; 10] ↔ [100; 40; 10] · ⚠ pod limitem 0,05 mm mezi kroky 17 a 18 (v polohách kroků nad limitem)
 Vazby splněny ve všech krocích
 ⚠ řádek 23: vůle „Kolík“ × „Nůž“ 0,03 mm < 0,05 mm mezi kroky 17 a 18 (nejmenší mezi kroky 17 a 18 (po přímé dráze: poloha 17,438, t = 0,969 s, motory 99,188)) – místo [100; 40,03; 10] ↔ [100; 40; 10]
-Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize · r·?
  1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
-Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Nůž“: ΔX +180 mm
  stojí: 3 („Rám“, „Doraz“, „Kolík“)

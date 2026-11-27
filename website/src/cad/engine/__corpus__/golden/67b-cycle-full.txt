@@ -88,7 +88,7 @@ Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nás
  střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
  otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
-Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–31) → děrovaný + označený (kroky 32–60)
+Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 ⚠ řádek 39: v pohybu „Plech“ × „Značka“ od kroku 29 (t = 0,967 s): kroků 1, dvojic komponent 1, největší průnik 8,011 mm³ – místo [25; 75; 10,86] v kroku 29
 ℹ řádek 39: pracovní kontakt „Plech“ × „Razník“ v krocích 28–32 (pravidlo proces střih 1), největší průnik 314,159 mm³
 ℹ řádek 39: pracovní kontakt „Plech“ × „Značka“ v krocích 30–31 (pravidlo proces otisk 2), největší průnik 28,274 mm³
@@ -106,7 +106,7 @@ Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nás
  střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
  otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
-Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–31) → děrovaný + označený (kroky 32–60)
+Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 Krok 60 (t = 2 s, motory 71):
  Deska A [0; 0; 0]
  Plech [10; 10; 10]
@@ -162,7 +162,7 @@ Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nás
  střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
  otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
-Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–31) → děrovaný + označený (kroky 32–60)
+Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 ⚠ řádek 2: v pohybu „Plech“ × „Značka“ od kroku 29 (t = 0,967 s): kroků 1, dvojic komponent 1, největší průnik 8,011 mm³ – místo [25; 75; 10,86] v kroku 29
 ℹ řádek 2: pracovní kontakt „Plech“ × „Razník“ v krocích 28–32 (pravidlo proces střih 1), největší průnik 314,159 mm³
 ℹ řádek 2: pracovní kontakt „Plech“ × „Značka“ v krocích 30–31 (pravidlo proces otisk 2), největší průnik 28,274 mm³
@@ -174,7 +174,7 @@ Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nás
  střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
  otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
-Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–31) → děrovaný + označený (kroky 32–60)
+Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 Krok 60 (t = 2 s, motory 71):
  Deska A [0; 0; 0]
  Plech [10; 10; 10]

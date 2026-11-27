@@ -25,7 +25,7 @@ Prvky:
 ✓ vazba ZDVIH „Střižník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -45 mm ↓ zdvih 55 mm
  pohání: „Střižník“ · směr −Z
-Pohybová studie: 1 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -45 mm ↓ zdvih 55 mm
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -45 mm ↓ zdvih 55 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Střižník“: ΔZ −55 mm
  stojí: 2 („Deska A“, „Plech“)
@@ -34,7 +34,7 @@ Kolize v pohybu: kroků s kolizí 0 z 2 · šroub v závitu 0 dvojic · skutečn
 Vazby splněny ve všech krocích
 ⚠ řádek 7: v pohybu „Plech“ × „Střižník“ mezi kroky 0 a 1 (zjemněno: poloha 0,5, t = 1 s, motory -17,5): průnik 314,159 mm³ – v krocích samotných není – místo [50; 50; 10,5]
 ℹ procesní operace 1. střih „Střižník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
-Pohybová studie: 1 kroků · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -45 mm ↓ zdvih 55 mm
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Střižník“ → „Deska A“ · hodnota vazby 10 → -45 mm ↓ zdvih 55 mm
 Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Střižník“: ΔZ −55 mm
  stojí: 2 („Deska A“, „Plech“)
