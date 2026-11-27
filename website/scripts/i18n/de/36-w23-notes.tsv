@@ -98,3 +98,4 @@ list {0}: poznámky mimo list 1 – {1}	Blatt {0}: Hinweise außerhalb von Blatt
 list {0}: poznámka bez cíle v geometrii – {1}	Blatt {0}: Hinweis ohne Ziel in der Geometrie – {1}
 list {0}: přesunuto do razítka – {1}	Blatt {0}: ins Schriftfeld verschoben – {1}
 Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)	Technische Zeichnung – Schriftfeld, Hinweislinien, höchstens 5 Zeilen (Regel für jeden Agenten)
+ – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany="ISO 13715 -0,3")	 – Wert eines Schriftfeldes stichwortartig, höchstens {0} Zeichen (z. B. Kanten="ISO 13715 -0,3")

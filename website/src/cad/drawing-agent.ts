@@ -34,7 +34,7 @@ import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 import { pmiMarksOf, zoneLegendOf } from "./pmi-marks";
-import { classifyNote, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, linesOf, NOTE_MAX_LINES, notesBudgetLine, notesRuleIssues, noteStyle, titleDataLabel, titleHint, type NoteClass } from "./drawing-notes-rules";
+import { classifyNote, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, linesOf, NOTE_MAX_LINES, notesBudgetLine, notesRuleIssues, noteStyle, titleDataLabel, TITLE_VALUE_MAX, titleHint, type NoteClass } from "./drawing-notes-rules";
 import { formNotesOfDoc } from "./drawing-doc";
 import { CodedError } from "./engine/codes";
 import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
@@ -451,7 +451,8 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
   if (cls.mixed || !cls.parts.length) {
     throw new CodedError("drawing.note-title-data", [
       sheetTitle(doc, idx),
-      tr("„{0}“ obsahuje údaj razítka ({1}) – do poznámky nepatří; zapište ho do razítka: {2}{3}", text, cls.parts.map((p) => titleDataLabel(p.key)).join(", ") || "—", titleHint(cls.parts), cls.rest.length ? tr(" a zbytek zkraťte na samostatnou heslovitou poznámku („{0}“)", cls.rest.join(", ")) : ""),
+      tr("„{0}“ obsahuje údaj razítka ({1}) – do poznámky nepatří; zapište ho do razítka: {2}{3}", text, cls.parts.map((p) => titleDataLabel(p.key)).join(", ") || "—", titleHint(cls.parts), cls.rest.length ? tr(" a zbytek zkraťte na samostatnou heslovitou poznámku („{0}“)", cls.rest.join(", ")) : "") +
+        (cls.parts.some((p) => p.value.length > TITLE_VALUE_MAX) ? tr(" – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany=\"ISO 13715 -0,3\")", TITLE_VALUE_MAX) : ""),
     ]);
   }
   const done: string[] = [];

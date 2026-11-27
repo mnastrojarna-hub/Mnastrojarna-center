@@ -247,7 +247,8 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   await p.screenshot({ path: S + 'gui-titleblock.png' });
   log = await run('výkres razítko');
   fs.writeFileSync(S + 'log8.txt', log);
-  ok(/Šablona razítka: kompaktní 180×27 mm · .* · logo „logo2\.png“ 80×80 px/.test(log), 'GUI → text: šablona kompaktní a nové logo „logo2.png“');
+  // vlna 23 (R1): vyplněné nepředepsané tolerance jsou v technickém pásu razítka (+10 mm) → kompaktní 180×27 + 10
+  ok(/Šablona razítka: kompaktní 180×37 mm · .* · logo „logo2\.png“ 80×80 px/.test(log), 'GUI → text: šablona kompaktní a nové logo „logo2.png“');
   ok(/Nepředepsané tolerance: ISO 2768-mK/.test(log) && /schválil „GUI Schválil“/.test(log), 'GUI → text: ISO 2768-mK a Schválil');
   await closeConsole();
 

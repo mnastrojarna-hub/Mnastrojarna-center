@@ -1,6 +1,6 @@
 // E2E – výkres textem pro agenty (balík drawing): listy, razítko, revize, značky, ruční kóty, úpravy, detaily,
 // rozšířený „výkres stav“ a export bez dialogu window.mncad.exportDrawing (PDF, DXF, DWG, SVG, PNG, CSV).
-// Díl textem → výkres A3 → kótovat → značky na Ø40 → razítko → nový list „Detail“ → výkres stav vše (id, souřadnice
+// Díl textem → výkres A3 → kótovat → značky na Ø40 → razítko → nový list „Detail“ (na listu 2 jen odkaz ke geometrii – vlna 23, R5) → výkres stav vše (id, souřadnice
 // pohledů) → export → výkresové prostředí ukáže značky na správném listu a přepne list podle „výkres list 1“.
 // Spuštění: E2E_BASE=http://localhost:3322 node e2e/cad-agent-drawing.e2e.cjs <složka>
 const { chromium } = require('playwright');
@@ -59,7 +59,7 @@ const first = (log, re) => (re.exec(log) || [])[0] || '';
   ok(doc1.props?.number === 'MN-1' && doc1.props?.author === 'AI' && doc1.materialName === 'ČSN 11 523', 'číslo / kreslil do vlastností dokumentu, materiál do označení materiálu');
 
   // ── 2. druhý list, stav všech listů (id, souřadnice, razítko) ──
-  const log2 = await run('výkres list nový "Detail"\nvýkres A4 pohledy přední měřítko 2:1\nvýkres detail přední v 45 10 poloměr 5 měřítko 5:1\nvýkres značka text "JEN LIST 2" v 20 20 výška 5\nvýkres stav vše');
+  const log2 = await run('výkres list nový "Detail"\nvýkres A4 pohledy přední měřítko 2:1\nvýkres detail přední v 45 10 poloměr 5 měřítko 5:1\nvýkres značka poznámka "JEN LIST 2" pohled přední v 50 10\nvýkres stav vše');
   fs.writeFileSync(S + 'log2.txt', log2);
   ok(!/^✗/m.test(log2), 'druhý list bez chyb' + (first(log2, /^✗.*$/m) ? ' – ' + first(log2, /^✗.*$/m) : ''));
   ok(/→ nový list 2 „Detail“/.test(log2) && /→ výkres: A4, pohledy přední, měřítko 2:1 · list 2 „Detail“/.test(log2), 'výkres list nový "Detail" + volby platí pro list 2');

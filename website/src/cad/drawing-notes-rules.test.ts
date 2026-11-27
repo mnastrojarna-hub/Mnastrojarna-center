@@ -3,7 +3,7 @@
  * Repro: src/cad/engine/__corpus__/84-w23-notes.txt (parita), w23/greens-notes.test.ts (skutečné jádro), e2e/cad-w23-notes.e2e.cjs.
  */
 import { describe, expect, it } from "vitest";
-import { classifyNote, freeTextLines, lineCount, linesOf, notesBudgetLine, notesRuleIssues, noteStyle, NOTE_MAX_LINES, stampAgentNotes } from "./drawing-notes-rules";
+import { classifyNote, freeTextLines, lineCount, linesOf, notesBudgetLine, notesRuleIssues, noteStyle, NOTE_MAX_LINES, stampAgentNotes, TITLE_VALUE_MAX, titleHint } from "./drawing-notes-rules";
 import { drawTitleBlock, techStripKeys, titleBlockSize } from "./title-block";
 import { setLang } from "./i18n";
 import { pmiMarksOf, zoneLegendOf } from "./pmi-marks";
@@ -42,10 +42,17 @@ describe("R1 – údaj razítka v poznámce (classifyNote)", () => {
     "3. Povrchová úprava černění dle normy, vrstva rovnoměrná bez skvrn.",
     "4. Nepředepsané tolerance ISO 2768-mK, pokud není uvedeno jinak.",
     "7. Díl po kalení brousit na rovinnost 0,01 mm na celé ploše.",
+    // věta jako hodnota buňky razítka (> TITLE_VALUE_MAX znaků) se do razítka nepřesune – agent ji musí zkrátit
+    "2. Nekótované hrany sražení 0,5x45 stupňů, ostré hrany zbavit otřepů.",
   ])("smíšený text „%s“ se nepřesune (mixed)", (t) => {
     const c = classifyNote(t)!;
     expect(c.parts.length).toBeGreaterThan(0);
     expect(c.mixed).toBe(true);
+  });
+  it("rada k dlouhé hodnotě buňky nepíše větu do razítka", () => {
+    const c = classifyNote("2. Nekótované hrany sražení 0,5x45 stupňů, ostré hrany zbavit otřepů.")!;
+    expect(c.parts.some((p) => p.value.length > TITLE_VALUE_MAX)).toBe(true);
+    expect(titleHint(c.parts)).toBe('výkres razítko hrany="…"');
   });
 });
 

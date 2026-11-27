@@ -12,7 +12,7 @@
 ℹ řádek 11: list List 1: přesunuto do razítka – „Ra 1,6“ → drsnost „Ra 1,6“ (dřív „Ra 3,2“) (údaje razítka se nepíšou jako poznámka)
 → značka text Brousit → list [30; 55] · a7 – výsledek po vyhodnocení listu níže
 → značka text Odmastit, konzervovat → list [30; 50] · a8 – výsledek po vyhodnocení listu níže
-✗ řádek 14: list List 1: údaj razítka v poznámce – „Tepelně zpracovat kalit a popustit na tvrdost 58 až 60 HRC podle předpisu výrobce oceli“ obsahuje údaj razítka (tvrdost, tepelné zpracování) – do poznámky nepatří; zapište ho do razítka: výkres razítko tvrdost="58 až 60 HRC" tepelné="Tepelně zpracovat kalit a popustit na tvrdost podle předpisu výrobce oceli"
+✗ řádek 14: list List 1: údaj razítka v poznámce – „Tepelně zpracovat kalit a popustit na tvrdost 58 až 60 HRC podle předpisu výrobce oceli“ obsahuje údaj razítka (tvrdost, tepelné zpracování) – do poznámky nepatří; zapište ho do razítka: výkres razítko tvrdost="58 až 60 HRC" tepelné="…" – hodnota buňky razítka heslovitě, nejvýš 32 znaků (např. hrany="ISO 13715 -0,3")
 ✗ řádek 15: list List 1: poznámka není strojařsky heslovitá – „Při jakékoli nejasnosti kontaktujte konstruktéra.“: věta s tečkou na konci – pište strojařsky heslovitě (např. „Hrany srazit 0,5×45°“ patří do razítka, „Brousit“ k ploše odkazem), ne větou
 ✗ řádek 16: list List 1: údaj razítka v poznámce – „Kalit 58 HRC“: tvrdost, tepelné zpracování u odkazu – údaje celého dílu patří do razítka (výkres razítko tvrdost="58 HRC" tepelné="Kalit"), oblastní úprava plochy do modelu jako čerchovaná čára (úprava F7 tepelná "58+2 HRC" [od 0 do 25]), drsnost plochy značkou (výkres značka drsnost Ra 0,8 na …)
 → popis F2 „Lapovat“ v modelu – výkres ho přebírá jako odkaz se šipkou na plochu – výsledek po vyhodnocení listu níže

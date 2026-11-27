@@ -48,6 +48,7 @@ export const DE: Record<string, string> = {
  " – bez zahloubení: head=none": " – ohne Senkung: head=none",
  " – definice se neuložila": " – die Definition wurde nicht gespeichert",
  " – díra": " – Bohrung",
+ " – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany=\"ISO 13715 -0,3\")": " – Wert eines Schriftfeldes stichwortartig, höchstens {0} Zeichen (z. B. Kanten=\"ISO 13715 -0,3\")",
  " – chybí: {0}": " – fehlt: {0}",
  " – motorů, které s ní začínaly: {0} (začnou od začátku studie)": " – Antriebe, die mit ihr begannen: {0} (sie beginnen jetzt am Studienanfang)",
  " – na listu {0} místo {1} mm": " – auf dem Blatt {0} statt {1} mm",

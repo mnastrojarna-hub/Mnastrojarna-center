@@ -48,6 +48,7 @@ export const EN: Record<string, string> = {
  " – bez zahloubení: head=none": " – without the counterbore: head=none",
  " – definice se neuložila": " – the definition was not saved",
  " – díra": " – hole",
+ " – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany=\"ISO 13715 -0,3\")": " – a title block cell value in keywords, at most {0} characters (e.g. edges=\"ISO 13715 -0,3\")",
  " – chybí: {0}": " – missing: {0}",
  " – motorů, které s ní začínaly: {0} (začnou od začátku studie)": " – motors that started with it: {0} (they now start at the beginning of the study)",
  " – na listu {0} místo {1} mm": " – on sheet {0} instead of {1} mm",

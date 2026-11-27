@@ -98,3 +98,4 @@ list {0}: poznámky mimo list 1 – {1}	sheet {0}: notes outside sheet 1 – {1}
 list {0}: poznámka bez cíle v geometrii – {1}	sheet {0}: note without a target in the geometry – {1}
 list {0}: přesunuto do razítka – {1}	sheet {0}: moved into the title block – {1}
 Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)	Engineering-style drawing – title block, leaders, at most 5 lines (rule for every agent)
+ – hodnota buňky razítka heslovitě, nejvýš {0} znaků (např. hrany="ISO 13715 -0,3")	 – a title block cell value in keywords, at most {0} characters (e.g. edges="ISO 13715 -0,3")

@@ -26,6 +26,8 @@ export const NOTE_MAX_LINES = 5;
 export const NOTE_MAX_CHARS = 60;
 /** nejvýš znaků popisu u odkazové čáry (místní popis plochy / hrany) */
 export const LEADER_MAX_CHARS = 40;
+/** R1: hodnota buňky razítka je údaj, ne věta („kalit a popustit“, „ISO 13715 -0,3“) – delší text se do razítka nepřesune */
+export const TITLE_VALUE_MAX = 32;
 /** nejvýš slov heslovitého řádku */
 export const NOTE_MAX_WORDS = 8;
 
@@ -181,6 +183,8 @@ export function classifyNote(text: string): NoteClass | null {
   }
   if (!any) return null;
   if (rest.length) mixed = true;
+  // věta jako hodnota buňky („Nekótované hrany sražení 0,5x45 stupňů, ostré hrany zbavit otřepů“) = do razítka se nepřesune
+  if (parts.some((p) => p.value.length > TITLE_VALUE_MAX)) mixed = true;
   return { parts, rest, mixed };
 }
 
@@ -202,7 +206,7 @@ export const TITLE_DATA_CMD: Record<TitleDataKey, string> = { material: "materi�
 /** rada „výkres razítko tepelné="…" tvrdost="…"“ pro údaje razítka z poznámky */
 export function titleHint(parts: NoteClass["parts"]): string {
   const p = parts.length ? parts : [{ key: "heatTreatment" as const, value: "…" }];
-  return `výkres razítko ${p.map((x) => `${TITLE_DATA_CMD[x.key]}="${x.value.replace(/"/g, "'")}"`).join(" ")}`;
+  return `výkres razítko ${p.map((x) => `${TITLE_DATA_CMD[x.key]}="${x.value.length > TITLE_VALUE_MAX ? "…" : x.value.replace(/"/g, "'")}"`).join(" ")}`;
 }
 
 // ---------------------------------------------------------------- R4 styl řádku
