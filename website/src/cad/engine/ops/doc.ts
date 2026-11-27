@@ -28,7 +28,7 @@ export const docOp: OpHandler<"doc"> = async (op, ctx) => {
   st?.report();
   // pravidla textu výkresu (vlna 23, R1–R5): načtený dokument agenta s porušením = ✗ na řádku načtení (dokument zůstane
   // otevřený k opravě, export listu s porušením se odmítne, vyhodnocení listu nálezy vypíše)
-  for (const f of (await import("../../drawing-agent")).ingestFindings(d)) coded(ctx, f.code, { args: f.args });
+  for (const f of (await import("../../drawing-agent")).ingestFindings(d)) coded(ctx, f.code, { args: f.args, ...(f.text ? { text: f.text } : {}) });
   // pružiny: délka z dosedacích ploch, rozpor s uloženou délkou ⚠ spring.stale (vlna 22, bod 7)
   await freshenRunDoc(ctx, op.line);
 };

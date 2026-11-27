@@ -25,7 +25,7 @@ import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
 import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, getLang, tr } from "./i18n";
 import { applyGeneralTol, applyTitleFields, titleRevisionCheck, titleStatusLines, titleValueProblem, type TitleCmdField } from "./agent-title";
-import { inheritTitle } from "./title-block";
+import { generalTolFields, inheritTitle, parseGeneralTol } from "./title-block";
 import { loadSettings } from "./settings";
 import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
@@ -34,11 +34,11 @@ import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 import { pmiMarksOf, zoneLegendLines } from "./pmi-marks";
-import { auditDoc, auditItems, classifyNote, TITLE_DATA_CMD, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
+import { auditDoc, auditItems, classifyNote, lostTokens, noteBody, TITLE_DATA_CMD, findingLevel, freeTextLines, freeTextList, isFreeAnn, LEADER_MAX_CHARS, limitHint, lineCount, linesOf, mainSheet, newAgentFindings, NOTE_MAX_LEADERS, NOTE_MAX_LINES, notesBudgetLine, noteStyle, orderedSheets, stampOrigin, TEXT_MAX_H, titleDataLabel, TITLE_VALUE_MAX, titleHint, type AuditFinding, type AuditInput, type GenLine, type NoteClass } from "./drawing-notes-rules";
 import { formNotesOfDoc } from "./drawing-doc";
 import { draftNotesAudit } from "./draft/agent-notes";
 import type { DraftModel } from "./draft/model";
-import { CodedError } from "./engine/codes";
+import { CodedError, scopedText } from "./engine/codes";
 import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
@@ -458,6 +458,18 @@ function checkStyle(doc: CadDoc, idx: number, text: string, max?: number, maxWor
  * smíšený text (údaj razítka ve větě) = ✗ drawing.note-title-data s radou, jak ho rozdělit. `null` = text údajem není.
  */
 function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: NoteClass, text: string, conflicts: string[] = []): string {
+  // kolo 5 (correct-F4): přesun jen beze ztráty – co by se ztratilo / rozdělilo do jiné buňky („58 HRC ±2“ ≠ tolerance ±2,
+  // „Kalit 58÷62 HRC“, „ISO 2768-mK / ISO 8015“), se nepřesune vůbec: ✗ s radou, jak údaj zapsat celý
+  const tolText = (v: string) => {
+    try {
+      return generalTolFields(parseGeneralTol(v)).tolerance || v;
+    } catch {
+      return v;
+    }
+  };
+  const written = cls.parts.map((p) => (p.key === "tolerance" ? tolText(p.value) : p.value));
+  const lost = cls.lost?.length ? cls.lost : cls.parts.length && !cls.mixed ? lostTokens(text, written) : [];
+  if (lost.length) throw new CodedError("drawing.note-title-data", [sheetTitle(doc, idx), tr("„{0}“: přesun do razítka by údaj změnil („{1}“ by se ztratilo nebo rozdělilo do jiné buňky) – nepřesouvá se nic; zapište ho do razítka celý: {2}", text, lost.join(", "), wholeHint(cls, text))]);
   if (cls.mixed || !cls.parts.length) {
     throw new CodedError("drawing.note-title-data", [
       sheetTitle(doc, idx),
@@ -487,6 +499,13 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
     }
     if (p.key === "tolerance") {
       const old = typeof m.tolerance === "string" ? m.tolerance.trim() : "";
+      // kolo 5: zásada ISO 8015 k obecným tolerancím v razítku přibude („ISO 2768-mK“ + „ISO 8015“ → „ISO 2768-mK / ISO 8015“)
+      const rest8015 = fold(p.value).replace(/(?:\s*\/\s*)?(?:(?:čsn|csn|din)\s+)?(?:en\s+)?iso\s*8015/, "").trim();
+      if (old && /8015/.test(p.value) && !/8015/.test(old) && (!rest8015 || fold(old) === rest8015)) {
+        m.tolerance = `${old} / ISO 8015`;
+        done.push(tr("nepředepsané „{0}“", String(m.tolerance)));
+        continue;
+      }
       if (old && fold(old) !== fold(p.value) && !fold(old).includes(fold(p.value))) {
         conflicts.push(tr("nepředepsané: v razítku „{0}“, poznámka „{1}“ – ponecháno „{0}“", old, p.value));
         keepConflict(m, "tolerance", old, p.value);
@@ -509,6 +528,18 @@ function moveToTitle(doc: CadDoc, idx: number, m: Record<string, unknown>, cls: 
     done.push(`${titleDataLabel(p.key)} „${p.value}“`);
   }
   return tr("„{0}“ → {1} (údaje razítka se nepíšou jako poznámka)", text, done.join(", "));
+}
+
+/** rada pro údaj, který se nepřesune beze ztráty: jedno pole = celý text do jeho buňky, víc polí = hodnoty po polích */
+function wholeHint(cls: NoteClass, text: string): string {
+  const keys = [...new Set(cls.parts.map((p) => p.key))];
+  if (keys.length === 1) {
+    const body = noteBody(text).replace(/"/g, "'");
+    // tolerance úhlů („Úhly ±0°30′“) má vlastní buňku
+    const cell = keys[0] === "tolerance" && /úhl|uhl|angle|winkel/i.test(text) ? "úhly" : TITLE_DATA_CMD[keys[0]];
+    return `výkres razítko ${cell}="${body}"`;
+  }
+  return `${titleHint(cls.parts)} ${tr("(hodnoty doplňte celé – nic z poznámky nesmí chybět)")}`;
 }
 
 /** rozpor v buňce razítka zůstane v údajích listu, dokud ho agent nevyřeší příkazem `výkres razítko <pole>=` (⚠ při každém vyhodnocení) */
@@ -591,24 +622,31 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
  * pravidel textu po kódech (počet + první nález) pro řádek ✗ načtení. Načtený dokument zůstane otevřený (agent ho opraví
  * příkazy `výkres smazat …`), ale běh skončí chybou a export listu s porušením se odmítne.
  */
-export function ingestFindings(doc: CadDoc): { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] {
+export type IngestFinding = { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string]; /** text nálezu celého dokumentu bez „list …:“ (kolo 5, correct-F7) */ text?: string };
+export function ingestFindings(doc: CadDoc): IngestFinding[] {
   if (doc.kind === "draft") return draftIngest(doc);
   const audit = auditOf(doc);
   const all = audit.filter((f) => f.by === "agent" && findingLevel(f) === "error");
   const by = new Map<string, AuditFinding[]>();
   for (const f of all) by.set(f.code, [...(by.get(f.code) ?? []), f]);
-  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
+  // kolo 5 (correct-F7): nález celého dokumentu (limit, materiál, název, popis v modelu) patří k hlavnímu listu – tam ho ukáže
+  // i vyhodnocení listu (stejný text = jeden řádek); dokument bez výkresu: „model: …“ místo „list model: …“
+  const at = (sheet: number, code: IngestFinding["code"], msg: string): IngestFinding => {
+    const i = sheet >= 0 ? sheet : doc.drawings?.length ? mainSheet(doc) : -1;
+    return i >= 0 ? { code, args: [sheetTitle(doc, i), msg] } : { code, args: [tr("model"), msg], text: scopedText(code, tr("model"), msg) };
+  };
+  const out: IngestFinding[] = [...by.entries()].map(([code, list]) => at(list[0].sheet, code as AuditFinding["code"], tr("dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")));
   // D1: soubor otevřený z disku – jeho text agent nevytvořil: ⚠ (žádná zelená), export povolen
   const loaded = audit.filter((f) => f.by === "loaded");
-  if (loaded.length) out.push({ code: "drawing.notes-loaded", args: [loaded[0].sheet >= 0 ? sheetTitle(doc, loaded[0].sheet) : tr("model"), loadedText(doc, loaded)] });
+  if (loaded.length) out.push(at(loaded[0].sheet, "drawing.notes-loaded", loadedText(doc, loaded)));
   return out;
 }
 
 /** 2D výkres z JSON řádku (agent → ✗ po kódech) nebo ze souboru z disku (⚠ drawing.notes-loaded) – cad/draft/agent-notes.ts */
-function draftIngest(doc: CadDoc): { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] {
+function draftIngest(doc: CadDoc): IngestFinding[] {
   if (!doc.draft) return [];
   const all = draftNotesAudit(doc.draft as DraftModel);
-  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [];
+  const out: IngestFinding[] = [];
   const by = new Map<string, typeof all>();
   for (const f of all.filter((x) => x.by === "agent")) by.set(f.code, [...(by.get(f.code) ?? []), f]);
   for (const [code, list] of by) out.push({ code: code as AuditFinding["code"], args: [doc.name, tr("dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] });

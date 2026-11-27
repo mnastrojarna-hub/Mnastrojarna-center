@@ -88,7 +88,14 @@ const FILLER = new Set([
 
 /** tvrdost: číslo před jednotkou („58-60 HRC“) i jednotka před číslem („HRC 58-62“, „HV10 600“) */
 // jednotka vpředu: zatížení HV jen připojené bez mezery („HV10 600“) – „HV 650“ je 650 HV, ne „0 HV65“ (kolo 4, F4)
-const HARD_RE = /(\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?\s*(?:HRC|HRB|HRA|HV\s?(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\b|\b(?:HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?)/i;
+// kolo 5 (correct-F4): rozsah i „÷“ a „/“ („58÷62 HRC“, „58/60 HRC“ – jen celá čísla, ne „1.2379 / 58 HRC“), mez „≥ 58 HRC“,
+// „HRC ≥ 58“, „min. 58 HRC“ a tolerance za jednotkou („58 HRC ±2“ = 56–60 HRC, nikdy obecná tolerance ±2)
+const HARD_UNIT = String.raw`(?:HRC|HRB|HRA|HV\s?(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)`;
+const HARD_UNIT_FRONT = String.raw`(?:HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)`;
+const HARD_NUM = String.raw`(?:\d{2,4}\s*[÷\/]\s*\d{2,4}|\d+(?:[.,]\d+)?(?:\s*(?:[-–…÷]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?)`;
+const HARD_PRE = String.raw`(?:(?:min\.?|max\.?|[≥≤]|[<>]=?)\s*)?`;
+const HARD_TAIL = String.raw`(?:\s*(?:±\s*\d+(?:[.,]\d+)?|\+\s*\d+(?:[.,]\d+)?(?:\s*\/\s*-\s*\d+(?:[.,]\d+)?)?|(?:min|max)\b\.?))?`;
+const HARD_RE = new RegExp(String.raw`((?<![\d.,])${HARD_PRE}${HARD_NUM}\s*${HARD_UNIT}\b${HARD_TAIL}|\b${HARD_UNIT_FRONT}\s*${HARD_PRE}${HARD_NUM}${HARD_TAIL})`, "i");
 const TOL_RE = /((?:(?:ČSN|CSN|DIN)\s+)?(?:EN\s+)?ISO\s*)?(?:2768\s*[-–]?\s*(?:[12]\s*[-–]?\s*)?([fmcv])\s*[-/]?\s*([HKL])?\b|22081)/i;
 /** starší obecné tolerance DIN 7168 (f, m, g, sg) */
 const DIN7168_RE = /\bDIN\s*7168\s*[-–]?\s*(sg|f|m|g)\b/i;
@@ -100,6 +107,10 @@ const IT_RE = /\bIT\s?(?:0[01]|1[0-8]|[1-9])\b/;
 /** obecná tolerance zapsaná hodnotou („±0,1“) – s nekótovanými rozměry / slovem tolerance */
 const PM_RE = /±\s*\d+(?:[.,]\d+)?|(?:^|\s)\+\s*\d+(?:[.,]\d+)?\s*\/\s*-\s*\d+(?:[.,]\d+)?/;
 const RA_RE = /\b(R[az]|Rmax)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/;
+/** všechny hodnoty drsnosti v textu i s mezí („Rz 6,3 / Ra 0,8“, „Ra 0,8 max“) – kolo 5: přesun nesmí žádnou ztratit */
+const RA_ALL_RE = /\b(R[az]|Rmax)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(\s*(?:max|min)\b\.?)?/g;
+/** zásada nezávislosti ISO 8015 – patří k nepředepsaným tolerancím (kolo 5: „ISO 2768-mK / ISO 8015“ zůstane celé) */
+const ISO8015_RE = /\b(?:(?:ČSN|CSN|DIN)\s+)?(?:EN\s+)?ISO\s*8015\b/i;
 /** třída drsnosti N1–N12 (ISO 1302) */
 const NCLASS_RE = /\bN(?:1[0-2]|[1-9])\b/;
 const WNR_RE = /\b1\.\d{4}\b/;
@@ -132,6 +143,8 @@ export type NoteClass = {
   rest: string[];
   /** text míchá údaj razítka s dalším obsahem (věta kolem údaje) – nejde čistě přesunout, agent ho musí rozdělit */
   mixed: boolean;
+  /** kolo 5 (correct-F4): části textu, které by přesun ztratil nebo rozdělil do jiné buňky („58÷“, „ISO 8015“) – nepřesouvá se */
+  lost?: string[];
 };
 
 type SegKinds = { kinds: Set<TitleDataKey>; extra: string[]; hard?: string; tol?: string; ra?: string; mat?: string; /** údaj neúplný („ISO 2768“ bez třídy) – do razítka se nepřesune, agent ho doplní */ incomplete?: boolean; /** rozměr v textu (Ø20, R5, M8) – „Ø20 ±0,1“ není obecná tolerance */ dimRef?: boolean };
@@ -139,7 +152,7 @@ type SegKinds = { kinds: Set<TitleDataKey>; extra: string[]; hard?: string; tol?
 /** tvrdost s jednotkou vpředu („HRC 58-62“, „HRC58“) → zápis razítka „58-62 HRC“ (stejný tvar, jaký přijme `výkres razítko tvrdost=`) */
 export function normHardness(v: string): string {
   const t = v.replace(/\s+/g, " ").trim();
-  const m = /^(HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*(\d.*)$/i.exec(t);
+  const m = /^(HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*((?:(?:min\.?|max\.?|[≥≤]|[<>]=?)\s*)?\d.*)$/i.exec(t);
   return m ? `${m[2].trim()} ${m[1].replace(/\s+/g, "").toUpperCase()}` : t;
 }
 
@@ -189,12 +202,19 @@ function segKinds(seg: string): SegKinds {
       }
     }
   }
+  // kolo 5: ISO 8015 k nepředepsaným tolerancím (s ISO 2768 v jedné buňce „ISO 2768-mK / ISO 8015“)
+  const i8015 = ISO8015_RE.exec(rest);
+  if (i8015) {
+    kinds.add("tolerance");
+    tol = tol ? `${tol} / ISO 8015` : "ISO 8015";
+    rest = rest.replace(i8015[0], " ");
+  }
   let ra: string | undefined;
-  const rm = RA_RE.exec(rest);
-  if (rm) {
+  const ras = [...rest.matchAll(RA_ALL_RE)];
+  if (ras.length) {
     kinds.add("roughness");
-    ra = `${rm[1]} ${rm[2]}`;
-    rest = rest.replace(rm[0], " ");
+    ra = ras.map((m) => `${m[1]} ${m[2]}${m[3] ? ` ${m[3].trim()}` : ""}`).join(" / ");
+    for (const m of ras) rest = rest.replace(m[0], " ");
   } else {
     const n = take(NCLASS_RE);
     if (n) {
@@ -222,6 +242,8 @@ function segKinds(seg: string): SegKinds {
   }
   // obecná tolerance hodnotou („Tol. ±0,1“, „Obecně ±0,2“, „±0,1“) – ± kdekoli v poznámce je tolerance (D3)
   if (PM_RE.test(rest)) {
+    // kolo 5 (correct-F4): „±“ u jiného údaje (tvrdost, povlak, drsnost) není obecná tolerance – takový text se nepřesune
+    if ([...kinds].some((k) => k !== "tolerance")) incomplete = true;
     kinds.add("tolerance");
     tol = tol ?? PM_RE.exec(rest)![0].trim();
     rest = rest.replace(PM_RE, " ");
@@ -276,6 +298,7 @@ export function classifyNote(text: string): NoteClass | null {
   const rest: string[] = [];
   let mixed = false;
   let any = false;
+  const lost: string[] = [];
   for (const seg of segs) {
     const k = segKinds(seg);
     if (!k.kinds.size) {
@@ -287,10 +310,12 @@ export function classifyNote(text: string): NoteClass | null {
     if (k.extra.length > 2 || k.incomplete || (k.dimRef && k.kinds.has("tolerance"))) mixed = true;
     // hodnota pole = text části bez popisku pole a bez hodnot, které patří jiným polím (tvrdost, ISO 2768, Ra, materiál)
     let body = clean(seg.replace(LABEL_RE, ""));
-    for (const x of [k.mat, k.ra && (RA_RE.exec(seg)?.[0] ?? k.ra), k.tol && TOL_RE.exec(seg)?.[0]]) if (x && body !== x) body = clean(body.replace(x, " "));
+    for (const x of [k.mat, ...(k.ra ? [...seg.matchAll(RA_ALL_RE)].map((m) => m[0]) : []), k.tol && TOL_RE.exec(seg)?.[0], k.tol && ISO8015_RE.exec(seg)?.[0]]) if (x && body !== x) body = clean(body.replace(x, " "));
+    const segVals: string[] = [];
     const push = (key: TitleDataKey, value: string) => {
       const v = clean(value);
       if (!v) return;
+      segVals.push(v);
       const had = parts.find((p) => p.key === key);
       if (had) had.value = `${had.value}, ${v}`;
       else parts.push({ key, value: v });
@@ -307,12 +332,45 @@ export function classifyNote(text: string): NoteClass | null {
     if (k.kinds.has("material")) push("material", k.mat ? (k.kinds.size === 1 ? clean(seg.replace(LABEL_RE, "")) : k.mat) : body);
     if (k.kinds.has("surfaceTreatment")) push("surfaceTreatment", body);
     if (k.kinds.has("edges")) push("edges", body);
+    // kolo 5 (correct-F4): přesun jen beze ztráty – každý číselný údaj celý v jedné buňce, každé slovo v některé buňce
+    const l = lostTokens(seg, segVals);
+    if (l.length) {
+      mixed = true;
+      lost.push(...l);
+    }
   }
   if (!any) return null;
   if (rest.length) mixed = true;
   // věta jako hodnota buňky („Nekótované hrany sražení 0,5x45 stupňů, ostré hrany zbavit otřepů“) = do razítka se nepřesune
   if (parts.some((p) => p.value.length > TITLE_VALUE_MAX)) mixed = true;
-  return { parts, rest, mixed };
+  return { parts, rest, mixed, ...(lost.length ? { lost: [...new Set(lost)] } : {}) };
+}
+
+/** text poznámky bez pořadového čísla a popisku pole („Tvrdost: 58 HRC“ → „58 HRC“) – hodnota celé buňky v radě */
+export const noteBody = (text: string): string => clean(stripEnum(vis(text).replace(/\s+/g, " ")).replace(LABEL_RE, ""));
+
+/** slova, která přesun smí vynechat: popisky polí („Tvrdost:“, „Hrany:“, „Nepředepsané tolerance“), třída ISO 2768 slovem, druh materiálu */
+const LOSS_OK = [...TOL, ...HARDW, ...ROUGH, ...MATERIAL, ...MATERIAL_FAMILY, "voln", "nekot", "obecn", "allgem", "general", "unspec", "mittel", "fein", "grob", "medium", "fine", "coarse", "stredn", "jemn", "hrub", "velmi", "very", "sehr", "trida", "class", "klasse", "povrch", "surface", "oberfl", "edges", "kanten", "tepeln", "heat", "warmebeh", "waermebeh", "mezn", "uchylk", "abmass", "grenzabm", "deviation", "bez", "ohne", "without", "vsude", "overall", "uberall", "ueberall", "rundum"];
+const lossFold = (s: string) => fold(stripEnum(s)).replace(/[÷–—…]/g, "-").replace(/×/g, "x").replace(/\b2768\s*-\s*[12]\b/g, "2768");
+/** číselný údaj i s rozsahem / tolerancí („58-62“, „58/60“, „±2“, „0,5x45“, „1.2379/1.2842“) – musí zůstat celý v jedné buňce */
+const NUM_GROUP_RE = /[±+]?\s*\d+(?:[.,]\d+)?(?:\s*(?:[-x/]|\+\s*\/?\s*-?|±|az|to|bis)\s*\d+(?:[.,]\d+)?)*/g;
+/**
+ * Kolo 5 (correct-F4) – kontrola tam a zpět: co by se z textu `text` přesunem do buněk s hodnotami `values` ztratilo nebo
+ * rozdělilo. Číselný údaj (i rozsah „58÷62“, tolerance „±2“, dvě hodnoty „Rz 6,3 / Ra 0,8“) musí být celý v jedné buňce,
+ * každé slovo mimo popisky polí a výplň v některé buňce. Prázdné pole = přesun je bezeztrátový.
+ */
+export function lostTokens(text: string, values: readonly string[]): string[] {
+  // popisek pole na začátku části („Volné míry“, „Tvrdost:“, „Mat.“) se do hodnoty nepíše – neztrácí se
+  const src = lossFold(segmentsOf(stripEnum(vis(text).replace(/\s+/g, " "))).map((x) => x.replace(LABEL_RE, "")).join(" ; "));
+  const vals = values.map((v) => lossFold(v).replace(/\s+/g, ""));
+  const vw = new Set(values.flatMap((v) => fold(v).match(/[a-z]{2,}/g) ?? []));
+  const out: string[] = [];
+  for (const m of src.matchAll(NUM_GROUP_RE)) {
+    const g = m[0].replace(/\s+/g, "");
+    if (!vals.some((v) => v.includes(g))) out.push(m[0].trim());
+  }
+  for (const w of src.match(/[a-z]{2,}/g) ?? []) if (!vw.has(w) && !FILLER.has(w) && !EDGE_WORDS.has(w) && !MAT_EXACT.has(w) && !TOL_EXACT.has(w) && !startsAny(w, LOSS_OK)) out.push(w);
+  return [...new Set(out)];
 }
 
 /** název pole razítka do protokolu (malými písmeny) */
@@ -855,19 +913,89 @@ const pmiMarks = (doc: AuditInput): FunctionalMark[] => (doc.kind === "assembly"
 /** původ podle podílu: agent, pokud se na položkách podílel; jinak načtený soubor, jinak člověk */
 const mixBy = (bs: readonly Origin[]): Origin => (bs.includes("agent") ? "agent" : bs.includes("loaded") ? "loaded" : bs.includes("user") ? "user" : "auto");
 
+// ---------------------------------------------------------------- název = jmenná fráze (D5, kolo 5 – correct-F6)
+
+/** kmeny slov obrábění – „Brousit“, „Lapovat F3“, „Leštit čela“ jsou pokyny, ne název ani jméno */
+const MACHINING = ["brous", "zabrous", "lest", "lapov", "honov", "frez", "soustruz", "vrtat", "vystruz", "rezat", "obrob", "superfinis", "polir", "grind", "hone", "schleif", "polier", "honen", "lappen", "frasen", "drehen", "bohren", "reiben"];
+/** slovesný tvar (infinitiv / rozkaz) – cs „kalit, nitridovat, srazte“, de „härten, nitrieren, entgraten“ */
+const VERB_CS = /(?:[iy]t|at|ovat|nout|out|ujte)$/;
+const VERB_DE = /(?:en|ern|eln)$/;
+/** anglický rozkaz na začátku názvu („Harden all over“, „Deburr edges“) – jen jednoznačná slovesa (ne „Drill bushing“, „Round bar“) */
+const EN_VERBS = new Set(["harden", "temper", "quench", "anneal", "normalize", "normalise", "carburize", "carburise", "nitride", "blacken", "anodize", "anodise", "galvanize", "galvanise", "passivate", "deburr", "chamfer", "paint", "sandblast", "shotblast", "degrease", "preserve", "pack", "inspect", "clean", "ship", "deliver", "protect", "grind", "hone", "engrave"]);
+/** podstatné jméno děje – „kalení, nitridace, Härtung, hardening“ */
+const PROCESS_NOUN = /(?:eni|ani|ace|ovani|ung|ing|tion|ation)$/;
+/** předpony složenin, za kterými následuje slovo úpravy („Plazmanitridace“, „Vakuumgehärtet“, „Induktionsgehärtet“, „Manganfosfát“) */
+const COMPOUND = ["plazma", "plasma", "vakuum", "vakuov", "vacuum", "salzbad", "durch", "induktions", "induktiv", "indukcni", "indukcne", "flamm", "laser", "einsatz", "kryogen", "kryogenne", "cryo", "tief", "mangan", "zink", "zinek", "eisen", "scharf", "gas", "ge"];
+/** slovo bez předpon složeniny (nejdřív delší předpony, opakovaně; zbytek aspoň 4 písmena) */
+export function stripCompound(w: string): string {
+  let x = w;
+  for (let k = 0; k < 3; k++) {
+    const p = COMPOUND.find((c) => x.length - c.length >= 4 && x.startsWith(c));
+    if (!p) break;
+    x = x.slice(p.length);
+  }
+  return x;
+}
+/**
+ * slovo je slovem úpravy / obrábění / pokynu – kmen + krátká koncovka (nejvýš 6 písmen): „kalit, kalená, nitridovat,
+ * gehärtet“ ano; „Temperierplatte“, „Kantenschutz“, „Hartmetall“ (kmen + další podstatné jméno) ne
+ */
+const treatWord = (w: string): boolean =>
+  [w, stripCompound(w)].some((x) => [HEAT, SURFACE, EDGES, MACHINING, PROCESS].some((list) => list.some((p) => x.startsWith(p) && x.length - p.length <= 6)) || HEAT_EXACT.has(x) || SURFACE_EXACT.has(x)) && !MAT_FIRST.some((m) => w.startsWith(m));
+/** materiálová slova, která začínají jako slovo úpravy („Hartmetall“ ≠ „hart“ = kalit) */
+const MAT_FIRST = ["hartmetall", "hardmetal", "tvrdokov", "karbid", "carbide"];
+
+/** německá podstatná jména v množném čísle, která končí jako sloveso („Kanten“, „Ecken“, „Fasen“) */
+const DE_NOUN_EN = new Set(["kanten", "ecken", "fasen", "platten", "flachen", "schneiden"]);
+/** předměty anglického rozkazu („Deburr all edges“, „Harden all over“) – s jiným podstatným jménem je to název („Chamfer tool“) */
+const EN_OBJ = new Set(["all", "edges", "edge", "corners", "corner", "surfaces", "surface", "part", "parts", "over", "sharp", "holes", "faces", "both", "sides", "and", "to", "the", "of"]);
+
+/**
+ * Pokyn v názvu / jménu / buňce razítka (D5): slovo úpravy, obrábění nebo expedice ve slovesném tvaru („Kalit“, „Srazit hrany“,
+ * „Leštit čela“, „Härten“), anglický rozkaz bez dalšího podstatného jména („Harden all over“, „Deburr edges“), podstatné jméno
+ * děje s hodnotou („Kalení 58“, „Nitridace 0,3“) nebo text jen z podstatných jmen děje („Kalení a popouštění“, „Härtung“).
+ * Jmenná fráze projde („Kalená vložka“, „Temperierplatte“, „Corner bracket“, „Chamfer tool“, „Povrchová deska“, „Tryska“).
+ * Vrací slovo, které pokyn dělá, nebo null.
+ */
+export function instructionWord(text: string): string | null {
+  const ws = words(text).filter((w) => w.length >= 2 && !isNum(w));
+  const content = ws.filter((w) => !FILLER.has(w));
+  for (const w of ws) {
+    if (!treatWord(w)) continue;
+    if (VERB_CS.test(w) || (VERB_DE.test(w) && !DE_NOUN_EN.has(w))) return w;
+    if (PROCESS_NOUN.test(w) && /\d/.test(text)) return w;
+  }
+  if (content.length && EN_VERBS.has(content[0]) && content.slice(1).every((w) => EN_OBJ.has(w) || treatWord(w))) return content[0];
+  if (content.length && content.every((w) => (treatWord(w) && PROCESS_NOUN.test(w)) || FILLER.has(w))) return content[0];
+  return null;
+}
+
+/**
+ * Název (dílu, listu, výkresu, buňky razítka „název“) je jmenná fráze (D5, kolo 5 – correct-F6): ✗ jen věta / souvětí,
+ * údaj razítka doložený hodnotou (tvrdost s HRC, ISO 2768, Ra, sražení 0,5×45°, označení materiálu) nebo pokyn
+ * (`instructionWord`). Samotné slovo „Kalená“, „Povrchová“, „Corner“, „Edge“ v názvu údajem razítka není.
+ */
+export function nameIssue(t: string, max = TITLE_FREE_MAX): { code: "drawing.note-style" | "drawing.note-title-data"; why?: string; data?: NoteClass["parts"]; word?: string } | null {
+  const why = noteStyle(t, max, 6);
+  if (why) return { code: "drawing.note-style", why };
+  const bad = titleDataIn(t, [], false);
+  if (bad.length) return { code: "drawing.note-title-data", data: bad };
+  const w = instructionWord(t);
+  if (w) return { code: "drawing.note-style", word: w };
+  return null;
+}
+
 /** název dílu (D5): krátce, bez vět, bez údajů razítka a pokynů – kontrola i pro příkaz `nový díl` / `název` */
 export function docNameIssue(name: string): { code: "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet"; text: string } | null {
   const t = name.trim();
   if (!t) return null;
   // D4: díl „MN-1 poznámky“ / „Technické požadavky“ = nosič poznámek k jinému dílu
   if (NOTES_TITLE_RE.test(t)) return { code: "drawing.notes-sheet", text: tr("název dílu „{0}“ – díl / výkres poznámek nebo požadavků k jinému dílu nevzniká: požadavky patří do razítka a k ploše na výkres dílu", cut(t)) };
-  const why = noteStyle(t, TITLE_FREE_MAX, 6);
-  if (why) return { code: "drawing.note-style", text: tr("název dílu „{0}“: {1} – název krátce (např. „Deska“, „Razník 12“), údaje razítka do razítka, pokyny nikam", cut(t), why) };
-  const bad = titleDataIn(t);
-  if (bad.length) return { code: "drawing.note-title-data", text: tr("název dílu „{0}“ obsahuje údaj razítka ({1}) – patří do razítka: {2}", cut(t), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) };
-  const pw = processWords(t);
-  if (pw.length) return { code: "drawing.note-style", text: tr("název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří", cut(t), pw[0]) };
-  return null;
+  const ni = nameIssue(t);
+  if (!ni) return null;
+  if (ni.why) return { code: "drawing.note-style", text: tr("název dílu „{0}“: {1} – název krátce (např. „Deska“, „Razník 12“), údaje razítka do razítka, pokyny nikam", cut(t), ni.why) };
+  if (ni.data) return { code: "drawing.note-title-data", text: tr("název dílu „{0}“ obsahuje údaj razítka ({1}) – patří do razítka: {2}", cut(t), ni.data.map((p) => titleDataLabel(p.key)).join(", "), titleHint(ni.data)) };
+  return { code: "drawing.note-style", text: tr("název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří", cut(t), ni.word ?? "") };
 }
 
 /**
@@ -1029,6 +1157,14 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
           continue;
         }
       }
+      // kolo 5 (correct-F6): buňka „název“ se stejným textem jako název dílu se hlásí jednou – u názvu dílu (doc:name), ne u každého
+      // listu a příkazu znovu; vlastní název v razítku = jmenná fráze (nameIssue)
+      if (k === "name") {
+        if (v === doc.name?.trim()) continue;
+        const ni = nameIssue(v);
+        if (ni) push({ code: ni.code, by, sheet: si, key: `meta:${k}`, item: v, text: ni.why ? tr("buňka razítka {0} „{1}“: {2} – hodnota buňky heslovitě (např. tepelné=\"kalit a popustit\", tvrdost=\"58-60 HRC\")", k, cut(v), ni.why) : ni.data ? tr("buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}", k, cut(v), ni.data.map((p) => titleDataLabel(p.key)).join(", "), titleHint(ni.data)) : tr("buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk", k, cut(v), ni.word ?? "") });
+        continue;
+      }
       if (TITLE_NO_DATA.has(k)) {
         const bad = titleDataIn(v);
         const pw = processWords(v);
@@ -1042,9 +1178,11 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
       const t = (v ?? "").trim();
       if (!t) continue;
       const by = metaBy(m, k);
-      const why = noteStyle(t, TITLE_FREE_MAX, 6);
-      const bad = why ? [] : titleDataIn(t);
-      const pw = why || bad.length ? [] : processWords(t);
+      // kolo 5 (correct-F6): název listu / výkresu je jmenná fráze – jen věta, údaj s hodnotou nebo pokyn ✗ („Povrchová deska“ projde)
+      const ni = nameIssue(t);
+      const why = ni?.why;
+      const bad = ni?.data ?? [];
+      const pw = ni?.word ? [ni.word] : [];
       const lbl = k === "sheetName" ? tr("listu") : tr("výkresu");
       if (why || bad.length || pw.length) push({ code: bad.length ? "drawing.note-title-data" : "drawing.note-style", by, sheet: si, key: `meta:${k}`, item: t, text: why ? tr("název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)", lbl, cut(t), why) : bad.length ? tr("název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}", lbl, cut(t), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) : tr("název {0} „{1}“ je pokyn („{2}“) – název listu / výkresu krátce (např. „Detail“, „Řezy“)", lbl, cut(t), pw[0]) });
     }
@@ -1085,7 +1223,7 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
     else if (pw.length) push({ code: "drawing.note-style", by: doc.materialBy ?? "user", sheet: -1, key: "doc:material", item: v, text: tr("materiál „{0}“ je pokyn („{1}“) – materiál je označení (např. „1.2379“, „C45“)", cut(v), pw[0]) });
   }
   // D5: název dílu se tiskne v razítku výchozího listu i listu bez vlastního názvu
-  if (doc.name?.trim() && doc.kind !== "draft" && (!ds.length || ds.some((s) => !str((s.meta as Record<string, unknown>).name).trim()))) {
+  if (doc.name?.trim() && doc.kind !== "draft" && (!ds.length || ds.some((s) => !str((s.meta as Record<string, unknown>).name).trim() || str((s.meta as Record<string, unknown>).name).trim() === doc.name!.trim()))) {
     const ni = docNameIssue(doc.name);
     if (ni) push({ code: ni.code, by: doc.nameBy ?? "user", sheet: -1, key: "doc:name", item: doc.name.trim(), text: ni.text });
   }

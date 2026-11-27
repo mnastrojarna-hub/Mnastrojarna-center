@@ -6,7 +6,7 @@ import { coded, say, type OpHandler } from "./util";
 import { supplyWord } from "../../bom-model";
 import { designationNote } from "../../material-designation";
 import { classifyNote, docNameIssue, titleDataLabel, titleHint } from "../../drawing-notes-rules";
-import { CodedError } from "../codes";
+import { scopedError, scopedText } from "../codes";
 
 export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -32,12 +32,12 @@ export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
     const mat = cls?.parts.find((p) => p.key === "material");
     const other = cls?.parts.filter((p) => p.key !== "material") ?? [];
     if (other.length) {
-      if (!mat || cls!.mixed) throw new CodedError("drawing.note-title-data", [tr("materiál"), tr("„{0}“ není označení materiálu – obsahuje {1}; zadejte materiál samotný (materiál 1.2379) a ostatní do razítka: {2}", patch.materialName, other.map((p) => titleDataLabel(p.key)).join(", "), titleHint(other))]);
-      if (!r.doc.drawings?.length) throw new CodedError("drawing.note-title-data", [tr("materiál"), tr("„{0}“: {1} nepatří do označení materiálu – zadejte materiál {2} a po založení výkresu {3}", patch.materialName, other.map((p) => titleDataLabel(p.key)).join(", "), mat.value, titleHint(other))]);
+      if (!mat || cls!.mixed) throw scopedError("drawing.note-title-data", tr("materiál"), tr("„{0}“ není označení materiálu – obsahuje {1}; zadejte materiál samotný (materiál 1.2379) a ostatní do razítka: {2}", patch.materialName, other.map((p) => titleDataLabel(p.key)).join(", "), titleHint(other)));
+      if (!r.doc.drawings?.length) throw scopedError("drawing.note-title-data", tr("materiál"), tr("„{0}“: {1} nepatří do označení materiálu – zadejte materiál {2} a po založení výkresu {3}", patch.materialName, other.map((p) => titleDataLabel(p.key)).join(", "), mat.value, titleHint(other)));
       const { titleValueProblem } = await import("../../agent-title");
       for (const p of other) {
         const bad = titleValueProblem(p.key, p.value);
-        if (bad) throw new CodedError("drawing.note-title-data", [tr("materiál"), tr("„{0}“: {1} – zapište ho přímo: {2}", patch.materialName, bad, titleHint([p]))]);
+        if (bad) throw scopedError("drawing.note-title-data", tr("materiál"), tr("„{0}“: {1} – zapište ho přímo: {2}", patch.materialName, bad, titleHint([p])));
       }
       patch.materialName = mat.value;
       r.doc = { ...r.doc, drawings: r.doc.drawings.map((s) => ({ ...s, meta: { ...s.meta, ...Object.fromEntries(other.map((p) => [p.key, p.value])), by: { ...(((s.meta as { by?: Record<string, string> }).by) ?? {}), ...Object.fromEntries(other.map((p) => [p.key, "agent"])) } } })) };
@@ -45,9 +45,9 @@ export const metaOp: OpHandler<"meta"> = async (op, ctx) => {
     }
   }
   r.doc = { ...r.doc, ...patch, ...(patch.materialName !== undefined ? { materialBy: "agent" as const } : {}), ...(patch.name !== undefined ? { nameBy: "agent" as const } : {}) };
-  if (moved.length) coded(ctx, "drawing.note-to-title", { args: [tr("materiál"), tr("„{0}“ → materiál „{1}“, {2} (údaje razítka se do označení materiálu nepíšou)", op.patch.materialName ?? "", patch.materialName ?? "", moved.join(", "))] });
+  if (moved.length) coded(ctx, "drawing.note-to-title", { text: scopedText("drawing.note-to-title", tr("materiál"), tr("„{0}“ → materiál „{1}“, {2} (údaje razítka se do označení materiálu nepíšou)", op.patch.materialName ?? "", patch.materialName ?? "", moved.join(", "))) });
   const nameBad = typeof patch.name === "string" ? docNameIssue(patch.name) : null;
-  if (nameBad) coded(ctx, nameBad.code, { args: [tr("název dílu"), nameBad.text] });
+  if (nameBad) coded(ctx, nameBad.code, { text: scopedText(nameBad.code, tr("název dílu"), nameBad.text) });
   r.changed = true;
   const d = r.doc;
   if (patch.materialName !== undefined) {
