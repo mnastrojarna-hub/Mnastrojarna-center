@@ -1830,7 +1830,7 @@ uložit
 # ✓ uloženo: Konzola.mncad · 1,9 kB · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
 #   ✓ kontrola: projekt jde znovu otevřít – „Konzola“, 5 prvků
 export step
-# ✓ export STEP: Konzola.step · 41 kB · STEP AP214 – staženo (bez dialogu)
+# ℹ export STEP: Konzola.step · 41 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
 #   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 46 701 mm³ (rozdíl 0,0000 %), obálka 80,00 × 50,00 × 12,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 výkres A3 na šířku pohledy přední,horní,iso
 kótovat
@@ -2604,8 +2604,8 @@ třídí. Nejčastější:
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
 | \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
-| \`out.reload-invalid\` ⚠ | soubor STEP / BREP odpovídá modelu (tělesa, objem, obálka), ale po zpětném načtení neprojde přesnou kontrolou platnosti, model ano (typicky aproximované hrany – závit šroubovicí: STEP tolerance hran nenese a čtečka je spočte menší než odchylka křivek od ploch); příčinu řádek píše jen doloženou rozborem souboru (viz „Přesná kontrola“ u stavu prvku); „věrná kopie“ se nenapíše, řádek F \`check=fail\`, \`--strict\` zastaví | soubor ověřit v cílovém CADu; \`přísně kromě out.reload-invalid\`, když to víte |
-| \`out.no-solid\` ✗ / \`out.free-surfaces\` ⚠ | objemový export (STEP, BREP, STL, 3MF) modelu bez objemového tělesa (jen plochy / skořepina – i uzavřená skořepina bez „Uzavřít do tělesa“) / s volnými skořepinami či plochami vedle těles (u sestavy se jmény komponent); soubor se zapíše, ale „věrná kopie modelu“ se nenapíše, řádek F \`check=fail\`, \`--strict\` zastaví | \`prvek surf.close\` (Plochy → Uzavřít do tělesa), \`prvek surf.thicken\`, volnou plochu smazat / potlačit |
+| \`out.reload-invalid\` ⚠ | soubor STEP / BREP odpovídá modelu (tělesa, objem, obálka), ale po zpětném načtení neprojde přesnou kontrolou platnosti, model ano; příčinu řádek píše jen změřenou rozborem znovu načteného souboru: (a) po přepočtu tolerancí projde s tolerancí do meze → „geometrie souboru odpovídá“, (b) projde nad mezí → „shoda nepotvrzena“, (c) neprojde a odchylka křivek od ploch je v souboru stejná jako v modelu → „zápis odchylku nezvětšil“, (d) v souboru větší → „vadu přinesl zápis nebo čtení“, (e) „příčina nezjištěna“ (viz „Přesná kontrola“ u stavu prvku); „věrná kopie“ se nenapíše, řádek F \`check=fail\`. V přísném režimu (\`--strict\`, \`přísně\`) se soubor kontroluje před zápisem a **nezapíše se** („soubor nezapsán (přísný režim zastaví běh) – …“, žádný řádek F, \`files=0\`), běh zastaví | soubor ověřit v cílovém CADu; \`přísně kromě out.reload-invalid\`, když to víte (pak se soubor zapíše) |
+| \`out.no-solid\` ✗ / \`out.free-surfaces\` ⚠ | objemový export (STEP, BREP, STL, 3MF) modelu bez objemového tělesa (jen plochy / skořepina – i uzavřená skořepina bez „Uzavřít do tělesa“) / s volnými skořepinami či plochami vedle těles (u sestavy se jmény komponent); bez přísného režimu se soubor zapíše (řádek zápisu ℹ, ne ✓), „věrná kopie modelu“ se nenapíše, řádek F \`check=fail\`; v přísném režimu (\`--strict\`, \`přísně\`) se soubor **nezapíše** – složení modelu je známé před zápisem („soubor nezapsán (přísný režim zastaví běh) – …“, žádný řádek F, \`files=0\`) a běh zastaví | \`prvek surf.close\` (Plochy → Uzavřít do tělesa), \`prvek surf.thicken\`, volnou plochu smazat / potlačit |
 | \`op.accepted\` ℹ / \`op.superseded\` ℹ / \`feature.unchecked\`, \`doc.unchecked\` ℹ / \`feature.built\` ℹ / \`feature.suppressed\` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u \`feature.unchecked\` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
 | \`drawing.section-legacy\` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (\`dnes pište: …\` v hlášce) |
@@ -2643,7 +2643,9 @@ konci skriptu – konzole prohlížeče i CLI dají pro týž skript stejný vý
   řádek posledního příkazu bloku – mezistav \`výkres A1\` před \`výkres měřítko 1:5\` nezastaví;
 - ℹ nezastaví nikdy (šrouby v závitu \`clash.thread\` tedy přísný běh nástroje nezastaví);
 - STOP = žádné soubory \`--formats\` ani odkaz \`--share\` (i když STOP přijde až po posledním řádku – konzole „■ přísný
-  režim: STOP – kód na řádku N“); po STOP se poslední \`stav\` neprovedl, výpis \`= status\` chybí.
+  režim: STOP – kód na řádku N“); výslovný \`export step|brep|stl|3mf\`, jehož nález (\`out.no-solid\`, \`out.free-surfaces\`,
+  \`out.reload-invalid\`, \`out.check-failed\`, \`geom.exact-invalid\`) běh zastaví, soubor **nezapíše** (žádný řádek F, fáze
+  průběhu bez „zápisu“); po STOP se poslední \`stav\` neprovedl, výpis \`= status\` chybí.
 
 \`\`\`
 přísně kromě select.ambiguous
@@ -2919,7 +2921,9 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do \`--out\` (řádek \
 (\`Deska.step\`, \`Deska_vykres.pdf\`); existující soubor v \`--out\` se nepřepíše – nový dostane „ (2)“ (ℹ \`out.renamed\`).
 
 - **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem
-  těles, obálka): řádek F \`check=ok|fail\`, při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). „→ věrná kopie
+  těles, obálka); řádek zápisu je ℹ „export STEP: … – zapsáno, kontrola níže“ (konzole „· kontrola níže“), ✓ nese jen
+  kontrola; v přísném režimu proběhne kontrola před zápisem a soubor, jehož nález běh zastaví, se nezapíše (ani soubor
+  bez tělesa / s volnými plochami, ani ⚠ \`out.reload-invalid\` – „soubor nezapsán (přísný režim zastaví běh) – …“): řádek F \`check=ok|fail\`, při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). „→ věrná kopie
   modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
   modelu; platnost souboru jen rychlou kontrolou …“), jinak ⚠ \`out.reload-invalid\` s počtem vadných ploch, a jen soubor
   s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ \`out.no-solid\` (i když

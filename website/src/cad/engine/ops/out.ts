@@ -9,7 +9,7 @@
  *
  * Konzole prohlížeče dostane tytéž řádky jako dřív (w11, e2e cad-agent-out); stručný protokol záznamy s kódem.
  */
-import { fileLogLine, fmtBytes, formatLabel, FORMAT_EXT, outFileName, type OutCmd, type OutDelivery } from "../../agent-out";
+import { fileLogLine, fmtBytes, formatLabel, FORMAT_EXT, outFileName, type ExportCheck, type OutCmd, type OutDelivery } from "../../agent-out";
 import { cadLocale, tr } from "../../i18n";
 import { groupShareCode, SHARE_DEFAULT_DAYS } from "../../share";
 import type { CadDoc } from "../../types";
@@ -29,7 +29,7 @@ import { runExportJob } from "../export-job";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
 import { modelId, sameModel } from "../../doc-outputs";
-import { sheetWarningCode } from "../sheet-eval";
+import { issueArgs, sameSheetFinding, sheetIssueText, sheetLabel, sheetWarningCode } from "../sheet-eval";
 import { staleCopies, staleCopyText } from "../../asm-refresh";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
@@ -67,11 +67,14 @@ type Out = { name: string; mime: string; data: Uint8Array; format: string };
  * úložiště odkazů s odkazem na stránku ke stažení (share-file.ts). Vrací zapsaný soubor (řádek F) – u base64 / odkazu jen
  * popis bez cesty; null = nedoručeno (✗ out.too-big, share.store-unavailable, share.rejected).
  */
-async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery, weak = false): Promise<OutFile | null> {
+async function deliver(ctx: OpCtx, e: Emit, f: Out, what: string, label: string, how: "file" | OutDelivery, weak: false | "note" | "check" = false): Promise<OutFile | null> {
   const doc = runOf(ctx).doc.name;
-  // `weak` (22c): objemový formát z modelu bez tělesa – soubor je zapsaný, ale export se nepočítá mezi ✓ (ℹ; ✗ out.no-solid následuje)
-  const done = (text: string) => (weak ? void ctx.report.code("msg.note", { line: ctx.line, doc, text }) : e.ok(text));
-  const sym = (line: string) => (weak ? line.replace(/^✓/, "ℹ") : line);
+  // `weak` (22c, 22i kolo 6): zápis souboru, o jehož výsledku rozhodne až kontrola níže (STEP / BREP se zpětným načtením,
+  // model bez tělesa, volné plochy) – soubor je zapsaný, ale zápis se nepočítá mezi ✓ (ℹ „zapsáno – kontrola níže“); ✓ nese
+  // jen kontrola, ⚠ / ✗ kontroly pak nestojí pod zeleným řádkem
+  // „check“ = výsledek nese kontrola zpětným načtením níže (věta „zapsáno, kontrola níže“); „note“ = jen ℹ (nález složení následuje)
+  const done = (text: string) => (weak ? void ctx.report.code("msg.note", { line: ctx.line, doc, text: weak === "check" ? `${text} – ${tr("zapsáno, kontrola níže")}` : text }) : e.ok(text));
+  const sym = (line: string) => (weak ? `${line.replace(/^✓/, "ℹ")}${weak === "check" ? ` · ${tr("kontrola níže")}` : ""}` : line);
   if (how === "link") {
     const { shareFile, FileStoreError } = await import("../../share-file");
     try {
@@ -143,6 +146,26 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   // model bez tělesa ji nepotřebuje („těleso platné“ by u ploch klamalo)
   const pre = (fmt === "step" || fmt === "brep") && cmd.check !== false && !noSolid ? await exactBeforeExport(ctx.host.kernel, ctx.ws, docKeyOf(ctx), d) : null;
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
+  // zpětná kontrola souboru (STEP / BREP): o výsledku exportu rozhodne až ona → zápis je ℹ, ne ✓ (22i kolo 6); volné plochy
+  // vedle tělesa jsou známé už před zápisem → také ℹ (⚠ out.free-surfaces následuje)
+  const checked = (fmt === "step" || fmt === "brep") && cmd.check !== false;
+  const weak = checked ? ("check" as const) : noSolid || (ms?.free ?? 0) > 0 ? ("note" as const) : false;
+  // přísný režim (22c kolo 6): nález, který běh zastaví, nesmí nechat soubor na disku – nález známý před zápisem (složení
+  // modelu, přesná kontrola modelu) soubor nezapíše vůbec; kontrola zpětným načtením proběhne PŘED zápisem nad daty
+  // a při nálezu, který zastaví, se soubor nezapíše (dřív STOP exit 2 a soubor s check=fail zůstal ve složce)
+  const stops = (code: string) => !!ctx.strict?.escalates(code, ctx.line);
+  const unwritten = (text: string) => tr("soubor nezapsán (přísný režim zastaví běh) – {0}", text);
+  const verdict0 = ms ? solidVerdict(ms, FMT, "model", ms.parts) : null;
+  if (verdict0 && stops(verdict0.code)) {
+    e.code(verdict0.code, { text: unwritten(verdict0.text), level: verdict0.level });
+    return;
+  }
+  if (pre?.level === "warn" && stops("geom.exact-invalid")) {
+    e.code("geom.exact-invalid", { args: [d.name, unwritten(pre.text)] });
+    return;
+  }
+  const strictCheck = checked && !!ctx.strict?.at(ctx.line).on;
+  const hold: { check?: ExportCheck } = {};
   // export jako úloha s fázemi (vlna 22, bod 22h – engine/export-job.ts): přestavba modelu, převod, zápis, kontrola
   // zpětným načtením; pořadí řádků protokolu jako dřív (soubor, pak kontrola); fáze hlásí hostitel (CLI --progress, běh v GUI)
   const job = await runExportJob(
@@ -151,11 +174,34 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
     {
       kernel: ctx.host.kernel,
       phase,
-      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", noSolid),
+      // nález kontroly zpětným načtením, který zastaví přísný běh: soubor se nezapíše a fáze „zápis“ se neohlásí
+      hold: (check) => {
+        if (check.ok || !stops(check.code ?? "out.check-failed")) return null;
+        hold.check = check;
+        return { out: null };
+      },
+      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", weak),
     },
-    { check: cmd.check !== false, verifyFirst: false, ...(ms?.parts ? { parts: ms.parts } : {}) },
+    { check: cmd.check !== false, verifyFirst: strictCheck, ...(ms?.parts ? { parts: ms.parts } : {}) },
   );
   const f = job.out;
+  const prePrint = () => {
+    if (!pre) return;
+    // volné plochy vedle tělesa (známé před zápisem): „těleso platné“ platí jen pro tělesa, soubor nese i plochy – žádné ✓
+    // hned nad ⚠ out.free-surfaces téhož exportu (oponentura kola 6, var/c1), jen ℹ s týmž textem
+    if (pre.level === "ok" && (ms?.free ?? 0) > 0) e.code("msg.note", { text: pre.text, indent: "  " });
+    else if (pre.level === "ok") {
+      e.console(`  ✓ ${pre.text}`);
+      e.ok(pre.text);
+    } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });
+    else e.code("msg.note", { text: pre.text, indent: "  " });
+  };
+  if (hold.check) {
+    const c = hold.check;
+    prePrint();
+    e.code(c.code ?? "out.check-failed", { text: unwritten(c.line.replace(/^[✓⚠✗]\s*/, "")), level: c.level === "error" || Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
+    return;
+  }
   if (!f) return;
   // záznam exportu s revizí modelu (bod 20) a záznamem úlohy (22h: stav, čas, fáze, kontrola – trvale v dokumentu); kontrola
   // zpětným načtením se doplní níže, až je známá (záznam téhož formátu a souboru se přepíše)
@@ -164,14 +210,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   note();
   f.modelRev = job.modelRev;
   f.phases = job.phases;
-  if (pre) {
-    if (pre.level === "ok") {
-      e.console(`  ✓ ${pre.text}`);
-      e.ok(pre.text);
-    } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });
-    else e.code("msg.note", { text: pre.text, indent: "  " });
-  }
-  if (!f) return;
+  prePrint();
   if ((fmt !== "step" && fmt !== "brep") || cmd.check === false) {
     if (fmt === "step" || fmt === "brep") e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", FMT));
     // bez zpětného čtení (síť, „bez kontroly“): složení modelu – ✗ bez tělesa / ⚠ plochy mimo tělesa (22c)
@@ -228,7 +267,26 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   // ne jen dřívější řádek změny dílu / listu; ✓ zápisu souboru zůstává, údaje v souboru jsou z vložení
   if (f && d.kind === "assembly") for (const sc of staleCopies(d, (n) => ctx.ws.findPart(n))) e.code("asm.stale-copy", { text: tr("{0} sestavy se zapisuje z kopie dílu: {1}", FMT, staleCopyText(sc)), indent: "  " });
   // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
-  for (const w of p.warnings) e.code(sheetWarningCode(w.text) === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
+  // řez mimo těleso (22i kolo 6): ✗ drawing.section-miss jako u příkazu výkresu – a když ho protokol pro týž list už má
+  // (příkaz `výkres řez …`, konec bloku), podruhé se nehlásí (dřív navíc ⚠ drawing.warning s odznakem bez kódu řezu)
+  const labels = ids.map((sid) => sheetLabel(d, d.drawings?.findIndex((x) => x.id === sid) ?? 0));
+  let missOwned: boolean | null = null; // listy exportu, které běh měnil: nález řezu nese řádek příkazu výkresu
+  for (const w of p.warnings) {
+    const wc = sheetWarningCode(w.text);
+    if (wc === "drawing.section-miss") {
+      const cands = w.sheet ? [w.sheet] : labels.length ? labels : [sheetLabel(d, 0)];
+      const known = () => cands.some((sheet) => ctx.report.entries.some((x) => sameSheetFinding(x, { code: wc, doc: d.name, text: sheetIssueText({ code: wc, sheet, text: w.text }) })));
+      if (known()) continue;
+      if (missOwned === null) {
+        missOwned = false;
+        for (const sid of ids) if (ctx.draw && (await ctx.draw.reportNow(sid, [wc]))) missOwned = true;
+      }
+      if (missOwned && known()) continue;
+      e.code(wc, { args: issueArgs(wc, cands[0]!, w.text), level: "error", indent: "  " });
+      continue;
+    }
+    e.code(wc === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
+  }
 }
 
 /** id listů dokumentu `d` v rozsahu exportu (bez uloženého výkresu žádné; „doc“ = listy dokumentu, výkresy dílů z komponent ne) */

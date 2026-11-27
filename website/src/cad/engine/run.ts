@@ -126,6 +126,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
   verify.switched();
   /** bloky po sobě jdoucích příkazů `výkres …` a listy, které běh měnil (kap. 5.3) */
   const draw = new DrawingTracker(ctx);
+  ctx.draw = draw;
   /** konec bloku příkazů výkresu: nálezy na řádky bloku; true = přísný režim zastavil */
   const closeBlock = async (): Promise<boolean> => {
     const line = draw.lastLine;

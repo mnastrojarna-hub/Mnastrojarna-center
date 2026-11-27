@@ -93,7 +93,8 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     ok(proj && proj.app === 'mnastrojarna-cad' && proj.features.length === 5, 'stažený .mncad je platný projekt s 5 prvky');
     ok(f2 && f2.name === 'Konzola.step' && f2.bytes > 5000, `export step → stažení ${f2 && f2.name} (${f2 && f2.bytes} B)`);
     ok(f2 && fs.readFileSync(f2.path, 'utf8').startsWith('ISO-10303-21;'), 'STEP začíná hlavičkou ISO-10303-21');
-    ok(/✓ export STEP: Konzola\.step · [\d,]+ kB · STEP AP214 – staženo \(bez dialogu\)/.test(log), 'protokol: název, velikost, formát STEP');
+    // kolo 6 (22i): zápis STEP s kontrolou je ℹ „· kontrola níže“, ✓ nese až kontrola zpětným načtením
+    ok(/ℹ export STEP: Konzola\.step · [\d,]+ kB · STEP AP214 – staženo \(bez dialogu\) · kontrola níže/.test(log) && !/✓ export STEP/.test(log), 'protokol: název, velikost, formát STEP (zápis ℹ, ne ✓)');
     const chk = /✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem ([^(]+) \(rozdíl ([\d,]+) %\), obálka ([^m]+) mm \(odchylka ([\d,]+) mm\) → věrná kopie modelu/.exec(log);
     ok(!!chk, `protokol: kontrola STEP → věrná kopie (${chk ? chk.slice(1).join(' | ') : log.split('\n').filter((l) => /kontrola/.test(l)).join(' / ')})`);
     await p.screenshot({ path: S + 'out-console.png' });
@@ -135,7 +136,7 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     const n0 = dl.length;
     const runLog = await p.evaluate(() => window.mncad.run('export brep'));
     const f5 = await nextDownload(n0 + 1);
-    ok(f5 && f5.name === 'Konzola.brep' && /✓ export BREP: Konzola\.brep/.test(runLog) && /✓ kontrola BREP: .* věrná kopie modelu/.test(runLog), `window.mncad.run('export brep') vrací řádky protokolu i kontrolu (${f5 && f5.name})`);
+    ok(f5 && f5.name === 'Konzola.brep' && /ℹ export BREP: Konzola\.brep/.test(runLog) && !/✓ export BREP/.test(runLog) && /✓ kontrola BREP: .* věrná kopie modelu/.test(runLog), `window.mncad.run('export brep') vrací řádky protokolu i kontrolu (${f5 && f5.name})`);
     const saved = await p.evaluate(() => window.mncad.save('API projekt'));
     const f6 = await nextDownload(n0 + 2);
     ok(saved.name === 'API projekt.mncad' && saved.bytes > 200 && saved.format === 'mncad' && saved.log[0].startsWith('✓ uloženo: API projekt.mncad'), `window.mncad.save('API projekt') → ${JSON.stringify({ name: saved.name, bytes: saved.bytes })}`);

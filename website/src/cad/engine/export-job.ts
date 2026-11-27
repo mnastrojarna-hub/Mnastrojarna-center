@@ -31,8 +31,16 @@ export type ExportFormat3d = Exclude<Export3dFormat, "mncad">;
 
 export type ExportJobDeps<T> = {
   kernel: Pick<KernelApi, "check" | "exportFile" | "exportStats">;
-  /** zápis dat (soubor CLI, stažení, FS Access, base64 volajícímu) */
-  write: (data: Uint8Array) => Promise<T>;
+  /**
+   * zápis dat (soubor CLI, stažení, FS Access, base64 volajícímu); `check` = výsledek kontroly zpětným načtením, když
+   * proběhla před zápisem (`verifyFirst`) – volající podle něj smí soubor nezapsat (přísný režim, 22c kolo 6)
+   */
+  write: (data: Uint8Array, check?: ExportCheck) => Promise<T>;
+  /**
+   * zadržení zápisu po kontrole (jen `verifyFirst`): vrátí-li `{ out }`, soubor se nezapíše a fáze „zápis“ se nehlásí
+   * (přísný režim, jehož nález kontroly zastaví běh – průběh CLI / hostitele dřív ukázal zápis souboru, který nevznikl)
+   */
+  hold?: (check: ExportCheck) => { out: T } | null;
   /** začátek fáze (průběh pro tracker / `--progress`) */
   phase?: (p: ExportPhase) => void;
   signal?: AbortSignal;
@@ -145,8 +153,12 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
       step("verify");
       check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts);
     }
-    step("write");
-    out = await deps.write(data);
+    const held = check && deps.hold ? deps.hold(check) : null;
+    if (held) out = held.out;
+    else {
+      step("write");
+      out = await deps.write(data, check);
+    }
   }
   close();
   return { doc, data, out, ...(check ? { check } : {}), modelRev: rev, phases };

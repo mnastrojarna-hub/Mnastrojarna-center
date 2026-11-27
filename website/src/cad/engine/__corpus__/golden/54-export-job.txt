@@ -1,7 +1,7 @@
 === run 1 ===
 ✓ nový díl „Deska A“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: Deska_A.step · 15 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 12 000 mm³ (rozdíl 0,0000 %), obálka 40,00 × 30,00 × 10,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 ✓ export STEP: bez-kontroly.step · 15 kB · STEP AP214 – staženo (bez dialogu)

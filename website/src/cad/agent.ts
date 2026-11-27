@@ -598,7 +598,7 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
       else if (prm?.kind === "mode" && typeof v === "string") v = canon(v) === "cut" ? "cut" : canon(v) === "intersect" ? "intersect" : canon(v) === "newbody" ? "new" : "add";
       setAt(data, key, v);
     }
-    const n = name ?? `${ext.label}`;
+    const n = name ?? tr(ext.label); // název v jazyce běhu (EN kontrola kót dřív psala „Tažení po šroubovici“)
     const feature = { id: uid(), name: n, type: "ext", ext: ext.ext, data } as unknown as Feature;
     return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no };
   }

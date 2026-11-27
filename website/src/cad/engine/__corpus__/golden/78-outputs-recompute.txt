@@ -20,7 +20,7 @@ kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontr
 → výkres: A3 – výsledek po vyhodnocení listu níže
 → list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
-✓ export STEP: Nastroj.step · 32 kB · STEP AP214 – staženo (bez dialogu)
+ℹ export STEP: Nastroj.step · 32 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 12
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 2, objem 132 000 mm³ (rozdíl 0,0000 %), obálka 100,00 × 60,00 × 30,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
 
