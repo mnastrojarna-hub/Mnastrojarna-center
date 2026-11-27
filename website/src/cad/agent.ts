@@ -1595,7 +1595,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
   if (res?.bodies && res.bodies.length > 1) lines.push(tr("Tělesa: {0}", res.bodies.map((b) => `${b.name}${b.active ? tr(" (aktivní)") : ""} ${fmt(b.volume / 1000, 2)} cm³`).join(" · ")));
   // popisy a oblastní úpravy ploch v modelu (vlna 23, R2 / D7 – jeden zdroj s výkresem, jako ve stromu prvků)
   const pmi = doc.kind === "assembly" ? [] : (doc.functional ?? []).filter((m) => (m.kind === "note" || m.kind === "treatment") && m.text);
-  if (pmi.length) lines.push(tr("Popisy ploch ({0}): {1}", pmi.length, pmi.map((m) => `F${(m.face?.index ?? 0) + 1} ${m.kind === "note" ? `„${m.text}“` : tr("úprava {0} „{1}“", m.what === "surface" ? tr("povrchová") : tr("tepelná"), m.text ?? "")}`).join(" · ")));
+  if (pmi.length) lines.push(tr("Popisy ploch ({0}): {1}", pmi.length, pmi.map((m) => `${m.face?.index !== undefined ? `F${m.face.index + 1}` : "F?"} ${m.kind === "note" ? `„${m.text}“` : tr("úprava {0} „{1}“", m.what === "surface" ? tr("povrchová") : tr("tepelná"), m.text ?? "")}`).join(" · ")));
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     // bez objemového tělesa (jen plochy / skořepina – 22c) objem není: „–“, ne pseudoobjem ploch

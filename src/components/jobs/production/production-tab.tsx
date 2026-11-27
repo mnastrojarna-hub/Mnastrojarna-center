@@ -31,8 +31,6 @@ import { OperationDialog } from "./operation-dialog";
 import { TemplateDialog, CompleteDeliveryDialog } from "./template-dialog";
 import { NoteDialog } from "./note-dialog";
 import { CustomerNoteCard } from "./customer-note-card";
-import { ClosingCard } from "./closing-card";
-import { DeliveryCard } from "./delivery-card";
 import { TechnologySection } from "./technology-section";
 import type { JobFlowData } from "@/components/jobs/detail/job-detail-view";
 
@@ -206,16 +204,7 @@ export function ProductionTab({ job, data, flow }: { job: JobDetail; data: JobPr
 
           <div className="min-w-0 space-y-4">
             <CustomerNoteCard jobId={job.id} note={note} />
-            <DeliveryCard job={job} />
-            {data?.closing && (
-              <ClosingCard
-                job={job}
-                closing={data.closing}
-                margins={perms.margins}
-                payments={flow?.payments}
-                stamps={flow?.stamps ?? null}
-              />
-            )}
+            {/* dodací list zákazníkovi, podepsaný DL, faktura a platba → záložka „Dodání & faktura" (28. 11.) */}
           </div>
         </div>
       </div>

@@ -265,9 +265,9 @@ export function Manager({
                 <div data-pmi-list className="my-1 border-t border-dashed border-[#cdd5de] pt-1">
                   <div className="px-2 py-[2px] text-[10.5px] font-semibold uppercase tracking-wide text-[#8a95a3]">{tr("Popisy ploch ({0})", pmi.length)}</div>
                   {pmi.map((m) => (
-                    <div key={m.id} data-pmi={m.id} data-pmi-face={`F${(m.face?.index ?? 0) + 1}`} title={m.kind === "note" ? tr("Místní popis plochy v modelu – výkres ho kreslí odkazem se šipkou / tečkou na plochu") : tr("Oblastní úprava plochy v modelu – výkres ji kreslí tlustou čerchovanou čarou s kótou rozsahu")} className="flex items-center gap-2 px-2 py-[3px] text-[12px] text-[#4a5664]">
+                    <div key={m.id} data-pmi={m.id} data-pmi-face={m.face?.index !== undefined ? `F${m.face.index + 1}` : "F?"} title={m.kind === "note" ? tr("Místní popis plochy v modelu – výkres ho kreslí odkazem se šipkou / tečkou na plochu") : tr("Oblastní úprava plochy v modelu – výkres ji kreslí tlustou čerchovanou čarou s kótou rozsahu")} className="flex items-center gap-2 px-2 py-[3px] text-[12px] text-[#4a5664]">
                       <CadIcon name="datum" tone="ref" className="h-3.5 w-3.5" />
-                      <span className="font-mono text-[10.5px] text-[#8a95a3]">F{(m.face?.index ?? 0) + 1}</span>
+                      <span className="font-mono text-[10.5px] text-[#8a95a3]">{m.face?.index !== undefined ? `F${m.face.index + 1}` : "F?"}</span>
                       <span className="truncate">{m.kind === "note" ? m.text : `${m.what === "surface" ? tr("povrchová") : tr("tepelná")}: ${m.text}`}</span>
                     </div>
                   ))}

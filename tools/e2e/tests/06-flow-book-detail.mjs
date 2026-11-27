@@ -117,7 +117,7 @@ await T("karta: korekce stavu ukáže dopad na nabídku a vyžádá důvod", asy
 await T("výroba: zapsat dodání 1 ze 2 položek → „Částečně dodáno 1/2 položek“ v kartě i řádku", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
-  await openJob(page, DEL, "?tab=vyroba");
+  await openJob(page, DEL, "?tab=dodani"); // dodání zákazníkovi je v záložce „Dodání & faktura“ (28. 11.)
   const card = page.getByRole("region", { name: "Dodání zákazníkovi" });
   await card.getByRole("button", { name: "Zapsat dodání" }).click();
   const dlg = page.getByRole("dialog");
