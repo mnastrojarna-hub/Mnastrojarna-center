@@ -75,6 +75,9 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   ok(/Z modelu: F2 „Brousit“ → \S+ \(odkaz se šipkou\) · Z1 F3 „62\+2 HRC“ → přední \(tlustá čerchovaná 04\.2 \+ kóta rozsahu\)/.test(log), 'R2/R3: výkres stav – popis a úprava z modelu na listu');
   ok(/✓ (řádek \d+: )?výkres: list „List 1“ vyhodnocen bez nálezů \(pohledy, řezy, Chytré kóty, poznámky a razítko\)/.test(log), 'R7: čistý list = ✓ bez nálezů (…, poznámky a razítko)');
   await closeConsole();
+  // D7 (kolo 4, F10): popis plochy z modelu je vidět ve stromu prvků dílu – „Popisy ploch (2)“, F2 „Brousit“, úprava F3
+  const pmi = await p.waitForSelector('[data-pmi-list]', { timeout: 30000 }).then(() => p.evaluate(() => ({ head: (document.querySelector('[data-pmi-list]') || {}).textContent || '', faces: [...document.querySelectorAll('[data-pmi]')].map((e) => `${e.getAttribute('data-pmi-face')} ${e.textContent || ''}`) })), () => null);
+  ok(!!pmi && /Popisy ploch \(2\)/.test(pmi.head) && pmi.faces.some((f) => /^F2 .*Brousit/.test(f)) && pmi.faces.some((f) => /^F3 .*62\+2 HRC/.test(f)), 'D7 GUI: strom prvků – Popisy ploch (2): F2 „Brousit“, F3 úprava „62+2 HRC“ – ' + JSON.stringify(pmi && pmi.faces));
   log = await run('výkres');
   await p.waitForSelector('[data-sheet]', { timeout: 180000 }).catch(() => {});
   ok(await waitSheet('Brousit'), 'R2 GUI: odkaz „Brousit“ z modelu je na listu');
@@ -130,7 +133,15 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   const legacy = await p.evaluate(async () => {
     const d = JSON.parse(JSON.stringify(window.mncad.getDocument()));
     d.name = 'Deska archiv';
-    for (const s of d.drawings || []) s.annotations = s.annotations.filter((a) => a.type !== 'text').map((a) => { const x = { ...a }; delete x.by; return x; });
+    // archiv člověka = soubor bez razítka původu (kolo 4: text, který soubor nese jako agentův – i poznámka u razítka
+    // meta.noteBy – zůstane agentův, proto se z „archivu“ smaže všude, nejen u značek)
+    for (const s of d.drawings || []) {
+      s.annotations = s.annotations.filter((a) => a.type !== 'text').map((a) => { const x = { ...a }; delete x.by; return x; });
+      delete s.meta.noteBy; delete s.meta.by;
+      for (const r of s.meta.revisions || []) delete r.by;
+    }
+    delete d.nameBy; delete d.materialBy;
+    for (const f of d.functional || []) delete f.by;
     d.drawings[0].annotations.push(...[1, 2, 3, 4, 5, 6, 7].map((i) => ({ id: 'h' + i, view: 'sheet', type: 'text', at: [30, 30 + i * 5], text: 'Bod ' + i, size: 3.5 })));
     window.mncad.attach({ name: 'archiv.mncad', text: JSON.stringify(d) });
     const r1 = await window.mncad.run('otevřít "archiv.mncad"\nvýkres export pdf');

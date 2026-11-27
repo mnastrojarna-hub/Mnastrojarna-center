@@ -1,0 +1,32 @@
+# vlna 23, 4. kolo – popisy s odkazem, 2D tolerance a drsnost, druh hodnoty buňky razítka, původ po uložení, kopie listu
+„{0}“ je pokyn („{1}“), ne hodnota buňky – pokyny pro výrobu a expedici na výkres nepatří	„{0}“ ist eine Anweisung („{1}“), kein Feldwert – Fertigungs- und Versandanweisungen gehören nicht auf die Zeichnung
+„{0}“ je pokyn pro výrobu / expedici („{1}“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří	„{0}“ ist eine Fertigungs-/Versandanweisung („{1}“) – ein Flächenhinweis trägt eine technische Angabe (z. B. „Schleifen“, „Läppen“); Anweisungen gehören weder ins Modell noch auf die Zeichnung
+„{0}“ není obecná tolerance (např. „ISO 2768-mK“, „ISO 22081“, tabulka „X. ±0,1 / X.X ±0,1“)	„{0}“ ist keine Allgemeintoleranz (z. B. „ISO 2768-mK“, „ISO 22081“, Tabelle „X. ±0,1 / X.X ±0,1“)
+„{0}“ není polotovar (např. „tyč Ø40×120“, „plech 40×160×185“)	„{0}“ ist kein Rohteil (z. B. „Stange Ø40×120“, „Blech 40×160×185“)
+„{0}“ není povrchová úprava (např. „černit“, „Zn 8 µm“, „RAL 9005“, „eloxovat“, „bez úpravy“)	„{0}“ ist keine Oberflächenbehandlung (z. B. „brünieren“, „Zn 8 µm“, „RAL 9005“, „eloxieren“, „ohne“)
+„{0}“ není stav hran (např. „ISO 13715 -0,3“, „srazit 0,5×45°“, „otupit“)	„{0}“ ist kein Kantenzustand (z. B. „ISO 13715 -0,3“, „fasen 0,5×45°“, „Kanten brechen“)
+„{0}“ není tepelné zpracování (např. „kalit a popustit“, „cementovat CHT 0,8“, „nitridovat“, „zušlechtit“)	„{0}“ ist keine Wärmebehandlung (z. B. „härten und anlassen“, „einsatzhärten CHT 0,8“, „nitrieren“, „vergüten“)
+„{0}“ není tolerance sražení (např. „±0,2“)	„{0}“ ist keine Fasentoleranz (z. B. „±0,2“)
+„{0}“ není tolerance úhlů (např. „±0°30′“, „±0,5°“)	„{0}“ ist keine Winkeltoleranz (z. B. „±0°30′“, „±0,5°“)
+atribut razítka {0}: {1}	Schriftfeldattribut {0}: {1}
+buňka razítka {0} „{1}“: {2}	Schriftfeld {0} „{1}“: {2}
+dokument „{0}“ je jen nosič textu (holé těleso z primitiv, víc řádků poznámek ({1}) než kót) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	Dokument „{0}“ ist nur ein Textträger (nackter Grundkörper, mehr Hinweiszeilen ({1}) als Maße) – keine Zeichnung nur mit Hinweisen; Angaben ins Schriftfeld der Teilzeichnung
+dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}	Dokument des Agenten (JSON / setDocument in diesem Lauf oder Datei mit vom Agenten gespeichertem Text): {0}{1}
+export odmítnut – {0}	Export abgelehnt – {0}
+geometrická tolerance „{0}“ je pokyn („{1}“) – rámeček nese jen značku, hodnotu a základny	Form- und Lagetoleranz „{0}“ ist eine Anweisung („{1}“) – der Rahmen trägt nur Symbol, Wert und Bezüge
+geometrická tolerance „{0}“ nese text („{1}“) – rámeček nese jen značku, hodnotu a základny (např. ⌖ Ø0,1 A B)	Form- und Lagetoleranz „{0}“ trägt Text („{1}“) – der Rahmen trägt nur Symbol, Wert und Bezüge (z. B. ⌖ Ø0,1 A B)
+geometrická tolerance „{0}“ obsahuje údaj razítka ({1}) – {2}	Form- und Lagetoleranz „{0}“ enthält Schriftfeldangaben ({1}) – {2}
+list „{0}“ opakuje pohledy listu „{1}“ a nenese nic vlastního (žádný řez, detail ani ruční kóta) – smažte ho (výkres list smazat {2}) nebo na něm nastavte jiné pohledy	Blatt „{0}“ wiederholt die Ansichten von Blatt „{1}“ und trägt nichts Eigenes (kein Schnitt, keine Einzelheit, kein manuelles Maß) – löschen (zeichnung blatt löschen {2}) oder andere Ansichten setzen
+list „{0}“ opakuje pohledy listu „{1}“, který nese poznámky – výkres se na „list s výkresem + list s poznámkami“ nedělí; jeden list s pohledy, kótami a nejvýš 5 řádky nad razítkem, druhý list smažte (výkres list smazat {2})	Blatt „{0}“ wiederholt die Ansichten von Blatt „{1}“, das Hinweise trägt – eine Zeichnung wird nicht in „Zeichnungsblatt + Hinweisblatt“ geteilt; ein Blatt mit Ansichten, Maßen und höchstens 5 Zeilen über dem Schriftfeld, das andere löschen (zeichnung blatt löschen {2})
+materiál „{0}“ je pokyn („{1}“) – materiál je označení (např. „1.2379“, „C45“)	Werkstoff „{0}“ ist eine Anweisung („{1}“) – der Werkstoff ist eine Bezeichnung (z. B. „1.2379“, „C45“)
+neviditelné znaky v textu (měkké dělení, nulová mezera) – pište text bez nich	unsichtbare Zeichen im Text (weiches Trennzeichen, Nullbreitenleerzeichen) – Text ohne sie schreiben
+plocha ?	Fläche ?
+polotovar „{0}“ nese údaj jiného pole ({1}) – do polotovaru jen rozměr a druh (např. „tyč Ø40×120“, „plech 40×160×185“), tvrdost a úpravy do jejich buněk	Rohteil „{0}“ trägt Angaben eines anderen Feldes ({1}) – ins Rohteil nur Maß und Art (z. B. „Stange Ø40×120“, „Blech 40×160×185“), Härte und Behandlungen in ihre Felder
+revize {0} „{1}“ je pokyn („{2}“), ne popis změny výkresu – pokyny do tabulky revizí nepatří ani s „změna:“ / „→“ (popis změny např. „Ø20 → Ø22“, „doplněna díra Ø9“)	Revision {0} „{1}“ ist eine Anweisung („{2}“), keine Beschreibung einer Zeichnungsänderung – Anweisungen gehören nicht in die Revisionstabelle, auch nicht mit „Änderung:“ / „→“ (Änderung z. B. „Ø20 → Ø22“, „Bohrung Ø9 ergänzt“)
+ze souboru {0}	aus Datei {0}
+ze souboru	aus Datei
+značka drsnosti „{0}“ je pokyn („{1}“) – značka nese hodnotu Ra / Rz a nanejvýš jedno slovo způsobu výroby	Oberflächenzeichen „{0}“ ist eine Anweisung („{1}“) – das Zeichen trägt den Ra/Rz-Wert und höchstens ein Wort Fertigungsverfahren
+značka drsnosti „{0}“ nemá hodnotu Ra / Rz – slova bez hodnoty jsou poznámka (např. „Ra 0,8“ + postup „broušeno“)	Oberflächenzeichen „{0}“ hat keinen Ra/Rz-Wert – Wörter ohne Wert sind ein Hinweis (z. B. „Ra 0,8“ + Verfahren „geschliffen“)
+značka drsnosti „{0}“ obsahuje údaj razítka ({1}) – {2}	Oberflächenzeichen „{0}“ enthält Schriftfeldangaben ({1}) – {2}
+značka drsnosti „{0}“: {1} slova – způsob výroby nejvýš jedním slovem (pole ISO 1302)	Oberflächenzeichen „{0}“: {1} Wörter – Fertigungsverfahren mit höchstens einem Wort (Feld ISO 1302)
+model {0}	Modell {0}

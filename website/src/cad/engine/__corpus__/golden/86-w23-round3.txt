@@ -19,7 +19,7 @@
 ✗ řádek 19: list List 1: údaj razítka mimo svou buňku razítka – a5 přípona kóty „černit“ obsahuje údaj razítka (povrchová úprava) – patří do razítka: výkres razítko povrch="černit"
 ✗ řádek 20: list List 1: text není strojařsky heslovitý – a7 značka drsnosti „Nitridovat“ nemá hodnotu Ra / Rz – značka nese hodnotu (např. „Ra 0,8“), nanejvýš s jedním slovem způsobu výroby („Ra 0,4 lapovat“); slova bez hodnoty jsou poznámka
 → značka drsnost Ra 0,4 lapovat → kóta 100 (horní, a4) · a7 – výsledek po vyhodnocení listu níže
-✗ řádek 22: list List 1: text není strojařsky heslovitý – revize A „Konzervovat olejem“ není popis změny – řádek revize říká, co se změnilo („Ø20 → Ø22“, „změna: doplněna díra Ø9“); pokyny a poznámky do tabulky revizí nepatří
+✗ řádek 22: list List 1: text není strojařsky heslovitý – revize A „Konzervovat olejem“ je pokyn („konzervovat“), ne popis změny výkresu – pokyny do tabulky revizí nepatří ani s „změna:“ / „→“ (popis změny např. „Ø20 → Ø22“, „doplněna díra Ø9“)
 → revize A ?.?.???? „Ø9 → Ø10“ – v razítku revize A – výsledek po vyhodnocení listu níže
 ✗ řádek 24: list List 1: text není strojařsky heslovitý – buňka razítka customer „Zabalit do VCI“ je pokyn („zabalit“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk (a dalších 1: buňka razítka project „Hrany otupit“ obsahuje údaj jiného pole (hrany))
 ✗ řádek 25: list Technické požadavky: poznámky mimo hlavní list – název listu „Technické požadavky“ – výkres poznámek / požadavků k jinému dílu (číslo „…/2“) nevzniká: požadavky patří do razítka a k ploše na výkres dílu

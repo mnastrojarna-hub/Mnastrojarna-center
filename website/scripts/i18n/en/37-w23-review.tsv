@@ -32,7 +32,6 @@ materiál „{0}“ obsahuje údaj jiného pole ({1}) – zapište ho do jeho bu
 materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379“, „C45“)	material “{0}”: {1} – material designation in keywords (e.g. “1.2379”, “C45”)
 model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	model {0} “{1}” contains {2} – a treatment of this face only = treatment {0} heat|surface "…", a treatment of the whole part into the title block ({3})
 model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	model {0} “{1}”: {2} – a face note / specification briefly in keywords (at most {3} characters)
-model F{0}	model F{0}
 oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	local treatment {0} “{1}” (F{2}): range {3}–{4} mm exceeds the face of length {5} mm – clipped on the sheet; correct the range in the model (treatment F{2} … from a to b)
 odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	leader “{0}” is not in keyword style: {1} – a face note briefly (e.g. “Grind”)
 odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	leader “{0}” contains data of the whole part ({1}) – {2}

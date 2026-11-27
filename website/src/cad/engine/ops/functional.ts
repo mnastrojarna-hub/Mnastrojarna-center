@@ -5,7 +5,7 @@
  * Kontrola kót (cad/dim-complete.ts) pak u funkčního prvku chce velikost, polohu (od základny) a toleranci.
  */
 import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-functional";
-import { classifyNote, leaderCount, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, titleDataLabel, titleHint } from "../../drawing-notes-rules";
+import { classifyNote, leaderCount, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, processWords, titleDataLabel, titleHint } from "../../drawing-notes-rules";
 import { treatmentWord } from "../../pmi-marks";
 import { CodedError } from "../codes";
 import { acceptLine, sheetTail } from "../accept";
@@ -49,7 +49,7 @@ export function functionalListText(d: CadDoc): string {
 
 /** popis / úprava modelu do výpisu: „popis F7 „Brousit““, „úprava tepelná F2 „58+2 HRC“ od 0 do 25“ */
 function pmiText(m: FunctionalMark): string {
-  const f = `F${(m.face?.index ?? 0) + 1}`;
+  const f = m.face?.index !== undefined ? `F${m.face.index + 1}` : tr("plocha ?");
   if (m.kind === "note") return tr("popis {0} „{1}“", f, m.text ?? "");
   const range = m.from !== undefined || m.to !== undefined ? tr(" od {0} do {1}", fmt(m.from ?? 0), m.to !== undefined ? fmt(m.to) : tr("konce")) : tr(" (celá plocha)");
   return tr("úprava {0} {1} „{2}“{3}", treatmentWord(m.what), f, m.text ?? "", range);
@@ -59,6 +59,9 @@ function pmiText(m: FunctionalMark): string {
 function checkPmiText(kind: "note" | "treatment", text: string): void {
   const why = noteStyle(text, LEADER_MAX_CHARS);
   if (why) throw new CodedError("drawing.note-style", [tr("model"), tr("„{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“", text, why, LEADER_MAX_CHARS)]);
+  // kolo 4 (F10): pokyn pro výrobu / expedici („Odmastit“, „Zabalit do VCI“) do modelu nepatří – ✗ hned u příkazu, ne až na listu
+  const pw = processWords(text);
+  if (pw.length) throw new CodedError("drawing.note-style", [tr("model"), tr("„{0}“ je pokyn pro výrobu / expedici („{1}“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří", text, pw[0])]);
   if (kind === "treatment") return;
   const cls = classifyNote(text);
   const bad = cls?.parts.filter((p) => p.key !== "edges" && p.key !== "roughness") ?? [];

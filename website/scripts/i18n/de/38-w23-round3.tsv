@@ -22,8 +22,6 @@ a{0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj
 atribut razítka {0} „{1}“ je pokyn („{2}“) – buňka nese jméno / číslo, pokyny na výkres nepatří	Schriftfeldattribut {0} „{1}“ ist eine Anweisung („{2}“) – das Feld trägt Name / Nummer, Anweisungen gehören nicht auf die Zeichnung
 buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk	Schriftfeldzelle {0} „{1}“ ist eine Anweisung („{2}“), kein Name / keine Nummer – Anweisungen gehören nicht auf die Zeichnung, Schriftfeldangaben in ihre Zellen
 číslo výkresu	Zeichnungsnummer
-dokument „{0}“ je jen nosič textu (zástupné těleso do 5 mm a {1} řádků poznámek) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	Dokument „{0}“ trägt nur Text (Platzhalterkörper bis 5 mm und {1} Hinweiszeilen) – keine Zeichnung nur mit Hinweisen; Angaben ins Schriftfeld der Teilzeichnung
-dokument agenta (JSON / setDocument v tomto běhu): {0}{1}	Dokument des Agenten (JSON / setDocument in diesem Lauf): {0}{1}
 drsnost „{0}“ nemá hodnotu (např. „Ra 3,2“)	Rauheit „{0}“ hat keinen Wert (z. B. „Ra 3,2“)
 Místní popis plochy v modelu – výkres ho kreslí odkazem se šipkou / tečkou na plochu	Lokaler Flächenhinweis im Modell – die Zeichnung zeigt ihn als Bezugslinie mit Pfeil / Punkt auf der Fläche
 model {0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj (např. „Brousit“)	Modell {0} „{1}“ ist eine Fertigungs- / Versandanweisung – an der Fläche nur technische Angaben (z. B. „Schleifen“)

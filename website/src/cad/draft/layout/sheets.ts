@@ -130,6 +130,11 @@ export function frameBlock(size: string, landscape: boolean, W: number, Hh: numb
   };
 }
 
+/** pevné texty bloku razítka (popisky buněk, firma, promítání) – klíče tr(); cad/draft/agent-notes.ts podle nich pozná
+ *  skutečné razítko rozvržení (vlna 23, kolo 4 – blok téhož jména od agenta s vlastním textem razítkem není) */
+export const TITLE_BLOCK_LABEL_KEYS = ["Váš partner ve strojírenství", "Promítání", "Název", "Číslo výkresu", "Materiál", "Měřítko", "Formát", "Hmotnost", "Kreslil", "Datum", ...TB_TECH_TAGS.map(([, l]) => l)];
+export const TITLE_BLOCK_LITERALS = ["Mnástrojárna s.r.o.", "www.mnastrojarna.cz", "ISO E", "Rev."];
+
 /**
  * Blok rohového razítka ČSN EN ISO 7200 (180 × 38 mm, stejné rozvržení jako razítko výkresu 3D dílu) s technickým pásem
  * 10 mm nahoře (vlna 23, R1 – TEPELNE, TVRDOST, POVRCH, HRANY, TOLERANCE, DRSNOST): firma, promítání ISO E, atributy NAZEV,

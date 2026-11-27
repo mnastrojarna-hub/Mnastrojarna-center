@@ -576,7 +576,12 @@ export function notesSheetIssues(doc: CadDoc, idx: number, res?: Pick<DrawingRes
     // D4: list agenta, který jen opakuje pohledy jiného listu a nese text = ✗ (rozdělení „výkres + poznámky“); prázdná kopie
     // (nový list s výchozími pohledy, který agent teprve nastaví) poznámkami není – ⚠ jako u člověka
     const agentSheet = s.annotations.some((a) => a.by === "agent" && (a.type === "text" || (a.type === "note" && isFreeAnn(a))));
-    if (twin !== undefined && !own) out.push({ level: agentSheet ? "error" : "warn", code: "drawing.sheet-duplicate", kind: "other", text: tr("list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše", sheetTitle(doc, idx), sheetTitle(doc, twin)), sheetId: s.id, data: { sheetPos: pos + 1 } });
+    // kolo 4 (bod 11): kopie pohledů v dokumentu, kde agent píše volný text (na kopii NEBO na listu, který kopíruje) = dělení
+    // „list s výkresem + list s poznámkami“ v kterémkoli pořadí → ✗; prázdná kopie bez textu v dokumentu dál ⚠
+    const agentText = freeTextLines(doc).some((x) => x.by === "agent");
+    // hlavní list kopií není (dřív ⚠ obviňovalo list s kótami); text hlášky podle toho, co kopie nese
+    if (twin !== undefined && !own && idx !== main)
+      out.push({ level: agentSheet || agentText ? "error" : "warn", code: "drawing.sheet-duplicate", kind: "other", text: carries ? tr("list „{0}“ opakuje pohledy listu „{1}“ a nepřidává nic než text – výkres se na „list s výkresem + list s poznámkami“ nedělí; smažte ho a údaje dejte do razítka / k ploše", sheetTitle(doc, idx), sheetTitle(doc, twin)) : agentText ? tr("list „{0}“ opakuje pohledy listu „{1}“, který nese poznámky – výkres se na „list s výkresem + list s poznámkami“ nedělí; jeden list s pohledy, kótami a nejvýš 5 řádky nad razítkem, druhý list smažte (výkres list smazat {2})", sheetTitle(doc, idx), sheetTitle(doc, twin), pos + 1) : tr("list „{0}“ opakuje pohledy listu „{1}“ a nenese nic vlastního (žádný řez, detail ani ruční kóta) – smažte ho (výkres list smazat {2}) nebo na něm nastavte jiné pohledy", sheetTitle(doc, idx), sheetTitle(doc, twin), pos + 1), sheetId: s.id, data: { sheetPos: pos + 1 } });
   }
   return out;
 }
@@ -592,7 +597,7 @@ export function ingestFindings(doc: CadDoc): { code: AuditFinding["code"] | "dra
   const all = audit.filter((f) => f.by === "agent" && findingLevel(f) === "error");
   const by = new Map<string, AuditFinding[]>();
   for (const f of all) by.set(f.code, [...(by.get(f.code) ?? []), f]);
-  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("dokument agenta (JSON / setDocument v tomto běhu): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
+  const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [...by.entries()].map(([code, list]) => ({ code: code as AuditFinding["code"], args: [list[0].sheet >= 0 ? sheetTitle(doc, list[0].sheet) : tr("model"), tr("dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] }));
   // D1: soubor otevřený z disku – jeho text agent nevytvořil: ⚠ (žádná zelená), export povolen
   const loaded = audit.filter((f) => f.by === "loaded");
   if (loaded.length) out.push({ code: "drawing.notes-loaded", args: [loaded[0].sheet >= 0 ? sheetTitle(doc, loaded[0].sheet) : tr("model"), loadedText(doc, loaded)] });
@@ -606,7 +611,7 @@ function draftIngest(doc: CadDoc): { code: AuditFinding["code"] | "drawing.notes
   const out: { code: AuditFinding["code"] | "drawing.notes-loaded"; args: [string, string] }[] = [];
   const by = new Map<string, typeof all>();
   for (const f of all.filter((x) => x.by === "agent")) by.set(f.code, [...(by.get(f.code) ?? []), f]);
-  for (const [code, list] of by) out.push({ code: code as AuditFinding["code"], args: [doc.name, tr("dokument agenta (JSON / setDocument v tomto běhu): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] });
+  for (const [code, list] of by) out.push({ code: code as AuditFinding["code"], args: [doc.name, tr("dokument agenta (JSON / setDocument v tomto běhu nebo soubor s textem, který uložil agent): {0}{1}", list[0].text, list.length > 1 ? tr(" (a dalších {0})", list.length - 1) : "")] });
   const loaded = all.filter((x) => x.by === "loaded");
   if (loaded.length) out.push({ code: "drawing.notes-loaded", args: [doc.name, tr("text 2D výkresu ze souboru otevřeného z disku porušuje pravidla pro agenty ({0} nálezů) – agent ho nezměnil, export je povolen. První: {1}", loaded.length, loaded[0].text)] });
   return out;
@@ -629,6 +634,9 @@ export function loadedText(doc: CadDoc, loaded: readonly AuditFinding[]): string
 export function exportGuard(doc: CadDoc, sheets: number[]): AuditFinding[] {
   const audit = auditOf(doc);
   const bad = audit.filter((f) => f.by === "agent" && findingLevel(f) === "error" && (f.sheet < 0 || sheets.includes(f.sheet)));
+  // kolo 4 (bod 11): kopie listu agenta při dělení „výkres + poznámky“ (✗ drawing.sheet-duplicate) se neexportuje ani v sadě listů
+  const dup = sheets.flatMap((i) => notesSheetIssues(doc, i).filter((x) => x.code === "drawing.sheet-duplicate" && x.level === "error").map((x) => ({ i, x })));
+  if (!bad.length && dup.length) throw new CodedError("drawing.notes-sheet", [sheetTitle(doc, dup[0].i), tr("export odmítnut – {0}", dup[0].x.text)]);
   // D1: nálezy textu načteného souboru export nezastaví – volající je ohlásí ⚠ drawing.notes-loaded
   if (!bad.length) return audit.filter((f) => f.by === "loaded" && (f.sheet < 0 || sheets.includes(f.sheet)));
   const f = bad[0];

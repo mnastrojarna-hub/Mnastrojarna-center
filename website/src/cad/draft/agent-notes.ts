@@ -17,13 +17,30 @@
  * = místní popis (nejvýš 8, krátce, bez údajů celého dílu); atributy razítka (technický pás TEPELNE / TVRDOST / POVRCH /
  * HRANY / TOLERANCE / DRSNOST a MATERIAL heslovitě, NAZEV / CISLO_VYKRESU / KRESLIL bez údajů razítka a pokynů).
  */
-import { tr } from "../i18n";
-import { classifyNote, DIM_TEXT_MAX, DRAFT_TEXT_TYPES, LEADER_MAX_CHARS, lineCount, NOTE_MAX_LEADERS, NOTE_MAX_LINES, noteStyle, processWords, TITLE_FREE_MAX, TITLE_VALUE_MAX, titleDataIn, titleDataLabel, type Origin, type TitleDataKey } from "../drawing-notes-rules";
+import { dictOf, tr } from "../i18n";
+import { cellValueProblem, classifyNote, DIM_TEXT_MAX, DRAFT_TEXT_TYPES, LEADER_MAX_CHARS, lineCount, NOTE_MAX_LEADERS, NOTE_MAX_LINES, noteStyle, processWords, TITLE_FREE_MAX, TITLE_VALUE_MAX, titleDataIn, titleDataLabel, type Origin, type TitleDataKey } from "../drawing-notes-rules";
+import { TITLE_BLOCK_LABEL_KEYS, TITLE_BLOCK_LITERALS } from "./layout/sheets";
 import type { DraftEntity, DraftModel } from "./model";
 
 /** atribut technického pásu razítka 2D výkresu pro pole razítka (R1) */
 const TECH_TAG: Record<TitleDataKey, string> = { heatTreatment: "TEPELNE", hardness: "TVRDOST", surfaceTreatment: "POVRCH", edges: "HRANY", tolerance: "TOLERANCE", roughness: "DRSNOST", material: "MATERIAL" };
 const TECH_TAGS = new Set(Object.values(TECH_TAG));
+/** atribut technického pásu → klíč buňky razítka (kontrola druhu hodnoty – cellValueProblem) */
+const TAG_KEY: Record<string, string> = Object.fromEntries(Object.entries(TECH_TAG).map(([k, t]) => [t, k]));
+
+/** řetězec rámečku tolerance → buňky jako čitelný text (kódy písma GDT pryč, %%c → Ø, %%d → °, %%p → ±) */
+function toleranceCells(s: string): string[] {
+  return s
+    .split(/\^J|\\P/)
+    .flatMap((row) => row.split(/%%v/i))
+    .map((c) => c.replace(/\{\\F[^;]*;[^}]*\}/g, " ").replace(/%%c/gi, "Ø").replace(/%%d/gi, "°").replace(/%%p/gi, "±").replace(/[{}]/g, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+/** slova v buňce tolerance mimo hodnotu, základny a modifikátory (CZ, SZ, ACS, LD, MD, PD, UF, ALL …) */
+const GDT_WORDS = new Set(["cz", "sz", "acs", "ld", "md", "pd", "uf", "all", "around", "lmc", "mmc", "max", "min", "cf", "lt", "nc", "st", "ug", "dr", "fr"]);
+const gdtWords = (cell: string): string[] => (cell.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().match(/[a-z]{2,}/g) ?? []).filter((w) => !GDT_WORDS.has(w));
+/** slova značky drsnosti mimo hodnotu (Ra 0,8, Rz 6,3, N7, „max“) */
+const surfWords = (t: string): string[] => (t.replace(/\bR(?:a|z|max)\b/g, " ").replace(/\bN\d{1,2}\b/g, " ").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().match(/[a-z]{2,}/g) ?? []).filter((w) => !["max", "min", "um", "mm"].includes(w));
 const FREE_TAGS = new Set(["NAZEV", "CISLO_VYKRESU", "KRESLIL", "KONTROLOVAL", "SCHVALIL", "DATUM", "REVIZE", "MERITKO", "LIST", "FORMAT", "FIRMA", "ZAKAZNIK", "PROJEKT", "HMOTNOST", "POCET"]);
 
 /** text MTEXT bez formátovacích kódů, po odstavcích (`\P`) */
@@ -43,8 +60,19 @@ export const isLabel = (t: string): boolean => /^[A-Z](?:\s*[-–]\s*[A-Z])?$/.t
 
 /** blok razítka rozvržení (cad/draft/layout/sheets.ts TITLE_BLOCK) */
 const TITLE_BLOCK_NAME = "ISO7200_TITLE";
+/** pevné texty skutečného razítka rozvržení ve všech jazycích (popisky buněk, firma, promítání) */
+let labelSet: Set<string> | null = null;
+const titleLabels = (): Set<string> => {
+  if (labelSet) return labelSet;
+  const en = dictOf("en") as Record<string, string>;
+  const de = dictOf("de") as Record<string, string>;
+  labelSet = new Set([...TITLE_BLOCK_LITERALS, ...TITLE_BLOCK_LABEL_KEYS.flatMap((k) => [k, en[k], de[k]].filter((x): x is string => !!x))]);
+  return labelSet;
+};
+/** atributy, které razítko rozvržení definuje (hodnoty nesou vložení – kontroluje je atribut vložení) */
+const TITLE_ATTDEF_TAGS = new Set(["POZNAMKA", "LIST"]);
 
-type Item = { key: string; text: string; kind: "free" | "leader" | "attr" | "dim"; tag?: string; lines: number; by: Origin; measurement?: number };
+type Item = { key: string; text: string; kind: "free" | "leader" | "attr" | "dim" | "gdt" | "surf"; tag?: string; lines: number; by: Origin; measurement?: number; value?: boolean };
 
 const byOf = (e: { by?: Origin }): Origin => e.by ?? "user";
 type X = DraftEntity & { s?: string; w?: number; h?: number; text?: string; attribs?: { tag: string; value: string }[]; block?: string; def?: string; tag?: string; measurement?: number; kind?: string };
@@ -75,13 +103,17 @@ function itemsOf(m: DraftModel): Item[] {
     }
   };
   for (const { list } of spaces) countIn(list, 1, 0);
-  // definice razítka rozvržení (popisky buněk „Název“, „Materiál“ …) poznámkou není – hodnoty nesou atributy vložení
-  const lists = [...spaces.map((s) => ({ ...s, mult: 1 })), ...(m.blocks ?? []).filter((b) => b.name !== TITLE_BLOCK_NAME).map((b) => ({ space: `block:${b.name}`, list: b.entities, mult: inserts.get(b.name) ?? 0 }))];
-  for (const { space, list, mult } of lists) {
+  // definice razítka rozvržení: pevné popisky buněk („Název“, „Materiál“ …) poznámkou nejsou – hodnoty nesou atributy
+  // vložení. Pozná se podle obsahu, ne podle jména (kolo 4, bod 4): text, který v razítku rozvržení není (MTEXT agenta
+  // v bloku „ISO7200_TITLE“), se počítá jako každý jiný text bloku × počet vložení.
+  const lists = [...spaces.map((s) => ({ ...s, mult: 1, title: false })), ...(m.blocks ?? []).map((b) => ({ space: `block:${b.name}`, list: b.entities, mult: inserts.get(b.name) ?? 0, title: b.name === TITLE_BLOCK_NAME }))];
+  for (const { space, list, mult, title } of lists) {
     for (const e of list) {
       const x = e as X;
       const by = byOf(x);
       const key = `${space}|${e.id}`;
+      if (title && e.type === "text" && titleLabels().has(String(x.s ?? "").trim())) continue;
+      if (title && e.type === "attdef" && (TECH_TAGS.has(x.tag ?? "") || FREE_TAGS.has(x.tag ?? "") || TITLE_ATTDEF_TAGS.has(x.tag ?? ""))) continue;
       if (e.type === "text" || e.type === "mtext") {
         const t = textItem(x);
         if (t && mult > 0) out.push({ key, text: t.text, kind: "free", lines: t.lines * mult, by });
@@ -92,6 +124,15 @@ function itemsOf(m: DraftModel): Item[] {
       } else if (e.type === "leader" && x.text) {
         const text = mtextLines(x.text).join(" ");
         if (text && mult > 0) out.push({ key, text, kind: "leader", lines: 0, by });
+      } else if (e.type === "tolerance") {
+        // rámeček geometrické tolerance (kolo 4, bod 5 / F6): buňky = značka, hodnota, základny – slova jsou poznámka
+        const cells = toleranceCells(String((x as { s?: string }).s ?? ""));
+        if (cells.length && mult > 0) out.push({ key, text: cells.join(" | "), kind: "gdt", lines: 0, by });
+      } else if (e.type === "surfsym") {
+        // značka drsnosti (F6): požadavek „Ra 0,8“ + nejvýš jedno slovo způsobu výroby (pole ISO 1302 „c“)
+        const req = String(x.text ?? "").trim();
+        const proc = String((x as { process?: string }).process ?? "").trim();
+        if ((req || proc) && mult > 0) out.push({ key, text: [req, proc].filter(Boolean).join(" · "), kind: "surf", lines: 0, by, value: /^(?:R[az]|Rmax|N\d)|^\d/i.test(req) || /\bR[az]\s*\d/.test(req) });
       } else if (e.type === "dimension" && x.text?.trim() && x.text.trim() !== "<>") {
         out.push({ key, text: x.text.trim(), kind: "dim", lines: 0, by, ...(typeof x.measurement === "number" ? { measurement: x.measurement } : {}) });
       } else if (e.type === "insert" && x.attribs?.length) {
@@ -133,7 +174,8 @@ export function draftNotesAudit(m: DraftModel): DraftNotesFinding[] {
   const free = items.filter((i) => i.kind === "free");
   const total = free.reduce((n, i) => n + i.lines, 0);
   if (total > NOTE_MAX_LINES) out.push({ key: "limit", count: total, by: mix(free.map((i) => i.by)), code: "drawing.notes-limit", text: tr("2D výkres by měl {0} řádků volného textu (nejvýš {1}): {2} – údaje celého dílu do razítka (technický pás), popis plochy krátce odkazem, nadbytečné smažte", total, NOTE_MAX_LINES, free.slice(0, 6).map((i) => `„${i.text.replace(/\s+/g, " ").slice(0, 28)}“`).join(" · ")) });
-  const leaders = items.filter((i) => i.kind === "leader");
+  // místní popisy (D2): odkazy s popisem + značky drsnosti se slovy (limit 8 platí i pro ně)
+  const leaders = items.filter((i) => i.kind === "leader" || (i.kind === "surf" && surfWords(i.text).length > 0));
   if (leaders.length > NOTE_MAX_LEADERS) out.push({ key: "leaders", count: leaders.length, by: mix(leaders.map((i) => i.by)), code: "drawing.leaders-limit", text: tr("2D výkres by měl {0} odkazů s popisem (nejvýš {1}) – slučte popisy stejné úpravy, údaje celého dílu dejte do razítka", leaders.length, NOTE_MAX_LEADERS) });
   for (const i of items) {
     const f = (code: DraftNotesFinding["code"], text: string) => out.push({ key: i.key, text, by: i.by, code });
@@ -150,6 +192,23 @@ export function draftNotesAudit(m: DraftModel): DraftNotesFinding[] {
       const bad = classifyNote(i.text)?.parts.filter((p) => p.key !== "edges" && p.key !== "roughness") ?? [];
       if (why) f("drawing.note-style", tr("odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)", i.text.slice(0, 40), why));
       else if (bad.length) f("drawing.note-title-data", tr("odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}", i.text.slice(0, 40), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint2d(bad.map((p) => p.key))));
+    } else if (i.kind === "gdt") {
+      // rámeček tolerance nese jen značku, hodnotu, modifikátory a základny – slovo = poznámka; údaj razítka / pokyn = ✗
+      const ws = i.text.split(" | ").flatMap(gdtWords);
+      const bad = titleDataIn(i.text.replace(/ \| /g, "; "), ["tolerance"]);
+      const pw = processWords(i.text);
+      if (bad.length) f("drawing.note-title-data", tr("geometrická tolerance „{0}“ obsahuje údaj razítka ({1}) – {2}", i.text.slice(0, 40), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint2d(bad.map((p) => p.key))));
+      else if (pw.length) f("drawing.note-style", tr("geometrická tolerance „{0}“ je pokyn („{1}“) – rámeček nese jen značku, hodnotu a základny", i.text.slice(0, 40), pw[0]));
+      else if (ws.length) f("drawing.note-style", tr("geometrická tolerance „{0}“ nese text („{1}“) – rámeček nese jen značku, hodnotu a základny (např. ⌖ Ø0,1 A B)", i.text.slice(0, 40), ws.slice(0, 3).join(" ")));
+    } else if (i.kind === "surf") {
+      // značka drsnosti: hodnota Ra / Rz a nejvýš jedno slovo způsobu výroby; slova bez hodnoty, víc slov, údaj razítka, pokyn = ✗
+      const ws = surfWords(i.text);
+      const bad = titleDataIn(i.text, ["roughness"]);
+      const pw = processWords(i.text);
+      if (bad.length) f("drawing.note-title-data", tr("značka drsnosti „{0}“ obsahuje údaj razítka ({1}) – {2}", i.text.slice(0, 40), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint2d(bad.map((p) => p.key))));
+      else if (pw.length) f("drawing.note-style", tr("značka drsnosti „{0}“ je pokyn („{1}“) – značka nese hodnotu Ra / Rz a nanejvýš jedno slovo způsobu výroby", i.text.slice(0, 40), pw[0]));
+      else if (ws.length && !i.value) f("drawing.note-style", tr("značka drsnosti „{0}“ nemá hodnotu Ra / Rz – slova bez hodnoty jsou poznámka (např. „Ra 0,8“ + postup „broušeno“)", i.text.slice(0, 40)));
+      else if (ws.length > 1) f("drawing.note-style", tr("značka drsnosti „{0}“: {1} slova – způsob výroby nejvýš jedním slovem (pole ISO 1302)", i.text.slice(0, 40), ws.length));
     } else if (i.kind === "dim") {
       // D2: text kóty = hodnota (s „<>“ nebo číslem) a nanejvýš krátká tolerance – ne poznámka, ne údaj razítka
       const why = noteStyle(i.text, DIM_TEXT_MAX, 4);
@@ -164,7 +223,9 @@ export function draftNotesAudit(m: DraftModel): DraftNotesFinding[] {
       const why = noteStyle(i.text, tech ? TITLE_VALUE_MAX : TITLE_FREE_MAX, tech ? 5 : 8);
       const bad = !tech ? titleDataIn(i.text) : [];
       const pw = !tech ? processWords(i.text) : [];
+      const cp = tech ? cellValueProblem(TAG_KEY[i.tag!] ?? "", i.text) : null;
       if (why) f("drawing.note-style", tr("atribut razítka {0} „{1}“: {2} – hodnota buňky heslovitě", i.tag!, i.text.slice(0, 40), why));
+      else if (cp) f("drawing.note-title-data", tr("atribut razítka {0}: {1}", i.tag!, cp));
       else if (bad.length) f("drawing.note-title-data", tr("atribut razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – {3}", i.tag!, i.text.slice(0, 40), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint2d(bad.map((p) => p.key))));
       else if (pw.length) f("drawing.note-style", tr("atribut razítka {0} „{1}“ je pokyn („{2}“) – buňka nese jméno / číslo, pokyny na výkres nepatří", i.tag!, i.text.slice(0, 40), pw[0]));
     }
@@ -195,7 +256,7 @@ export function draftNotesGuard(before: DraftModel, after: DraftModel): DraftNot
 /** podpis textu entity (změna textu = nový zápis agenta) */
 const sig = (e: DraftEntity): string => {
   const x = e as X & { prompt?: string };
-  return JSON.stringify([x.s, x.text, x.def, x.tag, x.prompt, x.attribs?.map((a) => [a.tag, a.value])]);
+  return JSON.stringify([x.s, x.text, x.def, x.tag, x.prompt, (x as { process?: string }).process, x.attribs?.map((a) => [a.tag, a.value])]);
 };
 
 /**
@@ -237,5 +298,5 @@ export function draftNotesLine(m: DraftModel): string {
   const ag = all.filter((f) => f.by === "agent").length;
   const ld = all.filter((f) => f.by === "loaded").length;
   const tail = [ag ? tr("✗ porušení agenta {0}", ag) : "", ld ? tr("⚠ ze souboru {0}", ld) : ""].filter(Boolean).join(", ");
-  return tr("Poznámky nad razítkem: {0}/{1} řádků · odkazy s popisem {2}/{3}", items.filter((i) => i.kind === "free").reduce((n, i) => n + i.lines, 0), NOTE_MAX_LINES, items.filter((i) => i.kind === "leader").length, NOTE_MAX_LEADERS) + (tail ? ` · ${tail}` : "");
+  return tr("Poznámky nad razítkem: {0}/{1} řádků · odkazy s popisem {2}/{3}", items.filter((i) => i.kind === "free").reduce((n, i) => n + i.lines, 0), NOTE_MAX_LINES, items.filter((i) => i.kind === "leader" || (i.kind === "surf" && surfWords(i.text).length > 0)).length, NOTE_MAX_LEADERS) + (tail ? ` · ${tail}` : "");
 }

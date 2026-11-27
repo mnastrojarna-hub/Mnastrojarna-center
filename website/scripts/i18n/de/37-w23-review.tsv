@@ -32,7 +32,6 @@ materiál „{0}“ obsahuje údaj jiného pole ({1}) – zapište ho do jeho bu
 materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379“, „C45“)	Werkstoff „{0}“: {1} – Werkstoffbezeichnung stichwortartig (z. B. „1.2379“, „C45“)
 model {0} „{1}“ obsahuje {2} – úprava jen této plochy = úprava {0} tepelná|povrchová "…", úprava celého dílu do razítka ({3})	Modell {0} „{1}“ enthält {2} – Behandlung nur dieser Fläche = behandlung {0} wärme|oberfläche "…", Behandlung des ganzen Teils ins Schriftfeld ({3})
 model {0} „{1}“: {2} – popis / předpis u plochy krátce a heslovitě (nejvýš {3} znaků)	Modell {0} „{1}“: {2} – Flächenhinweis / Vorgabe kurz und stichwortartig (höchstens {3} Zeichen)
-model F{0}	Modell F{0}
 oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)	örtliche Behandlung {0} „{1}“ (F{2}): Bereich {3}–{4} mm überschreitet die {5} mm lange Fläche – auf dem Blatt abgeschnitten; Bereich im Modell korrigieren (behandlung F{2} … von a bis b)
 odkaz „{0}“ není heslovitý: {1} – popis u plochy krátce (např. „Brousit“)	Hinweislinie „{0}“ ist nicht stichwortartig: {1} – Flächenhinweis kurz (z. B. „Schleifen“)
 odkaz „{0}“ obsahuje údaj celého dílu ({1}) – {2}	Hinweislinie „{0}“ enthält eine Angabe des ganzen Teils ({1}) – {2}

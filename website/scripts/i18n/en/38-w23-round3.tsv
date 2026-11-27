@@ -22,8 +22,6 @@ a{0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj
 atribut razítka {0} „{1}“ je pokyn („{2}“) – buňka nese jméno / číslo, pokyny na výkres nepatří	title block attribute {0} “{1}” is an instruction (“{2}”) – the cell holds a name / number, instructions do not belong on the drawing
 buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk	title block cell {0} “{1}” is an instruction (“{2}”), not a name / number – instructions do not belong on the drawing, title block data into their cells
 číslo výkresu	drawing number
-dokument „{0}“ je jen nosič textu (zástupné těleso do 5 mm a {1} řádků poznámek) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu	document “{0}” only carries text (placeholder body up to 5 mm and {1} note lines) – no drawing with notes only; put the data into the title block of the part drawing
-dokument agenta (JSON / setDocument v tomto běhu): {0}{1}	agent document (JSON / setDocument in this run): {0}{1}
 drsnost „{0}“ nemá hodnotu (např. „Ra 3,2“)	roughness “{0}” has no value (e.g. “Ra 3.2”)
 Místní popis plochy v modelu – výkres ho kreslí odkazem se šipkou / tečkou na plochu	Local face note in the model – the drawing shows it as a leader with an arrow / dot on the face
 model {0} „{1}“ je pokyn pro výrobu / expedici – u plochy jen technický údaj (např. „Brousit“)	model {0} “{1}” is a production / shipping instruction – at the face only technical data (e.g. “Grind”)

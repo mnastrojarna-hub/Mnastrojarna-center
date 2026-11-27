@@ -234,3 +234,45 @@ describe("w23 kolo 3 – žádná falešná zelená (D1–D7)", () => {
     expect(codes(r, "error")).toContain("drawing.note-style");
   }, 120000);
 });
+
+describe("w23 greens – kolo 4 (✓ jen tam, kde pravidla opravdu prošla)", () => {
+  const NOTES = ["Odmastit", "Konzervovat", "Zabalit do VCI", "Označit rytinou", "Měrný protokol 3.1"].map((t, i) => `výkres značka text "${t}" v 30 ${120 - 5 * i}`);
+  it("„✓ … bez nálezů“ s 5/5 řádky: ne, když kóty nesou slova (přípona „lapovat“) – dřív 5/5 a ✓; bez slov v kótách ano", async () => {
+    const r = await run(new MemoryWorkspace(), [...PART, 'výkres upravit a4 přípona=" lapovat"', ...NOTES, "výkres stav"]);
+    expect(codes(r, "error")).toContain("drawing.notes-limit");
+    expect(txt(r)).not.toMatch(OK_RE);
+    const r2 = await run(new MemoryWorkspace(), [...PART, 'výkres upravit a4 přípona=" H7"', ...NOTES.slice(0, 4), "výkres stav"]);
+    expect(txt(r2)).toMatch(OK_RE);
+  }, 180000);
+  it("„✓ … bez nálezů“: ne, když buňka razítka nese pokyn (tepelné=\"Konzervovat olejem\"); s hodnotou svého druhu ano", async () => {
+    const r = await run(new MemoryWorkspace(), [...PART, 'výkres razítko tepelné="Konzervovat olejem"', "výkres stav"]);
+    expect(codes(r, "error")).toContain("drawing.note-title-data");
+    const r2 = await run(new MemoryWorkspace(), [...PART, 'výkres razítko tepelné="kalit a popustit" povrch="černit" úhly="±0°30′" sražení="±0,2" polotovar="tyč Ø40×120"', "výkres stav"]);
+    expect(codes(r2, "error")).toEqual([]);
+    expect(txt(r2)).toMatch(OK_RE);
+  }, 180000);
+  it("„✓ … bez nálezů“ na obou listech: ne při dělení list s kótami + list s pohledy a poznámkami (F2, bod 11)", async () => {
+    const r = await run(new MemoryWorkspace(), [...PART, 'výkres list nový "Pohledy"', "výkres A3 měřítko 1:1 pohledy přední,horní,levý", "kótovat nic", ...NOTES, "výkres stav vše"]);
+    expect(codes(r, "error")).toContain("drawing.notes-sheet");
+    expect(txt(r)).not.toMatch(/✓ výkres: list „Pohledy“ vyhodnocen bez nálezů/);
+  }, 180000);
+  it("„✓ … bez nálezů“: ne, když revize nese pokyn se „změna:“ (F5); revize „Ø9 → Ø10“ ✓", async () => {
+    const r = await run(new MemoryWorkspace(), [...PART, 'výkres revize A "změna: zabalit do VCI fólie"', "výkres stav"]);
+    expect(codes(r, "error")).toContain("drawing.note-style");
+    const r2 = await run(new MemoryWorkspace(), [...PART, 'výkres revize A "Ø9 → Ø10"', "výkres stav"]);
+    expect(txt(r2)).toMatch(OK_RE);
+  }, 180000);
+  it("„✓ výkres PDF“: ne pro soubor, který uložil agent s porušením a otevřel ho znovu (F1) – export odmítnut", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, PART);
+    const d = docOf(ws, "Deska");
+    const s = d.drawings![0];
+    const bad = { ...d, drawings: [{ ...s, annotations: [...s.annotations, ...[1, 2, 3, 4, 5, 6, 7].map((i) => ({ id: `q${i}`, view: "sheet", type: "text", at: [30, 120 - 5 * i], text: `Bod ${i}`, size: 3.5 }))] }] };
+    await run(new MemoryWorkspace(), [JSON.stringify(bad), 'uložit "Q"']);
+    const saved = [...files.files.values()].find((f) => f.file.name.endsWith(".mncad"))!;
+    const h: EngineHost = { kernel: real, files: (files = memoryFileSink()), inputs: memoryFileSource({ "Q.mncad": saved.data }), now: () => Date.now() };
+    const r = await runScript(new MemoryWorkspace(), 'otevřít "Q.mncad"\nvýkres export pdf', h);
+    expect(txt(r)).not.toMatch(/✓ (L\d+ )?výkres PDF/);
+    expect(codes(r, "error")).toContain("drawing.notes-limit");
+  }, 180000);
+});
