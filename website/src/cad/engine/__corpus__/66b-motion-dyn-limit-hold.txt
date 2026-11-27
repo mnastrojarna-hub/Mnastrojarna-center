@@ -2,6 +2,10 @@
 # PEVNÁ 24,5 k rámu, Mez ⟨5; 25⟩ mezi nimi brání pohybu pod 37,5.
 # 1) `na mezi chyba` a motor, který za mezí dojede a STOJÍ (rychlost 30,35 → zdvih skončí v 1 s): neplatné jsou všechny snímky za
 #    mezí (kroky 4–12, invalid=9), `pohyb krok 12` ukáže poslední platnou polohu – dřív jen kroky 4–5 a krok 12 Deska A Z 37,15.
+#    Blok Dynamika bere zdvih, v max, a max, dotyky dorazu, síly pružin a energii jen z PLATNÝCH kroků („⚠ neplatné kroky 4–12 …“):
+#    zdvih Z 15,296 mm = ΔZ −15,296 mm téhož tělesa, dotyk dorazu min 5 se nevypíše (krok, ve kterém deska doraz dosáhla, ho už
+#    o 0,06 mm překročil), energie „v posledním platném kroku (t = 0,658 s)“ – dřív (první commit kola 7) „zdvih Z 30,35 mm“,
+#    „a max 15,17 m/s²“ (ráz zastavení motoru za mezí) a „dotyk 0,66–2 s“ ze stavu integrátoru za mezí (oponent kola 7).
 # 2) `na mezi stop`: zastavený motor = nesplněný pohon jako v kinematice (conflicts=5, motion.conflict ZDVIH, žádné „Vazby splněny
 #    ve všech krocích“); motor-limit u zpětného zdvihu dopíše nejzazší žádanou hodnotu „(nejdál 27,15 mm)“.
 nový díl "Rám"

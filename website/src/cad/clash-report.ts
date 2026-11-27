@@ -239,9 +239,10 @@ export function undeterminedWhy(x: Pick<ClashDetail, "why" | "hole" | "note">): 
  * nejvyšší úrovně (pružina sestavy). Bez takové pružiny prázdné.
  */
 export function lostSpringNote(d: CadDoc, items: readonly Pick<ClashDetail, "a" | "b" | "aPath" | "bPath">[]): string {
-  const lost = new Map(lostSpringComps(d).map((c) => [c.id, c.name] as const));
+  const lost = new Set(lostSpringComps(d).map((c) => c.id));
   if (!lost.size) return "";
-  const names = new Set(items.flatMap((x) => [pathA(x), pathB(x)].flatMap((p) => (p.length === 1 && lost.has(p[0]) ? [lost.get(p[0])!] : []))));
+  // pružina jako instance („Pružina #3“, „Pružina [P2]“) – víc pružin stejného názvu se rozliší (oponent kola 7: dřív holý název)
+  const names = new Set(items.flatMap((x) => [pathA(x), pathB(x)].flatMap((p) => (p.length === 1 && lost.has(p[0]) ? [leafLabel(d, p)] : []))));
   return [...names].map((n) => tr(" · pružina „{0}“ v neověřené délce (ztracená dosedací plocha – spring.lost)", n)).join("");
 }
 

@@ -20,14 +20,14 @@ Pohybová studie: motorů 1 · kroků 4
  „Deska A“: ΔZ −15,175 mm
  stojí: 1 („Rám“)
 Vazby splněny ve všech krocích
-⚠ řádek 13: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
+⚠ řádek 15: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
 Pohybová studie: motorů 1 · kroků 4 · 1 s · r·?
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Deska A“: ΔZ −15,175 mm
  stojí: 1 („Rám“)
 Vazby splněny ve všech krocích
-⚠ řádek 14: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
+⚠ řádek 16: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
 ✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
 ✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
 

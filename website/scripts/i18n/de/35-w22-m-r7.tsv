@@ -7,4 +7,6 @@ Vedení – posuv od výchozí polohy (Souosost, Drážka, Dráha, Šroub)	Führ
 nesplněné vazby {0}	nicht erfüllte Verknüpfungen {0}
 v {0} kroku	in {0} Schritt
 v {0} krocích	in {0} Schritten
+ ⚠ neplatné kroky {0} (motor za mezí – na mezi chyba): zdvih, rychlosti, zrychlení, dotyky, síly pružin a energie jen z platných kroků; v CSV a grafu vynechány	 ⚠ ungültige Schritte {0} (Antrieb über der Grenze – an Grenze: Fehler): Hub, Geschwindigkeiten, Beschleunigungen, Kontakte, Federkräfte und Energie nur aus gültigen Schritten; in CSV und Diagramm ausgelassen
+ Energie: na začátku {0} J, v posledním platném kroku (t = {1} s) {2} J (motor koná práci – bilance se nekontroluje)	 Energie: am Anfang {0} J, im letzten gültigen Schritt (t = {1} s) {2} J (der Antrieb leistet Arbeit – Bilanz wird nicht geprüft)
 #!dynamic

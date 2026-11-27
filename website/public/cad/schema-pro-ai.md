@@ -919,7 +919,9 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   (pevná vzdálenost, mez na dorazu), je v `pohyb krok N` „brání: …“. V **dynamice** platí `na mezi stop` (výchozí) i `chyba` také:
   mez porušená předepsaným pohybem motoru zastaví motory na poslední platné hodnotě (⚠ `motion.motor-limit`), resp. snímky za mezí
   jsou neplatné (⚠ `motion.invalid`, zobrazena poslední platná poloha) – všechny snímky, dokud motor žádá jinou hodnotu než
-  v posledním platném snímku, i když za mezí už stojí (dojel). Zastavený motor je v dynamice stejně jako v kinematice nesplněný pohon:
+  v posledním platném snímku, i když za mezí už stojí (dojel). Stav integrátoru za mezí je nefyzikální: blok Dynamika bere zdvih, v max,
+  a max, dotyky dorazů, síly pružin a energii jen z platných kroků (⚠ „neplatné kroky 4–12 … jen z platných kroků“, energie „v posledním
+  platném kroku (t = …)“), neplatný snímek nemá `dyn` (CSV prázdné buňky, graf mezera). Zastavený motor je v dynamice stejně jako v kinematice nesplněný pohon:
   `conflicts=N`, „nesplněné vazby v N krocích“ a `motion.conflict` vazby motoru, nikdy „Vazby splněny ve všech krocích“.
   `motion.motor-limit` u profilu, který za mezí dojel a couvl, dopíše nejzazší žádanou hodnotu („žádáno 37,226 → 37,348 mm
   (nejdál 27,15 mm)“).

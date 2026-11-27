@@ -30,13 +30,12 @@ Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska
 ⚠ nesplněné vazby v 9 krocích (mechanismus se zasekl nebo motor překročil meze)
  ⚠ motion.conflict pohyb porušuje vazbu „Mez Přidržovač → Deska A“ v kroku 4–12 (t = 0.672–2 s)
 Dynamika: 2 s · krok 2 ms · 1000 kroků · gravitace −Z · tlumení 0 N·s/mm · odraz 0
- „Deska A“ 0,785 kg (z objemu × hustoty): zdvih Z 30,35 mm · v max 0,03 m/s · a max 15,17 m/s² (bez rázů na dorazech)
+ ⚠ neplatné kroky 4–12 (motor za mezí – na mezi chyba): zdvih, rychlosti, zrychlení, dotyky, síly pružin a energie jen z platných kroků; v CSV a grafu vynechány
+ „Deska A“ 0,785 kg (z objemu × hustoty): zdvih Z 15,296 mm · v max 0,03 m/s · a max 0 m/s²
  „Přidržovač“ 0,2261 kg (z objemu × hustoty): v klidu
  doraz „Mez Přidržovač → Deska A“ (max 25 mm): dotyk 0 s
- doraz „Mez Přidržovač → Deska A“ (min 5 mm): dotyk 0,66–2 s · nárazy 0,03 m/s (t = 0,66 s)
-  první dotyk v t = 0,66 s
- Energie: na začátku 0,0004 J, na konci -0,2337 J (motor koná práci – bilance se nekontroluje)
-⚠ řádek 21: neřešitelné kroky 4–12 (t = 0.672–2 s) – zobrazena poslední platná poloha (krok 3), žádný kompromis; konflikt: „Mez Přidržovač → Deska A“ 4,605 mm < min 5 mm (-0,395 mm); příčina: motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)
+ Energie: na začátku 0,0004 J, v posledním platném kroku (t = 0,658 s) -0,1534 J (motor koná práci – bilance se nekontroluje)
+⚠ řádek 25: neřešitelné kroky 4–12 (t = 0.672–2 s) – zobrazena poslední platná poloha (krok 3), žádný kompromis; konflikt: „Mez Přidržovač → Deska A“ 4,605 mm < min 5 mm (-0,395 mm); příčina: motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)
 Krok 12 (t = 2 s, motory 27,15):
  Rám [0; 0; 0]
  Deska A [0; 0; 52,2036]
@@ -59,8 +58,8 @@ Dynamika: 2 s · krok 2 ms · 1000 kroků · gravitace −Z · tlumení 0 N·s/m
  doraz „Mez Přidržovač → Deska A“ (min 5 mm): dotyk 0,66 s · nárazy 0,03 m/s (t = 0,66 s)
   první dotyk v t = 0,66 s
  Energie: na začátku 0,0004 J, na konci 0 J (motor koná práci – bilance se nekontroluje)
-ℹ řádek 23: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
-⚠ řádek 23: motor 1 stojí na mezi v krocích 4–7 (t = 0.672–1.176 s): žádáno 37,105 → 32,492 mm (nejdál 27,15 mm), dosaženo 37,53 mm – brání: „Mez Přidržovač → Deska A“ 5,03 mm v mezích ⟨5; 25⟩; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly stojí v poslední dosažitelné poloze (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
+ℹ řádek 27: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
+⚠ řádek 27: motor 1 stojí na mezi v krocích 4–7 (t = 0.672–1.176 s): žádáno 37,105 → 32,492 mm (nejdál 27,15 mm), dosaženo 37,53 mm – brání: „Mez Přidržovač → Deska A“ 5,03 mm v mezích ⟨5; 25⟩; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly stojí v poslední dosažitelné poloze (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
 Krok 6 (t = 1,008 s, motory 27,393):
  Rám [0; 0; 0]
  Deska A [0; 0; 47,5297]

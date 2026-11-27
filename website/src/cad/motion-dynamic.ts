@@ -68,6 +68,9 @@ export type DynEnergy = {
   /** mechanická energie na začátku a na konci [J] */
   e0: number;
   end: number;
+  /** končí-li výpočet neplatnými kroky (motor „na mezi chyba“ za mezí): `end` je energie posledního PLATNÉHO integračního kroku
+   * v čase `endT` [s] – stav za mezí je nefyzikální (kolo 7) */
+  endT?: number;
   /** práce zadaných sil, ztráta tlumením a ztráta při dotycích / nárazech [J] */
   applied: number;
   damping: number;
@@ -79,11 +82,12 @@ export type DynEnergy = {
   /** vztažná energie odchylky [J]: největší kinetická energie, práce zadaných sil nebo ztráta tlumením (největší z nich) */
   ref: number;
 };
-/** Největší rychlost [mm/s] a zrychlení [mm/s²] těžiště za celý výpočet (každý integrační krok, ne jen zaznamenané); zrychlení
+/** Největší rychlost [mm/s] a zrychlení [mm/s²] těžiště za celý výpočet (každý PLATNÝ integrační krok, ne jen zaznamenané); zrychlení
  * bez nárazů na doraz (ráz = skok rychlosti v jednom kroku, jeho „zrychlení“ by záviselo na kroku dt). */
 export type DynPeak = { v: number; tv: number; a: number; ta: number };
 /** Stav těles v kroku (těžiště ve světě): poloha [mm], rychlost [mm/s], zrychlení [mm/s²]. */
 export type DynStepBody = { p: Vec3; v: Vec3; a: Vec3 };
+/** `dyn` chybí u neplatného snímku (status „invalid“): stav integrátoru za mezí je nefyzikální – CSV má prázdné buňky, graf mezeru. */
 export type DynMotionStep = MotionStep & { dyn?: Record<string, DynStepBody> };
 export type DynInfo = {
   dt: number;
@@ -815,6 +819,27 @@ export async function runDynamic(
   let lastValid: DynMotionStep | null = null;
   let frozenBy: Limit[] = [];
   let lastTargets: number[] | null = null;
+  /**
+   * Neplatný (nefyzikální) INTEGRAČNÍ krok (kolo 7, oponent): porušená mez vazby a motor „na mezi chyba“, který ji pohání a žádá jinou
+   * hodnotu než v posledním platném integračním kroku (jede, nebo po dojezdu stojí za mezí); bez platného předchůdce (porušeno už
+   * v t = 0) vždy. Integrátor tělo za mezí protlačí (přednost má motor), takže poloha, rychlost, zrychlení, dotyky a síly pružin
+   * v takovém kroku nejsou fyzikální: do špiček, dotyků, největší síly pružiny ani konečné energie nejdou a snímek nemá `dyn`.
+   * Dřív se neplatnost určovala jen u snímků (`place` = poslední platný), statistiky dynamiky ale braly stav integrátoru –
+   * „zdvih Z 30,35 mm“ a „dotyk 0,659–2 s“ vedle „ΔZ −15,205 mm“ téhož tělesa. Stejný příznak určuje i stav snímku (record).
+   */
+  let validTgt: number[] | null = null;
+  let stepInvalid = false;
+  const invalidAt = (prev: number[] | null): boolean => {
+    if (!hasMotors) return false;
+    const br = limits.filter((l) => !l.id.startsWith("spring:") && limitBroken(l));
+    if (!br.length) return false;
+    const inv = involved(br.map((l) => l.id));
+    return motors.some((x, i) => inv.has(i) && limitMode(i) === "error" && (!validTgt || Math.abs(x.target - validTgt[i]) > 1e-9 || (prev !== null && Math.abs(x.target - prev[i]) > 1e-12)));
+  };
+  const markStep = (prev: number[] | null) => {
+    stepInvalid = invalidAt(prev);
+    if (!stepInvalid) validTgt = motors.map((x) => x.target);
+  };
   const record = async (k: number, t: number, Vn: Float64Array, Aac: Float64Array, stepMs: number) => {
     const conflicts = live.filter((m) => resNorm(eqOf(m)) > 1e-3).map((m) => m.id);
     driveRes().forEach((r, i) => {
@@ -837,15 +862,13 @@ export async function runDynamic(
     }
     // motor na mezi (kolo 6): porušená mez při předepsaném pohybu motoru
     const wanted = hasMotors ? motors.map((x) => motorAt(x.mo, t, duration)) : [];
-    // motor „chyba“, který žádá jinou hodnotu než v posledním platném snímku (jede, NEBO po dojezdu stojí za mezí), a porušená
-    // mez = neplatný snímek; motory „stop“ zastaví. Dřív (kolo 6b) jen motor, který v tomto snímku jel: motor, který dojel za mez
-    // a tam stál (rychlost 30.35 → zdvih skončí v 1 s), dal kroky 6–12 s Deskou A 10,35 mm v přidržovači jako běžné polohy
-    // (oponent kola 6). Snímek bez platného předchůdce (porušeno už v kroku 0) je neplatný vždy.
-    const pastValid = (i: number) => !lastTargets || Math.abs(wanted[i] - lastTargets[i]) > 1e-9 || Math.abs(motorAt(motors[i].mo, t, duration) - motorAt(motors[i].mo, Math.max(0, t - dt), duration)) > 1e-12;
+    // motor „chyba“, který žádá jinou hodnotu než v posledním platném kroku (jede, NEBO po dojezdu stojí za mezí), a porušená
+    // mez = neplatný snímek (`stepInvalid` integračního kroku snímku, invalidAt); motory „stop“ zastaví. Dřív (kolo 6b) jen motor,
+    // který v tomto snímku jel: motor, který dojel za mez a tam stál (rychlost 30.35 → zdvih skončí v 1 s), dal kroky 6–12 s Deskou A
+    // 10,35 mm v přidržovači jako běžné polohy (oponent kola 6). Snímek bez platného předchůdce (porušeno už v kroku 0) je neplatný vždy.
     let status: MotionStep["status"];
     if (hasMotors && (broken.length || anyFrozen())) {
-      const inv = involved(broken.map((b) => b.id));
-      if (broken.length && motors.some((_, i) => inv.has(i) && limitMode(i) === "error" && pastValid(i))) status = "invalid";
+      if (broken.length && stepInvalid) status = "invalid";
       else {
         if (broken.length && freezeMoving(lastTargets ?? motors.map((x) => x.target), broken.map((b) => b.id))) frozenBy = limits.filter((l) => broken.some((b) => b.id === l.id));
         if (frozen.some((f, i) => f !== null && Math.abs(wanted[i] - f) > 1e-3)) status = "stopped";
@@ -864,11 +887,15 @@ export async function runDynamic(
       });
     if (conflicts.length) conflictSteps++;
     if (status === "invalid" && lastValid) for (const id of Object.keys(place)) place[id] = lastValid.place[id] ?? place[id];
-    const dyn: Record<string, DynStepBody> = {};
-    bodies.forEach((b, i) => {
-      dyn[b.id] = { p: com(i), v: [Vn[i * 6], Vn[i * 6 + 1], Vn[i * 6 + 2]], a: [Aac[i * 6], Aac[i * 6 + 1], Aac[i * 6 + 2]] };
-    });
-    const row: DynMotionStep = { i: frame++, t, motors: hasMotors && (anyFrozen() || status) ? wanted : motors.map((x) => x.target), place, conflicts, dyn };
+    const row: DynMotionStep = { i: frame++, t, motors: hasMotors && (anyFrozen() || status) ? wanted : motors.map((x) => x.target), place, conflicts };
+    // neplatný snímek bez `dyn`: stav integrátoru za mezí (těleso protlačené dorazem) není poloha ani rychlost dílu (kolo 7)
+    if (status !== "invalid") {
+      const dyn: Record<string, DynStepBody> = {};
+      bodies.forEach((b, i) => {
+        dyn[b.id] = { p: com(i), v: [Vn[i * 6], Vn[i * 6 + 1], Vn[i * 6 + 2]], a: [Aac[i * 6], Aac[i * 6 + 1], Aac[i * 6 + 2]] };
+      });
+      row.dyn = dyn;
+    }
     if (status) {
       row.status = status;
       row.cause = "motor";
@@ -887,7 +914,9 @@ export async function runDynamic(
       lastValid = row;
       lastTargets = motors.map((x) => x.target);
     }
-    if (hasSprings) {
+    // neplatný snímek: pružiny posledního platného (délka i síla – síla integrátoru za mezí je nefyzikální)
+    if (hasSprings && status === "invalid" && lastValid?.springs) row.springs = { ...lastValid.springs };
+    else if (hasSprings) {
       row.springs = springSteps(poseDoc(doc, place), g);
       // síla v kroku = pružina + tlumič (stejně jako v integraci)
       // (i pružina bez zadané tuhosti – tuhost z geometrie dílu)
@@ -912,6 +941,13 @@ export async function runDynamic(
     opts.onStep?.(k, nSteps, { ms: stepMs, solveMs: stepMs - collideMs, collideMs });
   };
   forces(V); // síly pružin pro první záznam
+  markStep(null);
+  let eValid = e0;
+  let tValid = 0;
+  if (stepInvalid)
+    bodies.forEach((b) => {
+      peaks[b.id] = { v: 0, tv: 0, a: 0, ta: 0 };
+    });
   await record(0, 0, V, new Float64Array(nv), 0);
   let lastYield = now();
   for (let k = 1; k <= nSteps; k++) {
@@ -919,7 +955,9 @@ export async function runDynamic(
     const t1 = k * dt;
     const tStep = now();
     if (!nb) {
+      const prevT = motors.map((x) => x.target);
       setTime(t1);
+      markStep(prevT);
       if (k % every === 0 || k === nSteps) await record(k, t1, V, new Float64Array(0), 0);
       continue;
     }
@@ -985,6 +1023,8 @@ export async function runDynamic(
     let Vn: Float64Array = new Float64Array(nv);
     for (let a = 0; a < nv; a++) Vn[a] = Vp[a] + 0.5 * dt * A1[a];
     let touching = false;
+    // platnost kroku v konečné poloze kroku (dál se mění jen rychlost) – neplatný krok nezapisuje dotyky ani nárazy (kolo 7)
+    markStep(tPrevTargets);
     // ráz: příjezd na doraz (skok rychlosti v jednom kroku) – zrychlení kroku se nepočítá (drží se předchozí, do špičky nejde)
     let jolt = false;
     for (const l of limits) {
@@ -1001,11 +1041,13 @@ export async function runDynamic(
       const sgn = side === "min" ? 1 : -1; // dovolený směr: od meze
       const vn = sgn * dotV(j, Vn);
       const vPre = sgn * dotV(j, V); // rychlost před nárazem: na konci minulého kroku (po projekci – bez síly, kterou drží jiný doraz)
-      contactOf(l, side, t1);
+      // neplatný krok: dotyk se nezapíše a otevřený úsek se uzavře (těleso „na dorazu“ je za ním protlačené motorem)
+      if (stepInvalid) for (const s of ["min", "max"] as const) openC.delete(`${l.id}:${s}`);
+      else contactOf(l, side, t1);
       touching = true;
       if (vn >= 0 && was === side) continue; // trvající dotyk, odjíždí – bez omezení
       const impact = was !== side && vPre < -V_REST;
-      if (impact) openC.get(`${l.id}:${side}`)!.impacts.push({ t: t1, v: -vPre * (l.unit === "°" ? DEG : 1) });
+      if (impact && !stepInvalid) openC.get(`${l.id}:${side}`)!.impacts.push({ t: t1, v: -vPre * (l.unit === "°" ? DEG : 1) });
       const target = impact ? -eRest * vPre : Math.max(0, vn);
       if (vn < target || impact) {
         rows.push({ j, b: sgn * target });
@@ -1037,15 +1079,20 @@ export async function runDynamic(
     const stepErr = eAfter - eBefore - pw.loadP * dt * 1e-6 + pw.dampP * dt * 1e-6;
     if (touching) eContact -= stepErr;
     else driftMax = Math.max(driftMax, Math.abs(eAfter + eDamp + eContact - eApplied - e0));
-    kinMax = Math.max(kinMax, kinetic(V));
-    for (const s of springNow) if (!springMax || Math.abs(s.force) > Math.abs(springMax.force)) springMax = { id: s.id, force: s.force, t: t1 };
-    bodies.forEach((b, i) => {
-      const pk = peaks[b.id];
-      const vv = Math.hypot(V[i * 6], V[i * 6 + 1], V[i * 6 + 2]);
-      const aa = Math.hypot(Aac[i * 6], Aac[i * 6 + 1], Aac[i * 6 + 2]);
-      if (vv > pk.v) Object.assign(pk, { v: vv, tv: t1 });
-      if (!jolt && aa > pk.a) Object.assign(pk, { a: aa, ta: t1 });
-    });
+    // špičky, největší síla pružiny a konečná energie jen z platných kroků (kolo 7)
+    if (!stepInvalid) {
+      kinMax = Math.max(kinMax, kinetic(V));
+      eValid = eAfter;
+      tValid = t1;
+      for (const s of springNow) if (!springMax || Math.abs(s.force) > Math.abs(springMax.force)) springMax = { id: s.id, force: s.force, t: t1 };
+      bodies.forEach((b, i) => {
+        const pk = peaks[b.id];
+        const vv = Math.hypot(V[i * 6], V[i * 6 + 1], V[i * 6 + 2]);
+        const aa = Math.hypot(Aac[i * 6], Aac[i * 6 + 1], Aac[i * 6 + 2]);
+        if (vv > pk.v) Object.assign(pk, { v: vv, tv: t1 });
+        if (!jolt && aa > pk.a) Object.assign(pk, { a: aa, ta: t1 });
+      });
+    }
     const stepMs = now() - tStep;
     timing.solveMs += stepMs;
     if (k % every === 0 || k === nSteps) await record(k, t1, V, Aac, stepMs);
@@ -1056,7 +1103,8 @@ export async function runDynamic(
     }
   }
   timing.ms = now() - tStart;
-  const eEnd = energy(V);
+  // končí-li výpočet neplatným krokem, „na konci“ = poslední platný krok (stav integrátoru za mezí je nefyzikální)
+  const eEnd = stepInvalid ? eValid : energy(V);
   // vztažná energie: pohybová energie (nebo práce sil / ztráta tlumením) – ne celková energie s polohovou energií tíže nebo
   // předpětím pružin, která by odchylku zmenšila podle toho, kde model leží
   const scaleE = Math.max(kinMax, Math.abs(eApplied), eDamp, 1e-12);
@@ -1070,7 +1118,7 @@ export async function runDynamic(
     restitution: eRest,
     bodies,
     contacts,
-    energy: { e0, end: eEnd, applied: eApplied, damping: eDamp, contacts: eContact, drift: hasMotors ? null : driftMax / scaleE, kinMax, ref: scaleE },
+    energy: { e0, end: eEnd, ...(stepInvalid ? { endT: tValid } : {}), applied: eApplied, damping: eDamp, contacts: eContact, drift: hasMotors ? null : driftMax / scaleE, kinMax, ref: scaleE },
     springMax,
     peaks,
     springRates: springs.map((s) => ({ id: s.c.id, rate: s.rate ?? null, source: s.rateSource })),
