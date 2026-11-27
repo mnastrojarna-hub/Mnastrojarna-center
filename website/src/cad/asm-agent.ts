@@ -57,9 +57,9 @@ import {
   type CompFaceRow,
   type TabInfo,
 } from "./agent-asm";
-import { tr } from "./i18n";
+import { getLang, tr } from "./i18n";
 import { csvCaption, supplyWord } from "./bom-model";
-import { copyFieldsText, refreshPlan, staleCopies, staleCopyText } from "./asm-refresh";
+import { copyFieldsText, refreshPlan, staleCopies, staleCopyText, staleHints } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
@@ -69,9 +69,9 @@ import { springComps, springSeatMates } from "./asm-spring";
 import { lostSpringComps, springLostSides } from "./spring-lost";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
-import { entPrint, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
+import { entPrint, faceBoxes, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
 import { isKinMate } from "./mates-kin";
-import { conflictText, solveStatic, type StaticConflict } from "./mates-static";
+import { conflictText, preferOutcome, solveStatic, type StaticConflict } from "./mates-static";
 import { isLimitMate } from "./motion-quasi";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import {
@@ -96,12 +96,13 @@ import {
   type PartFace,
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
+import { designationNote, withDesignation } from "./material-designation";
 import type { ClashDetail, ClashPair } from "./clash-class";
 import type { ClrReq, ClrRes } from "./clearance-types";
 import type { ProcReq, ProcRes } from "./process-types";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
-export type PartFaces = { faces: { face: number; info: PartFace; area?: number }[]; truncated: boolean };
+export type PartFaces = { faces: { face: number; info: PartFace; area?: number; box?: [Vec3, Vec3] }[]; truncated: boolean };
 
 /** Jádro a stav aplikace pro příkazy sestavy. */
 export type AsmEnv = {
@@ -207,9 +208,10 @@ export async function faceInfo(env: AsmEnv, key: string, index: number): Promise
  * Táž plocha v upraveném dílu (po přečíslování) – jen při skutečné geometrické shodě (cad/mate-remap.ts `matchFace`): přesná shoda,
  * nebo jediná plocha na téže rovině / ose; žádná nebo víc možností = null (ztracená reference – nikdy „nejbližší“ jiná plocha).
  */
-export function sameFace(old: PartFace, faces: PartFaces["faces"], _tol = 1e-4, oldIndex = -1): number | null {
+export function sameFace(old: PartFace, faces: PartFaces["faces"], _tol = 1e-4, oldIndex = -1, area?: number, box?: [Vec3, Vec3]): number | null {
   void _tol;
-  const m = matchFace(facePrint(old), faces, oldIndex);
+  // „táž plocha, změnila velikost“ jen s překryvem s původní plochou (plocha mm² / obálka – vlna 22 kolo 6); bez nich null
+  const m = matchFace(facePrint(old, area, box), faces, oldIndex);
   return m.state === "lost" ? null : m.face;
 }
 
@@ -223,13 +225,14 @@ export async function partFaces(env: AsmEnv, key: string, result: BuildResult | 
   const total = result?.metrics?.faces ?? 0;
   const n = Math.min(total, FACE_LIMIT);
   const areas = result?.mesh ? faceAreas(result.mesh) : [];
+  const boxes = result?.mesh ? faceBoxes(result.mesh) : [];
   const faces: PartFaces["faces"] = [];
   for (let start = 0; start < n; start += 25) {
     const idx = Array.from({ length: Math.min(25, n - start) }, (_, k) => start + k);
     const infos = await Promise.all(idx.map((i) => faceInfo(env, key, i)));
     const cones = await Promise.all(infos.map((f, k) => (f?.kind === "cylinder" && env.isCone ? env.isCone(key, idx[k]).catch(() => false) : Promise.resolve(false))));
     infos.forEach((f, k) => {
-      if (f && f.kind !== "other") faces.push({ face: idx[k], info: { ...f, cone: cones[k] || undefined }, area: areas[idx[k]] });
+      if (f && f.kind !== "other") faces.push({ face: idx[k], info: { ...f, cone: cones[k] || undefined }, area: areas[idx[k]], ...(boxes[idx[k]] ? { box: boxes[idx[k]] } : {}) });
     });
   }
   const out = { faces, truncated: total > n };
@@ -348,8 +351,8 @@ export async function remapAsmRefs(prev: CadDoc, next: CadDoc, env: AsmEnv): Pro
         print = info ? entPrint(info) : null;
       } else {
         const info = await faceInfo(env, j.was.key, ref.face);
-        const area = info ? (await partFaces(env, j.was.key, built.get(j.was.key))).faces.find((f) => f.face === ref.face)?.area : undefined;
-        print = info ? facePrint(info, area) : null;
+        const row = info ? (await partFaces(env, j.was.key, built.get(j.was.key))).faces.find((f) => f.face === ref.face) : undefined;
+        print = info ? facePrint(info, row?.area, row?.box) : null;
       }
     }
     if (!j.now) {
@@ -719,7 +722,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       // ✓ jen pro vazbu, která po změně platí v geometrii (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i);
       // konflikt = ⚠ a polohy beze změny (žádný kompromis v dokumentu – bod 8)
       const okNow = !s.conflict && (!after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed");
-      log.push(tr("{0} vazba {1} ({2}): {3}{4}", okNow ? "✓" : "⚠", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
+      // preferovaná strana, kterou rovnováha pružiny / vazby přebila: ne „✓ … preferovaná strana min · ok“, ale ⚠ s tím, kde díl je
+      // (vlna 22, bod 2 – kolo 6); stejnou polohu pak kinematika začne skokem (⚠ motion.start-jump krok 0)
+      const po = cmd.prefer && after && okNow ? preferOutcome(s.doc, geoProvider(s.doc, env), after) : null;
+      if (po && !po.met) {
+        const where = po.at ? tr("drží ji u {0}", po.at) : tr("hodnota {0}", String(Math.round(po.g * 1000) / 1000).replace(".", getLang() === "en" ? "." : ","));
+        what.push(po.spring ? tr("preference se neuplatnila (pružina tlačí k {0}; {1})", po.side === "min" ? "max" : "min", where) : tr("preference se neuplatnila (jiné vazby; {0})", where));
+      }
+      log.push(tr("{0} vazba {1} ({2}): {3}{4}", okNow && !(po && !po.met) ? "✓" : "⚠", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
       if (s.moved.length) log.push(tr("  pohnuto: {0}", movedText(s.doc, s.moved)));
       else if (s.conflict) log.push(tr("  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)"));
       log.push(...solveNotes(s.doc, s));
@@ -746,6 +756,10 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       if (p.fixed === false) doc = releaseComponent(doc, c0.id); // uvolnit zruší i vazbu Ukotvit (jinak by komponentu dál držel řešič)
       let c: AsmComponent = { ...doc.components!.find((x) => x.id === c0.id)!, placement: { position: [...c0.placement.position] as Vec3, rotation: [...c0.placement.rotation] as Vec3 } };
       const what: string[] = [];
+      /** ℹ material.class / ⚠ material.density-assumed k označení materiálu komponenty (jako příkaz dílu `materiál …`) */
+      const matCodes: { code: string; args?: unknown[] }[] = [];
+      /** řádek „→ … uložen jako označení“ místo ✓, je-li hustota komponenty jen předpoklad */
+      let assumed: string | undefined;
       const moved = !!(p.at || p.move || p.rotation || p.turn);
       if (p.at) c.placement.position = [...p.at] as Vec3;
       if (p.move) c.placement.position = c.placement.position.map((v, k) => Math.round((v + p.move![k]) * 1e6) / 1e6) as Vec3;
@@ -786,15 +800,20 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           if (!id) throw new Error(tr("materiál importované komponenty: jen třída hustoty – {0}", MATERIALS.map((m) => m.id).join(", ")));
           c.material = id;
         } else {
-          const sd = { ...c.source.doc };
-          // známá třída = hustota (a kusovník ukáže třídu); jiný text = označení do razítka a kusovníku, hustota zůstává
-          if (id) {
-            sd.material = id;
-            delete sd.materialName;
-          } else sd.materialName = p.material;
+          // jedno pravidlo s příkazem dílu `materiál …` a polem označení v GUI (material-designation.ts, vlna 22 kolo 6):
+          // známá třída = hustota; označení s rozpoznanou třídou (ČSN 11 423 → ocel) nastaví i třídu – ℹ material.class;
+          // jiné označení = do razítka a kusovníku, hustota zůstává jako PŘEDPOKLAD – ⚠ material.density-assumed (ne ✓)
+          const sd = withDesignation({ ...c.source.doc }, p.material);
           c = { ...c, source: { kind: "part", doc: sd } };
+          const note = designationNote(sd.materialName, sd.material);
+          if (note) matCodes.push({ code: note.code, args: note.args });
         }
-        what.push(tr("materiál {0}", id ? (MATERIALS.find((m) => m.id === id)?.label ?? id) : `„${p.material}“`));
+        const cls = MATERIALS.find((m) => m.id === (c.source.kind === "part" ? c.source.doc.material : id));
+        if (matCodes.some((x) => x.code === "material.density-assumed") && c.source.kind === "part") {
+          // hustota je PŘEDPOKLAD → žádné ✓ pro materiál (jako příkaz dílu `materiál …` v engine/ops/meta.ts): vlastní řádek „→“
+          // (ℹ msg.note) vedle ⚠ material.density-assumed; ostatní změny téhož příkazu (poloha, barva …) dál ✓ (vlna 22 kolo 6)
+          assumed = tr("→ komponenta „{0}“: materiál „{1}“ uložen jako označení do razítka – třída se z něj nepoznala, hustota zůstává podle třídy „{2}“ ({3} g/cm³); pro jinou hustotu zadejte: materiál {4}", c0.name, c.source.doc.materialName ?? p.material, cls?.label ?? "?", cls?.density ?? "?", MATERIALS.map((x) => x.id).join("|"));
+        } else what.push(tr("materiál {0}", c.source.kind === "part" && c.source.doc.materialName ? tr("„{0}“ (hustota podle: {1})", c.source.doc.materialName, cls?.label ?? "?") : (cls?.label ?? id ?? p.material)));
       }
       if (p.supply) {
         // druh položky kusovníku na komponentě (přepis druhu dílu); kind null = zpět na výchozí druh (bom-model.ts)
@@ -839,10 +858,12 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         movedOthers = s.moved.filter((id) => id !== c.id);
         conflict = s.conflict;
       } else if (moved) doc = await refreshSprings(doc, env); // bez vazeb: délka pružin podle nové polohy dosedací komponenty
-      log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
+      if (what.length) log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
+      if (assumed) log.push(assumed);
       if (movedOthers.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, movedOthers)));
       if (st && Object.values(st).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
-      return done(doc, true, { ...(st ? { mateStatus: st } : {}), ...(conflict ? { codes: [conflictCode(conflict)] } : {}) });
+      const codes = [...matCodes, ...(conflict ? [conflictCode(conflict)] : [])];
+      return done(doc, true, { ...(st ? { mateStatus: st } : {}), ...(codes.length ? { codes } : {}) });
     }
     case "remove": {
       asmOnly();
@@ -1088,7 +1109,7 @@ export async function bomData(d: CadDoc, env: AsmEnv, structured: boolean): Prom
 export function bomCodes(d: CadDoc, rows: BomRow[], env: Pick<AsmEnv, "partOf">): { code: string; text: string }[] {
   const out: { code: string; text: string }[] = [];
   for (const s of staleCopies(d, env.partOf)) out.push({ code: "asm.stale-copy", text: staleCopyText(s) });
-  for (const w of bomWarnings(rows)) out.push({ code: "bom.make-incomplete", text: w });
+  for (const w of bomWarnings(rows, staleHints(d, env.partOf))) out.push({ code: "bom.make-incomplete", text: w });
   return out;
 }
 

@@ -267,7 +267,6 @@ Upravit	Edit
 Upravit parametry	Edit parameters
 Upravit skicu	Edit sketch
 Vazby parametrů	Parameter bindings
-Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem	Free text for the drawing title block, e.g. ČSN 11 423 or 1.0503 – the density comes from the material class above; it is carried by link and file
 Výchozí	Default
 Výraz	Expression
 Zapnout prvek	Enable feature

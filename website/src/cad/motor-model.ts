@@ -540,7 +540,10 @@ export function motorNotes(study: Pick<MotionStudy, "motors" | "duration" | "col
         args: [i + 1, u(s.start), u(cur)],
         text: abs
           ? tr("motor {0}: začátek {1} se liší od aktuální hodnoty vazby „{2}“ {3} – v kroku 0 díl přeskočí o {4}; zdvih od aktuální hodnoty: pohyb motor … zdvih Δ", i + 1, u(s.start), label(m), u(cur), u(jump))
-          : tr("motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo zdvih Δ", i + 1, u(s.start), label(m), u(jump)),
+          : mo.kind === "rotary"
+            ? // rotační motor: zadání je „otočení Δ“, ne „zdvih Δ“ (vlna 22, bod 11 – kolo 6)
+              tr("motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo otočení Δ", i + 1, u(s.start), label(m), u(jump))
+            : tr("motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo zdvih Δ", i + 1, u(s.start), label(m), u(jump)),
       });
     if (s.short) {
       const speedText = mo.kind === "rotary" ? tr("{0} ot/min", motorNum(Math.abs(mo.speed!), 3)) : tr("{0} mm/s", motorNum(Math.abs(mo.speed!), 3));

@@ -206,7 +206,10 @@ export function holdPhase(down: P2, downT: number, now: P2, nowT: number, ms = H
   return nowT - downT >= ms ? "hold" : "wait";
 }
 
-/** poklepání: druhý stisk do `DBL_MS` ms a do `DBL_PX` px od prvního (stejné pravidlo pro plátno i rozšíření) */
+/**
+ * poklepání: druhý STISK do `DBL_MS` ms a do `DBL_PX` px od PRVNÍHO STISKU (`firstT` = čas stisku, ne puštění) – jedno pravidlo
+ * pro plátno 2D (draft-canvas: okno dvěma kliky) i rozšíření rozvržení (ui-layout `pointerHook`)
+ */
 export const DBL_MS = 350;
 export const DBL_PX = 6;
 export const isDoubleClick = (first: P2, firstT: number, now: P2, nowT: number, ms = DBL_MS, px = DBL_PX): boolean =>

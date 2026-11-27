@@ -218,7 +218,7 @@ export function resolveAction(query: string): ApiAction {
   const list = apiActions();
   const hit = list.find((a) => key(a.id) === q || key(a.label) === q) ?? list.find((a) => a.id === ACTION_ALIASES[q]);
   if (hit) return hit;
-  const ext = allExt().find((d) => key(d.ext) === q || key(d.label) === q);
+  const ext = allExt().find((d) => key(d.ext) === q || key(d.label) === q || key(d.labelSrc ?? "") === q);
   if (ext && !ext.action) throw new Error(tr("„{0}“ není akce, ale prvek – přidejte ho příkazem: prvek {1} klíč=hodnota …", ext.label, ext.ext));
   throw new Error(tr("neznámá akce „{0}“ – akce: {1}", query, list.map((a) => `${a.id} (${a.label})`).join(", ")));
 }

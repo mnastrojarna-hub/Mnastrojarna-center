@@ -12,6 +12,7 @@
  * Plocha komponenty = `F12` (číslo z `sestava plochy`, u podsestavy `F3@Díl`) nebo pravidlo `+Z|-X|horní|spodní|největší|nejmenší|válcová|rovinná|Ø8|R4`.
  * Provedení (jádro, řešič vazeb, záložky): cad/asm-agent.ts.
  */
+import { knownMaterialId } from "./material-designation";
 import { getLang, tr } from "./i18n";
 import { supplyKindOf, supplyWord, supplyWordsHelp, supplyOf, supplySection, kindsIn, bomNotes } from "./bom-model";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -22,6 +23,7 @@ import { springStatusLine, type SpringCheck } from "./asm-spring";
 import { lostSpringComps, springFixCmd } from "./spring-lost";
 import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, CadDoc, LostRef, Mate, MateRef, SupplyKind, Vec3 } from "./types";
+import type { StaleHint } from "./asm-refresh";
 
 /* ───────────────────────── typy ───────────────────────── */
 
@@ -405,14 +407,9 @@ const MOLD_KEYS: [MoldKey, Set<string>, number][] = [
 ];
 const CAVITY = W("dutina", "dutinu", "dutiny", "kapsa", "kapsy", "cavity", "pocket", "nest", "tasche");
 const FORMY = W("formy", "forma", "formu", "mold", "mould");
-const MAT_ALIAS: Record<string, string> = { steel: "ocel", stahl: "ocel", stainless: "nerez", edelstahl: "nerez", inox: "nerez", aluminium: "hlinik", aluminum: "hlinik", alu: "hlinik", brass: "mosaz", messing: "mosaz", copper: "med", kupfer: "med", titanium: "titan", plast: "pom", plastic: "pom", kunststoff: "pom" };
-/** materiál podle id, popisku nebo anglického / německého názvu třídy (null = neznámý) */
-export function materialId(q: string): string | null {
-  const f = fold(q.trim());
-  if (!f) return null;
-  const hit = MATERIALS.find((m) => fold(m.id) === f || fold(m.label) === f || fold(m.label).split(" ")[0] === f || MAT_ALIAS[f] === m.id);
-  return hit?.id ?? null;
-}
+/** materiál podle id, popisku nebo anglického / německého názvu třídy (null = neznámý) – jedno pravidlo s příkazem dílu
+ *  `materiál …` a polem označení v GUI (material-designation.ts `knownMaterialId`) */
+export const materialId = (q: string): string | null => knownMaterialId(q);
 const materialList = () => MATERIALS.map((m) => m.id).join(", ");
 
 function parseMoldBase(c: Cur): AsmCmd {
@@ -1412,11 +1409,21 @@ export function bomText(rows: BomRow[], docName: string, structured: boolean): s
  * Upozornění kusovníku jako řádky ⚠ (kód `bom.make-incomplete`): vyráběné díly bez čísla výkresu a bez označení materiálu.
  * Prázdný seznam = nic nechybí v TĚCHTO řádcích – kusovník nic dalšího netvrdí (výkresy hlídá `docSupply`).
  */
-export function bomWarnings(rows: BomRow[]): string[] {
+export function bomWarnings(rows: BomRow[], hints?: ReadonlyMap<string, StaleHint>): string[] {
   const n = bomNotes(rows);
   const out: string[] = [];
-  if (n.noNumber.length) out.push(tr("vyráběné díly bez čísla výkresu: {0} – číslo: výkres razítko číslo=\"…\" v dílu, nebo sestava komponenta \"…\" číslo \"…\"", n.noNumber.join(", ")));
-  if (n.noMaterial.length) out.push(tr("vyráběné díly bez označení materiálu (jen třída): {0} – materiál 1.2379 v dílu", n.noMaterial.join(", ")));
+  // údaj, který má díl v záložce, ale kopie v sestavě je starší: neradit „v dílu“, ale obnovit kopii (bod 22g, kolo 6)
+  const num = (x: string) => hints?.get(x)?.number;
+  const mat = (x: string) => hints?.get(x)?.material;
+  const noNumber = n.noNumber.filter((x) => !num(x));
+  const noMaterial = n.noMaterial.filter((x) => !mat(x));
+  if (noNumber.length) out.push(tr("vyráběné díly bez čísla výkresu: {0} – číslo: výkres razítko číslo=\"…\" v dílu, nebo sestava komponenta \"…\" číslo \"…\"", noNumber.join(", ")));
+  if (noMaterial.length) out.push(tr("vyráběné díly bez označení materiálu (jen třída): {0} – materiál 1.2379 v dílu", noMaterial.join(", ")));
+  for (const x of [...new Set([...n.noNumber.filter(num), ...n.noMaterial.filter(mat)])]) {
+    const h = hints!.get(x)!;
+    const what = [n.noNumber.includes(x) && h.number ? tr("číslo {0}", h.number) : "", n.noMaterial.includes(x) && h.material ? tr("materiál {0}", h.material) : ""].filter(Boolean).join(", ");
+    out.push(tr("{0}: v kusovníku chybí {1} – díl v záložce je má, kopie v sestavě je starší: sestava obnovit {2}", x, what, h.ref));
+  }
   return out;
 }
 

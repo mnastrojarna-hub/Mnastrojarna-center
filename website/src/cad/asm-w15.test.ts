@@ -233,7 +233,9 @@ describe("pružina – délka z dosedacích ploch (přepočet), síla, doraz", (
     expect(L[11]).toBeCloseTo(18, 4);
     expect(res.steps[11]).toMatchObject({ status: "stopped", cause: "motor" });
     expect(res.steps[11].reached![0]).toBeCloseTo(18, 4);
-    expect(res.steps[11].conflicts).toEqual(expect.arrayContaining(["d", "spring:S"]));
+    // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit: doraz Ln pružiny motor zastavil, ale je splněný → jen v odchylkách kroku
+    expect(res.steps[11].conflicts).toEqual(["d"]);
+    expect(res.steps[11].devs!.map((x) => x.id)).toEqual(expect.arrayContaining(["spring:S"]));
     expect(res.steps.map((s) => s.springs!.S.level)).toEqual(Array(12).fill("ok"));
     expect(res.steps[5].springs!.S.force).toBeCloseTo(25 * (44 - 28), 6);
     const sum = motionSummary(res, d);

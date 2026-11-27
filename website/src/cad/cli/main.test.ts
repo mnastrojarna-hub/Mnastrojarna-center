@@ -101,3 +101,29 @@ describe("--progress: pojmenované fáze", () => {
     expect(fmtEvent({ t: "progress", op: "export", phase: "write" })).toBe("  export: zápis souboru");
   });
 });
+
+describe("✗ run.timeout / run.memory / run.cancelled: poslední fáze a průběh (vlna 22 kolo 6, bod 22h)", () => {
+  it("průběh stavby při exportu → data.phase=model, data.progress „build 2/2 …“, text „(ve fázi: přestavba modelu, 2/2)“", async () => {
+    const { phaseInfo, trackProgress } = await import("./watchdog");
+    const { setLang } = await import("../i18n");
+    setLang("cs");
+    const c: Parameters<typeof phaseInfo>[0] = {};
+    expect(phaseInfo(c)).toBeNull(); // bez hlášené fáze nic nevymýšlet
+    trackProgress(c, { op: "export:step", phase: "model" });
+    trackProgress(c, { op: "build", index: 0, total: 2, name: "Trubka 1" });
+    trackProgress(c, { op: "build", index: 1, total: 2, name: "Tažení po šroubovici" });
+    expect(phaseInfo(c)).toEqual({ phase: "model", progress: "build 2/2 Tažení po šroubovici", text: " (ve fázi: přestavba modelu, 2/2)" });
+    trackProgress(c, { op: "build", index: 2, total: 2, phase: "mesh" });
+    expect(phaseInfo(c)).toEqual({ phase: "model", progress: "build: mesh", text: " (ve fázi: přestavba modelu, síť modelu)" });
+    // další fáze exportu vynuluje průběh stavby
+    trackProgress(c, { op: "export:step", phase: "convert" });
+    expect(phaseInfo(c)).toEqual({ phase: "convert", text: " (ve fázi: převod do STEP)" });
+    // stavba bez pojmenované fáze (dlouhý prvek) = přestavba modelu
+    const d: Parameters<typeof phaseInfo>[0] = {};
+    trackProgress(d, { op: "build", index: 0, total: 3, name: "Kvádr 1" });
+    expect(phaseInfo(d)?.text).toBe(" (ve fázi: přestavba modelu, 1/3)");
+    setLang("en");
+    expect(phaseInfo(c)?.text).toBe(" (in phase: conversion to STEP)");
+    setLang("cs");
+  });
+});

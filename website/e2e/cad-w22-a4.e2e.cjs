@@ -6,7 +6,8 @@
 //  16) tři `sdílet` v jednom běhu → tři adresy v JSON (shares) i v protokolu; `odkaz ověřit` (✓ / ✗ useknutý); otevření
 //      useknutého odkazu v adrese → hláška „Odkaz je useknutý“ (ne „neplatný“ / „nesprávné heslo“)
 //  21) bez WebGL: lišta „Softwarové zobrazení – WebGL není dostupné“ neutrálně + stav jádra vedle; klik → seznam omezení
-//      a alternativy výběru; EN / DE text
+//      a alternativy výběru; EN / DE text; (kolo 6) poznámka v náhledu bez „nelze spustit“ a bez barev chyby, stavový řádek
+//      s projekcí náhledu (pravoúhlá), ne „perspektiva“
 // Průchody: WebGL (cs), bez WebGL (cs – majitel testoval bez WebGL), EN a DE (texty lišty a konzole).
 // Spuštění: E2E_BASE=http://localhost:3531 node e2e/cad-w22-a4.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
@@ -118,6 +119,13 @@ async function softView(p, tag, re) {
     return seen || document.querySelector('[data-core-status]')?.getAttribute('data-core-status');
   });
   ok(/busy|ready/.test(busySeen || ''), `${tag}21: stav přepočtu se v softwarovém zobrazení ukazuje (${busySeen})`);
+  // kolo 6: poznámka nad VYKRESLENÝM modelem není chyba – žádné „3D okno nelze spustit“ ani barvy chyby; stavový řádek
+  // ukazuje skutečnou projekci náhledu (pravoúhle), ne nastavenou perspektivu
+  const softNote = await p.locator('[data-soft-note]').evaluate((el) => ({ t: el.innerText, bg: getComputedStyle(el).backgroundColor, bd: getComputedStyle(el).borderTopColor }));
+  ok(!/nelze spustit|cannot start|kann nicht/i.test(softNote.t) && re.test(softNote.t), `${tag}21: poznámka v náhledu bez „nelze spustit“ (${softNote.t.slice(0, 90).replace(/\s+/g, ' ')})`);
+  ok(!/255, 247, 246|243, 198, 194/.test(softNote.bg + softNote.bd), `${tag}21: poznámka v náhledu neutrálně, ne barvou chyby (${softNote.bg} / ${softNote.bd})`);
+  const proj = await p.locator('footer [data-projection]').evaluate((el) => ({ k: el.getAttribute('data-projection'), t: el.textContent }));
+  ok(proj.k === 'ortho' && /pravoúhlá|orthographic|orthogonal/.test(proj.t) && !/^\S+ · (perspektiva|perspective|Perspektive)$/.test(proj.t.trim()), `${tag}21: stavový řádek – skutečná projekce náhledu (${proj.t})`);
   await p.locator('[data-env-status="soft"]').click();
   await p.locator('[data-viewport-help]').waitFor({ timeout: 5000 });
   const lim = await p.locator('[data-soft-limit]').evaluateAll((els) => els.map((e) => e.getAttribute('data-soft-limit')));

@@ -555,6 +555,41 @@ describe("recenze B4: načtené dokumenty se ověří, jedna chyba = jeden ✗",
       } else expect(r.stopped).toBeUndefined();
     }
   }, 180_000);
+  it("vlna 22, bod 22b (kolo 6): ⚠ prvku dokumentu z --open zastaví přísný běh PŘED skriptem – žádný export se nezapíše", async () => {
+    // dřív: řádek načtení `--open` je null a `report` ⚠ nezměněného prvku u dokumentu bez řádku načtení přeskočil –
+    // přísné ověření před skriptem ⚠ nevidělo, `export stl` se provedl a soubor se zapsal; STOP dal až závěrečný souhrn (L-)
+    const doc = { app: "mnastrojarna-cad", version: 2, name: "Deska R", material: "ocel", features: [{ id: "t1", name: "Trubka 1", type: "tube", outer: 30, inner: 16.4, height: 20, position: [0, 0, 0], mode: "new", axis: "Z" }, { id: "h1", name: "Tažení po šroubovici", type: "box", size: [1, 1, 1], position: [0, 0, 0], centered: false, mode: "cut" }] };
+    const warned = (d: CadDoc) => d.features.map((f) => (f.id === "h1" ? { id: f.id, ok: true, warning: "špička profilu závitu je tečná k povrchu", warnCode: "thread.tip-tangent" } : { id: f.id, ok: true }));
+    const kernel = fakeKernel({
+      build: async (d: CadDoc) => ({ ...result(d), status: warned(d) }),
+      check: async (d: CadDoc) => ({ status: warned(d), paramErrors: [], solid: true }),
+      asmParts: async (parts: { key: string; source: ComponentSource }[]) => parts.map((p) => ({ key: p.key, result: { ...result(p.source.kind === "part" ? p.source.doc : emptyDoc()), status: warned(p.source.kind === "part" ? p.source.doc : emptyDoc()) } })),
+    });
+    const { engineRun, finishRun } = await import("../cli/job");
+    const { ReportBuilder } = await import("./protocol");
+    for (const strict of [true, false]) {
+      const ws = new MemoryWorkspace();
+      const files = memoryFileSink();
+      const host: EngineHost = { kernel, files, inputs: memoryFileSource({ "deska-r.mncad": new TextEncoder().encode(JSON.stringify(doc)) }), now: () => Date.now() };
+      const rb = new ReportBuilder({ lang: "cs", lines: 2, strict });
+      const ops: string[] = [];
+      const hooks = { opStart: (_l: number | null, op: string) => void ops.push(op), opEnd: () => undefined };
+      await engineRun(ws, "stav\nexport stl r7", host, rb, { strict, open: ["deska-r.mncad"] }, hooks);
+      await finishRun(ws, host, rb, { formats: "none", allDocs: false, noOutputOnError: false, share: false, strict }, hooks);
+      const r = rb.finish();
+      expect(coded(r)).toContain("L- warn thread.tip-tangent");
+      if (strict) {
+        expect(r.stopped).toEqual({ line: null, code: "thread.tip-tangent" });
+        expect(ops).not.toContain("export"); // skript se neprovedl
+        expect(ops).not.toContain("status");
+        expect([...files.files.keys()]).toEqual([]);
+      } else {
+        expect(r.stopped).toBeUndefined();
+        // normální běh: ⚠ jen jednou (ověření při otevření + závěrečný souhrn se neopakují)
+        expect(coded(r).filter((c) => c === "L- warn thread.tip-tangent")).toHaveLength(1);
+      }
+    }
+  });
   it("nález 10: selhané zaoblení v úpravě v kontextu = jeden ✗ feature.failed (ne další msg.error ze `sestava hotovo`)", async () => {
     const r = await runReal('nový díl Čep\nválec 10 30\nnová sestava S\nvložit "Čep" ukotvit\nsestava upravit "Čep"\nzaoblit 40\nsestava hotovo\nkolize');
     expect(coded(r).filter((c) => c.includes("error"))).toEqual(["L6 error feature.failed"]);

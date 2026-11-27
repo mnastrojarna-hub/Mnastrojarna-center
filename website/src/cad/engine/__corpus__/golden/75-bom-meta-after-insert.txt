@@ -34,8 +34,9 @@ Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
 1 | Deska A |  | 1 | — (třída Ocel) | 0,942
 2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
 ⚠ řádek 6: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo, materiál, výkres) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení
-⚠ řádek 6: vyráběné díly bez čísla výkresu: Deska A, Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
-⚠ řádek 6: vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu
+⚠ řádek 6: vyráběné díly bez čísla výkresu: Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 6: vyráběné díly bez označení materiálu (jen třída): Přidržovač – materiál 1.2379 v dílu
+⚠ řádek 6: Deska A: v kusovníku chybí číslo DA-001, materiál 1.2379 – díl v záložce je má, kopie v sestavě je starší: sestava obnovit #1
 
 Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]

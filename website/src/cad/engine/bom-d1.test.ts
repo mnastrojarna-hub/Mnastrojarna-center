@@ -65,7 +65,11 @@ describe("bod 22g – metadata dílu po vložení do sestavy", () => {
     expect(st[1].text).toBe("komponenta „Deska A“ je starší než díl „Deska A“ v záložce (materiál) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení");
     // kusovník ukazuje kopii z vložení – ale označeně (— (třída Ocel)) a s ⚠, ne tiché „Ocel“
     expect(text(r)).toMatch(/1 \| Deska A \|  \| 1 \| — \(třída Ocel\) \|/);
-    expect(codes(r, "bom.make-incomplete").map((e) => e.text)).toContain("vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu");
+    // kolo 6 (22g): Deska A materiál v záložce MÁ – rada obnovit kopii, ne „materiál 1.2379 v dílu“; Přidržovač dál s radou
+    // doplnit materiál (záměrná změna textu – dřív obě desky stejnou, u Desky A mylnou radou)
+    const inc = codes(r, "bom.make-incomplete").map((e) => e.text);
+    expect(inc).toContain("vyráběné díly bez označení materiálu (jen třída): Přidržovač – materiál 1.2379 v dílu");
+    expect(inc).toContain("Deska A: v kusovníku chybí materiál 1.2379 – díl v záložce je má, kopie v sestavě je starší: sestava obnovit #1");
   });
 
   it("sestava obnovit: kusovník i CSV převezmou materiál dílu, ⚠ zastaralé kopie zmizí; podruhé „už odpovídá“", async () => {

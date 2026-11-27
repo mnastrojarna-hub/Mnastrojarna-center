@@ -70,4 +70,3 @@ otevře sdílený odkaz jako příjemce a nic nezmění: ✓ s režimem, platnos
 #!dynamic – texty kódů share.store-off a share.link-broken (src/cad/engine/codes.ts, tr(def.key))
 úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu ({0} znaků)	the short-link store is switched off – the whole document is in the link ({0} characters)
 odkaz se neotevře ({0}): {1}	the link does not open ({0}): {1}
- – {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	 – {0}, wheel zooms. A click selects a face, edge or vertex (Ctrl/Shift adds), by text “select F3 E2” or window.mncad.select([…]). Full 3D: Chrome with --enable-unsafe-swiftshader without --disable-software-rasterizer.

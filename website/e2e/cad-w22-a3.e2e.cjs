@@ -3,7 +3,8 @@
 //      konzole ukazuje stav a id běhu, předchozí protokol jen jako „Předchozí běh“; uložit / export / sdílet počkají na
 //      dokončený stav a soubor nese revizi modelu
 //  22e) rozepsaná hodnota pole (helixSweep hloubka 0,8 → 0,82) a hned název – obojí v dokumentu; EN tečka / DE čárka;
-//      Esc vrátí hodnotu; opuštění pole bez změny = žádný krok Zpět; přepnutí záložky < 450 ms – hodnota ve SVÉM dokumentu
+//      Esc vrátí hodnotu; opuštění pole bez změny = žádný krok Zpět; přepnutí záložky < 450 ms – hodnota ve SVÉM dokumentu;
+//      (kolo 6) Ctrl+S / Cmd+S skutečnými klávesami s kurzorem v poli → zápis souboru s rozepsanou hodnotou, znovuotevření
 //  22f) formát A2 → A3 a přepnutí na jiný dokument do 500 ms – A3 v Desce A, druhý dokument bez cizího výkresu; Ctrl+Z
 //      vrátí jen změnu listu; zaškrtnutí pohledu se uloží
 //  22h) export jako úloha: fáze, seznam Exporty (data-*), kontrola zpětným načtením i z menu, zrušení bez prázdného souboru
@@ -220,6 +221,77 @@ async function fields(p, tag, lang) {
   ok(Math.abs(docs.a.features.find((x) => x.id === feat.id).data.depth - 0.9) < 1e-9 && docs.b.features.length === 1 && !docs.b.features.some((x) => x.type === 'ext'), `${tag}22e: rozepsaná hodnota zapsána do Formulář A, Formulář B beze změny (${bBefore.length > 0})`);
 }
 
+/* ───────────── 22e (kolo 6): Ctrl+S / Cmd+S s kurzorem v poli – skutečné klávesy, zápis do souboru, znovuotevření ───────────── */
+const fsInit = () => {
+  // automatizace (navigator.webdriver) stahuje rovnou bez dialogu – tady zkoušíme cestu člověka: dialog „Uložit jako“ a zápis
+  Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  window.__fs = { picked: [], writes: [] };
+  window.showSaveFilePicker = async (o) => {
+    const name = (o && o.suggestedName) || 'x';
+    window.__fs.picked.push(name);
+    return { name, kind: 'file', createWritable: async () => ({ write: async (blob) => { const t = typeof blob === 'string' ? blob : await new Response(blob).text(); window.__fs.writes.push([name, t]); }, close: async () => undefined }), remove: async () => undefined };
+  };
+};
+const lastWrite = async (p, n0, ms = 20000) => {
+  try { await p.waitForFunction((n) => window.__fs.writes.length > n, n0, { timeout: ms }); } catch { return null; }
+  const w = await p.evaluate(() => window.__fs.writes.slice(-1)[0]);
+  try { return JSON.parse(w[1]); } catch { return { raw: String(w[1]).slice(0, 200) }; }
+};
+const findDoc = (j, name) => {
+  if (!j || typeof j !== 'object') return null;
+  if (j.name === name && j.features) return j;
+  for (const k of ['doc', 'document', 'project']) if (j[k]) { const r = findDoc(j[k], name); if (r) return r; }
+  if (Array.isArray(j.docs)) for (const d of j.docs) { const r = findDoc(d, name); if (r) return r; }
+  return j.features ? j : null;
+};
+async function ctrlSave(b, tag, url, lang) {
+  const L = { cs: { depth: 'Hloubka závitu', d1: '0,82', d2: '0,84' }, en: { depth: 'Thread depth', d1: '0.82', d2: '0.84' }, de: { depth: 'Gewindetiefe', d1: '0,82', d2: '0,84' } }[lang];
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
+  await ctx.addInitScript(fsInit);
+  const p = await ctx.newPage();
+  try {
+    await start(p, url);
+    const docName = 'Uložit ' + lang;
+    await p.evaluate((t) => window.mncad.run(t), THREAD(docName, 6));
+    await p.evaluate(() => window.mncad.idle && window.mncad.idle());
+    const feat = await p.evaluate(() => window.mncad.getDocument().features.find((f) => f.type === 'ext'));
+    await p.locator(`[data-feature-row="${feat.id}"]`).click(); await p.waitForTimeout(700);
+    // skutečné klávesy: hloubka, hned název, hned Ctrl+S s kurzorem v poli názvu (bez Tab, bez OK)
+    const depth = p.getByLabel(L.depth).first();
+    await depth.click(); await p.keyboard.press('Control+a'); await p.keyboard.type(L.d1);
+    const idx = await p.locator('input').evaluateAll((els) => els.findIndex((i) => /^Tažení po šroubovici|^Helical sweep|^Austragung entlang Helix|^Helix/.test(i.value)));
+    ok(idx >= 0, `${tag}22e kolo 6: pole názvu prvku nalezeno`);
+    if (idx < 0) return;
+    const nameEl = p.locator('input').nth(idx);
+    await nameEl.click(); await p.keyboard.press('Control+a'); await p.keyboard.type('Závit S');
+    const n0 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved = await lastWrite(p, n0, 20000);
+    const sd = findDoc(saved, docName);
+    const sf = sd && sd.features ? sd.features.find((x) => x.id === feat.id) : null;
+    ok(!!sf && Math.abs(sf.data.depth - 0.82) < 1e-9 && sf.name === 'Závit S', `${tag}22e kolo 6: Ctrl+S v poli názvu zapsal soubor s hloubkou ${L.d1} a názvem (depth=${sf && sf.data.depth}, název=${sf && sf.name}, zápisů ${saved ? 1 : 0})`);
+    ok(await p.evaluate(() => !!document.activeElement && document.activeElement.tagName === 'INPUT'), `${tag}22e kolo 6: po Ctrl+S zůstal kurzor v poli (zkratka nepřebrala fokus)`);
+    // Cmd+S (Meta) s kurzorem v poli hloubky – druhý zápis do téhož souboru
+    await depth.click(); await p.keyboard.press('Control+a'); await p.keyboard.type(L.d2);
+    const n1 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Meta+s');
+    const saved2 = await lastWrite(p, n1, 20000);
+    const sf2 = findDoc(saved2, docName)?.features?.find((x) => x.id === feat.id);
+    ok(!!sf2 && Math.abs(sf2.data.depth - 0.84) < 1e-9, `${tag}22e kolo 6: Cmd+S v poli hloubky zapsal ${L.d2} (depth=${sf2 && sf2.data.depth})`);
+    // znovuotevření prvního souboru: hloubka a název ze souboru
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    if (saved && sd) {
+      await p.locator('input[type=file]:not([data-insert-input])').first().setInputFiles({ name: 'ulozit.mncad', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
+      await p.waitForTimeout(2500);
+      const d = await p.evaluate(() => window.mncad.getDocument());
+      const g = (d.features || []).find((x) => x.type === 'ext');
+      ok(!!g && Math.abs(g.data.depth - 0.82) < 1e-9 && g.name === 'Závit S', `${tag}22e kolo 6: znovu otevřený soubor má depth=${g && g.data.depth} a název „${g && g.name}“`);
+    }
+  } finally {
+    await ctx.close();
+  }
+}
+
 /* ───────────────────────── 22f: výkres – formát, přepnutí záložky, Ctrl+Z, pohled ───────────────────────── */
 async function drawing(p, tag, lang) {
   const fmt = { cs: 'Formát listu', en: 'Sheet size', de: 'Blattformat' }[lang];
@@ -376,6 +448,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
     await ctx.close();
   }
   await menuExport(b, '');
+  for (const [tag, url, lang] of [['', `${BASE}/cad`, 'cs'], ['[en] ', `${BASE}/en/cad`, 'en'], ['[de] ', `${BASE}/de/cad`, 'de']]) await ctrlSave(b, tag, url, lang);
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
   const nogl = await launch({ args: ['--disable-gpu', '--disable-webgl', '--disable-3d-apis'] });
@@ -386,6 +459,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   await round3(p, '[bez WebGL] ');
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
+  await ctrlSave(nogl, '[bez WebGL] ', `${BASE}/cad`, 'cs');
   await nogl.close();
 })()
   .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })

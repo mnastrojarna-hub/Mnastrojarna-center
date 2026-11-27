@@ -31,8 +31,14 @@ export const nf = (n: number, d = 2): string => {
 };
 /** bod „[50; 30; 31,5]“ */
 export const fmtPt = (v: Vec3, d = 2): string => `[${v.map((x) => nf(x, d)).join("; ")}]`;
-/** objem jako dřív v protokolu kolizí („365,2“, „1 135,2“) */
-export const fmtVol = (v: number): string => fmtNum(v, 1);
+/**
+ * objem jako dřív v protokolu kolizí („365,2“, „1 135,2“); desetinný oddělovač podle jazyka (EN „365.2“ – dřív i v EN čárka,
+ * kolo 6), seskupení tisíců mezerou ve všech jazycích
+ */
+export const fmtVol = (v: number): string => {
+  const s = fmtNum(v, 1);
+  return getLang() === "en" ? s.replace(",", ".") : s;
+};
 
 /** komponenta v seznamu sourozenců: „název [přezdívka]“, „název #k“ (stejný název vícekrát), jinak název */
 function compLabel(comps: readonly AsmComponent[], c: AsmComponent): string {
@@ -476,7 +482,9 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
   if (faults.length > MAX) codes.push({ code: "clash.real", text: tr("v pohybu další dvojice dílů s kolizí: {0} – pohyb krok N je vypíše", faults.length - MAX) });
   for (const g of all.filter((x) => x.cls === "work")) {
     const steps = [...g.steps].sort((x, y) => x - y);
-    codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, span(steps) || tr("mezi kroky"), g.rule ?? "?", n3(g.volume)) });
+    // kontakt jen mezi kroky (zjemnění): „mezi kroky 0 a 1“ – dřív „v krocích mezi kroky“
+    if (!steps.length && g.between) codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ mezi kroky {2} a {3} (pravidlo {4}), největší průnik {5} mm³", g.na, g.nb, g.between[0], g.between[1], g.rule ?? "?", n3(g.volume)) });
+    else codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, span(steps) || tr("mezi kroky"), g.rule ?? "?", n3(g.volume)) });
   }
   if (quiet.touch.size) codes.push({ code: "clash.touch", text: tr("dotyk pod tolerancí {0} mm: {1} dvojic", nf(touchTol(d), 6), quiet.touch.size) });
   return { lines, codes, stats };

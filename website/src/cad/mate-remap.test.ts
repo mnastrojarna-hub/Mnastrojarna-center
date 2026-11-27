@@ -75,10 +75,48 @@ describe("matchFace – táž plocha jen při skutečné geometrické shodě", (
   });
 
   it("válec: táž osa a poloměr (i obrácená osa), jiný poloměr nebo osa → ztraceno", () => {
-    const holes = [F(0, C([40, 30, -5], [0, 0, -1], 5.25, [0, 10])), F(1, C([20, 15, 0], [0, 0, 1], 4.5, [0, 10]))];
+    // vlna 22 kolo 6 (vědomá změna dat): obrácená osa TÉŽE díry, prohloubené o 2 mm (z 10 → −2); dřív z −5 → −15 = úsek osy pod
+    // deskou, který se s novým pravidlem překryvu správně nepřiřadí (případ „válec: úsek téže osy jinde“ níže)
+    const holes = [F(0, C([40, 30, 10], [0, 0, -1], 5.25, [0, 12])), F(1, C([20, 15, 0], [0, 0, 1], 4.5, [0, 10]))];
     expect(matchFace(facePrint(C([40, 30, 0], [0, 0, 1], 5.25, [0, 10])), holes, 3)).toEqual({ state: "renumbered", face: 0, how: "surface" });
     expect(matchFace(facePrint(C([40, 30, 0], [0, 0, 1], 5, [0, 10])), holes, 0).state).toBe("lost");
     expect(matchFace(facePrint(C([41, 30, 0], [0, 0, 1], 5.25, [0, 10])), holes, 0).state).toBe("lost");
+  });
+
+  it("kolo 6: druhý schod na TÉŽE rovině se stejnou plochou (bez překryvu s otiskem) → ztraceno, ne přečíslováno", () => {
+    // Deska 60 × 40 × 10 se dvěma schody 20 × 40 × 5 (vlevo x 0…20, vpravo x 40…60); vazba na levý schod; levý se smaže
+    const B = (x0: number, x1: number, z: number): [Vec3, Vec3] => [[x0, 0, z], [x1, 40, z]];
+    const left = { ...F(2, P([10, 20, 5], [0, 0, 1]), 800), box: B(0, 20, 5) };
+    const after = [{ ...F(6, P([50, 20, 5], [0, 0, 1]), 800), box: B(40, 60, 5) }, { ...F(5, P([20, 20, 10], [0, 0, 1]), 1600), box: B(0, 40, 10) }];
+    const o = facePrint(left.info, left.area, left.box);
+    expect(o.box).toEqual(B(0, 20, 5));
+    expect(matchFace(o, after, 2)).toEqual({ state: "lost", why: "none", candidates: [] });
+    // bez obálek (starší otisk): kotouče o stejné ploše kolem středů [10;20;5] a [50;20;5] se neprotínají → také ztraceno
+    expect(matchFace(old(2), after.map(({ box: _b, ...f }) => f), 2).state).toBe("lost");
+    // táž rovina, plocha se protíná s otiskem (schod rozšířen na x 0…30) → přečíslováno (surface)
+    expect(matchFace(o, [{ ...F(7, P([15, 20, 5], [0, 0, 1]), 1200), box: B(0, 30, 5) }], 2)).toEqual({ state: "renumbered", face: 7, how: "surface" });
+    // plocha jen dotčená hranou (x 20…40) není překryv
+    expect(matchFace(o, [{ ...F(7, P([30, 20, 5], [0, 0, 1]), 800), box: B(20, 40, 5) }], 2).state).toBe("lost");
+    // dva kandidáti na téže rovině, i když jeden překrývá → nejednoznačné
+    expect(matchFace(o, [{ ...F(7, P([15, 20, 5], [0, 0, 1]), 1200), box: B(0, 30, 5) }, after[0]], 2)).toMatchObject({ state: "lost", why: "ambiguous" });
+    // bez plochy i obálky se překryv ověřit nedá → ztraceno (nikdy tiché připojení)
+    expect(matchFace(facePrint(left.info), [F(6, P([12, 20, 5], [0, 0, 1]))], 2).state).toBe("lost");
+  });
+
+  it("kolo 6: válec – úsek téže osy jinde (rozsahy podél osy se neprotínají) → ztraceno; prodloužená díra → přečíslováno", () => {
+    const o = facePrint(C([40, 30, 0], [0, 0, 1], 5.25, [0, 10])); // z 0…10
+    expect(matchFace(o, [F(0, C([40, 30, -5], [0, 0, -1], 5.25, [0, 10]))], 0).state).toBe("lost"); // z −5…−15
+    expect(matchFace(o, [F(0, C([40, 30, 0], [0, 0, 1], 5.25, [0, 20]))], 0)).toEqual({ state: "same", face: 0, how: "surface" }); // z 0…20
+  });
+
+  it("faceBoxes: obálka ploch ze skupin sítě", async () => {
+    const { faceBoxes } = await import("./mate-remap");
+    // dva trojúhelníky plochy 0 (čtverec 0…2 × 0…3 v z = 5), jeden plochy 2
+    const mesh = { vertices: [0, 0, 5, 2, 0, 5, 2, 3, 5, 0, 3, 5, 9, 9, 9], triangles: [0, 1, 2, 0, 2, 3, 4, 4, 4], faceGroups: [0, 6, 0, 6, 3, 2] };
+    const b = faceBoxes(mesh);
+    expect(b[0]).toEqual([[0, 0, 5], [2, 3, 5]]);
+    expect(b[1]).toBeUndefined();
+    expect(b[2]).toEqual([[9, 9, 9], [9, 9, 9]]);
   });
 
   it("otisk válce = střed osy v rozsahu plochy a délka (přesná shoda podle nich)", () => {

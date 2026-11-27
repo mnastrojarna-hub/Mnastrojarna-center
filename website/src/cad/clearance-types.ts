@@ -26,7 +26,15 @@ export type ClrReq = {
    * spojitá kontrola úseku `from` → `to`: je-li vzájemný pohyb dvojice čistý posuv, nejmenší vzdálenost A od dráhy B
    * (B ∪ hranoly ploch B posunuté o vektor) – přesná nejmenší vůle po celé přímé dráze
    */
-  sweep?: (ClrPair & { from: number; to: number; cutoff?: number; /** dvojice je na koncích úseku v dotyku (klouže po ploše) – rozhodne zmenšená dráha */ touch?: boolean })[];
+  sweep?: (ClrPair & {
+    from: number;
+    to: number;
+    cutoff?: number;
+    /** dvojice je na koncích úseku v dotyku (klouže po ploše) – rozhodne zmenšená dráha */
+    touch?: boolean;
+    /** dohledat polohu minima na dráze (zlomek `s` úseku) a body A a B v té poloze (vůle mezi kroky – kolo 6) */
+    locate?: boolean;
+  })[];
 };
 
 /**
@@ -35,7 +43,14 @@ export type ClrReq = {
  */
 export type ClrDist = { d: number; exact: boolean; inside?: boolean; p1?: Vec3; p2?: Vec3; aPath?: string[]; bPath?: string[] };
 /** spojitá kontrola úseku: `ok` = vzájemný pohyb je čistý posuv a dráha se spočítala (jinak `d` nic neříká); `v` = vektor posuvu B vůči A (svět) */
-export type ClrSweep = ClrDist & { ok: boolean; v?: Vec3; /** dotyk s dráhou: 0 = jen klouzání po ploše (dráha B zmenšeného o toleranci dotyku se A nedotkne), ∞ = B zajede do A */ pen?: number };
+export type ClrSweep = ClrDist & {
+  ok: boolean;
+  v?: Vec3;
+  /** dotyk s dráhou: 0 = jen klouzání po ploše (dráha B zmenšeného o toleranci dotyku se A nedotkne), ∞ = B zajede do A */
+  pen?: number;
+  /** (`locate`) poloha minima na dráze: zlomek úseku 0…1; `p1`/`p2` jsou pak body A a B v té poloze (ne na hranolu dráhy) */
+  s?: number;
+};
 /** místní obálka komponenty: kvádr a opsaná koule ve vlastních souřadnicích komponenty nejvyšší úrovně; null = bez tělesa */
 export type ClrLocal = { box: [Vec3, Vec3]; c: Vec3; r: number } | null;
 

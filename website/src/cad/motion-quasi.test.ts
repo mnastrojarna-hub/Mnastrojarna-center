@@ -171,7 +171,9 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
       expect(res.steps[k].place.A.position[2]).toBeCloseTo(56.5, 4);
       expect(res.steps[k].springs!.S.length).toBeCloseTo(14, 3);
       expect(res.steps[k].reached![0]).toBeCloseTo(46.5, 4);
-      expect(res.steps[k].conflicts).toEqual(expect.arrayContaining(["zdvih", "spring:S"]));
+      // vlna 22, kolo 6 (vědomá změna): motion.conflict / s.conflicts nesou jen skutečně porušené vazby a pohony – meze, které motor zastavily a v poloze kroku jsou splněné, jsou jen „brání“ v motion.motor-limit: doraz Ln je splněný → jen v odchylkách kroku („brání“)
+      expect(res.steps[k].conflicts).toEqual(["zdvih"]);
+      expect(res.steps[k].devs!.map((x) => x.id)).toEqual(expect.arrayContaining(["spring:S"]));
     }
     const lim = motionFindings(res, rig()).find((x) => x.code === "motion.motor-limit")!;
     expect(lim.text).toMatch(/^motor 1 stojí na mezi v krocích 8–12 \(t = 1\.333–2 s\): žádáno 45,833 → 40 mm, dosaženo 46,5 mm – brání: /);

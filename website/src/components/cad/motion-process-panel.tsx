@@ -15,7 +15,7 @@ import { useState } from "react";
 import { nf } from "@/cad/clash-report";
 import { tr } from "@/cad/i18n";
 import type { MotionResult } from "@/cad/motion";
-import { opText, phaseWord, processLevelSentence, processLines, processOf, productStates } from "@/cad/motion-process";
+import { opText, processLevelSentence, processLines, processOf, productStates, stateWord } from "@/cad/motion-process";
 import { uid, type CadDoc, type MotionStudy, type ProcessOp } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -138,8 +138,8 @@ export function ProcessState({ res, doc, step }: { res: MotionResult; doc: CadDo
   return (
     <div data-process-result className="space-y-1 rounded border border-[#e3e8ee] bg-[#fbfcfd] p-2 text-[11px] leading-snug text-[#4a5664]">
       {states.map((p) => (
-        <p key={p.target} data-process-state={p.phase} data-process-for={name(p.target)} data-process-removed={Math.round(p.removed * 1000) / 1000} data-process-scrapped={p.scrap}>
-          <b>{name(p.target)}</b>: {phaseWord(p.phase)}
+        <p key={p.target} data-process-state={p.phase} {...(p.engaged ? { "data-process-engaged": "1" } : {})} data-process-for={name(p.target)} data-process-removed={Math.round(p.removed * 1000) / 1000} data-process-scrapped={p.scrap}>
+          <b>{name(p.target)}</b>: {stateWord(p)}
           {p.removed > 0 ? ` · ${tr("odebráno {0} mm³", nf(p.removed, 3))}` : ""}
           {p.depth > 0 ? ` · ${tr("hloubka {0} mm", nf(p.depth, 3))}` : ""}
           {p.scrap ? ` · ${tr("odpad {0} oddělen", p.scrap)}` : ""}

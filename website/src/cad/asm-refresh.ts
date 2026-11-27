@@ -95,6 +95,26 @@ export function staleCopies(asm: CadDoc, partOf: PartLookup | undefined): StaleC
   return out;
 }
 
+/**
+ * Zastaralá kopie, jejíž díl v záložce už má údaj, který kopii v sestavě chybí (číslo, označení materiálu, výkres): kusovník
+ * a souhrn dokumentace pak neradí doplnit ho „v dílu“ ani „bez výkresu“, ale obnovit kopii (`sestava obnovit #N`; vlna 22,
+ * bod 22g, kolo 6). Klíč = název komponenty i dílu (řádek kusovníku nese jedno z nich).
+ */
+export type StaleHint = { ref: string; number?: string; material?: string; drawing: boolean };
+export function staleHints(asm: CadDoc, partOf: PartLookup | undefined): Map<string, StaleHint> {
+  const out = new Map<string, StaleHint>();
+  if (!partOf) return out;
+  for (const s of staleCopies(asm, partOf)) {
+    const part = partOf(s.part);
+    if (!part) continue;
+    const number = s.stale.includes("number") ? part.props?.number?.trim() : undefined;
+    const material = s.stale.includes("material") ? part.materialName?.trim() : undefined;
+    const h: StaleHint = { ref: s.comp.alias ? `"${s.comp.alias}"` : `#${s.index + 1}`, ...(number ? { number } : {}), ...(material ? { material } : {}), drawing: s.stale.includes("drawing") && !!part.drawings?.length };
+    for (const k of [s.comp.name, s.part, s.comp.source.kind === "part" ? s.comp.source.doc.name : ""]) if (k && !out.has(k)) out.set(k, h);
+  }
+  return out;
+}
+
 /** text ⚠ jedné zastaralé kopie s příkazem, který ji obnoví */
 export function staleCopyText(s: StaleCopy): string {
   const ref = s.comp.alias ? `"${s.comp.alias}"` : `#${s.index + 1}`;

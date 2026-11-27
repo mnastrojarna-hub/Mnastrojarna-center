@@ -1,5 +1,7 @@
 "use client";
 
+import { withDesignation } from "@/cad/material-designation";
+import { MaterialNoteLine } from "./material-note";
 import { softLimitsText, softStatusText } from "@/cad/soft-view";
 import { SOFT_WHY_EVENT } from "./viewport-fallback";
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
@@ -116,6 +118,7 @@ import { ComputeChip, progressLabel } from "./compute-chip";
 import { discardPending, flushPending, historyRule, pendingCount, setDocKeyGetter } from "./flush-barrier";
 import { appRuns, guardApi, motionSignalHold, outputGate, runsSnapshot, textRun } from "./run-host";
 import { computeBegin, computesSnapshot, tracked, type ComputeKind, type ComputeRun } from "./compute-runs";
+import { trackedMotion } from "./motion-runs"; // výpočty pohybové studie v témže modelu výpočtů (vlna 22, bod 12)
 import { ComputeStatus } from "./compute-status";
 import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
@@ -1017,7 +1020,9 @@ export function CadApp() {
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
         const k = await import("@/cad/asm-agent-kin");
         const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
-        const res = await k.motionRun(d, asmEnvRef.current());
+        // záznam výpočtu ve sdíleném modelu výpočtů (id v…, revize vstupu, stav – vlna 22, bod 12; panel Pohyb totéž)
+        const env = asmEnvRef.current();
+        const { res, run } = await trackedMotion(d, () => k.motionRun(d, env));
         // časový plán videa s uloženými volbami studie (vlna 22, bod 13 – cad/motion-video.ts)
         const video = await import("@/cad/motion-video").then((m) => m.videoApi(res, d.motion)).catch(() => null);
         // první SKUTEČNÁ kolize (šroub v závitu, dotyk ani pracovní kontakt ne) s popisem instance a místem; kroky s třídami dvojic
@@ -1028,7 +1033,7 @@ export function CadApp() {
         const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
         // procesní vrstva: operace, stav výrobku po krocích, úroveň „geometrická aproximace“ (vlna 22, bod 4)
         const proc = (await import("@/cad/motion-process")).processApi(res, d);
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
+        return { ...(run ? { run } : {}), steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -2768,6 +2773,7 @@ export function CadApp() {
     flash(`${savedText(t.name)} · ${tr("model")} ${p.modelRev}`);
   };
   const saveProject = async () => {
+    flushPending("save"); // rozepsané pole / list výkresu patří do ukládaného souboru (i Ctrl+S, tlačítko Uložit)
     const t = projectTarget.current;
     if (t?.handle) {
       if (!(await waitOutputs(tr("uložení")))) return flash(tr("Uložení zrušeno."));
@@ -2957,12 +2963,19 @@ export function CadApp() {
     const onKey = (e: KeyboardEvent) => {
       if (askBusy() || gearWizardBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
-      if (field) {
-        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
-        return;
-      }
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (field) {
+        if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
+        // Ctrl/Cmd+S i s fokusem v poli (vlna 22 kolo 6, bod 22e): rozepsaná hodnota se zapíše (flush) a projekt se uloží –
+        // dřív zkratka v poli skončila tady a prohlížeč nabídl „Uložit stránku“, soubor zůstal bez změny
+        if (mod && !e.shiftKey && !e.altKey && k === "s") {
+          e.preventDefault();
+          flushPending("save");
+          void saveProject();
+        }
+        return;
+      }
       if (mod && e.shiftKey && k === "k") {
         e.preventDefault();
         setAgentOpen(true);
@@ -2986,7 +2999,8 @@ export function CadApp() {
       }
       if (mod && k === "s") {
         e.preventDefault();
-        saveProject();
+        flushPending("save");
+        void saveProject();
         return;
       }
       if (mod && k === "o") {
@@ -4503,7 +4517,8 @@ export function CadApp() {
           )}
           {selection.length > 0 && <span className="rounded bg-brand/10 px-1.5 font-mono text-[10.5px] text-brand-600">{tr("vybráno")}{" "}{selection.length}</span>}
           {cursor && !sketch && <span className="hidden font-mono text-[10.5px] text-[#5b6776] md:inline">X {fmtNum(cursor[0], 2)} {tr("· Y")}{" "}{fmtNum(cursor[1], 2)} {tr("· Z")}{" "}{fmtNum(cursor[2], 2)}</span>}
-          <span className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{prefs.ortho ? tr("pravoúhlá") : tr("perspektiva")}</span>
+          {/* skutečná projekce: softwarový náhled (bez WebGL) kreslí VŽDY pravoúhle – nastavená perspektiva platí jen ve WebGL (vlna 22 kolo 6, bod 21) */}
+          <span data-projection={glError || prefs.ortho ? "ortho" : "persp"} className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{glError && !prefs.ortho ? tr("pravoúhlá (perspektiva jen ve WebGL)") : prefs.ortho || glError ? tr("pravoúhlá") : tr("perspektiva")}</span>
           <span className="hidden text-[10.5px] text-[#5b6776] lg:inline" data-mouse-hint title={boxHelpText()}>{mouseHint(prefs.mouse, prefs.leftDrag)}</span>
         </footer>
 
@@ -4543,15 +4558,16 @@ export function CadApp() {
                 defaultValue={doc.materialName ?? ""}
                 key={`mn-${doc.materialName ?? ""}`}
                 placeholder={mat.label}
-                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše")}
+                title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – pozná-li se z něj třída (ocel, nerez, hliník…), nastaví i hustotu; jinak hustota zůstává podle třídy výše (⚠)")}
                 onBlur={(e) => {
-                  const t = e.target.value.trim();
-                  const next = t && t !== mat.label ? t : undefined;
-                  if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+                  // jedno pravidlo s textovým příkazem `materiál …` (material-designation.ts, vlna 22 kolo 6)
+                  const next = withDesignation(doc, e.target.value);
+                  if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
               />
+              <MaterialNoteLine doc={doc} />
             </label>
             <Row k={tr("Hmotnost")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
             <Row k={tr("Objem")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
@@ -4729,9 +4745,9 @@ export function CadApp() {
             doc={doc}
             onShare={() => openShare()}
             onMaterialChange={(v) => {
-              const t = v.trim();
-              const next = t && t !== mat.label ? t : undefined;
-              if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+              // pole Materiál v razítku výkresu: totéž pravidlo jako příkaz `materiál …` (material-designation.ts)
+              const next = withDesignation(doc, v);
+              if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) commit(next);
             }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? tr("dle kusovníku") : doc.materialName?.trim() || mat.label}

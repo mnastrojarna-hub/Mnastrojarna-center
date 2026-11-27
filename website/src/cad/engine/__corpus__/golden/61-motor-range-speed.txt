@@ -54,7 +54,7 @@ Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A 
 6;3;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
  pohání: „Deska A“ · směr −Z
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Deska A“: ΔZ −30,35 mm
  stojí: 1 („Rám“)
@@ -92,7 +92,6 @@ Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kol
 === run 6 ===
 Pohybová studie: motorů 1 · kroků 4
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
-Pohybová studie: 4 kroků · 1 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Deska A“: ΔZ −15,175 mm
  stojí: 1 („Rám“)
@@ -103,7 +102,7 @@ Krok 4 (t = 1 s, motory 42,325):
  Deska A [0; 0; 52,325]
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
  pohání: „Deska A“ · směr +Z
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Deska A“: ΔZ −20 mm
  stojí: 1 („Rám“)

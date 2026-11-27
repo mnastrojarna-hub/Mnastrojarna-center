@@ -40,6 +40,7 @@ import { verifyKeyOf } from "../engine/verify";
 import { hostAssets, setHostAssets } from "../host-assets";
 import { selfStoreBase } from "../share";
 import { asmDocNotes, hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
+import { sameSheetFinding } from "../engine/sheet-eval";
 import { shareInfo, shareWithPolicy } from "../engine/share-out";
 import { shareContent, shareLinkKv } from "../engine/share-content";
 import type { DocSummary, Entry, OutFile, RunReport, ShareInfo } from "../engine/protocol-types";
@@ -304,7 +305,8 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
         // varování listu, které běh už ohlásil (vyhodnocení listu na řádku bloku – engine/drawing-track.ts), se neopakuje
         await writeDocFormat(outHost, ws, it.doc, fmt, (n) => {
           const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}), ...(n.level ? { level: n.level } : {}) });
-          if (!rb.entries.some((x) => x.code === e.code && x.doc === e.doc && x.text === e.text)) rb.add(e);
+          // týž nález listu i s upřesněným důvodem (řez mimo těleso z řádku příkazu: „… : List 1 – rovina řezu Y = …“) – 22i kolo 6
+          if (!rb.entries.some((x) => sameSheetFinding(x, e))) rb.add(e);
         });
       } catch (e) {
         if (e instanceof OutPathError) rb.code("out.path", { doc: it.doc.name, args: [e.fileName] });
@@ -316,7 +318,7 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
     }
     // sestava: úplnost výrobní dokumentace i bez výkresového výstupu (vlna 22, bod 19 – vyráběné bez výkresu / čísla)
     if (formatsFor(it.doc, p.formats).length)
-      for (const n of asmDocNotes(it.doc)) {
+      for (const n of asmDocNotes(it.doc, (x) => ws.findPart(x))) {
         // bez výkresového výstupu jen ℹ (přísný běh kvůli tomu nezastaví); výkres / kusovník ji hlásí jako ⚠ (writeDocFormat)
         const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), level: "note" });
         if (!rb.entries.some((x) => x.code === e.code && x.doc === e.doc && x.text === e.text)) rb.add(e);

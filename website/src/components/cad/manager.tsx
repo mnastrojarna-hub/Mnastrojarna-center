@@ -1,5 +1,7 @@
 "use client";
 
+import { withDesignation } from "@/cad/material-designation";
+import { MaterialNoteLine } from "./material-note";
 import { cadLocale, tr } from "@/cad/i18n";
 import { useState } from "react";
 import { featureIcon, featureTone } from "@/cad/defaults";
@@ -280,17 +282,17 @@ export function Manager({
             key={`mn-${doc.materialName ?? ""}`}
             defaultValue={doc.materialName ?? ""}
             placeholder={MATERIALS.find((x) => x.id === doc.material)?.label ?? tr("Ocel")}
-            title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem")}
+            title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – pozná-li se z něj třída (ocel, nerez, hliník…), nastaví i hustotu; jinak hustota zůstává podle třídy výše (⚠); přenáší se odkazem i souborem")}
             aria-label={tr("Označení materiálu do razítka")}
             onBlur={(e) => {
-              const t = e.target.value.trim();
-              const cls = MATERIALS.find((x) => x.id === doc.material)?.label;
-              const next = t && t !== cls ? t : undefined;
-              if ((doc.materialName ?? undefined) !== next) onCommit({ ...doc, materialName: next });
+              // jedno pravidlo s textovým příkazem `materiál …` (material-designation.ts, vlna 22 kolo 6)
+              const next = withDesignation(doc, e.target.value);
+              if (next !== doc && (next.materialName !== doc.materialName || next.material !== doc.material)) onCommit(next);
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12.5px] outline-none focus:border-brand"
           />
+          <MaterialNoteLine doc={doc} />
         </label>
         {(doc.configs?.length ?? 0) > 0 && (
           <label className="block">

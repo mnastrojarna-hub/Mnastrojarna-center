@@ -31,9 +31,7 @@ Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska
  stojí: 2 („Rám“, „Přidržovač“)
 ⚠ nesplněné vazby v 5 krocích (mechanismus se zasekl nebo motor překročil meze)
  ⚠ motion.conflict pohyb porušuje vazbu „ZDVIH Deska A → Rám“ v kroku 8–12 (t = 1.333–2 s)
- ⚠ motion.conflict pohyb porušuje vazbu „PEVNÁ Přidržovač → Rám“ v kroku 8–12 (t = 1.333–2 s)
- ⚠ motion.conflict pohyb porušuje vazbu „Mez Přidržovač → Deska A“ v kroku 8–12 (t = 1.333–2 s)
-⚠ řádek 8: motor 1 stojí na mezi v krocích 8–12 (t = 1.333–2 s): žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm – brání: „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno); „Mez Přidržovač → Deska A“ 5 mm – na mezi min 5 mm (doraz); příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
+⚠ řádek 8: motor 1 stojí na mezi v krocích 8–12 (t = 1.333–2 s): žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm – brání: „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno); „Mez Přidržovač → Deska A“ 5 mm – na mezi min 5 mm (doraz); příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly stojí v poslední dosažitelné poloze (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
 Krok 7 (t = 1,1667 s, motory 39,796):
  Rám [0; 0; 0]
  Deska A [0; 0; 49,7958]
@@ -42,11 +40,11 @@ Krok 12 (t = 2 s, motory 27,15):
  Rám [0; 0; 0]
  Deska A [0; 0; 47,5]
  Přidržovač [0; 0; 34,5]
- ⚠ nesplněné vazby: 3
+ ⚠ nesplněné vazby: 1
  ⚠ motor stojí na mezi: dosaženo 37,5 (žádáno 27,15)
   konflikt: „motor 1: ZDVIH Deska A → Rám“ 37,5 mm místo 27,15 mm (+10,35 mm)
-  konflikt: „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno)
-  konflikt: „Mez Přidržovač → Deska A“ 5 mm – na mezi min 5 mm (doraz)
+  brání: „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno)
+  brání: „Mez Přidržovač → Deska A“ 5 mm – na mezi min 5 mm (doraz)
 
 Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5] · Přidržovač [0; 0; 34,5]
@@ -65,14 +63,12 @@ Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska
  stojí: 2 („Rám“, „Přidržovač“)
 ⚠ nesplněné vazby v 5 krocích (mechanismus se zasekl nebo motor překročil meze)
  ⚠ motion.conflict pohyb porušuje vazbu „ZDVIH Deska A → Rám“ v kroku 8–12 (t = 1.333–2 s)
- ⚠ motion.conflict pohyb porušuje vazbu „PEVNÁ Přidržovač → Rám“ v kroku 8–12 (t = 1.333–2 s)
- ⚠ motion.conflict pohyb porušuje vazbu „Mez Přidržovač → Deska A“ v kroku 8–12 (t = 1.333–2 s)
 ⚠ řádek 3: neřešitelné kroky 8–12 (t = 1.333–2 s) – zobrazena poslední platná poloha (krok 7), žádný kompromis; konflikt: „motor 1: ZDVIH Deska A → Rám“ 37,5 mm místo 37,267 mm (+0,233 mm); „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno); „Mez Přidržovač → Deska A“ 5 mm – na mezi min 5 mm (doraz); příčina: motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)
 Krok 12 (t = 2 s, motory 27,15):
  Rám [0; 0; 0]
  Deska A [0; 0; 49,7958]
  Přidržovač [0; 0; 34,5]
- ⚠ nesplněné vazby: 3
+ ⚠ nesplněné vazby: 1
  ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok 7), žádný kompromis
   konflikt: „motor 1: ZDVIH Deska A → Rám“ 37,5 mm místo 27,15 mm (+10,35 mm)
   konflikt: „PEVNÁ Přidržovač → Rám“ 24,5 mm (splněno)

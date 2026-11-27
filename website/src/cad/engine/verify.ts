@@ -192,8 +192,9 @@ export class RunVerifier {
         this.told.set(id, sig);
         out.push({ f, s, state, line: bad ? (after ?? x.line) : x.line, o: { took: o.took, typed: true } });
       } else if (before === undefined) {
-        // varování prvku, který běh nezměnil, jen u načteného dokumentu nebo po úpravě, která ho mohla způsobit
-        if (!bad || this.flagged.has(f.id) || (state === "warn" && after === undefined && loadedLine === null)) continue;
+        // varování prvku, který běh nezměnil, jen u načteného dokumentu nebo po úpravě, která ho mohla způsobit; načtený je
+        // i dokument z CLI `--open` (řádek načtení null) – jinak by přísný běh jeho ⚠ před skriptem neviděl (vlna 22, 22b)
+        if (!bad || this.flagged.has(f.id) || (state === "warn" && after === undefined && !this.loadedAt.has(key))) continue;
         this.told.set(id, sig);
         // dokument, ze kterého běh odešel (ověření `verifyDoc`), píše prvek s typem jako dřív; otevřený dokument na konci bez typu
         out.push({ f, s, state, line: after ?? loadedLine ?? o.line ?? null, o: { typed: !!o.header } });

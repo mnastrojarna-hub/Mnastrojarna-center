@@ -74,6 +74,33 @@ describe("vlna 22 C1: třídy kolizí všude (bod 5)", async () => {
     expect(short).toMatch(/^D "Sestava 5P" asm .* clash=1\(thread=1,real=0\)$/m);
   }, 240_000);
 
+  it("kolo 6: objem v textech kolizí s desetinným oddělovačem jazyka (EN „365.2 mm³“, DE „365,2 mm³“); dotyk bez dat díry", async () => {
+    // dřív EN „(365,2 mm³) – location [50; 30; 28.5]“ – objem s čárkou, souřadnice s tečkou
+    try {
+      setLang("en");
+      const en = await run(corpus("70-clash-classes"));
+      const real = lines(en.short, /clash\.real/);
+      expect(real.some((l) => /“Přidržovač” × “Šroub M12 \[S2\]” \(365\.2 mm³\) – location \[50; 30; 28\.5\]/.test(l) || /„Přidržovač“ × „Šroub M12 \[S2\]“ \(365\.2 mm³\) – location \[50; 30; 28\.5\]/.test(l)), real.join("\n")).toBe(true);
+      expect(en.short).not.toMatch(/365,2/);
+      expect(en.con).toMatch(/Šroub M12 \[S2\] \(365\.2 mm³\) at \[50; 30; 28\.5\]/);
+      setLang("de");
+      const de = await run(corpus("70-clash-classes"));
+      expect(de.short).toMatch(/\(365,2 mm³\)/);
+      expect(de.short).not.toMatch(/365\.2 mm³/);
+    } finally {
+      setLang("cs");
+    }
+    // JSON: dotyk „Deska A“ × „Deska B“ (deska má závitové díry) dřív nesl data.hole M12, holeIn, band, rest – patří jen šroubu v díře
+    const { r } = await run(corpus("71-clash-touch-plain"));
+    const touch = r.entries.filter((x) => x.code === "clash.touch");
+    expect(touch.length).toBeGreaterThanOrEqual(1);
+    for (const e of touch) {
+      const data = e.data as Record<string, unknown> & { items: Record<string, unknown>[] };
+      for (const k of ["hole", "holeIn", "band", "rest", "restDepth"]) expect(data[k], `${e.text} · ${k}`).toBeUndefined();
+      for (const it of data.items) for (const k of ["hole", "band", "rest"]) expect(it[k], `${e.text} · items.${k}`).toBeUndefined();
+    }
+  }, 240_000);
+
   it("72: čtyři stejné nárazy hlav = jeden ⚠ „4×“ s instancemi, ne čtyři řádky", async () => {
     const { short } = await run(corpus("72-clash-group"));
     const real = lines(short, /clash\.real/);

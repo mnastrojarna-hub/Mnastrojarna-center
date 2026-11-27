@@ -73,6 +73,24 @@ export function settleDim(views: PlacedView[], a: DimAnn): DimAnn {
   return rs.status === "ok" ? rs.a : a;
 }
 
+/**
+ * Znovu vybraná geometrie ztracené kóty (GUI „Vybrat znovu“ u ⚠, kolo 4 / 6): nová kóta z nového výběru převezme id
+ * a údaje uživatele původní kóty (text, přípona / tolerance, předpona s počtem „n× “, revize, zobrazení uložení), aby
+ * odkazy `aN`, tolerance a revize zůstaly – mění se jen geometrie, ke které se kóta váže.
+ */
+export function rebindDim(old: DimAnn, fresh: DimAnn): DimAnn {
+  const keepPrefix = !!old.prefix && /^\d+× $/.test(old.prefix) && "r" in old === "r" in fresh;
+  return {
+    ...fresh,
+    id: old.id,
+    ...(old.text ? { text: old.text } : {}),
+    ...(old.suffix ? { suffix: old.suffix } : {}),
+    ...(keepPrefix ? { prefix: old.prefix } : {}),
+    ...(old.rev ? { rev: old.rev } : {}),
+    ...(old.tolShow ? { tolShow: old.tolShow } : {}),
+  } as DimAnn;
+}
+
 /** popisek kóty pro výpis: hodnota na listu, u přichycené i zadaná hodnota */
 export function attachLabel(x: DimAttach): string {
   const now = dimLabel(x.ann, x.now);

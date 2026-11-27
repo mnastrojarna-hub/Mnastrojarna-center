@@ -1,0 +1,28 @@
+# vlna 22, bod 3 (kolo 6, oponent): podmínka fáze na MEZI vzdálenosti v dotyku – „vazba "Dosed" <= 0“, kdy volný přidržovač
+# (pružina mezi ním a Deskou A, kvazistatika) dosedne na Rám. Mezera dotyku sedí o zbytek řešiče nad 0: fáze „Přidržení“ začne
+# v okamžiku dosednutí (t ≈ 0,81 s, krok 10), ne o krok později; další fáze „Návrat“ při ZDVIH ≥ 28 → phases=3/3.
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+nový díl "Přidržovač"
+kvádr 60 60 8
+nový díl "Pružina"
+pružina 18 stoupání 5 závity 6 drát 2
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+vložit "Přidržovač" v 20 20 34.5
+vložit "Pružina" v 50 50 42.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"
+sestava vazba mez-vzdálenosti "Přidržovač" spodní "Rám" horní min 0 max 500 název "Dosed"
+sestava vazba zámek "Pružina" "Přidržovač"
+sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20
+pohyb fáze "Nájezd"
+pohyb fáze "Přidržení" při vazba "Dosed" <= 0
+pohyb fáze "Návrat" při vazba "ZDVIH" >= 28
+pohyb motor lineární vazba "ZDVIH" 57.5..27.15 pak 57.5 kroky 24
+pohyb fáze
+pohyb krok 9
+pohyb krok 10

@@ -22,7 +22,6 @@ Počítám pohyb sestavy „{0}“…	Computing the motion of assembly “{0}”
 Probíhá běh textových příkazů – panel počká na jeho dokončení a pak počítá s dokumentem, který běh zapíše.	A text command run is in progress – the panel waits for it to finish and then computes with the document the run writes.
 Vypočítat pohyb znovu	Compute the motion again
 Výsledek neplatí – od výpočtu se změnilo: {0}. Nezkontrolováno; spusťte Vypočítat pohyb znovu.	The result is not valid – changed since the computation: {0}. Unchecked; run Compute the motion again.
-Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} kroků · spočítáno {3}	The result is valid for “{0}” in its current state · {1} components · {2} steps · computed {3}
 #!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
 výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“	the motion study result is not valid for the current state of the assembly – changed since the computation: {0}; “motion run” recomputes it
 pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}	motion study recomputed – the stored result was not valid, changed since the computation: {0}

@@ -76,8 +76,10 @@ describe("export STEP: přesná kontrola před exportem, export = model (bez Sam
       const h = host();
       const r = finalizeReport(await runReport(ws, `nový díl "${name}"\n${body}\n${thr}\nexport step`, h), { full: true });
       const lines = (r.full ?? "").split("\n");
-      const at = lines.findIndex((l) => /^✓ L4 export STEP/.test(l));
+      // kolo 6 (22i): zápis STEP s kontrolou není ✓ – ℹ „zapsáno, kontrola níže“; ✓ nad ⚠ out.reload-invalid byl falešně zelený
+      const at = lines.findIndex((l) => /^ℹ L4 msg\.note ".*": export STEP: .* – zapsáno, kontrola níže$/.test(l));
       expect(at, name).toBeGreaterThanOrEqual(0);
+      expect(lines.some((l) => /^✓ L4 export STEP/.test(l)), name).toBe(false);
       expect(lines[at + 1], name).toMatch(/^✓ L4 těleso: přesná kontrola platnosti \(BRepCheck přesnou metodou\) – platné, ploch \d+ · [\d,]+ s$/);
       expect(lines[at + 2], name).toMatch(/^⚠ L4 out\.reload-invalid .*kontrola STEP: soubor znovu načten jádrem – těles: 1, .*rozdíl 0,0000 %.* – shoda s modelem, ale soubor po načtení NEPROJDE přesnou kontrolou platnosti \(BRepCheck přesnou metodou\): vadných ploch \d+ z \d+ \(rychlá kontrola: platné; model přesně platný\)/);
       expect(r.full ?? "", name).not.toMatch(/věrná kopie/);

@@ -125,6 +125,22 @@ export class DrawingTracker {
     return rb.entries.slice(before);
   }
 
+  /**
+   * Nálezy listu `sheetId` aktivního dokumentu hned teď (export listu – 22i kolo 6), jen kódů `codes`: na řádky bloku, který
+   * list v tomto běhu měnil (jako konec běhu – `finish` je pak neopakuje). false = list běh neměnil (nález ohlásí export sám).
+   */
+  async reportNow(sheetId: string, codes: readonly string[]): Promise<boolean> {
+    const ctx = this.ctx;
+    const t = this.touched.get(`${verifyKey(ctx)}\u0000${sheetId}`);
+    const d = runOf(ctx).doc;
+    const idx = d.drawings?.findIndex((s) => s.id === sheetId) ?? -1;
+    if (!t || idx < 0) return false;
+    const line = t.lines[t.lines.length - 1];
+    const extras = () => drawExtras(ctx.ws, ctx.host.kernel, d, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
+    for (const x of await evaluateSheet(d, idx, drawingMemo(ctx.host.kernel), extras, { knownTexts: this.known.get(sheetId) ?? [] })) if (codes.includes(x.code)) this.addSheet(line, x, d.name, t.lines);
+    return true;
+  }
+
   /** texty poznámek listu, jejichž překryv / přesah rámečku už protokol ohlásil (id listu → texty) – hlášení listu je neopakuje */
   private readonly known = new Map<string, Set<string>>();
   private noteKnown(issue: Pending["issue"]): void {

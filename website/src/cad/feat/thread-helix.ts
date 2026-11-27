@@ -121,6 +121,24 @@ export type Reach = {
 const TANGENT_TOL = 0.01;
 const BAD_SHARE = 0.3;
 
+/**
+ * Skutečný poloměr povrchu u tečné špičky (22a, kolo 6): špička leží do TANGENT_TOL od povrchu, ne NA něm – poloměr špičky
+ * jako „povrch“ by u hloubky 0,81 v díře Ø16,4 radil Ø16,38 / radius 8,19. Povrch se hledá podél paprsku profilu kolem
+ * špičky: okno ±δ (δ od 2·TANGENT_TOL, zdvojované do 8×), kde je jeden konec v materiálu a druhý ve vzduchu, pak půlení.
+ * Bez změny strany v okně (nemělo by nastat) zůstane poloměr špičky.
+ */
+export function tangentSurface(inR: (rr: number) => boolean, bisect: (inMat: number, inAir: number) => number, tipR: number): number {
+  for (let d = 2 * TANGENT_TOL; d <= 16 * TANGENT_TOL + 1e-12; d *= 2) {
+    const lo = tipR - d;
+    const hi = tipR + d;
+    if (lo <= 1e-3) break;
+    const a = inR(lo);
+    const b = inR(hi);
+    if (a !== b) return a ? bisect(lo, hi) : bisect(hi, lo);
+  }
+  return tipR;
+}
+
 function withDist<T>(load: unknown, p: Vec3, f: (q: InstanceType<OC["BRepExtrema_DistShapeShape"]>) => T, dflt: T): T {
   const o = oc();
   const v = r.makeVertex(p);
@@ -206,7 +224,7 @@ export function threadReach(body: Shape, s: GrooveSpec, g: Pick<Groove, "helixAt
     };
     let surfaceR: number | undefined;
     let cross: number | undefined;
-    if (kind === "tip-tangent") surfaceR = g.tipR;
+    if (kind === "tip-tangent") surfaceR = tangentSurface(inR, bisect, g.tipR);
     else if (kind === "wrong-side") {
       surfaceR = s.removing ? bisect(g.baseR, g.tipR) : bisect(g.tipR, g.baseR);
       cross = Math.abs(g.tipR - surfaceR);

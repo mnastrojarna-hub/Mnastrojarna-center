@@ -277,7 +277,8 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
     const loose = rows.filter((r) => r.st.level === "warn");
     const solid = solidOf(c);
     const fr = rows.filter((r) => r.st.force !== undefined).map((r) => r.st.force!);
-    const range = (a: number[], d = 3) => (Math.abs(a[0] - a[a.length - 1]) < 1e-9 ? fmt(a[0], d) : `${fmt(a[0], d)} → ${fmt(a[a.length - 1], d)}`);
+    // stejná zobrazená hodnota = jedna hodnota („35 mm“, ne „35 → 35 mm“ ze šumu řešiče ~1e-9 – kolo 6)
+    const range = (a: number[], d = 3) => (fmt(a[0], d) === fmt(a[a.length - 1], d) ? fmt(a[0], d) : `${fmt(a[0], d)} → ${fmt(a[a.length - 1], d)}`);
     const span = (list: typeof rows) => (!list.length ? "" : list[0].i === list[list.length - 1].i ? `${list[0].i}` : `${list[0].i}–${list[list.length - 1].i}`);
     let body = `: ${tr("délka {0} mm", range(L))} (min ${fmt(Math.min(...L), 3)} · L0 ${fmt(c.spring!.free, 3)}${solid !== undefined ? ` · Ln ${fmt(solid, 3)}` : ""})`;
     if (fr.length) body += ` · ${tr("síla {0} N (max {1} N)", range(fr, 1), fmt(Math.max(...fr), 1))}`;
@@ -287,6 +288,9 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
     const more = chk.length ? `; ${chk.join("; ")}` : "";
     if (bad.length) items.push({ c, text: (ref) => `✗ ${head(ref)}${body} – ${tr("pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)", span(bad), fmt(Math.min(...seat), 3))}${more}` });
     else if (loose.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("nedosedá v krocích {0} (mezera max {1} mm)", span(loose), fmt(Math.max(...seat) - c.spring!.free, 3))}${more}` });
+    // na dorazu Ln ve VŠECH krocích: pružina se nepohnula z bloku – ne „✓“ (kinematika pružinou netlačí; polohu drží jen vazby /
+    // preference) – vlna 22, bod 2, kolo 6
+    else if (solid !== undefined && rows.length > 1 && L.every((v) => v <= solid + 1e-6)) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("po celou studii stlačená na doraz Ln (blok) – síla {0} N je jen odvozená z polohy; zkontrolujte polohu dílů (kinematika pružinou netlačí: pohyb kvazistatika)", fmt(fr.length ? Math.max(...fr) : 0, 1))}${more}` });
     else if (chk.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${chk.join("; ")}` });
     else items.push({ c, text: (ref) => `✓ ${head(ref)}${body}` });
   }

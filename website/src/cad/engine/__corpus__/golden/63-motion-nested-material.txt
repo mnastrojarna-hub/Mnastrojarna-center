@@ -46,12 +46,11 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez
 ✓ úprava podsestavy „Skupina“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 ✓ komponenta „Doraz“: poloha [40; 10; 22]
 ✓ „Skupina“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 0,63 cm³ · vazby 1/1 ok
-Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize · r·?
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
 ⚠ řádek 5: výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“; přepočítá ho „pohyb spustit“
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
-Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −15 mm
  stojí: 2 („Deska A“, „Skupina“)
@@ -73,7 +72,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, pr�
 Pohybová studie: motorů 0 · kroků 36
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
  pohání: „Přidržovač“ · směr −Z
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
+Pohybová studie: 4 kroky · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −15 mm
  stojí: 2 („Deska A“, „Skupina“)
@@ -98,7 +97,6 @@ Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kol
 ✓ vazba ZDVIH „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0
-Pohybová studie: 20 kroků · 0,02 s · motory: 
  stojí: 3 („Deska A“, „Vodítko“, „Přidržovač“)
 Vazby splněny ve všech krocích
 Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
@@ -107,7 +105,6 @@ Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/m
 ✓ síla 10 N na vazbě „ZDVIH“ (kladná zvětšuje hodnotu vazby)
 Pohybová studie: motorů 0 · kroků 36
 Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0 · síla vazba 2 ZDVIH: 10 N
-Pohybová studie: 20 kroků · 0,02 s · motory: 
  stojí: 3 („Deska A“, „Vodítko“, „Přidržovač“)
 Vazby splněny ve všech krocích
 Dynamika: 0,02 s · krok 1 ms · 20 kroků · gravitace vyp · tlumení 0 N·s/mm · odraz 0
@@ -125,7 +122,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 20 kroků, vazby splněny, ko
 ✓ úprava dílu „Přidržovač“ v kontextu sestavy „S1“ – další příkazy pracují s ním; návrat: sestava hotovo
 ✓ materiál = Hliník (2.7 g/cm³)
 ✓ „Přidržovač“ vrácen do sestavy „S1“ (změnu převzalo komponent: 1) · objem dílu 1 cm³ · vazby 2/2 ok
-Pohybová studie: motorů 0 · kroků 36
+Pohybová studie: motorů 0 · kroků 36 · 0,02 s · r·?
 Dynamika: krok 0,001 s · gravitace vyp · tlumení 0 N·s/mm · odraz 0 · síla vazba 2 ZDVIH: 10 N
 ⚠ řádek 4: výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: materiál dílu „Přidržovač“ (hmotnost v dynamice); přepočítá ho „pohyb spustit“
 

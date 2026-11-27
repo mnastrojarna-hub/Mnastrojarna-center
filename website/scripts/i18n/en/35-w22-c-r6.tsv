@@ -1,0 +1,19 @@
+# Vlna 22, kolo 6, balík C (body 4, 5, 6): mezipolohy procesní vrstvy, otisk mělčí než hloubka, děrovaný + v záběru, vůle mezi kroky zvlášť
+{0} a {1}	{0} and {1}
+{0} + v záběru	{0} + engaged
+nezjištěn (záběr jen mezi kroky)	undetermined (engagement only between steps)
+mezipolohy mezi kroky {0} a {1} (t = {2} s)	the intermediate position between steps {0} and {1} (t = {2} s)
+mezipoloze mezi kroky {0} a {1} (t = {2} s)	the intermediate position between steps {0} and {1} (t = {2} s)
+záběr jen mezi kroky – výsledek procesu nezjištěn (mezipolohy od kroku {0} nešly spočítat)	engagement only between steps – process result undetermined (intermediate positions from step {0} could not be computed)
+procesní operace {0}: otisk do „{1}“ {2} mm z požadovaných {3} mm	process operation {0}: imprint into “{1}” {2} mm of the required {3} mm
+procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – mezipolohy nešly spočítat, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)	process operation {0}: the tool “{1}” could reach the workpiece “{2}” only between steps – the intermediate positions could not be computed, process result undetermined (finer steps: motion steps N)
+pracovní kontakt „{0}“ × „{1}“ mezi kroky {2} a {3} (pravidlo {4}), největší průnik {5} mm³	working contact “{0}” × “{1}” between steps {2} and {3} (rule {4}), largest overlap {5} mm³
+mezi kroky {0} a {1} (po přímé dráze: poloha {2}, t = {3} s, motory {4})	between steps {0} and {1} (along the straight path: position {2}, t = {3} s, motors {4})
+; mezi kroky {0}	; between steps {0}
+ · ⚠ pod limitem {0} mm mezi kroky {1} (v polohách kroků nad limitem)	 · ⚠ below the limit {0} mm between steps {1} (above the limit at the step positions)
+vůle „{0}“ × „{1}“ {2} mm < {3} mm mezi kroky {4} (nejmenší {5})	clearance “{0}” × “{1}” {2} mm < {3} mm between steps {4} (smallest {5})
+záběr jen mezi kroky – výsledek procesu nezjištěn (úsek před krokem {0} by potřeboval víc než {1} mezipoloh)	engagement only between steps – process result undetermined (the segment before step {0} would need more than {1} intermediate positions)
+záběr jen mezi kroky – výsledek procesu nezjištěn (kontrola kolizí našla průnik před krokem {0}, procesní vrstva v polohách ne)	engagement only between steps – process result undetermined (the collision check found an intersection before step {0}, the process layer found none at its positions)
+procesní operace {0}: nástroj „{1}“ mohl obrobek „{2}“ zasáhnout jen mezi kroky – úsek by potřeboval víc než {3} mezipoloh, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)	process operation {0}: the tool “{1}” could reach the workpiece “{2}” only between steps – the segment would need more than {3} intermediate positions, process result undetermined (finer steps: motion steps N)
+procesní operace {0}: kontrola kolizí našla průnik nástroje „{1}“ s obrobkem „{2}“ mezi kroky, procesní vrstva v polohách ne – výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)	process operation {0}: the collision check found an intersection of the tool “{1}” with the workpiece “{2}” between steps, the process layer found none at its positions – process result undetermined (finer steps: motion steps N)
+mezi kroky {0} a {1} (po přímé dráze: přibližně poloha {2}, t = {3} s, motory {4} – interpolováno podílem dráhy)	between steps {0} and {1} (along the straight path: approximately position {2}, t = {3} s, motors {4} – interpolated by the path fraction)

@@ -231,6 +231,45 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     expect(docSummaryOf(fine, null, { mates: okMates } as never).springs).toBeUndefined();
     expect(docKv(docSummaryOf(fine, null, { mates: okMates } as never))).not.toMatch(/springs/);
   });
+  it("„✓ vazba … preferovaná strana min · ok“ ne, když preferenci přebijí jiné vazby / pružina – ⚠ „preference se neuplatnila“ (kolo 6)", async () => {
+    const env = fakeEnv();
+    const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20 název "PEVNÁ"', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40 název "Mez"', 'sestava vazba "Mez" preferovat min');
+    const line = a.last.log[0];
+    expect(line).not.toMatch(/^✓/);
+    expect(line).toMatch(/^⚠ vazba 3 .*preferovaná strana min, preference se neuplatnila \(jiné vazby; hodnota 29,5\)/);
+    // preference, kterou nic nebrání: ✓
+    const b = await runLines(press({ holder: true }), env, MATE, 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40 název "Mez"', 'sestava vazba "Mez" preferovat min');
+    expect(b.last.log[0]).toMatch(/^✓ vazba 2 .*preferovaná strana min · ok/);
+  });
+  it("otevřený dokument se ztracenou dosedací plochou (plocha, kterou díl nemá): ne čistý stav – strana ztracená, springs.lost=1 (kolo 6)", async () => {
+    const { markMissingSeats } = await import("../asm-spring-agent");
+    const { docKv, } = await import("../engine/protocol");
+    const { docSummaryOf } = await import("../engine/kv");
+    const base = press();
+    const doc: CadDoc = { ...base, components: [...base.components!, { id: "s", name: "P", source: { kind: "part", doc: (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc }, placement: { position: [0, 0, 10], rotation: [0, 0, 0] }, spring: { a: { compId: "rám", face: 1 }, b: { compId: "deska-a", face: 99 }, free: 32, length: 25 } }] };
+    expect(docKv(docSummaryOf(doc, null, { mates: {} } as never))).not.toMatch(/springs\.lost/); // dřív: čistý řádek po otevření
+    const m = await markMissingSeats(doc, fakeEnv());
+    expect(docKv(docSummaryOf(m.doc, null, { mates: {} } as never))).toMatch(/\bsprings\.lost=1\b/);
+  });
+  it("„Vazby splněny ve všech krocích“ ne, když kvazistatika začne jinde než uložená poloha (pružina posune přidržovač v kroku 0) – ⚠ motion.start-jump (kolo 6, oponent)", async () => {
+    // dřív: krok 0 kvazistatiky v rovnováze pružin (přidržovač o 2,5 mm níž než v sestavě) bez ⚠ a „Vazby splněny ve všech krocích“ –
+    // start0 hlídal jen díly mezí s preferencí
+    const env = fakeEnv();
+    const base = press({ holder: true });
+    const spr = (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc;
+    const doc: CadDoc = { ...base, components: [...base.components!, { id: "s", name: "P", source: { kind: "part", doc: spr }, placement: { position: [0, 0, 38], rotation: [0, 0, 0] } }] };
+    const setup = [MATE, 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40 název "Mez"', 'sestava vazba mez-vzdálenosti "Přidržovač" F1 "Rám" F2 min 0 max 500 název "Dosed"', 'sestava vazba zámek "P" "Přidržovač"', 'sestava pružina "P" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20'];
+    const a = await runLines(doc, env, ...setup, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    const txt = a.last.log.join("\n");
+    expect(txt).not.toMatch(new RegExp(`^ ?${GREEN_MATES}$`, "m"));
+    expect(txt).toMatch(/⚠ vazby splněny ve všech krocích, ale krok 0 je jinde než poloha v sestavě \(„Přidržovač“/);
+    const jump = a.last.codes?.find((c) => c.code === "motion.start-jump");
+    expect(jump?.text).toMatch(/„Přidržovač“ 2,5 mm.*uložená poloha není v rovnováze pružin/);
+    // týž model v rovnováze (mez max 25 – sestava ho sama posadí na 34,5): ⚠ krok 0 není, „Vazby splněny…“ ano
+    const b = await runLines(doc, env, ...setup.map((l) => l.replace("max 40", "max 25")), "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    expect((b.last.codes ?? []).some((c) => c.code === "motion.start-jump")).toBe(false);
+    expect(b.last.log.join("\n")).toMatch(new RegExp(`^ ?${GREEN_MATES}$`, "m"));
+  });
   it("„Úroveň simulace: kvazistatika“ ne u kinematického výpočtu", async () => {
     const env = fakeEnv();
     const a = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
@@ -280,12 +319,24 @@ describe("zelené texty etapy M3 – kdy se nesmí vypsat", () => {
     expect(txt).not.toMatch(/pohání: „/);
     expect(a.codes.map((c) => c.code)).toContain("motion.motor-conflict");
   });
-  it("druhý motor na tomtéž stupni volnosti: ✓ motor 2 má vedle sebe ⚠ motion.motor-conflict; nahrazení motoru nikdy potichu", async () => {
+  it("druhý motor na tomtéž stupni volnosti: žádné „✓ motor 2“, jen „→ motor 2 přijat, ale je v konfliktu“ + ⚠ motion.motor-conflict; nahrazení motoru nikdy potichu", async () => {
+    // kolo 6 (změna zamýšleného chování): dřív se tu ověřovalo jen „✓ motor 2 má vedle sebe ⚠“ – přijetí konfliktního motoru bylo
+    // zelené (falešná zelená podle ověření bodu 10); teď přijetí bez ✓
     const env = fakeEnv();
     const a = await runLines(mk3(press()), env, MATE, 'sestava vazba souosost "Deska A" F3 "Rám" F3 název "OSA"', "pohyb motor lineární vazba 1 57,5..27,15 kroky 2", 'pohyb motor lineární vazba "OSA" 0..-5 kroky 2');
     expect(a.codes.map((c) => c.code)).toContain("motion.motor-conflict");
+    expect(a.log.some((l) => /^✓ motor 2/.test(l))).toBe(false);
+    expect(a.log.some((l) => /^→ motor 2 přijat, ale je v konfliktu/.test(l))).toBe(true);
     const b = await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
     expect(b.codes.map((c) => c.code)).toContain("motion.motor-replaced");
+  });
+  it("„✓ fáze … vazba „X“ ≤ …“ ne, když hodnotu vazby nejde měřit (zámek) – ✗ při definici; fáze na mezi vzdálenosti se měří (kolo 6)", async () => {
+    const env = fakeEnv();
+    const a = await runLines(mk3(press({ holder: true })), env, MATE, 'sestava vazba zámek "Přidržovač" "Deska A" název "Z"', 'sestava vazba mez-vzdálenosti "Přidržovač" F1 "Rám" F2 min 0 max 500 název "Dosed"');
+    await expect(runLines(a.doc, env, 'pohyb fáze "Nikdy" při vazba "Z" <= 0')).rejects.toThrow(/nejde měřit/);
+    const b = await runLines(a.doc, env, 'pohyb fáze "Dolů"', 'pohyb fáze "Dosed" při vazba "Dosed" <= 5', "pohyb motor lineární vazba 1 57,5..27,5 kroky 6");
+    expect(b.log.join("\n")).not.toMatch(/nejbližší hodnota \?/);
+    expect(b.kv).toMatch(/ phases=2\/2$/);
   });
   it("tuhá skupina: „na konci zpět ve výchozí poloze“ jen když se opravdu vrátila", async () => {
     const env = fakeEnv();

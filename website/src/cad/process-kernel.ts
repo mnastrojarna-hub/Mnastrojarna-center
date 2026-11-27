@@ -21,7 +21,7 @@
 import * as r from "replicad";
 import { pairIntersection, partEntry } from "./asm-kernel";
 import { meshArrays } from "./build";
-import { PROC_MAX_OPS, procKey, type ProcReq, type ProcRes, type ProcState, type ProcStep } from "./process-types";
+import { PROC_MAX_OPS, PROC_MAX_SUB, procKey, type ProcReq, type ProcRes, type ProcState, type ProcStep } from "./process-types";
 import type { MeshData, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -134,6 +134,7 @@ const overlap = (a: [Vec3, Vec3], b: [Vec3, Vec3]) => [0, 1, 2].every((i) => a[0
  * Procesní operace v jádře (viz hlavička). `req.mesh` = stavy, jejichž sítě se vrátí (obrobek po operaci a odpad).
  */
 export async function processOp(req: ProcReq): Promise<ProcRes> {
+  if (req.plan) return planOf(req);
   const { others, meshCombined, ...one } = req;
   const held = await heldOf(one);
   // víc operací na témže obrobku: stav obrobku po všech operacích v kroku (dřív každá z původního obrobku a odebrané objemy se
@@ -389,6 +390,66 @@ async function compute(req: ProcReq): Promise<Held> {
   void contactSteps;
   void computed;
   return { res, bodies, scraps, rs, used: 0 };
+}
+
+/**
+ * Plán mezipoloh (kolo 6, `ProcReq.plan`): bez booleovských operací. Úsek `i − 1 → i` potřebuje mezipolohy, když obálka dráhy
+ * nástroje (obálky v obou polohách) zasahuje obálku obrobku a největší posun bodu obálky nástroje (rohy – posun tuhého tělesa je
+ * afinní, maximum leží v rohu) je větší než polovina délky nástroje ve směru posunu: sousední polohy se pak nepřekrývají a nástroj
+ * by plechem „proskočil“ (razník Ø20 × 40 při zdvihu 55 mm v jednom kroku: kroky bez záběru, ve skutečnosti prostřiženo).
+ */
+async function planOf(req: ProcReq): Promise<ProcRes> {
+  const t0 = Date.now();
+  const te = await partEntry(req.target.key, req.target.source);
+  const pe = await partEntry(req.tool.key, req.tool.source);
+  const T = te.body as Shape | null;
+  const P = pe.body as Shape | null;
+  const volume0 = te.result.metrics?.volume ?? volumeOf(T);
+  const base: ProcRes = { steps: [], states: [{ removed: 0, volume: volume0, scrap: [] }], dir: null, thickness: null, volume0, ms: 0 };
+  if (!T || !P) return { ...base, error: !T ? "target" : "tool", ms: Date.now() - t0 };
+  const tBox = te.result.metrics?.bbox ?? (T.boundingBox.bounds as [Vec3, Vec3]);
+  const pBox = pe.result.metrics?.bbox ?? (P.boundingBox.bounds as [Vec3, Vec3]);
+  const corners = Array.from({ length: 8 }, (_, c) => [c & 1 ? pBox[1][0] : pBox[0][0], c & 2 ? pBox[1][1] : pBox[0][1], c & 4 ? pBox[1][2] : pBox[0][2]] as Vec3);
+  const gaps: NonNullable<ProcRes["gaps"]> = [];
+  for (let i = 1; i < req.rels.length; i++) {
+    const a = req.rels[i - 1];
+    const b = req.rels[i];
+    if (!a || !b) continue;
+    const ba = boxAt(pBox, a);
+    const bb = boxAt(pBox, b);
+    const swept: [Vec3, Vec3] = [
+      [Math.min(ba[0][0], bb[0][0]), Math.min(ba[0][1], bb[0][1]), Math.min(ba[0][2], bb[0][2])],
+      [Math.max(ba[1][0], bb[1][0]), Math.max(ba[1][1], bb[1][1]), Math.max(ba[1][2], bb[1][2])],
+    ];
+    if (!overlap(swept, tBox)) continue;
+    let disp = 0;
+    for (const c of corners) {
+      const p = ap(a, c);
+      const q = ap(b, c);
+      disp = Math.max(disp, Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]));
+    }
+    if (disp < 1e-9) continue;
+    const v: Vec3 = [b[9] - a[9], b[10] - a[10], b[11] - a[11]];
+    const lv = Math.hypot(...v);
+    // délka nástroje ve směru posunu (bez posunu – jen natočení: nejmenší rozměr obálky)
+    let ext: number;
+    if (lv > 1e-9) {
+      const u: Vec3 = [v[0] / lv, v[1] / lv, v[2] / lv];
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const c of corners) {
+        const w = dot(ap(a, c), u);
+        if (w < lo) lo = w;
+        if (w > hi) hi = w;
+      }
+      ext = hi - lo;
+    } else ext = Math.min(pBox[1][0] - pBox[0][0], pBox[1][1] - pBox[0][1], pBox[1][2] - pBox[0][2]);
+    const h = Math.max(1e-3, ext / 2);
+    const need = Math.ceil(disp / h) - 1;
+    if (need < 1) continue;
+    gaps.push({ i, n: Math.min(PROC_MAX_SUB, need), ...(need > PROC_MAX_SUB ? { capped: true as const } : {}) });
+  }
+  return { ...base, ...(gaps.length ? { gaps } : {}), ms: Date.now() - t0 };
 }
 
 /** T ∩ P(m) (zapamatováno podle matice); prázdný průnik / selhání → null */
