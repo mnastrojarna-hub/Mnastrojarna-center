@@ -222,18 +222,25 @@ export function solveStep<T = unknown>(
   const hard = vec(T.hard);
   const drive = vec(T.drive);
   // (A) vše najednou: bez měkkých členů přesně dřívější krok kinematiky (tvrdé + pohon stejnou vahou)
+  let cleaned = false;
   if (soft) {
     settle(poses, vars, T.hard, (H) => () => [...vec(H, K)(), ...vec(T.drive, K)(), ...vec(T.soft)()], { maxIter: it + 60, groups });
     solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
     // úklid jednostrannými mezemi nedokonverguje přesně, když měkký člen (pružina stovek N) tlačí díl přes mez, která se právě stala
     // aktivní (přidržovač dosedá na rám): zbytek ~1e-3 mm a krok by vyšel jako „motor na mezi – žádáno 32,208, dosaženo 32,209“.
     // Úklid s aktivní množinou mezí (rovnost na dosažené mezi) bez měkkých členů dá přesnou polohu (kolo 6)
-    if (worst(T.hard) > CONFLICT_TOL || worst(T.drive) > CONFLICT_TOL) settle(poses, vars, T.hard, (H) => () => [...vec(H)(), ...drive()], { maxIter: it + 60, groups });
+    if (worst(T.hard) > CONFLICT_TOL || worst(T.drive) > CONFLICT_TOL) {
+      settle(poses, vars, T.hard, (H) => () => [...vec(H)(), ...drive()], { maxIter: it + 60, groups });
+      cleaned = true;
+    }
   } else solvePoses(poses, vars, () => [...hard(), ...drive()], { maxIter: it, groups });
   if (worst(T.hard) <= CONFLICT_TOL && worst(T.drive) <= CONFLICT_TOL) {
     // měkké členy neurčují volné stupně volnosti: poloha = nejmenší změna od počátečního odhadu na tytéž hodnoty měkkých členů
-    if (soft) leastChange(poses, vars, snap, T.hard, T.drive, T.soft, { maxIter: it, groups });
-    return { status: "ok", blocking: [], short: [] };
+    const least = soft ? leastChange(poses, vars, snap, T.hard, T.drive, T.soft, { maxIter: it, groups }) : true;
+    // Poloha z úklidu (výše) platí, jen když ji dá i nejmenší změna od počátečního odhadu. Penalizační optimum s pružinou bez dna
+    // v nedourčených stupních volnosti „uklouzne“ o desítky metrů (deska jen se vzdáleností k rámu: Y +31 560 mm, pružina 30,082
+    // místo 30 mm); úklid tvrdé podmínky splní i tam, nejmenší změna ale ne – pak rozhodne větev (B) jako před kolem 6
+    if (least || !cleaned) return { status: "ok", blocking: [], short: [] };
   }
   // (B) z poslední platné polohy: tvrdé podmínky s přednostní vahou, pohon dojede, kam smí
   restore();
