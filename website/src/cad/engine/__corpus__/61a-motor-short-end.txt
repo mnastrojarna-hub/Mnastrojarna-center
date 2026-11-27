@@ -1,0 +1,17 @@
+# vlna 22, fáze 2, kolo 7 (bod 9): zkrácená studie. Motor 57,5..27,15 rychlostí 15,175 mm/s potřebuje 2 s; `pohyb čas 1` studii
+# zkrátí – ⚠ „motor 1 nedojede na konec … skončí na 42,325 mm“ (u `pohyb čas 1` i `pohyb`) a ve `stav` řádek „Pohyb: výsledek platí
+# … – 4 kroky“ (tvar čísla podle počtu; dřív „4 kroků“). Strojový řádek (`m1.end=42.325` na konci) NENÍ součástí protokolu konzole
+# a tento korpus ho tedy nekontroluje – kontrolují ho vitest w22/r7-m.test.ts „bod 9: zkrácená studie …“ a e2e cad-cli
+# (dřív hlavička tvrdila, že ho ukazuje tento soubor – oponent kola 7).
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175 kroky 4
+pohyb čas 1
+pohyb
+stav

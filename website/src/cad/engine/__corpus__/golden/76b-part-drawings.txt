@@ -1,0 +1,66 @@
+=== run 1 ===
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3 – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
+✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 10 mm (X 0…40, Y 0…30, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 40 × 30 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Pouzdro“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ druh dílu „Pouzdro“: nakupovaný · katalog „K-1“
+✓ nová sestava „Nástroj“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Pouzdro“ vložena do sestavy
+✓ normálie „ISO 4762 – M8×20 – 12.9“ vložena do sestavy jako komponenta
+✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+✓ záložka „Nástroj“ (sestava) je aktivní – další příkazy pracují s ní
+Výkresy dílů sestavy „Nástroj“ – vyráběných dílů 2 (normálie 1 a nakupované 1 výkres nedostanou):
+Založeno (1, A4, Chytré kóty):
+  → Deska A – list „List 1“ vyhodnocen bez nálezů
+Výkres už mají (1) – beze změny:
+  · Přidržovač (1 listů)
+Kopie dílů v sestavě se samy neobnoví: výkresy přibudou do výstupů sestavy po sestava obnovit vše
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1005,3 mm³ (6 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 1570,8 mm³ · těleso platné
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20] · Pouzdro [60; 10; 20] · Šroub M8×20 ISO 4762 [0; 0; 0]
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 106,5 × 66,5 × 60 mm · objem Σ 134,49 cm³ · hmotnost Σ 1,056 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+✓ záložka „Nástroj“ už je aktivní
+Výkresy dílů sestavy „Nástroj“ – vyráběných dílů 2 (normálie 1 a nakupované 1 výkres nedostanou):
+Výkres už mají (2) – beze změny:
+  · Deska A (1 listů)
+  · Přidržovač (1 listů)
+Kusovník „Nástroj“ (plochý): položek 4, kusů 4, hmotnost Σ 1,056 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+— Vyráběné díly —
+1 | Deska A |  | 1 | — (třída Ocel) | 0,934
+2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
+— Normálie —
+3 | Šroub M8×20 ISO 4762 | ISO 4762 – M8×20 – 12.9 | 1 | 12.9 | 0,015
+— Nakupované díly —
+4 | Pouzdro | K-1 | 1 | Ocel | 0,012
+⚠ řádek 3: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (výkres) – obnovit: sestava obnovit #1; kusovník a výkres ukazují údaje z vložení
+⚠ řádek 3: vyráběné díly bez čísla výkresu: Deska A, Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 3: vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20] · Pouzdro [60; 10; 20] · Šroub M8×20 ISO 4762 [0; 0; 0]
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 106,5 × 66,5 × 60 mm · objem Σ 134,49 cm³ · hmotnost Σ 1,056 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

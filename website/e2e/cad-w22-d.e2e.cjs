@@ -2,6 +2,7 @@
 //  - 22g: číslo a materiál zadané v záložce dílu AŽ PO vložení → panel komponenty ukáže „Kopie je starší než díl“
 //    (data-copy-stale), Kusovník upozornění (data-bom-note="stale"); tlačítko „Obnovit z dílu“ (data-refresh-btn) = týž
 //    příkaz `sestava obnovit` – pak kusovník i CSV nesou DA-001 / 1.2379 a upozornění zmizí;
+//  - kolo 7: přepočítat vše s kolizí (⚠, ne ✓), materiál po označení jiné třídy (⚠), Kusovník → Výrobní dokumentace (data-part-drawings)
 //  - 19: výběr „Druh v kusovníku“ (data-supply-select) → nakupovaný; Katalogové číslo; Kusovník v oddílech
 //    (data-bom-section make/standard/buy), normálie s třídou 12.9 a kolík s m6; text v konzoli dává totéž.
 //  - D2 (bod 20, výkresy a výstupy): vydaný list nese revizi modelu (odznak rev. A na záložce listu, data-sheet-issued),
@@ -415,6 +416,29 @@ async function scenario(args, label) {
   await p.waitForFunction(() => !document.querySelector('[data-drawing-stale-copy]'), null, { timeout: 120000 }).catch(() => {});
   ok((await p.locator('[data-drawing-stale-copy]').count()) === 0, `${label}: kolo 3 – Přepočítat vše obnoví kopii, odznak zmizí`);
   await p.keyboard.press('Escape').catch(() => {});
+
+  // ── kolo 7: přepočítat vše bez falešné zelené, materiál, Výrobní dokumentace (body 20, 22g, 19) ──
+  await openConsole();
+  log = await run('nový díl "Deska K"\nkvádr 100 60 20\nnový díl "Přidržovač K"\nkvádr 40 30 10\nnová sestava "Nástroj K"\nvložit "Deska K" ukotvit\nvložit "Přidržovač K" v 10 10 20\nkolize\nzáložka "Deska K"\nupravit "Kvádr 1" size=100;60;25\nzáložka "Nástroj K"\npřepočítat vše');
+  ok(!/✓ kontrola kolizí znovu/.test(log) && /⚠ kontrola kolizí znovu \(kolize\) – nalezeno kolizí: 1/.test(log), `${label}: kolo 7 – přepočítat vše s kolizí: ⚠ s počtem, žádné ✓ – ` + line(log, /kontrola kolizí znovu/));
+  log = await run('nový díl "Deska M"\nkvádr 10 10 10\nmateriál ČSN 11 423\nmateriál nerez');
+  ok(!/✓ materiál = Nerez/.test(log) && /je třídy Ocel, hustota se ale počítá podle třídy Nerez/.test(log), `${label}: kolo 7 – materiál nerez po ČSN 11 423 = ⚠ class-conflict – ` + line(log, /třídy Ocel/));
+  log = await run('nový díl "Deska V"\nkvádr 50 30 10\nnová sestava "Nástroj V"\nvložit "Deska V" ukotvit');
+  await closeConsole();
+  await p.locator('button', { hasText: /^Kusovník/ }).first().click().catch(() => {});
+  const pdBtn = p.locator('[data-part-drawings]').first();
+  await pdBtn.waitFor({ timeout: 20000 }).catch(() => {});
+  ok((await pdBtn.count()) === 1, `${label}: kolo 7 – okno Kusovník: tlačítko „Výrobní dokumentace“`);
+  await pdBtn.click().catch(() => {});
+  await p.waitForFunction(() => /Výkresy dílů sestavy/.test(document.body.innerText), null, { timeout: 120000 }).catch(() => {});
+  const flashText = await p.evaluate(() => document.body.innerText);
+  ok(/Výkresy dílů sestavy „Nástroj V“/.test(flashText) && /Deska V – list „List 1“/.test(flashText), `${label}: kolo 7 – Výrobní dokumentace založí list dílu – ` + line(flashText, /Deska V – list/));
+  await closeModal();
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska V"\nvýkres výkresy\nzáložka "Nástroj V"\nvýkresy dílů');
+  ok(/List 1/.test(log) && /Výkres už mají \(1\)/.test(log) && !/Založeno/.test(log.split('Výkresy dílů sestavy').pop() || ''), `${label}: kolo 7 – díl má list, opakování nic nezaloží – ` + line(log, /Výkres už mají/));
+  await closeConsole();
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

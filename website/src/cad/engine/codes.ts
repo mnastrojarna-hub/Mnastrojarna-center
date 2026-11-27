@@ -176,6 +176,8 @@ export const CODES = [
   { code: "compare.inexact", level: "note", key: "rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek" },
   { code: "material.density-assumed", level: "warn", key: "materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})" },
   { code: "material.class", level: "note", key: "materiál „{0}“ zařazen jako {1}" },
+  /** označení materiálu patří jiné třídě, než podle které se počítá hustota (vlna 22, bod 22g – kolo 7) */
+  { code: "material.class-conflict", level: "warn", key: "materiál „{0}“ je třídy {1}, hustota se ale počítá podle třídy {2} ({3} g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu {1}" },
   // ── výkresy a předloha (5.2 č. 32, 33; kap. 8) ──
   { code: "drawing.warning", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.section-miss", level: "warn", key: "rovina řezu neprotíná těleso: {0}" },
@@ -190,6 +192,27 @@ export const CODES = [
   // ruční kóta po změně modelu neleží na geometrii / přichytila se ke změněné geometrii (vlna 22, bod 20 – cad/drawing-dim-attach.ts)
   { code: "drawing.dim-detached", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
+  // pravidla poznámek výkresu pro agenty (vlna 23, R1–R7 – cad/drawing-notes-rules.ts): příkaz agenta, který by je porušil,
+  // skončí ✗ s radou; vyhodnocení listu je hlásí ✗ za text agenta (i z JSON / otevřeného dokumentu) a ℹ (rada) za ruční
+  // text z GUI (úroveň u záznamu); export listu s porušením agenta se odmítne
+  { code: "drawing.notes-limit", level: "error", key: "list {0}: poznámky nad razítkem – {1}" },
+  { code: "drawing.note-style", level: "error", key: "list {0}: text není strojařsky heslovitý – {1}" },
+  { code: "drawing.note-title-data", level: "error", key: "list {0}: údaj razítka mimo svou buňku razítka – {1}" },
+  { code: "drawing.notes-sheet", level: "error", key: "list {0}: poznámky mimo hlavní list – {1}" },
+  { code: "drawing.leaders-limit", level: "error", key: "list {0}: místních popisů je moc – {1}" },
+  { code: "drawing.note-not-model", level: "warn", key: "list {0}: popis jen na výkrese, ne v modelu – {1}" },
+  { code: "drawing.note-free-leader", level: "error", key: "list {0}: poznámka bez cíle v geometrii – {1}" },
+  { code: "drawing.note-to-title", level: "note", key: "list {0}: přesunuto do razítka – {1}" },
+  // D3: přesun do buňky razítka, která už nese jinou hodnotu – první zůstane, obě v hlášce
+  { code: "drawing.title-conflict", level: "warn", key: "list {0}: rozpor v razítku – {1}" },
+  // D1: text ze souboru otevřeného z disku (nezměněný tímto během) porušuje pravidla pro agenty – ne ✗, export povolen, ale ne ✓
+  { code: "drawing.notes-loaded", level: "warn", key: "list {0}: načtený výkres – {1}" },
+  { code: "drawing.sheet-empty", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.sheet-duplicate", level: "warn", key: "list {0}: {1}" },
+  // popis plochy / oblastní úprava z modelu (vlna 23, R2 / R3): plocha se změnila, nebo ji žádný pohled neukazuje
+  { code: "drawing.pmi-lost", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.pmi-unplaced", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.pmi-range", level: "warn", key: "list {0}: {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },
@@ -220,10 +243,23 @@ export class CodedError extends Error {
   constructor(
     readonly code: Code,
     readonly args: unknown[] = [],
+    /** vlastní (už lokalizovaný) text místo textu kódu – nález celého dokumentu (`scopedText`) */
+    text?: string,
   ) {
-    super(tr(BY_CODE.get(code)!.key, ...args));
+    super(text ?? tr(BY_CODE.get(code)!.key, ...args));
   }
 }
+
+/**
+ * Text kódu „list {0}: … – {1}“ pro nález, který se netýká listu (vlna 23, kolo 5 – correct-F7): místo „list materiál:“ /
+ * „list model:“ / „list název dílu:“ začne textem `where` („materiál: přesunuto do razítka – …“). Nezávislé na jazyce –
+ * nahradí se vše před `{0}` (cs „list “, en „sheet “, de „Blatt “).
+ */
+export function scopedText(code: Code, where: string, ...rest: unknown[]): string {
+  return tr(BY_CODE.get(code)!.key, "\u0000", ...rest).replace(/^[^\u0000]*\u0000/, where);
+}
+/** výjimka s kódem pro nález celého dokumentu (materiál, název dílu, popis v modelu) – text bez „list …:“ */
+export const scopedError = (code: Code, where: string, msg: string): CodedError => new CodedError(code, [where, msg], scopedText(code, where, msg));
 
 /** lokalizovaný text kódu v aktuálním jazyce (`setLang`) */
 export function codeText(code: Code, ...args: unknown[]): string {

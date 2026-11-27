@@ -2,6 +2,7 @@
 
 import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 
@@ -25,6 +26,8 @@ export function FloatPanel({
   className,
   width = 272,
   initial = { x: 12, y: 12 },
+  dock,
+  extra,
 }: {
   title: string;
   icon: CadIconName;
@@ -34,9 +37,31 @@ export function FloatPanel({
   className?: string;
   width?: number;
   initial?: { x: number; y: number };
+  /** kolo 7: ukotvený panel – vykreslí se do sloupce vedle pracovní plochy (celá výška, bez přetahování) */
+  dock?: HTMLElement | null;
+  /** tlačítka v záhlaví (před Zavřít) */
+  extra?: React.ReactNode;
 }) {
   const [pos, setPos] = useState(initial);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+  if (dock)
+    return createPortal(
+      <div data-float-docked className={cn("flex h-full flex-col border-l border-[#cfd6de] bg-white", className)} style={{ width }}>
+        <div className="flex select-none items-center gap-2 border-b border-[#e3e8ee] px-3 py-1.5">
+          <CadIcon name={icon} tone={tone} className="h-4 w-4" />
+          <p className="flex-1 text-[12.5px] font-semibold">{title}</p>
+          {extra}
+          {onClose && (
+            <button type="button" onClick={onClose} className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]" aria-label={tr("Zavřít")}>
+              <CadIcon name="x" className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {/* obsah na celou výšku sloupce (vnitřní omezení výšky plovoucího panelu se ruší) */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 [&>*]:max-h-none">{children}</div>
+      </div>,
+      dock,
+    );
   return (
     <div className={cn("absolute z-20 rounded-md border border-[#cfd6de] bg-white/95 shadow-xl backdrop-blur", className)} style={{ left: pos.x, top: pos.y, width }}>
       <div
@@ -50,6 +75,7 @@ export function FloatPanel({
       >
         <CadIcon name={icon} tone={tone} className="h-4 w-4" />
         <p className="flex-1 text-[12.5px] font-semibold">{title}</p>
+        {extra && <span onPointerDown={(e) => e.stopPropagation()}>{extra}</span>}
         {onClose && (
           <button type="button" onClick={onClose} className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]" aria-label={tr("Zavřít")}>
             <CadIcon name="x" className="h-3.5 w-3.5" />

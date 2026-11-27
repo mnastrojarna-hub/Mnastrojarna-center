@@ -81,7 +81,6 @@ pohled „{0}“ na listu není – pohledy: {1}	Ansicht „{0}“ ist nicht auf
 poloviční	halb
 posun	verschiebung
 pozice komponent (balónky)	Positionsnummern der Komponenten
-poznámka potřebuje text: výkres značka poznámka "Kalit 58 HRC" na Ø40	ein Hinweis braucht einen Text: zeichnung symbol hinweis "Härten 58 HRC" an Ø40
 Prohlížeč nepodporuje kreslení do canvasu.	Der Browser unterstützt das Zeichnen in ein Canvas nicht.
 přichyceno ke geometrii	an Geometrie gefangen
 razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí	Schriftfeld des Blatts (Nummer, Ersteller und Index auch in die Dokumenteigenschaften, Werkstoff in die Werkstoffbezeichnung) und Änderungstabelle
@@ -96,7 +95,6 @@ střed	Mitte
 střed detailu	Mitte der Einzelheit
 střed detailu {0} je mimo pohled {1} – rozsahy ukáže výkres stav	Mitte der Einzelheit {0} liegt außerhalb der Ansicht {1} – die Bereiche zeigt zeichnung status
 text se umisťuje na list: výkres značka text "…" v x y (mm listu od levého dolního rohu)	Text wird auf dem Blatt platziert: zeichnung symbol text "…" bei x y (Blatt-mm von der linken unteren Ecke)
-text: výkres značka text "Kalit 58 HRC" v 20 30 [výška 5] (mm listu od levého dolního rohu)	Text: zeichnung symbol text "Härten 58 HRC" bei 20 30 [höhe 5] (Blatt-mm von der linken unteren Ecke)
 umístit	platzieren
 v bodě {0} je více kružnic (R {1}) – zadejte r	an {0} liegen mehrere Kreise (R {1}) – r angeben
 v pohledu {0} není kružnice se středem {1}{2} – kružnice: {3}	in der Ansicht {0} gibt es keinen Kreis mit Mitte {1}{2} – Kreise: {3}

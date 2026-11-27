@@ -82,6 +82,10 @@ export const ProductionTab = lazyTab(
   "vyroba",
   dynamic(() => import("@/components/jobs/production/production-tab").then((m) => m.ProductionTab)),
 );
+export const DeliveryTab = lazyTab(
+  "dodani",
+  dynamic(() => import("@/components/jobs/production/delivery-tab").then((m) => m.DeliveryTab)),
+);
 export const PurchasingTab = lazyTab(
   "nakup",
   dynamic(() => import("@/components/jobs/purchasing/purchasing-tab").then((m) => m.PurchasingTab)),

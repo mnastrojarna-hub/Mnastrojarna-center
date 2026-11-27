@@ -1,0 +1,30 @@
+# vlna 22, fáze 2, kolo 7 (stopa D): přepočítat vše bez falešné zelené, třída materiálu razítka, výkresy dílů
+{0} – nedoběhlo, výsledek nezkontrolován	{0} – did not finish, result not checked
+{0} – s varováním: {1}	{0} – with warning: {1}
+{0} kopií zůstává starších než díl	{0} copies remain older than the part
+nalezeno kolizí: {0} – viz ⚠ výše	clashes found: {0} – see ⚠ above
+nesplněno vazeb: {0} (sestava vazby)	mates not satisfied: {0} (assembly mates)
+vazba {0} – ztracená reference po úpravě dílu	mate {0} – lost reference after the part edit
+sestava vazba {0} plocha … / sestava vazba {0} smazat	assembly mate {0} face … / assembly mate {0} delete
+vazba {0} – nesplněna ({1})	mate {0} – not satisfied ({1})
+→ materiál = {0} · označení „{1}“ v razítku zůstává	→ material = {0} · designation “{1}” stays in the title block
+✓ materiál = {0} · označení „{1}“ v razítku zůstává	✓ material = {0} · designation “{1}” stays in the title block
+{0} ({1} listů)	{0} ({1} sheets)
+{0} (bez výkresu)	{0} (no drawing)
+exporty [vymazat] · výstupy [zastaralé] · přepočítat vše · výkresy dílů [A4|A3|A2|A1|A0]	exports [clear] · outputs [stale] · recompute all · part drawings [A4|A3|A2|A1|A0]
+Kopie dílů v sestavě se samy neobnoví: výkresy přibudou do výstupů sestavy po sestava obnovit vše	Part copies in the assembly are not refreshed automatically: the drawings join the assembly outputs after assembly refresh all
+Nezaloženo – díl není otevřený v záložce ({0}); otevřete díl a zadejte výkres {1}:	Not created – the part is not open in a tab ({0}); open the part and enter drawing {1}:
+Nezaloženo – list se nevytvořil ({0}):	Not created – the sheet was not created ({0}):
+Sestava nemá vyráběné díly – není co založit	The assembly has no manufactured parts – nothing to create
+Výkres už mají ({0}) – beze změny:	Already have a drawing ({0}) – unchanged:
+Výkresy dílů sestavy „{0}“ – vyráběných dílů {1} (normálie {2} a nakupované {3} výkres nedostanou):	Part drawings of assembly “{0}” – manufactured parts {1} (standard parts {2} and purchased {3} get no drawing):
+výkresy dílů: jen v sestavě – výkres dílu: výkres {0} v jeho záložce	part drawings: only in an assembly – a part drawing: drawing {0} in its tab
+výkresy dílů: neznámé „{0}“ – výkresy dílů [A4|A3|A2|A1|A0]	part drawings: unknown “{0}” – part drawings [A4|A3|A2|A1|A0]
+Založeno ({0}, {1}, Chytré kóty):	Created ({0}, {1}, Smart dimensions):
+„{0}“ dílu „{1}“	“{0}” of part “{1}”
+{0} – list „{1}“ s varováním: {2}	{0} – sheet “{1}” with warning: {2}
+{0} – list „{1}“ vyhodnocen bez nálezů	{0} – sheet “{1}” evaluated without findings
+Výrobní dokumentace	Production documentation
+Založí list výkresu každému vyráběnému dílu otevřenému v záložce, který výkres nemá (text: výkresy dílů)	Creates a drawing sheet for every manufactured part open in a tab that has no drawing (text: part drawings)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+materiál „{0}“ je třídy {1}, hustota se ale počítá podle třídy {2} ({3} g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu {1}	material “{0}” is of class {1}, but the density is computed for class {2} ({3} g/cm³) – the title block designation and the class contradict each other: correct the designation, or choose class {1}

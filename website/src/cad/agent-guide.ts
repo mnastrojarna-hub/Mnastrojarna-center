@@ -30,7 +30,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    dokument; \`await window.mncad.setDocument(docOrJson)\` ho otevře v nové záložce (\`{ inPlace: true }\` = nahradí otevřený
    dokument jako jeden krok historie); \`await window.mncad.undo(n)\` / \`redo(n)\` / \`history()\` = historie Zpět / Znovu;
    \`await window.mncad.status()\` vrátí stav
-   jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
+   jako text (poslední řádek „Zobrazení: … · view=webgl|soft projection=persp|ortho“ = zobrazení okna aplikace, ne model;
+   v CLI \`stav\` ho nemá); \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
    3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
    \`await window.mncad.save("název")\` stáhne projekt .mncad bez dialogu (jako příkaz \`uložit\`) a vrátí
@@ -718,7 +719,8 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \
    obálka je **přesná** obálka těles všech viditelných listových dílů v jejich umístění (jádro, ne síť, bez skic a pomocné
    geometrie; i natočené díly, např. otočení 0 0 20).
 6. \`sestava komponenta "Čep" v x y z | posun dx dy dz | otočení rx ry rz | pootočit X 90 | ukotvit | uvolnit | skrýt | zobrazit |
-   barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel\` (třída hustoty, jiný text = označení do kusovníku);
+   barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel\` (třída hustoty, jiný text = označení do kusovníku;
+   třída po označení jako u dílu: označení zůstává, odporuje-li mu, \`→ … v razítku zůstává – patří jiné třídě\` + ⚠, ne ✓);
    po přesunu se vazby přepočítají (přesunutá komponenta drží). \`sestava odebrat "X"\` (i s jejími vazbami),
    \`sestava duplikovat "X" [posun 50 0 0]\`, \`sestava izolovat "X"\`, \`sestava zobrazit vše\`.
 7. \`sestava pole "X" 4 rozteč 25 [směr Y|dx dy dz]\`, \`sestava pole "X" kruhové 6 [úhel 360] [osa Z] [v cx cy cz]\` (kopie
@@ -837,7 +839,14 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   znovu zadat \`pohyb motor … A..B rychlost V\` (v panelu tlačítko „Převést na rozsah × rychlost“), převod do skriptu to uvede v poznámce.
 - **Motory na strojovém řádku** (i ve stručném protokolu): na konci \`= … motion …\` jedno pole na motor
   \`m<i>=<průběh>:<začátek>><konec>:<směr>\` – průběh \`range\` | \`back\` (\`55>25>55\`) | \`ranged\` | \`open\` (konec = hodnota na konci
-  studie), směr \`+\` roste / \`-\` klesá / \`+-\` \`-+\` tam a zpět; např. \`m1=ranged:57.5>27.15:-\`.
+  studie), směr \`+\` roste / \`-\` klesá / \`+-\` \`-+\` tam a zpět; např. \`m1=ranged:57.5>27.15:-\`. Pole nese ZADANÝ rozsah; motor,
+  který ve zkrácené studii na konec nedojede (⚠ \`motion.motor-short\`), má navíc na konci řádku \`m<i>.end=<hodnota na konci studie>\`
+  (např. \`m1.end=42.325\`) – skutečný dojezd, stejně jako \`travel=\`.
+- **Vazba pro motor – hlavní zdvih × vedení:** Vzdálenost a Drážka s polohou = motor řídí HODNOTU vazby (řádek motoru „hodnota
+  vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm“); Souosost, Drážka bez polohy, Dráha, Šroub = vedení, motor posouvá / natáčí od výchozí
+  polohy („posuv od výchozí polohy“). Formulář motoru v panelu nabízí vazby v těchto dvou skupinách (předvybraná první vazba
+  s hodnotou) a u vazby, kterou už motor pohání, dopíše „– pohání motor N“; druhý motor na témže stupni volnosti = ⚠
+  \`motion.motor-conflict\`.
 - **Režim studie a úroveň simulace (vlna 22, bod 2):** \`pohyb kinematika\` = polohy jen z vazeb a motorů (pružiny se měří, netlačí);
   díl, kterého polohu vazby neurčují (volný v mezi – stírací deska, přidržovač), zůstává, kde byl, a posune ho jen doraz meze → ⚠
   \`motion.undetermined\` a souhrn místo „Vazby splněny ve všech krocích“ napíše „⚠ vazby splněny …, ale polohu „X“ neurčují“.
@@ -871,7 +880,13 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   „Nesplněné vazby: N“ a \`motion.conflict\` počítají jen skutečně porušené vazby a pohony; vazba, která motor zastavila a je splněná
   (pevná vzdálenost, mez na dorazu), je v \`pohyb krok N\` „brání: …“. V **dynamice** platí \`na mezi stop\` (výchozí) i \`chyba\` také:
   mez porušená předepsaným pohybem motoru zastaví motory na poslední platné hodnotě (⚠ \`motion.motor-limit\`), resp. snímky za mezí
-  jsou neplatné (⚠ \`motion.invalid\`, zobrazena poslední platná poloha).
+  jsou neplatné (⚠ \`motion.invalid\`, zobrazena poslední platná poloha) – všechny snímky, dokud motor žádá jinou hodnotu než
+  v posledním platném snímku, i když za mezí už stojí (dojel). Stav integrátoru za mezí je nefyzikální: blok Dynamika bere zdvih, v max,
+  a max, dotyky dorazů, síly pružin a energii jen z platných kroků (⚠ „neplatné kroky 4–12 … jen z platných kroků“, energie „v posledním
+  platném kroku (t = …)“), neplatný snímek nemá \`dyn\` (CSV prázdné buňky, graf mezera). Zastavený motor je v dynamice stejně jako v kinematice nesplněný pohon:
+  \`conflicts=N\`, „nesplněné vazby v N krocích“ a \`motion.conflict\` vazby motoru, nikdy „Vazby splněny ve všech krocích“.
+  \`motion.motor-limit\` u profilu, který za mezí dojel a couvl, dopíše nejzazší žádanou hodnotu („žádáno 37,226 → 37,348 mm
+  (nejdál 27,15 mm)“).
 - **Preferovaná strana meze:** \`sestava vazba "Mez" preferovat max\` (EN \`prefer\`, DE \`bevorzugen\`; \`ne\` = zrušit; JSON
   \`prefer: "min" | "max"\`) u Meze vzdálenosti / úhlu a Drážky bez polohy: kinematika i přepočet vazeb drží díl u této meze, když ho
   ostatní vazby neurčují; pevnou vazbu, ukotvení, kontakt ani motor nepřebije. Výpis vazby končí „· preferuje max“.
@@ -912,7 +927,10 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   který obrobek nezasáhne = ⚠ \`motion.process-miss\`; neprostřiženo = ℹ \`motion.process-partial\` (i otisk mělčí než zadaná hloubka:
   \`otisk do „Plech“ 0,1 mm z požadovaných 0,3 mm\`); strop 48 booleovských operací na operaci = ℹ \`motion.process-approx\`. Krok delší
   než polovina nástroje ve směru pohybu (razník projde plechem mezi dvěma kroky): procesní vrstva doplní mezipolohy z řešiče
-  (\`záběr od mezipolohy mezi kroky 0 a 1 (t = 0,667 s)\`); nejdou-li spočítat (dynamika, řešič bez řešení), úsek by potřeboval víc než 64 mezipoloh
+  (\`záběr od mezipolohy mezi kroky 0 a 1 (t = 0,667 s)\`); začátek operace uprostřed kroku (\`při motor 1 <= 5\`) = úsek od polohy
+  v okamžiku začátku; hodnota motoru mezi kroky se bere z profilu motoru (kosinus u \`tam a zpět\`), takže začátek v úvrati mezi kroky
+  (\`kroky 21 tam a zpět\` + \`při motor 1 <= -45\`) nastane v t = 1 s, ne „nenastal“; obrat motoru uvnitř kroku je vždy mezipolohou (jediný krok
+  tam a zpět: razník plechem projde); profil nesedí na kroky = „začátek … mezi kroky nezjištěn“ (⚠ \`motion.process-between\`), strop mezipoloh se posuzuje pro každou operaci zvlášť (jiná operace obrobku nezjištěna → \`odebráno nejméně …\`, kv \`removed=…+\`); nejdou-li spočítat (dynamika, řešič bez řešení), úsek by potřeboval víc než 64 mezipoloh
   (tenký nástroj, dlouhý krok) nebo spojitá kontrola kolizí najde nástroj × obrobek mezi kroky a procesní vrstva ne = ⚠ \`motion.process-between\`
   „výsledek procesu nezjištěn“ s důvodem a stav výrobku \`nezjištěn\`, nikdy „plný“ ani „nezasáhl“. Víc operací: hotový výsledek má přednost – \`děrovaný + v záběru\`. \`pohyb krok N\` vypíše stav výrobku a hloubku zásahu; \`stav\` stav na konci. Dokument se NEMĚNÍ:
   krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava). Víc operací na
@@ -930,10 +948,12 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
 - **Souhrn po tuhých skupinách (bod 15):** výchozí výpis pohybu = jeden řádek na skupinu dílů se stále stejnou vzájemnou polohou
   (tolerance, žádné „58 + 1“ ze zaokrouhlení): \` „Horní deska“ + 20 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm\`, pak
   \` stojí: 1 („Deska A“)\` a nesplněné vazby; po dílech \`pohyb detail\` / \`pohyb stav detail\` (EN \`motion detail\`). Strojově na konci
-  řádku \`groups=21:z-30,1:z-24.75\` (počet dílů : osy ± posunutí v kroku největšího vychýlení).
+  řádku \`groups=21:z-30:Horní%20deska,1:z-24.75:Razník\` (počet dílů : osy ± posunutí v kroku největšího vychýlení : jméno
+  kořene skupiny – znaky mezera , : = " % zapsané jako v URL, \`%20\` = mezera; kolo 7).
 - \`pohyb\` / \`pohyb stav\` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); \`pohyb krok 12\` – polohy
   v kroku; \`pohyb export csv\` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
-  \`pohyb přehrát [smyčka]\`, \`pohyb zastavit\`, \`pohyb export png|webm\` (snímky ZIP / video z 3D okna, jen v aplikaci);
+  \`pohyb přehrát [smyčka]\`, \`pohyb zastavit\`, \`pohyb export png|webm\` (snímky ZIP / video z 3D okna, jen v aplikaci; prohlížeč bez kodéru WebM = animované PNG se
+  stejným časováním a ⚠);
   \`pohyb kroky 48 čas 2 kolize vyp\`, \`pohyb motor smazat 1\`, \`pohyb smazat\`.
 - API: \`await window.mncad.motion('motor rotační "Klika" 0..360 krok 5')\` (text = volitelný příkaz \`pohyb …\` předem) vrátí
   \`{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }\`;
@@ -1225,7 +1245,8 @@ počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předc
 protokol se nikdy nečte jako výsledek nového běhu (atributy \`data-run-id\`, \`data-run-state\` u výstupu); tlačítko
 **Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
 ✗ \`run.cancelled\` před dalším řádkem; zapsal-li běh před zrušením jiný dokument (přechod \`nový díl\` / \`záložka\`), dokumenty, které
-založil, se zahodí a dokumenty zapsané do dřívějších záložek vyjmenuje ✗ \`run.cancelled-partial\` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+založil, se zahodí a zápisy do dřívějších záložek se vrátí do stavu před během („Změny, které běh zapsal do „Deska A“, se vrátily.“);
+jen záložku, kterou mezitím změnil někdo jiný, zrušení nepřepíše a vyjmenuje ji ✗ \`run.cancelled-partial\` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
 měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny \`pohyb přehrát\` se panelu doručí až po zápisu
 dokumentu běhu.
 
@@ -1823,7 +1844,8 @@ je na jejich řádku.
 | \`odkaz\` (\`link\`) | vypíše poslední sdílený odkaz znovu |
 | \`exporty [vymazat]\` (\`exports [clear]\` · \`exporte [löschen]\`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý \`export …\`, \`výkres export …\`, \`skica export dxf\` i export tlačítkem zapíše formát, soubor, revizi modelu \`r·a1b2c3\` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení); \`zpět\` / Ctrl+Z záznam nesmaže (soubor existuje) – k vrácenému modelu je ZASTARALÝ, \`exporty vymazat\` Zpět vrátí |
 | \`výstupy [zastaralé]\` (\`outputs [stale]\` · \`ausgaben [veraltet]\`) · \`zastaralé\` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
-| \`přepočítat vše\` (\`recompute all\` · \`alles neu berechnen\`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (\`sestava obnovit vše\` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, \`kolize\`, \`pohyb spustit\`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (\`výkres vydat B\`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz) |
+| \`přepočítat vše\` (\`recompute all\` · \`alles neu berechnen\`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (\`sestava obnovit vše\` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, \`kolize\`, \`pohyb spustit\`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (\`výkres vydat B\`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz). **✓ jen s platným výsledkem bez nálezu**: nalezená kolize (\`⚠ kontrola kolizí znovu (kolize) – nalezeno kolizí: N\`), nesplněné vazby, studie, která nedoběhla, a podpříkaz s ⚠/✗ jsou ⚠ s důvodem; vazby se ztracenou referencí jsou v „Zbývá udělat ručně“; strojová část končí \`warned=N\` |
+| \`výkresy dílů [A4|A3|A2|A1|A0]\` (\`part drawings\` · \`teilezeichnungen\`) | **výrobní dokumentace sestavy** (vlna 22, bod 19): každému vyráběnému dílu (druh z kusovníku) otevřenému v záložce, který výkres nemá, založí list (\`záložka "díl"\` + \`výkres A4\`, Chytré kóty) a hned ho vyhodnotí (⚠ \`drawing.warning\` listu); díly s výkresem nemění, normálie a nakupované vynechá; díl mimo záložku (jen kopie, import) = ⚠ \`bom.make-incomplete\` – výkres mu založit nejde. Kopie v sestavě se sama neobnoví (\`sestava obnovit vše\`). \`= L<n> out make=N created=N existing=N missing=N\`. GUI: okno Kusovník → „Výrobní dokumentace“ |
 
 \`\`\`
 uložit
@@ -2015,7 +2037,8 @@ vynutí 3D okno). Volby: \`view\` iso | front | top | right | back | bottom | le
 shaded | wireframe | hiddenLine | xray, \`fit\`, \`hints\` (popisky F1 / E2 / V3 do obrázku), \`section: { axis: "X", offset:
 25, flip: true }\` (\`null\` = bez řezu), \`explode\` (sestava 0–3), \`background\` white | current. Dočasný pohled, styl
 i řez se po snímku vrátí. Funguje i bez WebGL (zjednodušený náhled). V sestavě má v řezu každá komponenta s objemem
-čelo řezu (barva komponenty + šrafy, sousední díly se liší; i bez WebGL, ve snímku a ve videu studie; čelo se nevybírá),
+čelo řezu (barva komponenty + šrafy vázané na model – rozteč v mm, jedou s komponentou – a tmavý obrys; sousední díly
+se liší; i bez WebGL včetně průhlednosti, ve snímku a ve videu studie; čelo se nevybírá),
 odpověď \`řez\` to uvádí. Trvale textem:
 
 \`\`\`
@@ -2120,7 +2143,7 @@ pixely v 3D okně:
    jádra a přepočtu (\`[data-core-status]\`: \`loading|ready|busy|stale|error\`) – omezení prostředí není chyba modelu.
    Náhled nekreslí: perspektivu (je pravoúhlý), gizmo přesunu, skici a pomocné roviny v modelu, mřížku, analýzy ploch
    (zebra, úkosy, tloušťka, křivost), barevnou mapu odchylek, duchy porovnání, grafiku měření a stopu bodu pohybové studie,
-   hřebeny křivosti / řídicí body ploch třídy A a průhlednost – čísla dávají text a panely (\`analýza …\`, \`měřit\`,
+   hřebeny křivosti / řídicí body ploch třídy A – čísla dávají text a panely (\`analýza …\`, \`měřit\`,
    \`porovnat\`, \`pohyb stav\`); seznam je pod „Proč nevidím 3D?“ (\`[data-soft-limit]\`, cad/soft-view.ts).
    Výběr v něm funguje stejně jako ve 3D okně: **klik** vybere plochu (nejbližší ke kameře), hranu (do ~6 px, jen
    viditelnou) nebo vrchol (do ~7 px), **Ctrl / Shift + klik** přidá či odebere, platí filtr výběru (stavový řádek),
@@ -2149,7 +2172,10 @@ pixely v 3D okně:
   \`material.class\`). Nepozná-li se (\`materiál XY-123\`), hustota zůstává podle dosavadní třídy a protokol to napíše
   (\`→ materiál „XY-123“ uložen jako označení do razítka …\` + ⚠ \`material.density-assumed\` – nikdy ✓). Totéž pravidlo a tytéž
   kódy platí pro \`sestava komponenta "X" materiál "…"\` (\`→ komponenta „X“: materiál „XY-123“ uložen jako označení …\` + ⚠; ✓ jen
-  pro ostatní změny téhož příkazu) i pro pole „Označení materiálu (razítko)“ a pole Materiál v razítku výkresu (ℹ / ⚠ pod polem). V JSON jsou to pole \`material\` (id třídy) a \`materialName\`.
+  pro ostatní změny téhož příkazu), pro \`výkres razítko materiál="…"\` (ČSN 11 523 na hliníkovém dílu → třída ocel + ℹ) i pro pole
+  „Označení materiálu (razítko)“ a pole Materiál v razítku výkresu (ℹ / ⚠ pod polem). Třída zadaná PO označení
+  (\`materiál nerez\` po \`materiál ČSN 11 423\`) označení nechá, ale odporuje-li mu, je to \`→ …\` + ⚠ \`material.class-conflict\`
+  (nikdy ✓). V JSON jsou to pole \`material\` (id třídy) a \`materialName\`.
 - Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
   (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
   jen „Rozměry v mm“.
@@ -2234,8 +2260,9 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
    ztratí – zkontrolujte \`výkres stav\`. \`výkres kontrola tolerancí\` vypíše funkční rozměry, které toleranci nemají;
    tolerované kóty předlohy kontroluje až po připojení předlohy (balík předlohy) – bez ní hlavička řekne „předloha není
    připojena – kóty předlohy se nekontrolují“.
-6. **Razítko:** \`výkres nepředepsané ISO 2768-mK\`, \`výkres hrany ISO 13715 -0,3\`, \`výkres drsnost Ra 3,2\`,
-   \`výkres poznámka "…"\`.
+6. **Razítko (vše klíčové sem, ne do poznámek):** \`výkres nepředepsané ISO 2768-mK\`, \`výkres hrany ISO 13715 -0,3\`,
+   \`výkres drsnost Ra 3,2\`, \`výkres razítko tepelné="kalit a popustit" tvrdost="58–60 HRC" povrch="černit"\` – viz
+   „Výkres strojařsky“ níže (nad razítkem nejvýš 5 krátkých řádků, popis plochy odkazem z modelu).
 7. \`výkres stav\` naposledy, pak export (výkres → PDF / DXF / DWG / SVG).
 
 ### Pravidla Chytrých kót (ČSN EN ISO 129-1) – kontrolní seznam
@@ -2370,7 +2397,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | Příkaz | Význam |
 | --- | --- |
 | \`výkres razítko název="…" číslo="MN-1" kreslil="AI" revize=A datum="13.11.2026" materiál="ČSN 11 523"\` | razítko listu (+ \`nepředepsané=\`, \`hrany=\`, \`poznámka=\`); číslo, kreslil a revize se uloží i do dokumentu |
-| \`výkres razítko kontroloval="…" schválil="…" zákazník="…" projekt="…" polotovar="…" počet=4 tepelné="kalit 58–60 HRC" povrch="černit" úhly="±0°30′" sražení="±0,2" firma="…"\` | další pole razítka (en checked/approved/customer/project/stock/quantity/heat/surface/angles/chamfers/company, de geprüft/genehmigt/kunde/projekt/rohteil/menge/wärmebehandlung/oberflächenbehandlung/winkel/fasen/firma); pole, které šablona nemá, se vypíše v patičce nad razítkem |
+| \`výkres razítko kontroloval="…" schválil="…" zákazník="…" projekt="…" polotovar="…" počet=4 tepelné="kalit a popustit" tvrdost="58–60 HRC" povrch="černit" drsnost="Ra 3,2" úhly="±0°30′" sražení="±0,2" firma="…"\` | další pole razítka (en checked/approved/customer/project/stock/quantity/heat/hardness/surface/roughness/angles/chamfers/company, de geprüft/genehmigt/kunde/projekt/rohteil/menge/wärmebehandlung/härte/oberflächenbehandlung/rauheit/winkel/fasen/firma); technické údaje (tepelné zpracování, tvrdost, povrch, hrany, nepředepsané tolerance, drsnost) jsou vždy v buňkách razítka – ISO 7200 a kompaktní šablona dostanou technický pás razítka (+10 mm); ostatní pole, která šablona nemá, se vypíšou v patičce nad razítkem |
 | \`výkres razítko šablona=iso7200|kompaktní|nástrojářská\` | šablona razítka listu: ISO 7200 (výchozí, 180×38), kompaktní (180×27), nástrojářská (180×64, všechna pole); výchozí pro nové listy v Nastavení → Výkres |
 | \`výkres razítko logo="firma.png"\` · \`… logo="data:image/png;base64,…"\` · \`… logo=ne\` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG/SVG, v CLI soubor ze složky \`--files\`; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek (logo SVG jako vektor), DXF/DWG jako vyplněný obrys (SOLID) |
 | \`výkres nepředepsané ISO 2768-mK\` · \`… mK\` · \`… f H\` · \`… desetinná\` · \`… desetinná ±0,1 ±0,1 ±0,01 ±0,005\` · \`… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005\` · \`… X.XX=±0,02\` · \`… ne\` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); \`ne\` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
@@ -2379,11 +2406,11 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | \`výkres otočení 0|90|180|270\` · \`výkres řez XZ odsazení 0 poloviční|celý\` · \`výkres kusovník ano|ne\` · \`výkres balónky ano|ne\` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | \`výkres pružiny zjednodušeně|plně\` | pružiny se na výkrese kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr přes volnou délku), osa a čerchované osy drátu na středním průměru jen tam, kde je obrys vidět; v řezu se obal nešrafuje (jen obrys a osy drátu). Pružina = prvek Pružina nebo Tažení po šroubovici s profilem Kruh, který je **prvním materiálem svého tělesa** (normálie pružin, \`pružina …\` jako první prvek dílu, \`… nové těleso "Pružina"\`, i jako komponenty sestavy); těleso pak smí už jen odebírat (zabroušené konce) nebo přidat jiný tvar (očka, ramena). Šroubovice přidaná na existující těleso (chod šneku, oblý závit na hřídeli, pružina přidaná do pouzdra) se kreslí vždy přesně, stejně jako šroubovicová drážka (odebrání) – samostatnou pružinu proto zakládejte jako \`nové těleso\`. Chytré kóty čtou skutečný tvar (obal pružiny nekótují jako díru). \`plně\` = skutečná šroubovice – skrytí hran trvá u každé pružiny desítky sekund (A1 sestava se 4 pružinami: minuty). Stav listu (\`výkres stav\`) uvádí ve Volbách, jak se pružiny kreslí, jen když list nějakou pružinu má. |
 | \`kótovat základní\` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
-| \`výkres značka poznámka "Kalit 58 HRC" na Ø40\` | poznámka s odkazovou čarou na kótu (popisek nebo id) |
+| \`výkres značka poznámka "Lapovat" pohled přední v 20 12\` | krátká poznámka (≤ 40 znaků, heslovitě) s odkazovou čarou na hranu pohledu – raději \`poznámka F7 "Lapovat"\` v modelu (výkres ji převezme; odkaz jen na výkrese = ⚠ \`drawing.note-not-model\`); na kótu nebo volný bod = ✗ \`drawing.note-free-leader\`; tepelné zpracování / tvrdost / povrch u odkazu = ✗ (razítko nebo \`úprava F7 …\`) |
 | \`výkres značka drsnost Ra 1,6 na Ø40\` · \`… drsnost Ra 0,8 pohled přední v 0 20\` | značka drsnosti na kótu nebo na povrch (bod pohledu) |
 | \`výkres značka tolerance kolmost 0,02 A na Ø40\` | rámeček ISO 1101: přímost, rovinnost, kruhovitost, válcovitost, profil, rovnoběžnost, kolmost, sklon, poloha, souosost, souměrnost, házení (+ hodnota, základna) |
 | \`výkres značka základna A pohled horní v -50 0\` | základna (bez písmene další volné) |
-| \`výkres značka text "Kalit 58 ± 2 HRC" v 20 30 [výška 5]\` | volný text na listu (mm listu) |
+| \`výkres značka text "Odmastit" v 20 30 [výška 3,5]\` | volný text na hlavním listu (mm listu, písmo ≤ 5 mm) – nejvýš 5 krátkých heslovitých řádků v celém dokumentu; údaj razítka v textu se přesune do razítka (ℹ \`drawing.note-to-title\`), věta / překročení = ✗ |
 | \`… posun dx dy\` | posun popisku značky od cíle [mm listu] |
 | \`výkres kóta vodorovně|svisle|šikmo pohled přední x1 y1 x2 y2 [odsazení 10] [text "…"]\` | ruční kóta dvou bodů; konce jedné hrany = kóta hrany (sleduje změny modelu); kladné odsazení = ven z pohledu |
 | \`výkres kóta průměr|poloměr pohled horní střed x y [r R] [úhel 45]\` · \`výkres kóta úhel pohled přední x1 y1 x2 y2 x3 y3 x4 y4\` | kóta kružnice (dohledá se podle středu a poloměru) a úhlu dvou hran (mezi směry 1→2 a 3→4) |
@@ -2431,6 +2458,100 @@ výkres stav vše
 Pak \`window.mncad.exportDrawing("pdf", { sheet: "all" })\` (oba listy v jednom PDF) a \`exportDrawing("png", { sheet: 2 })\` pro
 kontrolu očima; totéž textem \`výkres export pdf vše\`. Druhý výkres téhož dílu (např. montážní) založí \`výkres nový "Montážní"\` –
 má vlastní listy a \`výkres výkresy 1\` vrátí práci na první výkres.
+
+### Výkres strojařsky – razítko, odkazy, nejvýš 5 řádků (pravidlo pro každého agenta)
+
+Majitel: „Musí to být strojařský, ne slohové cvičení.“ Platí pro **každou textovou cestu** – jazyk mncad v konzoli, CLI,
+HTTP, \`window.mncad.run\`, JSON dokument ve skriptu / \`setDocument\`, 2D výkres \`2d …\`, i výchozí list \`--formats\`.
+Člověk v GUI výkresu (nástroje Text / Poznámka / Kóta, panel Razítko, tabulka revizí, příkazový řádek 2D editoru) omezen
+není – dostane jen nenápadnou radu.
+
+**Původ textu:** co agent v tomto běhu vytvoří nebo změní (příkaz, JSON dokument na řádku, \`setDocument\`) = **agent** →
+porušení ✗ a export listu se odmítne. Text ze souboru otevřeného z disku (\`otevřít\` uloženého .mncad / .json, CLI
+\`--open\`, HTTP open), který běh nezměnil = **načtený** → nikdy ✗ a export neblokuje (archivní výkres člověka jde agentem
+exportovat), ale list dostane ⚠ \`drawing.notes-loaded\` místo ✓. Jakmile agent načtený text upraví, je jeho (✗).
+\`"by":"user"\` v souboru nekoupí víc než ⚠. Text, který soubor nese jako agentův (\`"by":"agent"\` – soubor uložil agent,
+i v běhu, který skončil ✗), zůstane agentův: \`uložit\` + \`otevřít\` ani \`--open\` v dalším běhu porušení nevyperou.
+
+1. **Klíčové údaje vždy v razítku:** materiál, tepelné zpracování, tvrdost, povrchová úprava, hrany (ISO 13715),
+   nepředepsané tolerance (ISO 2768 / ISO 22081), obecná drsnost – \`výkres razítko tepelné="…" tvrdost="58–60 HRC"
+   povrch="…" hrany="…" drsnost="Ra 3,2"\`, \`výkres nepředepsané ISO 2768-mK\`. Hodnota buňky heslovitě (≤ 32 znaků).
+   Poznámka, která je takovým údajem („Kalit 58 HRC“, „HRC 58-62“, „Ra=1,6“, „N7“, „C0,5“, „Fazeta 0,5“, „RAL 9005“, „KTL“,
+   „Brunýrovat“, „Tol. ±0,1“, „Volné míry ±0,2“, „DIN ISO 2768 mittel“, „IT12“, „Mat. 11 523“, „Ck45“, „AISI 304“, „Hardox
+   450“, „PA6“, „CHT 0,8 mm“, „Rohy zaoblit R1“, „Vanadis 23“, „Böhler K110“, „X5CrNi18-10“, „DIN 7168 m“, „HV 650“ →
+   „650 HV“, „Black oxide“), se do razítka přesune sama (ℹ \`drawing.note-to-title\`) – ve stejném tvaru,
+   jaký přijme \`výkres razítko\` (tvrdost „58-62 HRC“); údaj uprostřed věty nebo neúplný („ISO 2768“ bez třídy, „Tvrdit
+   58-60“ bez jednotky, „Allgemeintoleranz“ bez normy) = ✗ \`drawing.note-title-data\`. Přesun je **bezeztrátový**: rozsah
+   zůstane celý („58 HRC ±2“, „Kalit 58÷62 HRC“, „58/60 HRC“ → tvrdost, nikdy obecná tolerance ±2), obě hodnoty zůstanou
+   („Rz 6,3 / Ra 0,8“, „ISO 2768-mK / ISO 8015“); co by se ztratilo nebo rozdělilo („Ra 3,2 brousit“, „Zn 8 µm ±2“), se
+   nepřesune vůbec – ✗ s radou \`výkres razítko …="celý údaj"\`. Každá buňka nese hodnotu **svého
+   druhu**: tepelné = tepelné zpracování, povrch = povrchová úprava, hrany = stav hran, úhly / sražení = tolerance (±, °),
+   polotovar = rozměr a druh (ne tvrdost, ne úprava); pokyn („Konzervovat olejem“, „Zabalit do VCI“, „Měrný protokol“)
+   nepatří do žádné buňky (✗, i \`výkres razítko …=\`). Buňka, která už nese jinou hodnotu, se nepřepíše (⚠ \`drawing.title-conflict\`, ukáže obě);
+   materiál jiný než materiál modelu = ✗ (zdroj je model: \`materiál …\`). \`materiál 1.2379 kalený na 58-60 HRC\` se
+   rozdělí (materiál do modelu, tvrdost a tepelné zpracování do razítka listů; bez výkresu ✗ s radou).
+   Totéž hlídají **všechny kanály**: kóta (text, předpona, přípona – slovo „kalit“ / „černit“ stačí), popis díry, značka
+   drsnosti, revize, název dílu / listu / výkresu a volné buňky razítka (zákazník, projekt, kontroloval …: jméno / číslo,
+   ne pokyn „Odmastit“ / „Zabalit“). Název dílu / listu / výkresu je **jmenná fráze** („Kalená vložka“, „Povrchová deska“,
+   „Temperierplatte“, „Corner bracket“ projdou); ✗ jen věta, údaj s hodnotou („Deska 58 HRC“) nebo pokyn („Kalit“, „Srazit
+   hrany“, „Leštit čela“, „Kalení 58“). Volná buňka nese hodnotu svého druhu: počet kusů číslo („4 ks“), datum číslicemi,
+   revize krátké označení; jména, projekt a zákazník bez pokynů („Lapovat F3“, „Brousit na čisto“ = ✗). Totéž platí pro
+   **kusovník sestavy** (\`sestava komponenta … název / materiál / katalog / výrobce / rozměr / třída / přezdívka\`): pokyn
+   nebo věta = ✗, v materiálu jen označení (tepelné zpracování a tvrdost do razítka výkresu dílu). **Popisek pohledu**
+   (detail, pomocný pohled, řez) je jen písmeno („B“, „A-A“, „Detail C“), název pohledu jiného modelu jmenná fráze.
+   Revize smí popsat změnu tepelného zpracování / povrchu / hran („doplněno kalit a popustit“) jen, když údaj je v razítku.
+   V JSON dokumentu se údaje generátoru (\`meta.formNotes\`, \`meta.pmi\`, \`meta.bom\`, svary, tabulky …) neberou – list je
+   spočítá z modelu; příznak \`auto\` u popisu není výjimka (popis se hodnotí obsahem).
+2. **Místní popis = odkaz se šipkou na plochu, text je v MODELU:** \`poznámka F7 "Brousit"\` (EN \`note\`, DE \`hinweis\`) –
+   výkres ho sám kreslí odkazovou čarou (šipka na hranu plochy viděné z boku, tečka na ploše viděné zepředu); změna textu
+   v modelu = změna na výkrese. Nejvýš 8 místních popisů v dokumentu (✗ \`drawing.leaders-limit\`). Odkaz jen na výkrese
+   (\`výkres značka poznámka "…" pohled přední v x y\` na hraně) = ⚠ \`drawing.note-not-model\`; na kótu nebo volný bod = ✗.
+3. **Oblastní tepelná / povrchová úprava = tlustá čerchovaná čára (ISO 128, 04.2):** \`úprava F3 tepelná "58+2 HRC" od 10
+   do 40\` (EN \`treatment F3 heat … from 10 to 40\`, DE \`behandlung F3 wärme … von 10 bis 40\`) – čára rovnoběžně nad
+   plochou, kóta rozsahu, značka Z1 a vysvětlivka „Z1 tepelná: 58+2 HRC“ dole (počítá se do 5 řádků – i když výkres ještě
+   není; stejný předpis = jedna vysvětlivka „Z1, Z2 …“). Rozsah mimo plochu = ⚠ \`drawing.pmi-range\`.
+4. **Nad razítkem nejvýš 5 řádků volného textu v celém dokumentu** (všechny výkresy a listy dohromady), řádek ≤ 60 znaků,
+   ≤ 8 slov, písmo ≤ 5 mm, heslovitě – žádné věty, souvětí ani „pokud není uvedeno jinak“; věta rozdělená na řádky (řádek
+   končí čárkou / začíná spojkou) je věta. Víc = ✗ \`drawing.notes-limit\`, věta = ✗ \`drawing.note-style\`. Počítá se každý
+   kanál, který čtenář vidí: poznámky, texty, vysvětlivky úprav, řádky popisů s odkazem, které nejsou označením díry /
+   závitu / sražení („Brousit jemně“, „1) Rovinnost hlídat 2x“ – číslo v řádku ho technickým nedělá), kóta se slovy
+   v textu / předponě / příponě („100 lapovat“ = 1 řádek), 2D TEXT / MTEXT / atributy / text v blocích × počet vložení
+   (razítko rozvržení se pozná podle obsahu, ne podle jména bloku). Krátké slovo není výjimka – štítkem je jen „A-A“,
+   „Řez A-A“, „Detail B“, pozice „12“, oblast „Z1“, měřítko. **Revize** = popis změny („Ø20 → Ø22“, „změna: doplněna díra Ø9“),
+   pokyn v revizi = ✗ i se „změna:“ / „→“, nejvýš 5 řádků revize od agenta. **Kóta**, jejíž text nahradil hodnotu slovy, = ✗ a kontrola kót ji za
+   kótu velikosti nepočítá. **Značka drsnosti** nese hodnotu Ra / Rz (+ nejvýš 1 slovo způsobu výroby); slova bez hodnoty = ✗.
+   Popisy s odkazem a značky drsnosti se slovy se počítají do 8 místních popisů. Ve 2D totéž: značka drsnosti
+   (\`2d drsnost\`) hodnota + nejvýš 1 slovo postupu, rámeček tolerance (\`2d tolerance\`) jen značka, hodnota a základny.
+   Popis plochy v modelu (\`poznámka F7 "…"\`) je technický údaj – pokyn („Odmastit“) ✗ hned u příkazu.
+5. **Žádný list ani výkres jen s poznámkami** a žádné dělení „výkres + poznámky“ (v žádném pořadí): hlavní list = list
+   s největší plochou pohledů dílu v rozumném měřítku vážené počtem kót (žeton 1:10 s jednou kótou ani kopie pohledů bez kót
+   hlavním listem není); volný text jinde = ✗ \`drawing.notes-sheet\`. Výkres, jehož název / číslo odkazuje na poznámky nebo
+   jiný díl („Technické požadavky“, „Poznámky“, „MN-1/2“), a dokument jen s textem (výkres bez kót, s kótami 3× méně než
+   řádků, drobné těleso do 10 mm s 3+ řádky – **bez ohledu na prvky**, díra nosič nezruší) = ✗; druhý výkres téhož dílu
+   (číslo jiného dokumentu s příponou „MN-1-B“, totéž těleso) s dalšími poznámkami = ✗; list agenta, který jen opakuje
+   pohledy jiného listu a nese text = ✗ \`drawing.sheet-duplicate\` (prázdná kopie ⚠). Název dílu je údaj razítka: krátce, žádná věta ani pokyn (\`nový díl
+   "…"\` jinak ✗; výchozí list \`--formats\` jde stejnou kontrolou).
+6. **Kontrola:** \`výkres stav\` ukáže „Údaje razítka (technické, v buňkách) …“, „Poznámky nad razítkem: N/5 řádků (agent …,
+   ručně …) · místní popisy N/8“ a „Z modelu: …“; \`stav\` dílu „Popisy ploch (N): F7 „Brousit“ …“ (i ve stromu prvků).
+   Vyhodnocení listu hlásí porušení agenta ✗ (i u textu z JSON na řádku), export listu s porušením agenta se odmítne;
+   načtený soubor ⚠ \`drawing.notes-loaded\`; „✓ … bez nálezů (… poznámky a razítko)“ jen bez nich. 2D výkres: text, který
+   pravidla porušuje, příkaz \`2d …\` nepřijme, export ho nezapíše, \`2d stav\` ukáže „Poznámky nad razítkem: N/5“; údaje celého
+   dílu patří do technického pásu razítka rozvržení (atributy TEPELNE, TVRDOST, POVRCH, HRANY, TOLERANCE, DRSNOST).
+
+\`\`\`
+nový díl "Deska"
+kvádr 100 60 12
+díra 9 skrz v 50 30
+materiál 1.2379
+výkres A3 měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres nepředepsané ISO 2768-mK
+výkres razítko číslo="MN-1" tepelné="kalit a popustit" tvrdost="58–60 HRC" povrch="černit" hrany="ISO 13715 -0,3" drsnost="Ra 3,2"
+poznámka F2 "Brousit"
+úprava F3 tepelná "62+2 HRC" od 10 do 40
+výkres značka text "Odmastit" v 30 120
+výkres stav
+\`\`\`
 
 ### Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize
 
@@ -2503,7 +2624,7 @@ chyby jsou nepřesnost (zaokrouhlení, záměna průměru a poloměru, posunutá
   přesnost asi ±0,5 mm), nebo ji doplníte?“
 - Odhad z měřítka jen se souhlasem: změřte ho na předloze v měřítku listu (u podkladu ve skice nejdřív **Kalibrovat
   měřítko**), zaokrouhlete rozumně a odhad viditelně označte – v modelu proměnnou s názvem \`odhad_…\`, na výkrese
-  \`výkres poznámka "Rozměry označené ≈ jsou odhadnuty z měřítka – ověřit"\`.
+  \`výkres poznámka "≈ rozměry odhadem – ověřit"\` (krátce, heslovitě – jeden z nejvýš 5 řádků nad razítkem).
 - Běžíte-li bez člověka a zeptat se nejde, odhad použijte, ale v závěrečné zprávě ho uveďte jako **první bod**.
 
 ### 3. Po dokončení – kontrola 1:1 (vždy, i když vše hlásí ✓)
@@ -2594,6 +2715,7 @@ třídí. Nejčastější:
 | \`hole.no-surface\` ⚠ | díra \`v x y\` bez z mimo povrch tělesa – začíná na obálce | zadat z |
 | \`select.fallback\` ⚠ / \`select.ambiguous\` ⚠ | pravidlo plochy nenašlo plochu na obálce / našlo víc ploch | plochu číslem F3 |
 | \`name.renamed\` ⚠ / \`name.renamed-auto\` ℹ | obsazený název prvku přečíslován („Díra 1“ → „Díra 2“) | jiný název |
+| \`material.class-conflict\` ⚠ | označení materiálu patří jiné třídě, než podle které se počítá hustota (\`materiál nerez\` po \`materiál ČSN 11 423\`, nabídka Materiál v GUI); označení se samo nemaže | opravit označení, nebo \`materiál <třída označení>\` |
 | \`material.density-assumed\` ⚠ / \`material.class\` ℹ | \`materiál X\` jen označením: hustota zůstává / třída z označení (EN AW-* → hliník, 1.4xxx → nerez, 1.0xxx–1.3xxx, ČSN 1x xxx, S235, C45 → ocel, CuZn → mosaz) | \`materiál hlinik\` + označení |
 | \`asm.stale-copy\` ⚠ | díl změněný po \`vložit\` (prvek, číslo, materiál, druh, výkres) – komponenta je kopie, změna se do sestavy sama nepromítne; hlásí se na řádku změny i u \`kusovník\`, listu sestavy a \`stav\` | \`sestava obnovit "X"\` (\`vše\`, \`údaje\`) |
 | \`mate.lost\` ✗ / ⚠ | plocha / hrana vazby po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení, komponenta stojí (✗ u kroku, který ji ztratil; ⚠ při \`stav\` a na konci běhu nad otevřeným dokumentem se ztracenou referencí – přísný režim zastaví) | \`sestava vazba N plocha b <plocha>\` / \`sestava vazba N smazat\` |
@@ -2927,7 +3049,7 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do \`--out\` (řádek \
   kontrola; v přísném režimu proběhne kontrola před zápisem a soubor, jehož nález běh zastaví, se nezapíše (ani soubor
   bez tělesa / s volnými plochami, ani ⚠ \`out.reload-invalid\` – „soubor nezapsán (přísný režim zastaví běh) – …“): řádek F \`check=ok|fail\`, při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). „→ věrná kopie
   modelu“ je **jen** soubor, který po načtení projde i **přesnou** kontrolou platnosti (do 400 ploch; jinak ✓ „→ odpovídá
-  modelu; platnost souboru jen rychlou kontrolou …“), jinak ⚠ \`out.reload-invalid\` s počtem vadných ploch, a jen soubor
+  modelu; platnost souboru jen rychlou kontrolou …“; nad 3000 ploch se bez přísného režimu neprovede ani rychlá kontrola → ℹ „→ odpovídá modelu; platnost souboru nezkontrolována (N ploch > 3000; přísný režim ji zkontroluje)“, ne ✓ – přísný režim kontroluje platnost souboru bez meze ploch), jinak ⚠ \`out.reload-invalid\` s počtem vadných ploch, a jen soubor
   s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ \`out.no-solid\` (i když
   odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ \`out.free-surfaces\` s počty (u sestavy jména
   komponent). STL / 3MF a \`export step bez kontroly\` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
@@ -2944,6 +3066,13 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do \`--out\` (řádek \
   ⚠ \`drawing.default-sheet\` a exportuje se výchozí list (stejně u \`--formats pdf\`; \`--strict\` ho zastaví). 2D výkres
   (\`2d nový …\`) se exportuje příkazem \`2d export dxf|dwg\` (v CLI soubor do \`--out\` s řádkem F, stejně \`2d tisk\` = PDF
   rozvržení a \`--formats dxf,dwg\`) – \`výkres export\` na něm dá ✗ s tímto důvodem.
+  **Řádek zápisu výkresu je ✓ jen u listu bez nálezu.** Nálezy listu (⚠ \`drawing.warning\` – např. „Výkres nemá
+  nepředepsané tolerance“, funkční poloha bez tolerované kóty –, ⚠ \`drawing.dims-incomplete\`, ✗ \`drawing.section-miss\`,
+  ⚠ \`asm.stale-copy\`) se rozhodnou před zápisem: s nálezem je zápis ℹ „výkres PDF: … – zapsáno, nálezy níže“ (konzole
+  „· nálezy níže“) a nálezy stojí pod ním; nález, který protokol už má na jiném řádku (řez mimo těleso na řádku příkazu
+  řezu, ⚠ zastaralého listu), dá zápis ℹ bez věty. V přísném režimu se soubor s nálezem, který běh zastaví, **nezapíše**:
+  „⚠ … soubor nezapsán (přísný režim zastaví běh) – <nález>“, žádný řádek F, \`files=0\`; \`přísně kromě drawing.warning\`
+  soubor zapíše (zápis ℹ, ⚠ pod ním).
 - **CLI \`--formats auto\`** (výchozí) = STEP hlavního dokumentu + \`.mncad\` + jedno PDF všech listů (jako \`výkres export pdf
   dokument\`, má-li výkres dokument nebo díl v jeho komponentách); \`--formats pdf\` totéž PDF, \`dxf|dwg|svg\` soubor na
   list, \`csv\` kusovník sestavy. Listy spočítané v běhu (\`výkres export pdf dokument\`) převezme \`--formats pdf\` téhož
@@ -3027,7 +3156,9 @@ O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb7
   - Tvary odkazu (část za \`#\` se na server nikdy neposílá):
     \`…/cad#q=<id 10 znaků>.<klíč 22 znaků base64url>\` – vlastní úložiště, obsah AES-GCM, 128bitový klíč jen v odkazu;
     \`…/cad#s=1d.<data>\` – data = base64url(deflate-raw(JSON \`{"v":1,"exp":<ms|null>,"from"?,"view":"model|drawing","doc":{…}}\`)),
-    \`#s=1dp.<sůl>.<data>\` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256), \`#s=1r.<data>\` bez komprese;
+    \`#s=1dpk.<sůl>.<n>.<kontrola>.<data>\` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256; n = počet znaků dat, kontrola =
+    base64url(SHA-256(data)) prvních 6 B – useknutý / změněný odkaz se pozná i bez hesla; starší \`#s=1dp.<sůl>.<data>\` bez
+    kontroly se otevírá dál), \`#s=1r.<data>\` bez komprese;
     \`…/cad#r=<cesta>.<klíč>[.p<sůl>]\` – úložiště Supabase. V Node odkaz otevře \`openShareLink(parseShareHash(hash))\`
     (share.ts).
 - Mnoho souborů a málo místa ve stručném protokolu: místo jednotlivých řádků F jeden souhrnný

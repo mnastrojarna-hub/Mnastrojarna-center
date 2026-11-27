@@ -31,7 +31,11 @@
  *                /cad#q=<id>.<klíč>          starší tvar (vlna 8; id 10 znaků base62 od serveru, klíč 22 znaků = 128 bitů) –
  *                                            otevírá se dál; nově vzniká jen proti starší verzi skriptu úložiště.
  *                /cad#s=1d.<data>           dokument v odkazu, deflate
- *                /cad#s=1dp.<sůl>.<data>    totéž s heslem (data = AES-GCM)
+ *                /cad#s=1dp.<sůl>.<data>    totéž s heslem (data = AES-GCM) – starší tvar, otevírá se dál
+ *                /cad#s=1dpk.<sůl>.<n>.<kontrola>.<data>   s heslem a kontrolou úplnosti (vlna 22 kolo 7, bod 16):
+ *                                            n = počet znaků dat, kontrola = base64url(SHA-256(data)[0..6]) – mimo šifru,
+ *                                            takže useknutý / změněný odkaz se pozná BEZ hesla a „Nesprávné heslo“ už
+ *                                            neznamená „možná useknutý“ (hlavička je před daty, useknutí ji nezasáhne)
  *                /cad#s=1r.<data>           bez komprese (prohlížeč bez CompressionStream)
  *                /cad#r=<cesta>.<klíč>      úložiště Supabase, klíč náhodný
  *                /cad#r=<cesta>.<klíč>.p<sůl>   úložiště Supabase + heslo
@@ -66,7 +70,17 @@ export type ShareResult = {
   code?: string;
 };
 export type ParsedShare =
-  | { kind: "link"; data: string; compressed: boolean; salt: string | null }
+  | {
+      kind: "link";
+      data: string;
+      compressed: boolean;
+      salt: string | null;
+      /**
+       * kontrola úplnosti šifrovaného odkazu (`1dpk`, bod 16 kolo 7): n = počet znaků dat, chk = otisk dat; `broken` =
+       * hlavička kontroly sama neúplná / nečitelná (odkaz useknutý hned za solí)
+       */
+      check?: { n: number; chk: string } | { broken: true };
+    }
   | { kind: "store"; path: string; key: string; salt: string | null }
   | { kind: "self"; id: string; key: string }
   | { kind: "code"; code: string };
@@ -87,6 +101,10 @@ export type OpenResult =
        */
       damage?: ShareDamage;
       chars?: number;
+      /** odkaz s kontrolou úplnosti (`1dpk`): kolik znaků dat má mít – useknutý „má X z Y znaků“ */
+      expected?: number;
+      /** useknuto ještě PŘED daty dokumentu (sůl hesla, hlavička kontroly) – data v odkazu vůbec nejsou */
+      head?: boolean;
     };
 /** poškození obsahu dlouhého odkazu (`#s=…`): useknutý × změněný */
 export type ShareDamage = "truncated" | "corrupt";
@@ -141,6 +159,11 @@ export async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
 /* ───────── šifrování ───────── */
 /** WebCrypto (crypto.subtle) dává prohlížeč jen v zabezpečeném kontextu – https nebo localhost; na http:// chybí */
 export const shareCryptoOk = () => typeof crypto !== "undefined" && !!crypto.subtle;
+
+/** otisk dat dlouhého šifrovaného odkazu (`1dpk`): base64url(SHA-256(znaky dat))[0..6 B] = 8 znaků – kontrola úplnosti mimo šifru */
+async function linkDataCheck(data: string): Promise<string> {
+  return b64u(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(data))).subarray(0, 6));
+}
 /**
  * Adresa téže stránky přes https – pro stránku otevřenou na http://, kde sdílení nejde (viz shareCryptoOk). Jen na
  * výchozím portu (na jiném portu https nejspíš neběží); jinak null. `hash` = část za # (sdílený odkaz), kterou má nést.
@@ -585,10 +608,13 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
       salt = crypto.getRandomValues(new Uint8Array(16));
       body = await encrypt(await keyFromPassword(password, salt), packed);
     }
-    const flags = `1${compressed ? "d" : "r"}${salt ? "p" : ""}`;
+    // šifrovaný odkaz nese kontrolu úplnosti před daty (bod 16 kolo 7): useknutí / změnu pozná příjemce bez hesla
+    const flags = `1${compressed ? "d" : "r"}${salt ? "pk" : ""}`;
     // dlouhý odkaz nepotřebuje úložiště: stránka CADu od hostitele (`linkPage`), ne web nedostupného úložiště (vlna 22, bod 16)
     const linkBase = o.base ?? hostAssets().share?.linkPage ?? base;
-    const url = `${linkBase}#s=${flags}.${salt ? b64u(salt) + "." : ""}${b64u(body)}`;
+    const data = b64u(body);
+    const head = salt ? `${b64u(salt)}.${data.length}.${await linkDataCheck(data)}.` : "";
+    const url = `${linkBase}#s=${flags}.${head}${data}`;
     return { url, mode: "link", bytes: body.length, exp, password: !!password, ...(note ? { note } : {}) };
   };
   const linkOrThrow = async (note?: string, hint?: () => Promise<string | undefined>): Promise<ShareResult> => {
@@ -735,13 +761,21 @@ export function parseShareHash(hash: string): ParsedShare | null {
   }
   const s = params.get("s");
   if (s) {
-    const m = /^1([dr])(p?)\.(.+)$/s.exec(s);
-    if (!m) return null;
-    const rest = m[3];
+    const m = /^1([dr])(p?)(k?)(?:\.(.*))?$/s.exec(s);
+    if (!m || (m[3] && !m[2])) return null;
+    const rest = m[4] ?? "";
+    // tvar s kontrolou je celý, ale za ním nic (useknuto hned za `#s=1dpk.`) – useknutý odkaz, ne „není to odkaz“ (starší
+    // tvary beze změny: `#s=1d.` bez dat hlásí ověření odkazu vlastním textem „za #s= chybí data“)
+    if (!rest) return m[3] ? { kind: "link", compressed: m[1] === "d", salt: "", data: "", check: { broken: true } } : null;
     if (m[2]) {
       const i = rest.indexOf(".");
-      if (i < 0) return null;
-      return { kind: "link", compressed: m[1] === "d", salt: rest.slice(0, i), data: rest.slice(i + 1) };
+      // useknuto uvnitř soli hesla (oponentura kola 7): u tvaru s kontrolou je to jistě useknutý odkaz; starší `1dp` beze změny
+      if (i < 0) return m[3] ? { kind: "link", compressed: m[1] === "d", salt: rest, data: "", check: { broken: true } } : null;
+      const salt = rest.slice(0, i);
+      if (!m[3]) return { kind: "link", compressed: m[1] === "d", salt, data: rest.slice(i + 1) };
+      const k = /^(\d{1,8})\.([A-Za-z0-9_-]{8})\.(.*)$/s.exec(rest.slice(i + 1));
+      if (!k) return { kind: "link", compressed: m[1] === "d", salt, data: "", check: { broken: true } };
+      return { kind: "link", compressed: m[1] === "d", salt, data: k[3], check: { n: Number(k[1]), chk: k[2] } };
     }
     return { kind: "link", compressed: m[1] === "d", salt: null, data: rest };
   }
@@ -1097,12 +1131,24 @@ export async function openShareLink(parsed: ParsedShare, password?: string, o: O
   if (parsed.kind === "code") return openCode(parsed, password, o);
   if (parsed.kind === "self") return openSelf(parsed, password, o);
   if (parsed.kind === "link") {
-    const chars = parsed.data.length;
+    let data = parsed.data;
+    // kontrola úplnosti šifrovaného odkazu (`1dpk`, bod 16 kolo 7) – rozhodne BEZ hesla: kratší = useknutý, jiný otisk =
+    // změněný; znaky přilepené za odkaz (tečka, závorka od messengeru) se odříznou, sedí-li pak otisk
+    const chk = parsed.check;
+    // useknuto ještě před daty (v soli nebo v hlavičce kontroly) – vlastní text bez „má 0 znaků“ (oponentura kola 7)
+    if (chk && "broken" in chk) return { ok: false, reason: "invalid", damage: "truncated", chars: 0, head: true };
+    if (chk) {
+      if (data.length < chk.n) return { ok: false, reason: "invalid", damage: "truncated", chars: data.length, expected: chk.n };
+      const head = data.slice(0, chk.n);
+      if ((await linkDataCheck(head)) !== chk.chk) return { ok: false, reason: "invalid", damage: "corrupt", chars: data.length, expected: chk.n };
+      data = head;
+    }
+    const chars = data.length;
     // useknutý × poškozený obsah (vlna 22, bod 16): délka base64 se zbytkem 1 nevznikne nikdy – data končí uprostřed znaku
     if (chars % 4 === 1) return { ok: false, reason: "invalid", damage: "truncated", chars };
     let bytes: Uint8Array;
     try {
-      bytes = unb64u(parsed.data);
+      bytes = unb64u(data);
     } catch {
       return { ok: false, reason: "invalid", damage: "corrupt", chars };
     }
@@ -1111,8 +1157,9 @@ export async function openShareLink(parsed: ParsedShare, password?: string, o: O
       try {
         bytes = await decrypt(await keyFromPassword(password, unb64u(parsed.salt)), bytes);
       } catch {
-        // šifrovaný obsah nejde odlišit: špatné heslo i useknutý / změněný odkaz selžou stejně (text to říká, s délkou)
-        return { ok: false, reason: "password", chars };
+        // s kontrolou úplnosti (`1dpk`) jsou data ověřená celá a beze změny → jistě špatné heslo; starší `1dp` bez kontroly
+        // nejde odlišit: špatné heslo i useknutý / změněný odkaz selžou stejně (text to říká, s délkou)
+        return chk ? { ok: false, reason: "password" } : { ok: false, reason: "password", chars };
       }
     }
     const u = await unpackDiag(bytes, parsed.compressed);
@@ -1152,8 +1199,10 @@ export function shareMessage(docName: string, r: ShareResult): string {
  * Důvod neotevření odkazu česky. `kind` = druh odkazu: u odkazu s kódem „nenalezeno“ nejčastěji znamená překlep
  * (jiné písmeno, velikost písmen) – hlášení na to upozorní.
  */
-export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"], damage?: { damage?: ShareDamage; chars?: number }): string {
+export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null, kind?: ParsedShare["kind"], damage?: { damage?: ShareDamage; chars?: number; expected?: number; head?: boolean }): string {
   // useknutý / změněný dlouhý odkaz (vlna 22, bod 16) – vlastní text s délkou dat, ne obecné „neplatný“
+  if (reason === "invalid" && damage?.damage === "truncated" && damage.head) return tr("Odkaz je useknutý – končí ještě před daty dokumentu (v hlavičce odkazu za #s=). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.");
+  if (reason === "invalid" && damage?.damage === "truncated" && damage.expected) return tr("Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} z {1} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.", damage.chars ?? 0, damage.expected);
   if (reason === "invalid" && damage?.damage === "truncated") return tr("Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.", damage.chars ?? 0);
   if (reason === "invalid" && damage?.damage === "corrupt") return tr("Odkaz je poškozený – data dokumentu jsou úplná, ale změněná (část za #s= má {0} znaků; změnu mohl udělat program, kterým se odkaz předával). Požádejte odesílatele o nový odkaz.", damage.chars ?? 0);
   if (reason === "password" && kind === "link" && damage?.chars) return tr("Nesprávné heslo – nebo je odkaz useknutý či změněný (šifrovaný obsah nejde rozlišit; část za #s= má {0} znaků).", damage.chars);

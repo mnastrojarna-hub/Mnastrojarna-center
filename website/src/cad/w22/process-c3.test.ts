@@ -228,4 +228,67 @@ describe("vlna 22 C3: procesní vrstva – střih a otisk během pohybu (bod 4)"
     expect(two[2]).toBe("2");
     expect(short).not.toMatch(/motion\.process-failed/);
   }, 240_000);
+
+  it("kolo 7 · 74l: podmínka operace splněná UPROSTŘED kroku bez kolizí – střih 314,159 mm³ jako 74i, ne „nezasáhl“ / „plný“", async () => {
+    // oponent kola 6: proc=1 removed=0, „bez záběru – nástroj obrobek nezasáhl“, „plný (kroky 0–1)“, ⚠ process-miss
+    const { short, con } = await run("74l", corpus("74l-process-start-mid"));
+    const kv = short.split("\n").find((l) => /^= L\d+ asm "Lis" motion .* proc=1 /.test(l))!;
+    const m = / proc=1 removed=([\d.]+) scrap=(\d+) through=1$/.exec(kv)!;
+    expect(m, kv).toBeTruthy();
+    expect(Math.abs(Number(m[1]) - PI_R2_T) / PI_R2_T).toBeLessThan(0.01);
+    expect(m[2]).toBe("1");
+    expect(short).not.toMatch(/motion\.process-miss|nezasáhl/);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(krok 0\) → děrovaný \(krok 1\)/);
+    expect(con).toMatch(/střih 1 „Střižník“ → „Plech“: záběr od mezipolohy mezi kroky 0 a 1 \(t = 0,[2-9]\d* s\)/);
+    // totéž s kontrolou kolizí: výsledek spočítán, ne jen „nezjištěn“
+    const kol = await run("74l-kolize", corpus("74l-process-start-mid").replace(/kroky 1$/m, "kroky 1 kolize"));
+    expect(kol.short).toMatch(/ proc=1 removed=314\.1\d* scrap=1 through=1$/m);
+    expect(kol.short).not.toMatch(/nezjištěn|process-between|nezasáhl/);
+  }, 240_000);
+
+  it("kolo 7 · 74m: strop mezipoloh platí pro operaci – razník spočítán, jen tenký střižník „nezjištěn“, objem „nejméně“", async () => {
+    // NIT oponenta kola 6: dřív obě operace „nezjištěn … víc než 64 mezipoloh“, proc=2 removed=0
+    const { short, con } = await run("74m", corpus("74m-process-cap-per-op"));
+    expect(con).toMatch(/střih 1 „Razník“ → „Plech“: záběr od mezipolohy mezi kroky 0 a 1/);
+    expect(con).not.toMatch(/střih 1 „Razník“ → „Plech“: záběr jen mezi kroky – výsledek procesu nezjištěn/);
+    expect(con).toMatch(/střih 2 „Střižník“ → „Plech“: záběr jen mezi kroky – výsledek procesu nezjištěn \(úsek před krokem 1 by potřeboval víc než 64 mezipoloh\)/);
+    const between = short.split("\n").filter((l) => /motion\.process-between/.test(l));
+    expect(between.length).toBe(1);
+    expect(between[0]).toMatch(/střih 2: nástroj „Střižník“/);
+    // razník Ø20 × plech 0,5 mm = 157,08 mm³; střižník nezjištěn → jen dolní mez („+“, „nejméně“)
+    expect(short).toMatch(/^= L\d+ asm "Lis" motion .* proc=2 removed=157\.0\d*\+ scrap=1 through=1$/m);
+    expect(con).toMatch(/odebráno nejméně 157,0\d* mm³ – výsledek některé operace nezjištěn/);
+    expect(con).not.toMatch(/celkem odebráno/);
+  }, 240_000);
+
+  it("kolo 7 oprava · 74p: začátek v dolní úvrati mezi kroky (tam a zpět, 21 kroků) – ne „nenastal“ / „plný“ / ⚠ process-miss", async () => {
+    // oponent kola 7: `<= -45` v žádném kroku (úvrať t = 1 s mezi kroky 10 a 11) → proc=1 removed=0, „začátek operace nenastal“
+    const { short, con } = await run("74p", corpus("74p-process-start-turn"));
+    expect(short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+    expect(short).toMatch(/^= L\d+ asm "Lis" motion .* proc=1 removed=314\.1\d* scrap=1 through=13$/m);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(kroky 0–12\) → děrovaný \(kroky 13–21\)/);
+    // s kolizemi: týž výsledek (dřív „nenastal“ a jen ⚠ clash.real)
+    const kol = await run("74p-kolize", corpus("74p-process-start-turn").replace(/tam a zpět$/m, "tam a zpět kolize"));
+    expect(kol.short).toMatch(/ proc=1 removed=314\.1\d* scrap=1 through=13$/m);
+    expect(kol.short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+  }, 240_000);
+
+  it("kolo 7 oprava · 74q: jediný krok tam a zpět – obrat motoru je mezipolohou, začátek z kosinového průběhu", async () => {
+    const { short, con } = await run("74q", corpus("74q-process-turn-one-step"));
+    expect(short).not.toMatch(/motion\.process-miss|nenastal|nezasáhl/);
+    expect(short).toMatch(/^= L\d+ asm "Lis" motion .* proc=1 removed=314\.1\d* scrap=1 through=1$/m);
+    expect(con).toMatch(/Stav výrobku „Plech“: plný \(krok 0\) → děrovaný \(krok 1\)/);
+    // bez podmínky (dřív plán z obálky kroků 0 a 1 – obě polohy nahoře – úsek přeskočil: „nezasáhl“)
+    const bez = await run("74q-bez", corpus("74q-process-turn-one-step").replace(/ při motor 1 <= 5$/m, ""));
+    expect(bez.short).toMatch(/ proc=1 removed=314\.1\d* scrap=1 through=1$/m);
+    expect(bez.short).not.toMatch(/motion\.process-miss|nezasáhl/);
+  }, 240_000);
+
+  it("kolo 7 · text: pracovní kontakt v jediném kroku „v kroku 6“ (dřív „v krocích 6“), jedna skutečná kolize „v kroku 6“", async () => {
+    const { short, con } = await run("74j-r7", corpus("74j-process-imprint-depth"));
+    expect(short).not.toMatch(/v krocích 6 \(/);
+    expect(short).toMatch(/pracovní kontakt „Plech“ × „Střižník“ v kroku 6 \(pravidlo proces otisk 1\)/);
+    expect(con).not.toMatch(/v 1 krocích, první v kroku/);
+    expect(con).toMatch(/skutečné: 1 dvojic dílů v kroku 6/);
+  }, 240_000);
 });

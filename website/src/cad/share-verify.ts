@@ -39,7 +39,7 @@ export async function verifyShareLink(text: string, o: { password?: string; stor
     const hash = url.includes("#") ? url.slice(url.indexOf("#") + 1) : url;
     const code = shareCodeProblem(hash, url.includes("#"));
     // `#s=` bez rozpoznatelné hlavičky / data = useknutý hned za # (hlavička 1d. / 1r. chybí nebo je neúplná)
-    if (/[#&]s=1?[dr]?p?\.?$/.test(url) || /[#&]s=$/.test(url)) return { ok: false, url, chars: url.length, reason: "truncated", text: tr("Odkaz je useknutý – za #s= chybí data dokumentu ({0} znaků odkazu).", url.length) };
+    if (/[#&]s=1?[dr]?p?k?\.?$/.test(url) || /[#&]s=$/.test(url)) return { ok: false, url, chars: url.length, reason: "truncated", text: tr("Odkaz je useknutý – za #s= chybí data dokumentu ({0} znaků odkazu).", url.length) };
     return { ok: false, url, chars: url.length, reason: "unrecognized", text: code ?? tr("Text není sdílený odkaz Mnástrojárna CAD ani kód odkazu (čeká se …/s#KÓD, …/cad#s=…, …/cad#q=… nebo desetimístný kód).") };
   }
   const store = o.store !== undefined ? o.store : storeForLink(url);

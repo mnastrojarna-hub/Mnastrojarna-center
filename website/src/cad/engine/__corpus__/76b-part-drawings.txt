@@ -1,0 +1,23 @@
+# vlna 22, bod 19 (kolo 7): výkresy dílů – list výkresu každému vyráběnému dílu sestavy otevřenému v záložce, který výkres
+# nemá (normálie a nakupované díly ne, díl s výkresem beze změny); list se hned vyhodnotí; opakování nic nezaloží
+# (Přidržovač má výkres už z 1. běhu; příkaz výkresy dílů výkresové prostředí neotevírá – sestava zůstane aktivní)
+nový díl "Přidržovač"
+kvádr 40 30 10
+výkres A3
+#--- run
+nový díl "Deska A"
+kvádr 100 60 20
+díra 8 skrz v 20 20
+nový díl "Pouzdro"
+válec 10 20
+druh nakupovaný katalog "K-1"
+nová sestava "Nástroj"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 10 10 20
+vložit "Pouzdro" v 60 10 20
+normálie M8x20
+výkresy dílů
+#--- run
+záložka "Nástroj"
+výkresy dílů A3
+kusovník

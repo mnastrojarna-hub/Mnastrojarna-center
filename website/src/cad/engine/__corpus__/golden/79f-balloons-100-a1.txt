@@ -1,0 +1,435 @@
+=== run 1 ===
+✓ nový díl „Deska 1“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 2“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 3“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 4“ – nová záložka
+→ Kvádr 4 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 5“ – nová záložka
+→ Kvádr 5 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 6“ – nová záložka
+→ Kvádr 6 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 7“ – nová záložka
+→ Kvádr 7 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 8“ – nová záložka
+→ Kvádr 8 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 9“ – nová záložka
+→ Kvádr 9 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 10“ – nová záložka
+→ Kvádr 10 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 11“ – nová záložka
+→ Kvádr 11 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 12“ – nová záložka
+→ Kvádr 12 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 13“ – nová záložka
+→ Kvádr 13 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 14“ – nová záložka
+→ Kvádr 14 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 15“ – nová záložka
+→ Kvádr 15 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 16“ – nová záložka
+→ Kvádr 16 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 17“ – nová záložka
+→ Kvádr 17 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 18“ – nová záložka
+→ Kvádr 18 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 19“ – nová záložka
+→ Kvádr 19 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 20“ – nová záložka
+→ Kvádr 20 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 21“ – nová záložka
+→ Kvádr 21 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 22“ – nová záložka
+→ Kvádr 22 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 23“ – nová záložka
+→ Kvádr 23 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 24“ – nová záložka
+→ Kvádr 24 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 25“ – nová záložka
+→ Kvádr 25 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 26“ – nová záložka
+→ Kvádr 26 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 27“ – nová záložka
+→ Kvádr 27 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 28“ – nová záložka
+→ Kvádr 28 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 29“ – nová záložka
+→ Kvádr 29 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 30“ – nová záložka
+→ Kvádr 30 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 31“ – nová záložka
+→ Kvádr 31 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 32“ – nová záložka
+→ Kvádr 32 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 33“ – nová záložka
+→ Kvádr 33 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 34“ – nová záložka
+→ Kvádr 34 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 35“ – nová záložka
+→ Kvádr 35 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 36“ – nová záložka
+→ Kvádr 36 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 37“ – nová záložka
+→ Kvádr 37 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 38“ – nová záložka
+→ Kvádr 38 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 39“ – nová záložka
+→ Kvádr 39 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 40“ – nová záložka
+→ Kvádr 40 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 41“ – nová záložka
+→ Kvádr 41 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 42“ – nová záložka
+→ Kvádr 42 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 43“ – nová záložka
+→ Kvádr 43 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 44“ – nová záložka
+→ Kvádr 44 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 45“ – nová záložka
+→ Kvádr 45 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 46“ – nová záložka
+→ Kvádr 46 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 47“ – nová záložka
+→ Kvádr 47 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 48“ – nová záložka
+→ Kvádr 48 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 49“ – nová záložka
+→ Kvádr 49 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 50“ – nová záložka
+→ Kvádr 50 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 51“ – nová záložka
+→ Kvádr 51 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 52“ – nová záložka
+→ Kvádr 52 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 53“ – nová záložka
+→ Kvádr 53 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 54“ – nová záložka
+→ Kvádr 54 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 55“ – nová záložka
+→ Kvádr 55 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 56“ – nová záložka
+→ Kvádr 56 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 57“ – nová záložka
+→ Kvádr 57 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 58“ – nová záložka
+→ Kvádr 58 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 59“ – nová záložka
+→ Kvádr 59 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 60“ – nová záložka
+→ Kvádr 60 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 61“ – nová záložka
+→ Kvádr 61 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 62“ – nová záložka
+→ Kvádr 62 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 63“ – nová záložka
+→ Kvádr 63 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 64“ – nová záložka
+→ Kvádr 64 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 65“ – nová záložka
+→ Kvádr 65 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 66“ – nová záložka
+→ Kvádr 66 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 67“ – nová záložka
+→ Kvádr 67 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 68“ – nová záložka
+→ Kvádr 68 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 69“ – nová záložka
+→ Kvádr 69 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 70“ – nová záložka
+→ Kvádr 70 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 71“ – nová záložka
+→ Kvádr 71 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 72“ – nová záložka
+→ Kvádr 72 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 73“ – nová záložka
+→ Kvádr 73 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 74“ – nová záložka
+→ Kvádr 74 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 75“ – nová záložka
+→ Kvádr 75 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 76“ – nová záložka
+→ Kvádr 76 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 77“ – nová záložka
+→ Kvádr 77 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 78“ – nová záložka
+→ Kvádr 78 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 79“ – nová záložka
+→ Kvádr 79 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 80“ – nová záložka
+→ Kvádr 80 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 81“ – nová záložka
+→ Kvádr 81 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 82“ – nová záložka
+→ Kvádr 82 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 83“ – nová záložka
+→ Kvádr 83 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 84“ – nová záložka
+→ Kvádr 84 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 85“ – nová záložka
+→ Kvádr 85 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 86“ – nová záložka
+→ Kvádr 86 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 87“ – nová záložka
+→ Kvádr 87 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 88“ – nová záložka
+→ Kvádr 88 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 89“ – nová záložka
+→ Kvádr 89 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 90“ – nová záložka
+→ Kvádr 90 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 91“ – nová záložka
+→ Kvádr 91 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 92“ – nová záložka
+→ Kvádr 92 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 93“ – nová záložka
+→ Kvádr 93 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 94“ – nová záložka
+→ Kvádr 94 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 95“ – nová záložka
+→ Kvádr 95 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 96“ – nová záložka
+→ Kvádr 96 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 97“ – nová záložka
+→ Kvádr 97 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 98“ – nová záložka
+→ Kvádr 98 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 99“ – nová záložka
+→ Kvádr 99 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska 100“ – nová záložka
+→ Kvádr 100 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Nástroj“ – nová záložka
+✓ komponenta „Deska 1“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska 2“ vložena do sestavy
+✓ komponenta „Deska 3“ vložena do sestavy
+✓ komponenta „Deska 4“ vložena do sestavy
+✓ komponenta „Deska 5“ vložena do sestavy
+✓ komponenta „Deska 6“ vložena do sestavy
+✓ komponenta „Deska 7“ vložena do sestavy
+✓ komponenta „Deska 8“ vložena do sestavy
+✓ komponenta „Deska 9“ vložena do sestavy
+✓ komponenta „Deska 10“ vložena do sestavy
+✓ komponenta „Deska 11“ vložena do sestavy
+✓ komponenta „Deska 12“ vložena do sestavy
+✓ komponenta „Deska 13“ vložena do sestavy
+✓ komponenta „Deska 14“ vložena do sestavy
+✓ komponenta „Deska 15“ vložena do sestavy
+✓ komponenta „Deska 16“ vložena do sestavy
+✓ komponenta „Deska 17“ vložena do sestavy
+✓ komponenta „Deska 18“ vložena do sestavy
+✓ komponenta „Deska 19“ vložena do sestavy
+✓ komponenta „Deska 20“ vložena do sestavy
+✓ komponenta „Deska 21“ vložena do sestavy
+✓ komponenta „Deska 22“ vložena do sestavy
+✓ komponenta „Deska 23“ vložena do sestavy
+✓ komponenta „Deska 24“ vložena do sestavy
+✓ komponenta „Deska 25“ vložena do sestavy
+✓ komponenta „Deska 26“ vložena do sestavy
+✓ komponenta „Deska 27“ vložena do sestavy
+✓ komponenta „Deska 28“ vložena do sestavy
+✓ komponenta „Deska 29“ vložena do sestavy
+✓ komponenta „Deska 30“ vložena do sestavy
+✓ komponenta „Deska 31“ vložena do sestavy
+✓ komponenta „Deska 32“ vložena do sestavy
+✓ komponenta „Deska 33“ vložena do sestavy
+✓ komponenta „Deska 34“ vložena do sestavy
+✓ komponenta „Deska 35“ vložena do sestavy
+✓ komponenta „Deska 36“ vložena do sestavy
+✓ komponenta „Deska 37“ vložena do sestavy
+✓ komponenta „Deska 38“ vložena do sestavy
+✓ komponenta „Deska 39“ vložena do sestavy
+✓ komponenta „Deska 40“ vložena do sestavy
+✓ komponenta „Deska 41“ vložena do sestavy
+✓ komponenta „Deska 42“ vložena do sestavy
+✓ komponenta „Deska 43“ vložena do sestavy
+✓ komponenta „Deska 44“ vložena do sestavy
+✓ komponenta „Deska 45“ vložena do sestavy
+✓ komponenta „Deska 46“ vložena do sestavy
+✓ komponenta „Deska 47“ vložena do sestavy
+✓ komponenta „Deska 48“ vložena do sestavy
+✓ komponenta „Deska 49“ vložena do sestavy
+✓ komponenta „Deska 50“ vložena do sestavy
+✓ komponenta „Deska 51“ vložena do sestavy
+✓ komponenta „Deska 52“ vložena do sestavy
+✓ komponenta „Deska 53“ vložena do sestavy
+✓ komponenta „Deska 54“ vložena do sestavy
+✓ komponenta „Deska 55“ vložena do sestavy
+✓ komponenta „Deska 56“ vložena do sestavy
+✓ komponenta „Deska 57“ vložena do sestavy
+✓ komponenta „Deska 58“ vložena do sestavy
+✓ komponenta „Deska 59“ vložena do sestavy
+✓ komponenta „Deska 60“ vložena do sestavy
+✓ komponenta „Deska 61“ vložena do sestavy
+✓ komponenta „Deska 62“ vložena do sestavy
+✓ komponenta „Deska 63“ vložena do sestavy
+✓ komponenta „Deska 64“ vložena do sestavy
+✓ komponenta „Deska 65“ vložena do sestavy
+✓ komponenta „Deska 66“ vložena do sestavy
+✓ komponenta „Deska 67“ vložena do sestavy
+✓ komponenta „Deska 68“ vložena do sestavy
+✓ komponenta „Deska 69“ vložena do sestavy
+✓ komponenta „Deska 70“ vložena do sestavy
+✓ komponenta „Deska 71“ vložena do sestavy
+✓ komponenta „Deska 72“ vložena do sestavy
+✓ komponenta „Deska 73“ vložena do sestavy
+✓ komponenta „Deska 74“ vložena do sestavy
+✓ komponenta „Deska 75“ vložena do sestavy
+✓ komponenta „Deska 76“ vložena do sestavy
+✓ komponenta „Deska 77“ vložena do sestavy
+✓ komponenta „Deska 78“ vložena do sestavy
+✓ komponenta „Deska 79“ vložena do sestavy
+✓ komponenta „Deska 80“ vložena do sestavy
+✓ komponenta „Deska 81“ vložena do sestavy
+✓ komponenta „Deska 82“ vložena do sestavy
+✓ komponenta „Deska 83“ vložena do sestavy
+✓ komponenta „Deska 84“ vložena do sestavy
+✓ komponenta „Deska 85“ vložena do sestavy
+✓ komponenta „Deska 86“ vložena do sestavy
+✓ komponenta „Deska 87“ vložena do sestavy
+✓ komponenta „Deska 88“ vložena do sestavy
+✓ komponenta „Deska 89“ vložena do sestavy
+✓ komponenta „Deska 90“ vložena do sestavy
+✓ komponenta „Deska 91“ vložena do sestavy
+✓ komponenta „Deska 92“ vložena do sestavy
+✓ komponenta „Deska 93“ vložena do sestavy
+✓ komponenta „Deska 94“ vložena do sestavy
+✓ komponenta „Deska 95“ vložena do sestavy
+✓ komponenta „Deska 96“ vložena do sestavy
+✓ komponenta „Deska 97“ vložena do sestavy
+✓ komponenta „Deska 98“ vložena do sestavy
+✓ komponenta „Deska 99“ vložena do sestavy
+✓ komponenta „Deska 100“ vložena do sestavy
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A1, na šířku, pohledy přední, horní, iso – výsledek po vyhodnocení listu níže
+→ výkres: kusovník nad razítkem – výsledek po vyhodnocení listu níže
+→ výkres: pozice komponent (balónky) – výsledek po vyhodnocení listu níže
+Výkres „List 1“: list A1 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A1 (aktivní)
+Kóty a popisy (0, z toho vygenerovaných 0):
+Duplicity: žádné
+Kontrola kót: celkové rozměry 3/3 (sestava – rozměry dílů se kontrolují na výkresech dílů)
+U razítka: nepředepsané tolerance — · hrany — · poznámka —
+Razítko: název Nástroj · číslo — · kreslil — · revize — · datum ?.?.???? · materiál dle kusovníku
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Údaje razítka (technické, v buňkách): tepelné zpracování — · tvrdost — · povrchová úprava — · hrany — · nepředepsané — · drsnost —
+Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Poznámky nad razítkem: 0/5 řádků · místní popisy 0/8
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Pozice: 100 (horní 56, izometrie 44) · přiřazené ručně 0 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
+  horní: 5, 24, 26–28, 36–40, 46–75, 77–79, 81–84, 87–90, 96–100
+  izometrie: 1–4, 6–23, 25, 29–35, 41–45, 76, 80, 85–86, 91–95
+Kusovník: 100 řádků · ve 4 sloupcích – první nad razítkem, další vlevo od razítka
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 841 × 594):
+  přední (x = X, y = Z): x 0…245, y 0…32 mm · 1:1 · na listu x 34…279, y 538…570
+  horní (x = X, y = Y): x 0…245, y 0…145 mm · 1:1 · na listu x 34…279, y 369…514
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 4 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 5 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 6 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 7 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 8 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 9 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 10 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 11 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 12 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 13 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 14 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 15 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 16 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 17 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 18 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 19 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 20 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 21 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 22 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 23 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 24 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 25 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 26 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 27 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 28 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 29 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 30 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 31 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 32 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 33 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 34 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 35 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 36 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 37 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 38 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 39 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 40 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 41 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 42 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 43 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 44 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 45 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 46 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 47 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 48 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 49 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 50 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 51 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 52 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 53 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 54 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 55 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 56 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 57 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 58 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 59 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 60 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 61 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 62 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 63 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 64 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 65 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 66 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 67 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 68 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 69 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 70 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 71 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 72 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 73 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 74 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 75 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 76 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 77 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 78 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 79 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 80 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 81 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 82 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 83 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 84 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 85 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 86 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 87 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 88 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 89 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 90 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 91 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 92 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 93 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 94 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 95 (box) · přidáno 800 mm³ · těleso platné
+✓ Kvádr 96 (box) · přidáno 1000 mm³ · těleso platné
+✓ Kvádr 97 (box) · přidáno 1200 mm³ · těleso platné
+✓ Kvádr 98 (box) · přidáno 1400 mm³ · těleso platné
+✓ Kvádr 99 (box) · přidáno 1600 mm³ · těleso platné
+✓ Kvádr 100 (box) · přidáno 800 mm³ · těleso platné
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska 1 [0; 0; 0] ⚓ · Deska 2 [25; 0; 12] · Deska 3 [50; 0; 24] · Deska 4 [75; 0; 0] · Deska 5 [100; 0; 12] · Deska 6 [125; 0; 24] · Deska 7 [150; 0; 0] · Deska 8 [175; 0; 12] · Deska 9 [200; 0; 24] · Deska 10 [225; 0; 0] · Deska 11 [0; 15; 12] · Deska 12 [25; 15; 24] · Deska 13 [50; 15; 0] · Deska 14 [75; 15; 12] · Deska 15 [100; 15; 24] · Deska 16 [125; 15; 0] · Deska 17 [150; 15; 12] · Deska 18 [175; 15; 24] · Deska 19 [200; 15; 0] · Deska 20 [225; 15; 12] · Deska 21 [0; 30; 24] · Deska 22 [25; 30; 0] · Deska 23 [50; 30; 12] · Deska 24 [75; 30; 24] · Deska 25 [100; 30; 0] · Deska 26 [125; 30; 12] · Deska 27 [150; 30; 24] · Deska 28 [175; 30; 0] · Deska 29 [200; 30; 12] · Deska 30 [225; 30; 24] · Deska 31 [0; 45; 0] · Deska 32 [25; 45; 12] · Deska 33 [50; 45; 24] · Deska 34 [75; 45; 0] · Deska 35 [100; 45; 12] · Deska 36 [125; 45; 24] · Deska 37 [150; 45; 0] · Deska 38 [175; 45; 12] · Deska 39 [200; 45; 24] · Deska 40 [225; 45; 0] · Deska 41 [0; 60; 12] · Deska 42 [25; 60; 24] · Deska 43 [50; 60; 0] · Deska 44 [75; 60; 12] · Deska 45 [100; 60; 24] · Deska 46 [125; 60; 0] · Deska 47 [150; 60; 12] · Deska 48 [175; 60; 24] · Deska 49 [200; 60; 0] · Deska 50 [225; 60; 12] · Deska 51 [0; 75; 24] · Deska 52 [25; 75; 0] · Deska 53 [50; 75; 12] · Deska 54 [75; 75; 24] · Deska 55 [100; 75; 0] · Deska 56 [125; 75; 12] · Deska 57 [150; 75; 24] · Deska 58 [175; 75; 0] · Deska 59 [200; 75; 12] · Deska 60 [225; 75; 24] … a dalších 40 (sestava)
+Sestava: 100 komponent (100 dílů po rozložení podsestav) · obálka 245 × 145 × 32 mm · objem Σ 120 cm³ · hmotnost Σ 0,942 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

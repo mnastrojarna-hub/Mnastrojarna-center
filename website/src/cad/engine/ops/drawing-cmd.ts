@@ -25,6 +25,7 @@ import { reportStaleCopies } from "../bom-notes";
 import { modelId } from "../../doc-outputs";
 import { staleData } from "../outputs-ops";
 import { inputFile } from "./reference";
+import { designationNote } from "../../material-designation";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -49,6 +50,12 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const failsNow = observe && issues.some((x) => !deferredIssue(x) && x.kind === "section-miss");
   const shown = res.log.filter((l) => !l.startsWith("! ") && !issueLines.has(l.trimStart()));
   sayKv(ctx, drawingKv(r.doc, activeSheetIndex(r.doc)), ...(checks ? (failsNow ? shown.map(noteLine) : shown) : shown.map((l) => (res.changed ? acceptLine(l, sheetTail()) : noteLine(l)))));
+  // `výkres razítko materiál="…"`: rozpoznaná třída = ℹ material.class, jinak hustota jen předpokládaná = ⚠ (bod 22g, kolo 7 –
+  // stejné hlášky jako příkaz `materiál …`; dřív razítko textem nechalo hustotu cizí třídy bez jediného slova)
+  if (op.cmd.k === "title" && op.cmd.fields.material !== undefined && r.doc.kind !== "assembly") {
+    const note = designationNote(r.doc.materialName, r.doc.material);
+    if (note) coded(ctx, note.code, { args: note.args });
+  }
   for (const x of issues) {
     if (deferredIssue(x)) {
       (r.drawIssues ??= []).push({ line: ctx.line, issue: x });

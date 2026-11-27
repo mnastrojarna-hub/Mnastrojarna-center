@@ -4,8 +4,8 @@ válec 40 60
 #--- run
 výkres A4 na výšku
 výkres razítko název="Čep" číslo="MN-001" kreslil="AI" revize="A"
+výkres poznámka "Odmastit"
 výkres list nový "Detail"
 výkres A4 měřítko 2:1 pohledy přední
-výkres poznámka "Kalit 58 HRC"
 výkres listy
 výkres stav vše

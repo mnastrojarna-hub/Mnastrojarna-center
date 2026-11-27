@@ -60,6 +60,7 @@ export function AsmTree({
   onResolve,
   picked,
   onRepick,
+  onRepickSpring,
   repickMate,
   onRun,
 }: {
@@ -83,6 +84,8 @@ export function AsmTree({
   onResolve?: () => void;
   /** ztracená reference vazby (vlna 22, bod 20): začít nový výběr plochy strany `side` (klik do modelu nebo seznam ploch) */
   onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void;
+  /** ztracená dosedací plocha pružiny: nový výběr klikem do modelu / ze seznamu ploch (kolo 7, bod 20 – mate-repick.tsx) */
+  onRepickSpring?: (springId: string, side: "a" | "b") => void;
   /** vazba, jejíž plocha se právě vybírá znovu */
   repickMate?: string | null;
   /** textový příkaz přes agenta (protokol + záznam) – např. `sestava pružina #k odebrat`; bez něj přímá změna dokumentu */
@@ -158,7 +161,7 @@ export function AsmTree({
             ))}
         </div>
       ))}
-      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} repickMate={repickMate} onRun={onRun} />
+      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} onRepick={onRepick} onRepickSpring={onRepickSpring} repickMate={repickMate} onRun={onRun} />
     </div>
   );
 }
@@ -171,7 +174,7 @@ const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "ko
  * v poli (číslo i výraz), otočit, potlačit nebo smazat – každá změna jde přes `onCommit`, které sestavu znovu přepočítá.
  * Vazba Ukotvit se týká jedné komponenty; jejím smazáním / potlačením se komponenta uvolní.
  */
-function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, repickMate, onRun }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; repickMate?: string | null; onRun?: (text: string) => void }) {
+function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick, onRepickSpring, repickMate, onRun }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void; onRepick?: (mateId: string, side: "a" | "b" | "c" | "d") => void; onRepickSpring?: (springId: string, side: "a" | "b") => void; repickMate?: string | null; onRun?: (text: string) => void }) {
   const mates = doc.mates ?? [];
   const [closed, setClosed] = useState(false);
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
@@ -312,7 +315,12 @@ function MatesList({ doc, status, state, onCommit, onResolve, onSelect, onRepick
                     {t}
                   </span>
                 ))}
-                <span className="mt-0.5 flex gap-1.5">
+                <span className="mt-0.5 flex flex-wrap gap-1.5">
+                  {onRepickSpring && (
+                    <button type="button" data-spring-repick={c.id} data-spring-repick-side={springLostSides(s)[0]} aria-pressed={repickMate === `spring:${c.id}`} onClick={(e) => { e.stopPropagation(); onRepickSpring(c.id, springLostSides(s)[0]); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
+                      {tr("Vybrat dosedací plochu znovu")}
+                    </button>
+                  )}
                   <button type="button" data-spring-fix={c.id} onClick={(e) => { e.stopPropagation(); onSelect(c.id); }} className="rounded border border-[#f3c4c0] bg-white px-1.5 py-[1px] text-[10.5px] font-semibold text-[#b42318] hover:bg-[#fde8e7]">
                     {tr("Zadat dosedací plochy znovu")}
                   </button>
@@ -941,7 +949,7 @@ export function AsmProps({
  * Kusovník – tabulka + CSV. Při více druzích položek oddíly Vyráběné díly / Normálie / Nakupované díly (bom-model.ts);
  * upozornění (`notes`): kopie dílu starší než díl v záložce (s tlačítkem Obnovit z dílu) a co chybí vyráběným dílům.
  */
-export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void }) {
+export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh, onPartDrawings }: { rows: BomRow[]; onCsv: () => void; onDrawing?: () => void; notes?: { text: string; stale?: boolean }[]; onRefresh?: () => void; /** `výkresy dílů` (bod 19, kolo 7) */ onPartDrawings?: () => void }) {
   const total = rows.reduce((s, r) => s + (r.massKg ?? 0) * r.qty, 0);
   const sections = kindsIn(rows).length > 1 && !rows.some((r) => (r.level ?? 0) > 0);
   let cur: string | undefined;
@@ -1018,6 +1026,11 @@ export function BomTable({ rows, onCsv, onDrawing, notes = [], onRefresh }: { ro
         <button type="button" onClick={onCsv} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12px] hover:bg-[#f3f6f9]">
           {tr("Export CSV (Excel)")}
         </button>
+        {onPartDrawings && rows.some((r) => !r.assembly && (r.kind ?? "make") === "make") && (
+          <button type="button" data-part-drawings onClick={onPartDrawings} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12px] hover:bg-[#f3f6f9]" title={tr("Založí list výkresu každému vyráběnému dílu otevřenému v záložce, který výkres nemá (text: výkresy dílů)")}>
+            {tr("Výrobní dokumentace")}
+          </button>
+        )}
         {onDrawing && (
           <button type="button" onClick={onDrawing} className="rounded bg-brand px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-brand-600">
             {tr("Výkres sestavy s kusovníkem")}

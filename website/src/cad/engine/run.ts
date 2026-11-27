@@ -7,8 +7,11 @@
  * (zrušený výpočet dokument nezmění), zápis do záložky, výsledky přidaných prvků po stavbě, stav dokumentu.
  * Výsledek: `RunReport` se záznamy s kódem (stručný protokol CLI/HTTP) a `console` = dnešní text konzole prohlížeče.
  */
+import { docSig } from "./doc-sig";
+import { carryOutputs } from "../history-outputs";
 import { docStatusText, parseAgentText, type AgentOp } from "../agent";
 import { stripLineComment } from "../agent-comment";
+import { setNotesSiblings } from "../drawing-notes-rules";
 import { getLang, tr } from "../i18n";
 import { CadCancelled, isCancelled } from "../kernel-client";
 import type { CadDoc, Feature } from "../types";
@@ -90,6 +93,8 @@ export async function runScript(ws: Workspace, text: string, host: EngineHost, o
  */
 export async function runInto(ws: Workspace, text: string, host: EngineHost, rb: ReportBuilder, o: EngineRunOptions = {}): Promise<string> {
   ws.beginRun?.();
+  // vlna 23, kolo 5 (bypass-F5): pravidla textu výkresu vidí ostatní dokumenty běhu („druhý výkres téhož dílu“ MN-1-B)
+  setNotesSiblings(() => ws.listDocs().map((x) => x.doc));
   const hooks = o.hooks ?? {};
   const now = host.now ?? (() => Date.now());
   const log = new ConsoleLog(rb);
@@ -218,7 +223,9 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           if (isCancelled(e)) throw e;
           rb.code("build.failed", { line: op.line, doc: run.doc.name, args: [errMessage(e)] });
         });
-        if (op.k === "drawingCmd") draw.add(op.line);
+        // popis plochy / oblastní úprava v modelu (vlna 23) mění list výkresu a JSON dokument s listy je přináší – list se
+        // vyhodnotí jako po příkazu výkresu (pravidla poznámek, R7)
+        if (op.k === "drawingCmd" || ((op.k === "doc" || op.k === "open") && !!runOf(ctx).doc.drawings?.length) || (op.k === "functional" && (op.cmd.kind === "note" || op.cmd.kind === "treatment" || (op.cmd.kind === "clear" && (op.cmd.what === "note" || op.cmd.what === "treatment"))) && !!runOf(ctx).doc.drawings?.length)) draw.add(op.line);
         hooks.opEnd?.(op.line, label, now() - t0);
         const fresh = rb.entries.slice(before);
         if (stopOn(fresh, op.line)) break;
@@ -236,12 +243,19 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     host.ui?.restoreKernel?.();
     // vlna 22, bod 12: co běh zapsal už před zrušením (přechod na jiný dokument – `nový díl`, `záložka` …), se nezamlčí:
     // záložky, které běh založil, se zavřou (zrušený běh = nic nového); kroky historie dřívějších záložek se vyjmenují
-    const { closed, kept } = await rollbackRun(ws, run);
+    // záložka, ke které patří rozpracovaný dokument běhu (nový dokument bez záložky nemá kam – zahodí se celý)
+    const workTab = run.openNew && !run.tabbed ? undefined : ws.tabs().find((t) => t.active)?.id;
+    const { closed, kept, restored } = await rollbackRun(ws, run);
+    // záznamy exportů z rozpracovaného dokumentu (kolo 7, bod 22h po oponentuře): soubor, který běh zapsal, i neúspěšný /
+    // zrušený export jsou záznam skutečnosti – zrušení je nesmí zahodit s rozpracovaným modelem (model se nezapíše, záznam ano)
+    const logged = await keepRunRecords(ws, run, workTab);
     if (!kept.length) rb.code("run.cancelled");
     else rb.code("run.cancelled-partial", { args: [kept.map((n) => `„${n}“`).join(", ")] });
     const present = ws.present();
     const head = kept.length ? tr("✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v {0} (Zpět je vrátí).", kept.map((n) => `„${n}“`).join(", ")) : tr("✗ Výpočet zrušen – dokument zůstal beze změny.");
-    log.tailLine(head + (closed.length ? " " + tr("Dokumenty založené během ({0}) se zahodily.", closed.map((n) => `„${n}“`).join(", ")) : ""), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
+    const back = restored.length ? " " + tr("Změny, které běh zapsal do {0}, se vrátily.", restored.map((n) => `„${n}“`).join(", ")) : "";
+    const rec = logged ? " " + tr("Záznam exportu z tohoto běhu (i neúspěšného nebo zrušeného) zůstal v „{0}“ – výpis `exporty`.", logged) : "";
+    log.tailLine(head + back + rec + (closed.length ? " " + tr("Dokumenty založené během ({0}) se zahodily.", closed.map((n) => `„${n}“`).join(", ")) : ""), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
     return log.text();
   }
 }
@@ -250,9 +264,9 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
  * Zrušený běh (vlna 22, bod 12): záložky, které běh založil před zrušením, se zavřou a znovu se aktivuje záložka, ve které
  * běh začal; dokumenty zapsané krokem historie do dřívějších záložek zůstanou (`kept` – hláška je vyjmenuje, Zpět je vrátí).
  */
-async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: string[]; kept: string[] }> {
+async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: string[]; kept: string[]; restored: string[] }> {
   const w = run.wrote;
-  if (!w) return { closed: [], kept: [] };
+  if (!w) return { closed: [], kept: [], restored: [] };
   const closed: string[] = [];
   for (const t of [...w.opened].reverse()) {
     if (!ws.tabs().some((x) => x.id === t.id)) continue;
@@ -267,8 +281,48 @@ async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: str
       w.committed.push(t.name); // záložku nešlo zavřít – zůstala, hláška ji vyjmenuje
     }
   }
+  // dřívější záložky, do kterých běh zapsal (kolo 7, bod 12 – dřív jen vyjmenované): vrátit stav před prvním zápisem běhu.
+  // Jen když záložku od posledního zápisu běhu nikdo nezměnil (otisk CELÉHO dokumentu = poslední zápis – revize geometrie
+  // nestačí, změnu výkresu / vazby / razítka by nepoznala a vrácení by ji zahodilo); záznamy exportů a neúspěšných
+  // exportů zůstanou (soubor na disku zrušení nesmaže – history-outputs.ts). Jinak zůstane vyjmenovaná v ✗ run.cancelled-partial.
+  const restored: string[] = [];
+  for (const x of [...(w.restore ?? [])].reverse()) {
+    if (!ws.tabs().some((t) => t.id === x.id)) continue;
+    try {
+      await ws.activate(x.id);
+      const cur = ws.present();
+      if (docSig(cur) !== x.lastSig) continue;
+      ws.commit(carryOutputs(x.prev, cur));
+      restored.push(x.name);
+    } catch {
+      /* záložku nešlo vrátit – zůstane vyjmenovaná */
+    }
+  }
   if (run.startTab && ws.tabs().some((x) => x.id === run.startTab) && !ws.tabs().find((x) => x.id === run.startTab)?.active) await ws.activate(run.startTab).catch(() => undefined);
-  return { closed: closed.reverse(), kept: [...new Set(w.committed)] };
+  const back = new Set(restored);
+  return { closed: closed.reverse(), kept: [...new Set(w.committed)].filter((n) => !back.has(n)), restored: [...new Set(restored)].reverse() };
+}
+
+/**
+ * Zrušený běh (kolo 7, bod 22h): záznamy exportů a neúspěšných exportů, které běh zapsal do rozpracovaného dokumentu záložky
+ * `tab`, se přenesou do jejího zapsaného stavu (`carryOutputs` – stejné pravidlo jako krok Zpět). Model se nemění. Vrátí název
+ * dokumentu, do kterého se něco zapsalo (jinak null). Záložka, kterou běh založil a zrušení zavřelo, záznam nedostane.
+ */
+async function keepRunRecords(ws: Workspace, run: EngineRun, tab: string | undefined): Promise<string | null> {
+  if (!tab || !ws.tabs().some((t) => t.id === tab) || run.wrote?.opened.some((x) => x.id === tab)) return null;
+  const wasActive = ws.tabs().find((t) => t.active)?.id;
+  try {
+    if (wasActive !== tab) await ws.activate(tab);
+    const cur = ws.present();
+    const next = carryOutputs(cur, run.doc);
+    if (next === cur) return null;
+    ws.commit(next);
+    return cur.name;
+  } catch {
+    return null;
+  } finally {
+    if (wasActive && wasActive !== tab && ws.tabs().some((t) => t.id === wasActive)) await ws.activate(wasActive).catch(() => undefined);
+  }
 }
 
 /** hloubka vnoření podsestav (sestava bez podsestav = 1); hlubší než `MAX_DEPTH` se při stavbě vynechají (5.2 č. 29) */

@@ -140,7 +140,7 @@ describe("4 – směr a konec motoru na strojovém řádku", () => {
   it("přesný příkaz zprávy: `m1=ranged:57.5>27.15:-` na konci řádku (dřív řádek bajt po bajtu stejný jako při jízdě opačně)", async () => {
     const env = fakeEnv();
     const r = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175");
-    expect(r.kv).toBe("motion steps=36 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=ranged:57.5>27.15:- level=kin groups=1:z-30.35"); // M2: úroveň na konci; M3: tuhé skupiny
+    expect(r.kv).toBe("motion steps=36 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=ranged:57.5>27.15:- level=kin groups=1:z-30.35:Deska%20A"); // kolo 7, bod 15: + jméno kořene; M2: úroveň na konci; M3: tuhé skupiny
     // výsledek, který neplatí: definice motorů zůstává na řádku (bez výsledkových polí)
     const st = await runLines({ ...r.doc, motion: { ...r.doc.motion!, steps: 9 } }, env, "pohyb stav");
     expect(st.kv).toBe("motion steps=9 t=2 motors=1 motion.stale=1 m1=ranged:57.5>27.15:-");
@@ -172,7 +172,7 @@ describe("5 – `motion=ok` jen po skutečné kontrole", () => {
     const { store, key } = slotOf(env);
     const s = motionStatusOf(store, key, jump.doc)!;
     expect(s.state).toBe("warn");
-    expect(s.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)");
+    expect(s.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 2 kroky, vazby splněny, kolize nekontrolovány, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)");
     // mezera pod nulou bez kontroly kolizí: také „warn“
     const gap = await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..-5 kroky 2");
     expect(motionStatusOf(store, key, gap.doc)!.state).toBe("warn");

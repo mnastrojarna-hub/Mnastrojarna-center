@@ -46,6 +46,7 @@ const SoftHandle = forwardRef<ViewportHandle, { vp: SoftPickProps }>(function So
   useImperativeHandle(
     ref,
     () => ({
+      screenOf: (q) => softView.current?.screenOf?.(q) ?? null, // testovací háček (bod 20, kolo 7)
       hintList: () => softView.current?.hintList?.() ?? [],
       clickHint: (id, additive) => softView.current?.clickHint?.(id, additive) ?? false,
       setView: (v) => softView.current?.setView(v),

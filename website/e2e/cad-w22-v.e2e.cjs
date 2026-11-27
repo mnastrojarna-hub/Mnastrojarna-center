@@ -103,6 +103,20 @@ function zipFile(buf, re) {
   return null;
 }
 
+/** kolo 7: čtení APNG (počet snímků z acTL a fcTL, zpoždění snímků) – nezávislé na aplikaci */
+function readApng(buf) {
+  let o = 8, frames = 0, delays = [], w = 0, h = 0;
+  while (o + 12 <= buf.length) {
+    const len = buf.readUInt32BE(o), type = buf.toString('ascii', o + 4, o + 8), d = buf.slice(o + 8, o + 8 + len);
+    if (type === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); }
+    if (type === 'acTL') frames = d.readUInt32BE(0);
+    if (type === 'fcTL') delays.push(d.readUInt16BE(20) / (d.readUInt16BE(22) || 100));
+    o += 12 + len;
+    if (type === 'IEND') break;
+  }
+  return { w, h, frames, delays, seconds: delays.reduce((a, b) => a + b, 0) };
+}
+
 async function open(b, p0) {
   const ctx = await b.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
   const p = await ctx.newPage();
@@ -150,6 +164,49 @@ async function v1(b) {
   ok(pb && vb && pb.y + pb.height > vb.y + vb.height - 40, `lišta ukotvená u dolního okraje 3D okna (${pb && Math.round(pb.y)} / ${vb && Math.round(vb.y + vb.height)})`);
   ok(await p.locator('[data-motion-hud]').isVisible(), 'anotace polohy v okně: ' + (await p.locator('[data-motion-hud]').innerText().catch(() => '')).replace(/\n/g, ' | '));
 
+  // ── kolo 7, bod 21: window.mncad.status() uvádí zobrazení (view=…) ──
+  const stView = await p.evaluate(() => window.mncad.status());
+  const viewLine = (stView.split('\n').find((l) => /view=/.test(l)) || '').trim();
+  ok(NOGL ? /view=soft projection=ortho/.test(viewLine) && /Softwarové zobrazení – WebGL není dostupné/.test(viewLine) : /view=webgl projection=persp/.test(viewLine) && /3D okno \(WebGL\)/.test(viewLine), `bod 21: window.mncad.status() – ${viewLine}`);
+
+  // ── kolo 7, bod 13: skutečná rychlost přehrávání v panelu (stopky v prohlížeči: doba přehrání ≈ délka studie / rychlost) ──
+  const measurePlay = async (speed) => {
+    await p.locator('[data-player-speed]').selectOption(String(speed));
+    await p.locator('[data-player-scrub]').fill('0');
+    await p.waitForTimeout(300);
+    return p.evaluate(() => new Promise((res) => {
+      const btn = document.querySelector('[data-player-play]');
+      const t0 = performance.now();
+      const samples = [];
+      btn.click();
+      const tick = () => {
+        const now = performance.now() - t0;
+        const m = /t = ([\d,.]+)/.exec(document.querySelector('[data-player-time]')?.textContent || '');
+        samples.push([now / 1000, m ? Number(m[1].replace(',', '.')) : NaN]);
+        const playing = (document.querySelector('[data-player-play]')?.textContent || '').includes('❚');
+        if (!playing && now > 100) return res({ wall: now / 1000, samples });
+        if (now > 30000) return res({ wall: -1, samples });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }));
+  };
+  for (const sp of [1, 0.25]) {
+    const r0 = await measurePlay(sp);
+    const want = 0.65 / sp;
+    // zpoždění za skutečným časem: zobrazený čas kroku ≤ čas × rychlost (krok = poslední s časem ≤ t; 112 kroků po 5,8 ms)
+    const mid = r0.samples.filter(([w]) => w > want * 0.2 && w < want * 0.8 && w * sp < 0.64);
+    const lag = mid.map(([w, t]) => w * sp - t).sort((a, b) => a - b);
+    const med = lag.length ? lag[Math.floor(lag.length / 2)] : NaN;
+    // snímek obrazovky trvá při zátěži (software WebGL) i stovky ms: zobrazený čas smí zaostávat nejvýš o dva snímky obrazovky
+    // (krok se vykreslí v dalším snímku) – zpomalené přehrávání (dřív krok ≥ 30 ms) by překročilo dobu přehrání
+    const dts = r0.samples.slice(1).map(([w], i) => w - r0.samples[i][0]).sort((a, b) => a - b);
+    const frame = dts.length ? dts[Math.floor(dts.length / 2)] : 0;
+    const lagMax = 2 * frame * sp + 0.02;
+    ok(r0.wall > 0 && r0.wall >= want - 0.05 && r0.wall <= want + 0.35 && lag.length >= 2 && med >= -0.02 && med <= lagMax, `bod 13: přehrávání ${sp}× trvalo ${r0.wall.toFixed(3)} s (čekáno ${want.toFixed(3)} s), zpoždění zobrazeného času za skutečným (medián) ${Number.isFinite(med) ? (med * 1000).toFixed(1) : '?'} ms z ${lag.length} vzorků (snímek obrazovky ${(frame * 1000).toFixed(0)} ms, mez ${(lagMax * 1000).toFixed(0)} ms)`);
+  }
+  await p.locator('[data-player-speed]').selectOption('1');
+
   // ── bod 13: WebM s pevným časováním, 1× ──
   let r = await exportVia('pohyb export webm', 'video-1x');
   ok(/video 0,667 s = 1,03 × délka studie 0,65 s/.test(r.log), 'protokol: plán délky a poměr ke studii – ' + (r.log.split('\n').find((l) => /video 0,667/.test(l)) || '').trim());
@@ -172,6 +229,26 @@ async function v1(b) {
     ok(Math.abs(w.duration - 2.6) <= 1 / 30 + 1e-6 && w.blocks.length === 78, `0,25×: ${w.duration} s, ${w.blocks.length} snímků (2,6 s, 78)`);
   } else ok(false, '0,25×: soubor nestažen');
 
+  // ── kolo 7, bod 13: export videa bez WebCodecs (WebM z WebP → VP8) a bez WebCodecs i WebP (jako Safari → animované PNG) ──
+  await p.evaluate(() => { window.__mncadVE = window.VideoEncoder; window.__mncadVF = window.VideoFrame; delete window.VideoEncoder; delete window.VideoFrame; });
+  r = await exportVia('pohyb export webm', 'video-bez-webcodecs');
+  if (r.file && /\.webm$/.test(r.file)) {
+    const w = readWebm(fs.readFileSync(r.file));
+    ok(r.rep && r.rep.videoEncoder === 'webp-vp8' && Math.abs(w.duration - 0.65) <= 1 / 30 + 1e-6 && w.blocks.length === 20 && w.blocks.every((x, i) => Math.abs(x.time - (i * 1000) / 30) <= 1), `bez WebCodecs: WebM (${r.rep && r.rep.videoEncoder}) ${w.duration} s, ${w.blocks.length} snímků po 33,3 ms`);
+  } else ok(false, `bez WebCodecs: WebM nevzniklo – ${(r.rep && r.rep.text) || r.log.trim().split('\n').pop()}`);
+  await p.evaluate(() => {
+    const orig = HTMLCanvasElement.prototype.toBlob;
+    window.__mncadToBlob = orig;
+    // jako Safari: neznámý typ (image/webp) vrátí PNG
+    HTMLCanvasElement.prototype.toBlob = function (cb, type, q) { return orig.call(this, cb, type === 'image/webp' ? 'image/png' : type, q); };
+  });
+  r = await exportVia('pohyb export webm', 'video-bez-webp');
+  if (r.file && /\.png$/.test(r.file)) {
+    const a = readApng(fs.readFileSync(r.file));
+    ok(r.rep && r.rep.videoEncoder === 'apng' && r.rep.videoLevel === 'warn' && /^⚠/.test(r.rep.text) && a.frames === 20 && a.delays.length === 20 && Math.abs(a.seconds - 0.65) <= 1 / 30 + 1e-6, `bez WebCodecs i WebP: animované PNG (${r.rep && r.rep.videoEncoder}, ${r.rep && r.rep.videoLevel}) ${a.seconds.toFixed(3)} s, ${a.frames} snímků ${a.w}×${a.h} – „${(r.rep && r.rep.text || '').slice(0, 90)}…“`);
+  } else ok(false, `bez WebCodecs i WebP: animované PNG nevzniklo – ${(r.rep && r.rep.text) || r.log.trim().split('\n').pop()}`);
+  await p.evaluate(() => { HTMLCanvasElement.prototype.toBlob = window.__mncadToBlob; if (window.__mncadVE) window.VideoEncoder = window.__mncadVE; if (window.__mncadVF) window.VideoFrame = window.__mncadVF; });
+
   // ── bod 14: kompaktní lišta a panel řezu ──
   await p.locator('[data-player-compact]').click();
   await p.waitForTimeout(300);
@@ -186,6 +263,25 @@ async function v1(b) {
   const mb = await p.locator('[data-motion-panel]').locator('xpath=..').boundingBox().catch(() => null);
   const overlap = sb && mb && !(sb.x >= mb.x + mb.width || mb.x >= sb.x + sb.width || sb.y >= mb.y + mb.height || mb.y >= sb.y + sb.height);
   ok(!!sb && !overlap, `panel Řez modelem není pod panelem studie (řez x ${sb && Math.round(sb.x)}, studie x ${mb && Math.round(mb.x)}–${mb && Math.round(mb.x + mb.width)})`);
+
+  // ── kolo 7, bod 14: plný panel studie ukotvený vpravo vedle 3D okna (okno se zúží, model se nepřekrývá) ──
+  const main0 = await p.locator('main').boundingBox();
+  await p.locator('[data-motion-dock]').click();
+  await p.waitForTimeout(700);
+  const dockedN = await p.locator('#mncad-motion-dock [data-float-docked] [data-motion-panel]').count();
+  const main1 = await p.locator('main').boundingBox();
+  const slotB = await p.locator('#mncad-motion-dock').boundingBox();
+  const cvB = await p.locator(NOGL ? '[data-soft-canvas]' : '[data-gl-host] canvas').first().boundingBox();
+  const plB = await player.boundingBox();
+  ok(dockedN === 1 && main1 && main0 && slotB && main1.width < main0.width - 300 && slotB.x >= main1.x + main1.width - 1 && slotB.height > main1.height * 0.9, `bod 14: panel ukotvený vpravo (3D okno ${main0 && Math.round(main0.width)} → ${main1 && Math.round(main1.width)} px, sloupec x ${slotB && Math.round(slotB.x)}, výška ${slotB && Math.round(slotB.height)})`);
+  ok(!!cvB && !!plB && cvB.x + cvB.width <= main1.x + main1.width + 1 && plB.x + plB.width <= main1.x + main1.width + 1, `bod 14: ukotvený panel nepřekrývá model – plátno do x ${cvB && Math.round(cvB.x + cvB.width)}, lišta do x ${plB && Math.round(plB.x + plB.width)}, okno do x ${Math.round(main1.x + main1.width)}`);
+  // panel Řez modelem je otevřený z kontroly výše (klávesa x) – s ukotveným panelem studie se vrátí vlevo nahoru
+  const secD = await p.locator('div.absolute', { hasText: 'Řez modelem' }).last().boundingBox().catch(() => null);
+  ok(!!secD && secD.x < main1.x + 40, `bod 14: s ukotveným panelem je panel Řez modelem vlevo nahoře (x ${secD && Math.round(secD.x)})`);
+  await p.locator('[data-motion-dock]').click();
+  await p.waitForTimeout(700);
+  const main2 = await p.locator('main').boundingBox();
+  ok((await p.locator('[data-float-docked]').count()) === 0 && Math.abs(main2.width - main0.width) <= 2 && (await panel.isVisible()), `bod 14: Plovoucí – panel zase nad modelem, 3D okno zpět ${Math.round(main2.width)} px`);
 
   // ── uložit pohled z okna (kamera + řez) a použít ho ──
   await p.locator('[data-player-save-view]').click();
@@ -314,6 +410,51 @@ function capPatch(im, cx, cy, fill, hatch, bg, r = 6, tol = 10) {
   return { cap: all ? cap / all : 0, back: all ? back / all : 0 };
 }
 
+/** kolo 7: pixely obrysu kolem čela – prstenec u hranice obdélníku čela (± 3 px) a vnitřek (o 6 px dovnitř) */
+function capRing(im, fill, hatch, outline, tol = 10, otol = 34) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let y = Math.floor(im.h * 0.08); y < Math.ceil(im.h * 0.95); y++)
+    for (let x = Math.floor(im.w * 0.15); x < Math.ceil(im.w * 0.85); x++) {
+      const o = (y * im.w + x) * 4;
+      const px = [im.px[o], im.px[o + 1], im.px[o + 2]];
+      if (dist(px, fill) <= tol || dist(px, hatch) <= tol) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    }
+  if (!(x1 > x0 && y1 > y0)) return { ring: 0, inner: 0, perim: 0 };
+  let ring = 0, inner = 0;
+  for (let y = y0 - 3; y <= y1 + 3; y++)
+    for (let x = x0 - 3; x <= x1 + 3; x++) {
+      if (x < 0 || y < 0 || x >= im.w || y >= im.h) continue;
+      const o = (y * im.w + x) * 4;
+      if (dist([im.px[o], im.px[o + 1], im.px[o + 2]], outline) > otol) continue;
+      if (x > x0 + 6 && x < x1 - 6 && y > y0 + 6 && y < y1 - 6) inner++;
+      else if (x < x0 + 3 || x > x1 - 3 || y < y0 + 3 || y > y1 - 3) ring++;
+    }
+  return { ring, inner, perim: 2 * (x1 - x0 + y1 - y0) };
+}
+/** kolo 7: horní hrana čela (první řádek shora, kde je ve sloupcích kolem x výplň nebo šrafa čela) */
+function capTop(im, fill, hatch, cx, tol = 10) {
+  for (let y = 0; y < im.h; y++) {
+    let n = 0;
+    for (let x = Math.round(cx) - 20; x <= Math.round(cx) + 20; x++) {
+      const o = (y * im.w + x) * 4;
+      const px = [im.px[o], im.px[o + 1], im.px[o + 2]];
+      if (dist(px, fill) <= tol || dist(px, hatch) <= tol) n++;
+    }
+    if (n >= 20) return y;
+  }
+  return -1;
+}
+/** kolo 7: maska šraf v okně ± r kolem těžiště čela (vzor šraf vůči čelu) */
+function hatchMask(im, c, hatch, r, tol = 10) {
+  const out = [];
+  for (let y = Math.round(c.y) - r; y <= Math.round(c.y) + r; y++)
+    for (let x = Math.round(c.x) - r; x <= Math.round(c.x) + r; x++) {
+      const o = (y * im.w + x) * 4;
+      out.push(x >= 0 && y >= 0 && x < im.w && y < im.h && dist([im.px[o], im.px[o + 1], im.px[o + 2]], hatch) <= tol);
+    }
+  return out;
+}
+
 async function v2(b) {
   const { p } = await open(b, '/cad');
   const errs = [];
@@ -337,7 +478,7 @@ async function v2(b) {
   await p.waitForTimeout(900);
   const host = p.locator(NOGL ? '[data-soft-viewport][data-section-caps]' : '[data-section-caps]').first();
   await host.waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
-  const caps = await host.evaluate((el) => ({ n: Number(el.dataset.sectionCaps), fill: (el.dataset.sectionCapColors || '').split(','), hatch: (el.dataset.sectionCapHatch || '').split(',') })).catch(() => null);
+  const caps = await host.evaluate((el) => ({ n: Number(el.dataset.sectionCaps), fill: (el.dataset.sectionCapColors || '').split(','), hatch: (el.dataset.sectionCapHatch || '').split(','), outline: el.dataset.sectionCapOutline ? el.dataset.sectionCapOutline.split(',') : [], mm: el.dataset.sectionCapHatchMm || '' })).catch(() => null);
   ok(!!caps && caps.n === 2 && caps.fill.length === 2 && caps.fill[0] !== caps.fill[1], `V2: dvě čela řezu, sousední se liší barvou: ${JSON.stringify(caps)}`);
   if (!caps || caps.n !== 2) return void (await p.context().close());
   const F = caps.fill.map(hexRgb);
@@ -355,6 +496,13 @@ async function v2(b) {
   const ca = capPixels(im, F[0], Hh[0]);
   const cb = capPixels(im, F[1], Hh[1]);
   ok(ca.n && cb.n && cb.y < ca.y - 10, `V2 snímek: čelo B nad čelem A (y ${Math.round(cb.y)} < ${Math.round(ca.y)})`);
+  // ── kolo 7: obrys čela (průsečnice roviny se sítí) na hranici čela, uvnitř čela ne ──
+  const O = (caps.outline || []).map(hexRgb);
+  ok(O.length === 2 && O.every((c) => c.every((v) => v < 60)), `V2 kolo 7: barvy obrysů čel z okna ${JSON.stringify(caps.outline)}`);
+  if (O.length === 2) for (const k of [0, 1]) {
+    const r = capRing(im, F[k], Hh[k], O[k]);
+    ok(r.perim > 40 && r.ring >= r.perim * 0.4 && r.inner === 0, `V2 kolo 7: obrys čela ${k ? 'B' : 'A'} – ${r.ring} px obrysu na hranici (obvod ${r.perim} px), uvnitř ${r.inner}`);
+  }
 
   // ── 2) živé okno: najetí myší a klik na čelo nic nevybere ──
   const cv = p.locator(NOGL ? '[data-soft-canvas]' : '[data-section-caps] canvas').first();
@@ -392,6 +540,9 @@ async function v2(b) {
   log = await run(['pohyb motor lineární vazba "ZDVIH" 10..30 kroky 10 čas 0,5', 'pohyb spustit', 'pohyb pohled uložit "Řez Y" řez Y 15 kamera přední', 'pohyb pohled "Řez Y"'].join('\n'));
   ok(!/^✗/m.test(log), 'V2: studie a uložený pohled „Řez Y“ s řezem');
   await p.waitForFunction(() => document.querySelector('[data-motion-player]')?.getAttribute('data-player-state') === 'ok', null, { timeout: 60000 }).catch(() => {});
+  // barvy čel teď (komponenta A může být po kontrolním kliku vybraná – čelo má nádech výběru; dřív se bralo z počátku testu)
+  const capsNow = await host.evaluate((el) => ({ fill: (el.dataset.sectionCapColors || '').split(','), hatch: (el.dataset.sectionCapHatch || '').split(',') })).catch(() => null);
+  if (capsNow && capsNow.fill.length === 2) for (const k of [0, 1]) { F[k] = hexRgb(capsNow.fill[k]); Hh[k] = hexRgb(capsNow.hatch[k]); }
   const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);
   await run('pohyb export png');
   const f = await dl;
@@ -407,6 +558,22 @@ async function v2(b) {
       const a1 = capPixels(i1, F[0], Hh[0]), b1 = capPixels(i1, F[1], Hh[1]);
       ok(a0.n > 200 && b0.n > 200 && a1.n > 200 && b1.n > 200, `V2 PNG studie: čela A i B ve snímku prvního i posledního kroku (${a0.n}/${b0.n} → ${a1.n}/${b1.n} px)`);
       ok(Math.abs(a1.y - a0.y) <= 3 && b1.y < b0.y - 5, `V2 PNG studie: čelo B se zvedá s komponentou (y ${Math.round(b0.y)} → ${Math.round(b1.y)}), čelo A stojí (${Math.round(a0.y)} → ${Math.round(a1.y)})`);
+      // kolo 7: šrafy vázané na model – vzor šraf čela B jede s komponentou. Posun čela = posun horní hrany čela B (rovina řezu je
+      // rovnoběžná s obrazem, posun je čistý posun v obraze); vzor v okně pod horní hranou se porovná s tolerancí ±1 px (zlomek
+      // pixelu posunu). Šrafy v pixelech obrazovky (dřív) by vůči čelu ujely o posun modulo rozteč.
+      // snímek kroku 3: čelo B už je posunuté, ale celé v obraze (v posledním kroku může horní hrana opustit snímek)
+      const mid3 = zipFile(z, /krok-0003\.png$/);
+      const i3 = mid3 ? readPng(mid3) : i1;
+      const b3 = capPixels(i3, F[1], Hh[1]);
+      const t0 = capTop(i0, F[1], Hh[1], b0.x), t1 = capTop(i3, F[1], Hh[1], b3.x);
+      const m0 = hatchMask(i0, { x: b0.x, y: t0 + 30 }, Hh[1], 14), m1 = hatchMask(i3, { x: b3.x, y: t1 + 30 }, Hh[1], 14);
+      const n0 = m0.filter(Boolean).length;
+      const W1 = 29;
+      const near1 = (m, q) => { const x = q % W1, y = Math.floor(q / W1); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W1 && yy < W1 && m[yy * W1 + xx]) return true; } return false; };
+      let miss = 0;
+      for (let q = 0; q < m0.length; q++) if (m0[q] && !near1(m1, q)) miss++;
+      for (let q = 0; q < m1.length; q++) if (m1[q] && !near1(m0, q)) miss++;
+      ok(t0 > 0 && t1 > 0 && t1 < t0 - 3 && n0 > 20 && miss <= n0 * 0.15, `V2 kolo 7: šrafy čela B se pohnuly s komponentou (horní hrana y ${t0} → ${t1}, ${n0} px šraf, nesouhlas vzoru vůči čelu ${miss} px; rozteč ${caps.mm} mm)`);
     } else ok(false, 'V2 PNG studie: snímky krok-0000 / poslední v ZIP chybí');
   } else ok(false, 'V2 PNG studie: soubor nestažen');
 

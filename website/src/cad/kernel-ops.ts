@@ -19,7 +19,7 @@ import { clearCompareCache, compareTransferables, compareWithReference } from ".
 import { clashDetail, clearClashDetailCache } from "./clash-detail";
 import { clearance, clearClearanceCache } from "./clearance-kernel";
 import { clearProcessCache, processOp } from "./process-kernel";
-import { exportShape } from "./formats/export";
+import { exportShape, stepStageText } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type ShapeSrc } from "./inspect";
 import { measureQuery } from "./measure";
 import { surfQuery } from "./surf-query";
@@ -31,6 +31,7 @@ import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark } from "./perf-log";
 import { formNotesOfDoc, springMarksOf } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
+import { pmiMarksOf } from "./pmi-marks";
 import { springDrawTables } from "./drawing-springtable";
 import { gearTablesOf } from "./gears/data";
 import { splitStepAssembly } from "./formats/step-assembly";
@@ -365,12 +366,13 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
       case "export": {
         const b = await shapeOfDoc(m.doc);
         if (!b) throw new Error(tr("Model je prázdný."));
-        const buf = await exportShape(b, m.format, m.doc.name);
+        // průběh uvnitř převodu STEP (bod 22h kolo 7): kroky přenos / zápis / čtení jako průběh operace export
+        const buf = await exportShape(b, m.format, m.doc.name, (st, index, total, detail) => post({ id: m.id, progress: { phase: "feature", index, total, name: detail ? `${stepStageText(st)} – ${detail}` : stepStageText(st) } }));
         reply(post, m, buf, [buf]);
         break;
       }
       case "exportStats":
-        reply(post, m, await exportStats(m.doc, m.bytes, m.format));
+        reply(post, m, await exportStats(m.doc, m.bytes, m.format, m.full === true));
         break;
       case "validity":
         reply(post, m, await validityOfDoc(m.doc, m.maxFaces !== undefined ? { maxFaces: m.maxFaces } : {}));
@@ -392,6 +394,8 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         let meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
         // značky svarů ISO 2553 z 3D svarů (stav prvků po stavbě – mezipaměť stavby) – drawing-welds.ts
         if (!meta.welds && hasWelds(dd)) meta = { ...meta, welds: weldMarksOf(dd, (await buildShape(dd)).status) };
+        // popisy ploch a oblastní úpravy z modelu (vlna 23, R2 / R3) – výkres je bere z modelu, ne z poznámek listu
+        if (!meta.pmi && m.doc.functional?.some((x) => x.kind === "note" || x.kind === "treatment")) meta = { ...meta, pmi: pmiMarksOf(m.doc) };
         // tabulka údajů pružin (EN ISO 2162-2) z prvků spring.* – drawing-springtable.ts; z dokumentu, ne z kopie pro výkres
         // (tam je tlačná pružina z tabulky nahrazená obalem vinutí ISO 2162-1)
         if (m.opts?.springTable && !meta.springData) meta = { ...meta, springData: springDrawTables(m.doc) };

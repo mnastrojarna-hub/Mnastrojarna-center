@@ -1575,6 +1575,9 @@ export function primaryChip(f: FlowFacts, s: FlowSnapshot, stamps?: JobStamps | 
   if (rank >= 5 && rank <= 8) {
     if (s.delivery === "castecne") return chip("delivery", DELIVERY_STATES.castecne, { progress: deliveryProgress(f) });
     if (s.delivery === "k_expedici") return chip("delivery", DELIVERY_STATES.k_expedici);
+    // vše dodáno, DL vystaven — čeká na podepsaný DL (27. 11.: stav se posune až s ním)
+    if (s.delivery === "dodano") return chip("delivery", DELIVERY_STATES.dodano, { label: "Čeká na podepsaný DL" });
+    if (s.delivery === "dl_potvrzen") return chip("delivery", DELIVERY_STATES.dl_potvrzen, { stamp: stamps?.deliveryNote ?? null });
     if (f.stage === "ve_vyrobe") {
       const h = productionHealth(f);
       if (h.late !== null) return chip("fulfilment", ROUTE_LATE_META, { label: `${ROUTE_LATE_META.label} (o ${h.late} ${czPlural(h.late, "den", "dny", "dní")})` });

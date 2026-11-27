@@ -156,8 +156,12 @@ export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, 
         <Field name="quantity" label={tr("Počet kusů")} value={meta.quantity} onChange={(v) => setM({ quantity: v })} placeholder="1" />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field name="heatTreatment" label={tr("Tepelné zpracování")} value={meta.heatTreatment} onChange={(v) => setM({ heatTreatment: v })} placeholder={tr("např. kalit 58–60 HRC")} />
+        <Field name="heatTreatment" label={tr("Tepelné zpracování")} value={meta.heatTreatment} onChange={(v) => setM({ heatTreatment: v })} placeholder={tr("např. kalit a popustit")} />
+        <Field name="hardness" label={tr("Tvrdost")} value={meta.hardness} onChange={(v) => setM({ hardness: v })} placeholder={tr("např. 58–60 HRC")} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <Field name="surfaceTreatment" label={tr("Povrchová úprava")} value={meta.surfaceTreatment} onChange={(v) => setM({ surfaceTreatment: v })} placeholder={tr("např. černit")} />
+        <Field name="roughness" label={tr("Obecná drsnost")} value={meta.roughness} onChange={(v) => setM({ roughness: v })} placeholder={tr("např. Ra 3,2")} />
       </div>
 
       <Row label={tr("Nepředepsané tolerance")}>

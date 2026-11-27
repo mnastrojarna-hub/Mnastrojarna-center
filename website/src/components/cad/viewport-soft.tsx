@@ -11,7 +11,8 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sectionPlane } from "@/cad/section-plane";
 import { fitSoftCam, newSoftCam, softCamOnModel, type SoftCam } from "@/cad/soft-cam";
-import { buildPickIndex, edgeNear, edgeSnaps, itemEdgePolyline, pickAt, snapNear, softHintSteps, surfaceAt, type PickItem, type SoftHint, type SoftPickIndex } from "@/cad/soft-pick";
+import { buildPickIndex, edgeNear, edgeSnaps, itemEdgePolyline, pickAt, projectPoint, snapNear, softHintSteps, surfaceAt, type PickItem, type SoftHint, type SoftPickIndex } from "@/cad/soft-pick";
+import { entityCandidates, findOnScreen, type ProbeQuery } from "@/cad/screen-probe"; // testovací háček screenOf (bod 20, kolo 7)
 import { basisOf, hexToRgb, orbitAngles, screenToWorld, softBounds, softRender, type RGB, type SoftViewName } from "@/cad/soft-render";
 import type { MeshData, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -21,7 +22,7 @@ import { orthoBoxCamera, type BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, dragAction, queryBox, type BoxSceneOf, type DragAction } from "./box-pick-3d";
 import type { AsmView, DisplayMode, Section } from "./viewport";
-import { softCapStyles } from "@/cad/section-cap";
+import { bodyOpacity, capModule, softCapStyles } from "@/cad/section-cap";
 
 /** Co se má vykreslit – stejná data, jaká dostává 3D okno. */
 export type SoftScene = {
@@ -37,6 +38,8 @@ export type SoftScene = {
   hidden?: boolean;
   /** tmavé pozadí pracovní plochy (světlé popisky) */
   dark?: boolean;
+  /** kolo 7: průhlednost tělesa dílu (1 = neprůhledné, tlačítko Průhledné = 0,35) – shodně se 3D oknem */
+  bodyOpacity?: number;
 };
 
 /** podíl plátna, který model po přizpůsobení zabere (zbytek je místo na tlačítka a popisky) */
@@ -64,11 +67,14 @@ const LEGACY = new Set(["edges", "faces", "face-plane"]);
 /** Sítě k vykreslení a výběru: díl (jedna síť s barvami ploch) nebo komponenty sestavy s maticemi umístění. */
 export function sceneItems(sc: SoftScene, points?: Float32Array | null): PickItem[] {
   if (sc.assembly) {
-    // vlna 22: čelo řezu každé komponenty – barva komponenty a šrafy jako ve 3D okně (`@/cad/section-cap`); kreslí se jen v řezu
-    const caps = softCapStyles(sc.assembly, sc.display);
+    // vlna 22: čelo řezu každé komponenty – barva komponenty a šrafy jako ve 3D okně (`@/cad/section-cap`); kreslí se jen v řezu.
+    // Kolo 7: šrafy vázané na model (modul šraf ze sestavy – stejný jako ve 3D okně), obrys čela, průhlednost těla i čela
+    // (tlumená komponenta 0,18, styl Průhledný 0,3 – dřív jen hrany / neprůhledně)
+    const caps = softCapStyles(sc.assembly, sc.display, capModule(sc.assembly));
     return sc.assembly.map((c, i) => {
       const base = hexToRgb(c.clash ? "#ff3b30" : c.color);
       const cap = caps[i];
+      const op = bodyOpacity(c, sc.display);
       return {
         vertices: c.mesh.vertices,
         triangles: c.mesh.triangles,
@@ -80,11 +86,14 @@ export function sceneItems(sc: SoftScene, points?: Float32Array | null): PickIte
         matrix: c.matrix,
         color: c.selected ? mix(base, SEL, 0.3) : base,
         edgeColor: c.selected ? SEL : null,
-        wire: !!c.dim,
+        opacity: op < 1 ? op : null,
+        // tlumená komponenta nezakrývá výběr komponent za ní (jako dřív, kdy byla jen v hranách)
+        dim: !!c.dim,
         compId: c.id,
         topId: c.topId ?? c.id,
         capColor: cap ? cap.fill : null,
-        capHatch: cap ? { nx: cap.hatch.nx, ny: cap.hatch.ny, step: cap.hatch.step, width: cap.hatch.width, color: cap.hatch.color } : null,
+        capHatch: cap ? { angle: cap.hatch.angle, stepMm: cap.hatch.stepMm, width: cap.hatch.width, color: cap.hatch.color } : null,
+        capOutline: cap ? cap.outline : null,
       };
     });
   }
@@ -92,7 +101,9 @@ export function sceneItems(sc: SoftScene, points?: Float32Array | null): PickIte
   if (!m || sc.hidden || !m.triangles.length) return [];
   const fc: Record<number, RGB> = {};
   for (const [k, v] of Object.entries(sc.faceColors ?? {})) fc[Number(k)] = hexToRgb(v);
-  return [{ vertices: m.vertices, triangles: m.triangles, normals: m.normals, lines: m.lines, faceGroups: m.faceGroups, edgeGroups: m.edgeGroups, points: points ?? null, faceColors: fc, color: hexToRgb(sc.color) }];
+  // kolo 7: průhlednost tělesa dílu (tlačítko Průhledné) jako ve 3D okně; styl Průhledný 0,3
+  const op = sc.display === "xray" ? 0.3 : (sc.bodyOpacity ?? 1);
+  return [{ vertices: m.vertices, triangles: m.triangles, normals: m.normals, lines: m.lines, faceGroups: m.faceGroups, edgeGroups: m.edgeGroups, points: points ?? null, faceColors: fc, color: hexToRgb(sc.color), opacity: op < 1 ? op : null }];
 }
 
 /** Zvýraznění ploch, těles a komponent (výběr, entita pod kurzorem, plochy formuláře) – barvy ploch a sítí. */
@@ -155,6 +166,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   // ---------- výběr: vlastnosti 3D okna, entita pod kurzorem, body k uchopení ----------
   const pickRef = useRef(pick ?? null);
   pickRef.current = pick ?? null;
+  /** výběr v bodě plátna (CSS px) podle filtru – tentýž `pickSel` jako klik (testovací háček `screenOf`) */
+  const probePick = useRef<((p: { x: number; y: number }, f: SelFilter) => SelItem | null) | null>(null);
   const [hover, setHover] = useState<SelItem | null>(null);
   /** formuláře prvků (hrany zaoblení, plochy skořepiny, plocha skici): plocha / hrana pod kurzorem */
   const [lhover, setLhover] = useState<{ face: number; edge: number }>({ face: -1, edge: -1 });
@@ -175,13 +188,13 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   const fcKey = JSON.stringify(scene.faceColors ?? {});
   const points = pick?.vertices ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const baseItems = useMemo(() => sceneItems(scene, points), [scene.mesh, scene.assembly, scene.color, fcKey, scene.hidden, points, scene.display]);
+  const baseItems = useMemo(() => sceneItems(scene, points), [scene.mesh, scene.assembly, scene.color, fcKey, scene.hidden, points, scene.display, scene.bodyOpacity]);
   /** čela řezu komponent sestavy (vlna 22) – stav pro e2e a diagnostiku: počet a barvy výplně v pořadí komponent */
   const capInfo = useMemo(() => {
     if (!scene.assembly || !scene.section || scene.display === "wireframe") return null;
     const hex = (c: RGB) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
     const caps = baseItems.filter((it) => it.capColor);
-    return { n: caps.length, colors: caps.map((it) => hex(it.capColor!)).join(","), hatch: caps.map((it) => (it.capHatch ? hex(it.capHatch.color) : "")).join(",") };
+    return { n: caps.length, colors: caps.map((it) => hex(it.capColor!)).join(","), hatch: caps.map((it) => (it.capHatch ? hex(it.capHatch.color) : "")).join(","), mm: caps.map((it) => (it.capHatch ? String(it.capHatch.stepMm) : "")).join(","), outline: caps.map((it) => (it.capOutline ? hex(it.capOutline) : "")).join(",") };
   }, [baseItems, scene.assembly, scene.section, scene.display]);
   const baseRef = useRef(baseItems);
   baseRef.current = baseItems;
@@ -683,6 +696,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       }
       return r;
     };
+    probePick.current = pickSel;
     const legacyPick = (p: { x: number; y: number }) => {
       const ix = pickIndex();
       const mode = pickRef.current?.pickMode;
@@ -769,7 +783,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       const c = cam.current;
       const sc = sceneRef.current;
       const camB = orthoBoxCamera({ ...basisOf(c.angles), center: c.center, scale: c.scale }, el.clientWidth, el.clientHeight);
-      const meshes = baseRef.current.map((it) => ({ mesh: it, points: it.points ?? null, matrix: it.matrix ?? null, meta: it.compId ? { compId: it.compId, topId: it.topId } : {}, occluder: !it.wire }));
+      const meshes = baseRef.current.map((it) => ({ mesh: it, points: it.points ?? null, matrix: it.matrix ?? null, meta: it.compId ? { compId: it.compId, topId: it.topId } : {}, occluder: !it.wire && !it.dim }));
       return buildBoxScene(camB, meshes, sc.section ? sectionPlane(sc.section) : null, sc.display);
     };
     const isAsm = () => baseRef.current.some((it) => !!it.compId);
@@ -994,6 +1008,21 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         setViewName(cam.current.view);
         schedule();
       },
+      screenOf: (q: ProbeQuery) => {
+        const cv = canvas.current;
+        const ix = pickIndex();
+        const pick = probePick.current;
+        if (!cv || !ix || !pick) return null;
+        const it = q.compId !== undefined ? baseRef.current.find((x) => x.compId === q.compId) : baseRef.current.find((x) => !x.compId);
+        if (!it) return null;
+        const r = cv.getBoundingClientRect();
+        const project = (p: Vec3): [number, number] | null => {
+          const [x, y] = projectPoint(ix, p);
+          return x >= 2 && y >= 2 && x <= r.width - 2 && y <= r.height - 2 ? [x + r.left, y + r.top] : null;
+        };
+        const src = { mesh: it as unknown as MeshData, vertices: it.points ?? null, matrix: it.matrix ?? null };
+        return findOnScreen(entityCandidates(src, q.kind, q.index), q, project, (x, y) => pick({ x: x - r.left, y: y - r.top }, q.kind));
+      },
       hintList: () => hintsNow().map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
       clickHint: (id, additive = false) => {
         const hh = hintsNow().find((x) => x.id.toUpperCase() === id.trim().toUpperCase());
@@ -1037,7 +1066,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
     return () => {
       if (softView.current === handle) setSoftView(null);
     };
-  }, [fit, draw, schedule, hintsNow]);
+  }, [fit, draw, schedule, hintsNow, pickIndex]);
 
   const views: { v: SoftViewName; label: string }[] = [
     { v: "iso", label: tr("Izometrie") },
@@ -1051,7 +1080,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   const btn = SOFT_BTN;
   const measureLabels = pick?.measure?.labels ?? [];
   return (
-    <div ref={box} data-soft-viewport data-soft-pick={pickMode} data-section-caps={capInfo ? capInfo.n : undefined} data-section-cap-colors={capInfo ? capInfo.colors : undefined} data-section-cap-hatch={capInfo ? capInfo.hatch : undefined} className="absolute inset-0 overflow-hidden">
+    <div ref={box} data-soft-viewport data-soft-pick={pickMode} data-section-caps={capInfo ? capInfo.n : undefined} data-section-cap-colors={capInfo ? capInfo.colors : undefined} data-section-cap-hatch={capInfo ? capInfo.hatch : undefined} data-section-cap-hatch-mm={capInfo ? capInfo.mm : undefined} data-section-cap-outline={capInfo ? capInfo.outline : undefined} className="absolute inset-0 overflow-hidden">
       <canvas ref={canvas} data-soft-canvas className="absolute inset-0 h-full w-full cursor-grab touch-none select-none active:cursor-grabbing" aria-label={tr("Náhled modelu bez WebGL")} role="img" />
       <canvas ref={overlay} data-soft-overlay className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
       {/* popisky kót měření (polohu nastavuje překryvná vrstva) */}

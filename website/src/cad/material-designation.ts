@@ -6,8 +6,10 @@
  * * text = třída hustoty (ocel, steel, Hliník, 1.2311 …) → jen třída, označení se smaže;
  * * jiný text = označení do razítka; pozná-li se z něj třída (ČSN 11 423 → ocel, 1.4301 → nerez, EN AW-6082 → hliník –
  *   `materialClass`), nastaví se i třída hustoty: ℹ `material.class`;
- * * třída se z označení nepozná (Hardox 400) nebo s ním nesouhlasí → hustota zůstává podle třídy dokumentu, ale je to
- *   PŘEDPOKLAD: ⚠ `material.density-assumed` – nikdy ✓ (vlna 22: žádná falešná zelená).
+ * * třída se z označení nepozná (Hardox 400) → hustota zůstává podle třídy dokumentu, ale je to PŘEDPOKLAD:
+ *   ⚠ `material.density-assumed` – nikdy ✓ (vlna 22: žádná falešná zelená);
+ * * označení patří JINÉ třídě, než má dokument (třída změněna po označení: `materiál nerez` po `materiál ČSN 11 423`,
+ *   nabídka Materiál v GUI) → ⚠ `material.class-conflict` (kolo 7); označení se samo nemaže – opraví ho člověk.
  */
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { materialClass } from "./agent-strict";
@@ -50,7 +52,7 @@ export function designationPatch(text: string, known: string | null = knownMater
   return cls ? { materialName: q, material: cls } : { materialName: q };
 }
 
-export type MaterialNote = { code: "material.class" | "material.density-assumed"; args: (string | number)[] };
+export type MaterialNote = { code: "material.class" | "material.density-assumed" | "material.class-conflict"; args: (string | number)[] };
 
 /**
  * Hláška k označení materiálu dokumentu: třída rozpoznaná z označení = třída dokumentu → ℹ `material.class`; jinak ⚠
@@ -60,7 +62,13 @@ export function designationNote(materialName: string | undefined, material: stri
   const n = materialName?.trim();
   if (!n) return null;
   const cls = MATERIALS.find((x) => x.id === material) ?? MATERIALS[0];
-  return materialClass(n) === cls.id ? { code: "material.class", args: [n, `${cls.label} (${cls.density} g/cm³)`] } : { code: "material.density-assumed", args: [n, cls.density, cls.label] };
+  const of = materialClass(n);
+  if (of === cls.id) return { code: "material.class", args: [n, `${cls.label} (${cls.density} g/cm³)`] };
+  // označení JINÉ rozpoznané třídy (ČSN 11 423 = ocel, třída dokumentu nerez – `materiál nerez` po označení, nabídka Materiál
+  // v GUI): hustota podle třídy dokumentu odporuje označení v razítku – ⚠, nikdy tiše (vlna 22, bod 22g – kolo 7)
+  const ofCls = of ? MATERIALS.find((x) => x.id === of) : undefined;
+  if (ofCls) return { code: "material.class-conflict", args: [n, ofCls.label, cls.label, cls.density] };
+  return { code: "material.density-assumed", args: [n, cls.density, cls.label] };
 }
 
 /** dokument (díl) po zadání materiálu – prázdný text nebo popisek současné třídy = bez označení (pole GUI) */

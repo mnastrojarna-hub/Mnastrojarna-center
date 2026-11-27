@@ -5,7 +5,7 @@
  * průhlednost) a obraz softwarového náhledu dvou kvádrů v řezu.
  */
 import { describe, expect, it } from "vitest";
-import { assignCapPatterns, bodyOpacity, CAP_PATTERNS, capStyle, capStyles, capSummary, CLASH_HEX, onHatch, parseHex, softCapStyles, type CapInput } from "./section-cap";
+import { assignCapPatterns, bodyOpacity, CAP_PATTERNS, capStyle, capStyles, capSummary, CLASH_HEX, hatchWorld, onModelHatch, parseHex, softCapStyles, type CapInput } from "./section-cap";
 import { basisOf, fitCamera, softRender, VIEW_ANGLES, type RGB, type SoftCamera, type SoftItem } from "./soft-render";
 import type { Vec3 } from "./types";
 
@@ -78,22 +78,25 @@ describe("čelo řezu komponenty – rozhodnutí (section-cap)", () => {
     expect(capStyles([...ids, "k9"].map((id) => ({ id, color: "#b9c2cc" })), "shaded")[8]).not.toBeNull();
   });
 
-  it("softwarový náhled: tlumená komponenta (jen hrany) bez čela, ostatní neprůhledná", () => {
+  // kolo 7 (vědomá změna): softwarový náhled umí průhlednost – dřív tlumená komponenta bez čela a Průhledný neprůhledně
+  it("softwarový náhled: čela se stejnou průhledností jako 3D okno (tlumená 0,18, Průhledný 0,3)", () => {
     const st = softCapStyles([A, { id: "b", color: "#4678c8", dim: true }], "xray");
-    expect(st[0]!.opacity).toBe(1);
-    expect(st[1]).toBeNull();
+    expect(st[0]!.opacity).toBe(0.3);
+    expect(st[1]!.opacity).toBe(0.18);
+    expect(softCapStyles([A], "shadedEdges")[0]!.opacity).toBe(1);
   });
 
-  it("šrafy: čára, když (x·nx + y·ny) mod rozteč < tloušťka; měřítko pixelů", () => {
-    const h = capStyle(A, "shaded", 0)!.hatch; // 45°, rozteč 8
+  // kolo 7 (vědomá změna): šrafy vázané na model – dřív čára v pixelech obrazovky (x·nx + y·ny) mod rozteč
+  it("šrafy vázané na model: rozteč v mm z modulu scény, čára když zlomková část < tloušťka × |∇|", () => {
+    const h = capStyle(A, "shaded", 0, 0.25)!.hatch; // 45°, rozteč 8 × 0,25 mm
     expect(h.angle).toBe(45);
-    let on = 0;
-    for (let x = 0; x < 80; x++) if (onHatch(h, x + 0.5, 0.5)) on++;
-    expect(on).toBeGreaterThan(4);
-    expect(on).toBeLessThan(40);
-    let on2 = 0;
-    for (let x = 0; x < 80; x++) if (onHatch(h, x + 0.5, 0.5, 2)) on2++;
-    expect(Math.abs(on2 - on)).toBeLessThanOrEqual(3); // dvojnásobná rozteč i tloušťka → podobný podíl
+    expect(h.stepMm).toBe(2);
+    // rovina Y, komponenta v počátku: hodnota šraf roste o 1 na 2 mm kolmo k čarám
+    const { g } = hatchWorld(null, [0, 1, 0], 45, 2);
+    expect(Math.hypot(...g)).toBeCloseTo(0.5, 9);
+    expect(g[1]).toBeCloseTo(0, 12); // v rovině řezu (kolmo na normálu)
+    expect(onModelHatch(3.02, 0.1, 1)).toBe(true);
+    expect(onModelHatch(3.2, 0.1, 1)).toBe(false);
   });
 
   it("věta pro text `řez`: v drátovém zobrazení čela nejsou, bez komponent nic", () => {
@@ -133,12 +136,13 @@ const toScreen = (c: SoftCamera, p: Vec3): [number, number] => {
   return [Math.floor(W / 2 + c.scale * (c.right[0] * d[0] + c.right[1] * d[1] + c.right[2] * d[2])), Math.floor(H / 2 - c.scale * (c.up[0] * d[0] + c.up[1] * d[1] + c.up[2] * d[2]))];
 };
 /** položky sestavy se styly čel tak, jak je staví viewport-soft.tsx (sceneItems) */
-function asmItems(comps: (CapInput & { min: Vec3; max: Vec3 })[], display: "shadedEdges" | "hiddenLine" = "shadedEdges"): SoftItem[] {
-  const st = softCapStyles(comps, display);
+function asmItems(comps: (CapInput & { min: Vec3; max: Vec3 })[], display: "shadedEdges" | "hiddenLine" | "xray" = "shadedEdges", module?: number): SoftItem[] {
+  const st = softCapStyles(comps, display, module);
   return comps.map((c, i) => {
     const it = box(c.min, c.max, parseHex(c.color));
     const s = st[i];
-    return { ...it, wire: !!c.dim, capColor: s ? s.fill : null, capHatch: s ? { nx: s.hatch.nx, ny: s.hatch.ny, step: s.hatch.step, width: s.hatch.width, color: s.hatch.color } : null };
+    const op = bodyOpacity(c, display);
+    return { ...it, opacity: op < 1 ? op : null, capColor: s ? s.fill : null, capHatch: s ? { angle: s.hatch.angle, stepMm: s.hatch.stepMm, width: s.hatch.width, color: s.hatch.color } : null, capOutline: s ? s.outline : null };
   });
 }
 
@@ -175,17 +179,30 @@ describe("softwarový náhled – čela řezu komponent sestavy", () => {
     expect(styles[0]!.hex).not.toBe(styles[1]!.hex);
   });
 
-  it("šrafy v obraze přesně podle onHatch (stejný vzorec jako shader 3D okna, y nahoru), i s měřítkem pixelů", () => {
+  // kolo 7 (vědomá změna): očekávaný obraz šraf se počítá z bodu modelu v rovině řezu (hatchWorld), ne z pixelu obrazovky
+  it("šrafy v obraze přesně podle hatchWorld (bod čela v rovině řezu, stejný vzorec jako shader 3D okna), i s měřítkem pixelů", () => {
     for (const scale of [1, 2]) {
       const r = softRender({ width: W, height: H, items, camera, clip, edges: false, capScale: scale });
       const s = styles[0]!;
+      const { g, g0 } = hatchWorld(null, clip.normal, s.hatch.angle, s.hatch.stepMm);
+      // přední pohled, rovina y = 15: bod pixelu (x, y) = C + R·r + U·u s y = 15; |∇v| na pixel = |g| / měřítko
+      const fw = Math.hypot(g[0], g[2]) / camera.scale;
       const [cx, cy] = toScreen(camera, [20, 15, 10]);
+      let lines = 0;
       for (let y = cy - 10; y <= cy + 10; y++)
         for (let x = cx - 10; x <= cx + 10; x++) {
           const o = (y * W + x) * 4;
-          const want = onHatch(s.hatch, x + 0.5, H - y - 0.5, scale) ? s.hatch.color : s.fill;
+          const rr = (x + 0.5 - W / 2) / camera.scale, uu = -(y + 0.5 - H / 2) / camera.scale;
+          const P = [camera.center[0] + camera.right[0] * rr + camera.up[0] * uu, 15, camera.center[2] + camera.right[2] * rr + camera.up[2] * uu];
+          const v = g[0] * P[0] + g[1] * P[1] + g[2] * P[2] + g0;
+          const want = onModelHatch(v, fw, s.hatch.width * scale) ? s.hatch.color : s.fill;
+          if (want === s.hatch.color) lines++;
+          // hranice čáry (zaokrouhlení float32 v jednom pixelu) – tolerance jen na samotném rozhraní
+          const edgeV = v - Math.floor(v);
+          if (Math.abs(edgeV - s.hatch.width * scale * fw) < 1e-4 || edgeV < 1e-4 || edgeV > 1 - 1e-4) continue;
           expect([r.data[o], r.data[o + 1], r.data[o + 2]]).toEqual(want);
         }
+      expect(lines).toBeGreaterThan(10);
     }
   });
 
@@ -211,11 +228,14 @@ describe("softwarový náhled – čela řezu komponent sestavy", () => {
     expect(edgePx).toBe(0);
   });
 
-  it("tlumená komponenta (jen hrany) čelo nemá; díl bez barvy čela kreslí výchozí barvu řezu jako dřív", () => {
+  // kolo 7 (vědomá změna): tlumená komponenta je průhledná (0,18) i se svým čelem – dřív jen hrany a bez čela (alfa 0)
+  it("tlumená komponenta: průhledné těleso i čelo (alfa ≈ 0,18 nad pozadím); díl bez barvy čela kreslí výchozí barvu řezu jako dřív", () => {
     const dimItems = asmItems([comps[0], { ...comps[1], dim: true }]);
     const r = softRender({ width: W, height: H, items: dimItems, camera, clip, edges: false });
     const [bx, by] = toScreen(camera, [60, 15, 10]);
-    expect(r.data[(by * W + bx) * 4 + 3]).toBe(0);
+    const a = r.data[(by * W + bx) * 4 + 3];
+    expect(a).toBeGreaterThan(30);
+    expect(a).toBeLessThan(120);
     const part = box([0, 0, 0], [40, 30, 20], [185, 194, 204]);
     const pc = fitCamera([part], basisOf(VIEW_ANGLES.front), W, H);
     const rp = softRender({ width: W, height: H, items: [part], camera: pc, clip, edges: false });

@@ -253,6 +253,10 @@ export type CadDoc = {
   material: string;
   /** označení materiálu do razítka (volný text, např. „ČSN 11 423“, „1.0503“, „EN AW-6082“) – nezávislé na hustotě */
   materialName?: string;
+  /** kdo označení materiálu zapsal (vlna 23, R6 – agent = textová cesta v tomto běhu, loaded = ze souboru otevřeného z disku); chybí = ručně */
+  materialBy?: "agent" | "user" | "loaded";
+  /** kdo název dokumentu zapsal (vlna 23, D5 – název se tiskne v razítku): agent = textová cesta v tomto běhu, loaded = ze souboru; chybí = ručně */
+  nameBy?: "agent" | "user" | "loaded";
   features: Feature[];
   /** barva tělesa (#rrggbb) */
   color?: string;
@@ -279,6 +283,11 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /**
+   * neúspěšné a zrušené exporty dokumentu (vlna 22 kolo 7, bod 22h – cad/export-failures.ts): formát, soubor, fáze, ve které
+   * úloha skončila, chyba, revize modelu, čas. Soubor nevznikl – záznam není výstup (nikdy „odpovídá modelu“), jen trvalá stopa.
+   */
+  exportFailures?: ExportFailRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
   /**
@@ -469,7 +478,7 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * Uživatelská poznámka/kóta ve výkrese. Souřadnice jsou v souřadnicích promítnutého pohledu (`view` = klíč pohledu,
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
-export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** ručně umístěná vygenerovaná kóta / popis (odsazení, posun) – přegenerování po změně modelu polohu zachová (vlna 22, bod 17) */ placed?: "user"; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
+export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** ručně umístěná vygenerovaná kóta / popis (odsazení, posun) – přegenerování po změně modelu polohu zachová (vlna 22, bod 17) */ placed?: "user"; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits"; /** kdo značku zapsal (vlna 23, R6): "agent" = textová cesta (engine – jazyk mncad, CLI, HTTP, window.mncad.run, JSON / otevřít v běhu – přerazítkuje se vždy), "user" = GUI výkresu; chybí = starší dokument (počítá se jako ruční) */ by?: "agent" | "user" | "loaded"; /** poznámka s odkazem bez cíle v geometrii (volný bod / místo na listu) – počítá se do volného textu nad razítkem (R4) */ free?: boolean } & (
   | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean; /** kóta dvou bodů přichycených k vrcholům pohledu – po změně modelu se ověří, že tam vrcholy pořád jsou (cad/drawing-dim-attach.ts) */ geo?: boolean; /** souřadnicová kóta (ISO 129-1): `a` = počátek (základna), `b` = bod; kreslí se jen vynášecí čára z `b` a hodnota na jejím konci, `jog` = posun textu podél řady [mm listu] (cad/drawing-ordinate.ts) */ ord?: boolean; jog?: number }
   /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
   | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
@@ -508,7 +517,11 @@ export type DrawingDoc = {
  */
 export type FunctionalMark = {
   id: string;
-  kind: "functional" | "datum";
+  /**
+   * `note` = popis plochy v modelu (PMI, vlna 23 R2) – výkres ho kreslí odkazovou čarou se šipkou / tečkou na ploše;
+   * `treatment` = oblastní tepelná / povrchová úprava plochy (R3) – výkres ji kreslí tlustou čerchovanou čarou 04.2
+   */
+  kind: "functional" | "datum" | "note" | "treatment";
   label?: string;
   feature?: string;
   face?: { index: number; sig?: Sig };
@@ -519,6 +532,15 @@ export type FunctionalMark = {
    * po změně modelu se plocha nekontroluje (nezkontrolováno, označit znovu), ne podle starého snímku (vlna 22, bod 18 – kolo 3)
    */
   rev?: string;
+  /** text popisu (`note`) nebo předpis úpravy (`treatment`, např. „58+2 HRC“, „Eht 0,8“, „černit“) – krátký, jeden řádek */
+  text?: string;
+  /** druh oblastní úpravy (`treatment`): tepelná / povrchová */
+  what?: "heat" | "surface";
+  /** rozsah oblasti podél plochy v pohledu [mm modelu od začátku plochy] – chybí = celá plocha */
+  from?: number;
+  to?: number;
+  /** kdo popis / úpravu zapsal (vlna 23, R6): agent = textová cesta v tomto běhu (i JSON na řádku skriptu), loaded = ze souboru otevřeného z disku, user = GUI; chybí = ručně */
+  by?: "agent" | "user" | "loaded";
 };
 
 /** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
@@ -548,6 +570,8 @@ export type ExportRecord = {
    */
   job?: ExportJobRecord;
 };
+/** neúspěšný / zrušený export (bod 22h kolo 7): soubor nevznikl; `phase` = fáze úlohy, ve které skončila (model / convert / verify / write) */
+export type ExportFailRecord = { id: string; format: string; file?: string; state: "error" | "cancelled"; phase?: string; error: string; modelRev: string; at: string; ms?: number };
 /** záznam úlohy exportu v dokumentu (bod 22h): stav, čas, fáze a výsledek kontroly – zůstane s dokumentem i po zavření relace */
 export type ExportJobRecord = { id?: string; state?: string; ms?: number; phases?: { phase: string; ms: number }[]; check?: { ok: boolean; text: string } };
 

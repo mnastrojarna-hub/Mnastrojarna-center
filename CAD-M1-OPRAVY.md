@@ -82,6 +82,8 @@ cd website && npm run build:ftp
 
 Nahrát celou složku `out/` včetně skrytých souborů, hlavně `cad/share/index.php` a `cad/share/store.php`. Pak otevřít `https://www.mnastrojarna.cz/cad/share/?diag`: má ukázat `"php":"5.6.40"` a `"random":"openssl"`. Dnes (27. 11.) web vrací `php_too_old` ze starého zavaděče a má CLI 0.1.0-d0a2ff8b. Doporučení: přepnout hosting na PHP 8.x.
 
+**Pozor na dlouhé odkazy s heslem (bod 16, kolo 7):** nový kód vytváří šifrovaný dlouhý odkaz v novém tvaru `#s=1dpk.…` (kontrola úplnosti před daty). Stránka `www.mnastrojarna.cz/cad`, na které dnes běží starší kód, tento tvar nepřečte a ohlásí „není sdílený odkaz“. Takový odkaz proto funguje až po nasazení nového buildu; do té doby posílejte odkazy s heslem jen z nasazené verze (nebo krátký odkaz s kódem). Odkazy bez hesla (`#s=1d.…`) a starší odkazy s heslem (`#s=1dp.…`) se nemění a otevírají se v obou verzích.
+
 ## Jak ověřit znovu
 
 Vše z adresáře `website/`:

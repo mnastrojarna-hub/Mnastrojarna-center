@@ -17,7 +17,7 @@
  * `components/cad/agent-out-host.ts`.
  */
 import { cadLocale, tr } from "./i18n";
-import { EXACT_AUTO_FACES } from "./validity";
+import { EXACT_AUTO_FACES, EXPORT_VALID_FACES } from "./validity";
 import type { Vec3 } from "./types";
 import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
 import { partsText, solidVerdict, type SolidParts, type SolidStats } from "./solid-export";
@@ -421,7 +421,8 @@ export type ExportCheck = {
   volumeDiffPct: number;
   bboxDiff: number;
   solidsOk: boolean;
-  level?: "ok" | "warn" | "error";
+  /** "note" = soubor odpovídá modelu, ale jeho platnost se nekontrolovala vůbec (ploch nad mez) – ℹ, ne ✓ (22c kolo 7) */
+  level?: "ok" | "note" | "warn" | "error";
   code?: "out.no-solid" | "out.free-surfaces" | "out.check-failed" | "out.reload-invalid";
   /** která kontrola platnosti souboru proběhla (22a): přesná / jen rychlá / žádná */
   validCheck?: "exact" | "fast" | "none";
@@ -533,13 +534,17 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
       line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
     };
   // přesná kontrola souboru neproběhla: shoda v mírách ano, „věrná kopie“ ne – řádek řekne, co chybí (slabší tvrzení)
+  // platnost souboru nezkontrolovaná vůbec (ani rychle – ploch nad `EXPORT_VALID_FACES`): shoda v mírách platí, ale řádek je
+  // ℹ, ne ✓ (22c kolo 7 – dřív ✓ s chybnou větou „jen rychlou kontrolou“, ač neproběhla ani rychlá)
+  if (file.valid !== true) {
+    const why = file.faces !== undefined && file.faces > EXPORT_VALID_FACES ? tr("platnost souboru nezkontrolována ({0} ploch > {1}; přísný režim ji zkontroluje)", file.faces, EXPORT_VALID_FACES) : tr("platnost souboru nezkontrolována");
+    return { ...base, ok: true, level: "note", validCheck: "none", line: `ℹ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
+  }
   const why =
     file.validExact === null && file.faces !== undefined && file.faces > EXACT_AUTO_FACES
       ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla ({0} ploch > {1})", file.faces, EXACT_AUTO_FACES)
-      : file.valid === true
-        ? tr("platnost souboru jen rychlou kontrolou – přesná neproběhla")
-        : tr("platnost souboru nezkontrolována");
-  return { ...base, ok: true, level: "ok", validCheck: file.valid === true ? "fast" : "none", line: `✓ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
+      : tr("platnost souboru jen rychlou kontrolou – přesná neproběhla");
+  return { ...base, ok: true, level: "ok", validCheck: "fast", line: `✓ ${tr("kontrola {0}: {1} → odpovídá modelu; {2}", label, same, why)}` };
 }
 
 /** složení souboru / modelu pro `solidVerdict` */
@@ -617,9 +622,9 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     desc: tr("„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠"),
   },
   {
-    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše",
-    en: "exports [clear] · outputs [stale] · recompute all",
-    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen",
-    desc: tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)"),
+    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše · výkresy dílů [A4|A3|A2|A1|A0]",
+    en: "exports [clear] · outputs [stale] · recompute all · part drawings [A4|A3|A2|A1|A0]",
+    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen · teilezeichnungen [A4|A3|A2|A1|A0]",
+    desc: tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export); v sestavě založí list výkresu (Chytré kóty, výchozí A4) každému vyráběnému dílu otevřenému v záložce, který výkres nemá; díly s výkresem nemění, normálie a nakupované díly vynechá, díl mimo záložku jen vypíše s ⚠ – kopie v sestavě pak obnoví sestava obnovit vše; GUI: Kusovník → Výrobní dokumentace"),
   },
 ];

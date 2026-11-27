@@ -11,6 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
+import { freeTextLines, linesOf, NOTE_MAX_LINES, stampOrigin } from "@/cad/drawing-notes-rules";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, dimLabel, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { rebindDim, settleDim, userDimAttach } from "@/cad/drawing-dim-attach";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
@@ -386,7 +387,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   /** vydání aktivního listu (`výkres vydat`): písmeno revize + revize modelu + datum, krok historie */
   const issueNow = (rev?: string) => {
-    const r = issueSheet(doc, sheetDoc(), rev ? { rev } : {});
+    const r = issueSheet(doc, stampOrigin(saved, sheetDoc(), "user"), rev ? { rev } : {});
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = r.sheet;
     const m = r.sheet.meta as Partial<DrawingMeta>;
@@ -399,7 +400,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   const withdrawNow = () => {
     const next = sheets.length ? [...sheets] : [];
-    next[sheetIdx] = withdrawIssue(sheetDoc());
+    next[sheetIdx] = withdrawIssue(stampOrigin(saved, sheetDoc(), "user"));
     dirty.current = false;
     const out = withGroup(next);
     wrote.current = JSON.stringify(out);
@@ -409,7 +410,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const persistNow = () => {
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
-    next[sheetIdx] = sheetDoc();
+    // co člověk v GUI zapsal nebo změnil, nese razítko původu „user“ (vlna 23, R6 – pravidla textu pro agenty ho neomezují);
+    // text, který GUI jen přepočítalo / uložilo beze změny, si původ nechá (agent ho tím „člověkem“ neudělá)
+    next[sheetIdx] = stampOrigin(saved, sheetDoc(), "user");
     // krok Zpět jen za změnu uživatele; uložení nezměněného listu a samotné sloučení Chytrých kót po výpočtu listu (odvozená
     // data, ne úprava) se zapíšou bez kroku – jinak by Ctrl+Z hned po „+ Výkres“ vrátil jen sloučení kót, ne nový výkres
     const record = dirty.current && !autoOnly.current;
@@ -457,7 +460,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const addSheet = () => {
     if (!onDrawingsChange) return;
     const cur = sheets.length ? [...sheets] : [];
-    cur[sheetIdx] = sheetDoc();
+    cur[sheetIdx] = stampOrigin(saved, sheetDoc(), "user");
     const n = cur.length + 1;
     cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { ...inheritTitle(meta), name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance } as Record<string, unknown>, annotations: [] });
     dirty.current = false;
@@ -847,7 +850,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     }
     return best;
   };
-  const addAnn = (a: DrawingAnnotation) => {
+  const addAnn = (a0: DrawingAnnotation) => {
+    // poznámka / text z GUI = ruční (vlna 23, R6): pravidla poznámek pro agenty člověka neomezují, jen nenápadně radí
+    const a: DrawingAnnotation = a0.type === "note" || a0.type === "text" ? { ...a0, by: "user" } : a0;
     setAnn((list) => [...list, a]);
     markDirty();
     setAnnPts([]);
@@ -1597,8 +1602,17 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>
             <Row label={tr("Poznámka v patičce")}>
-              <TextInput value={meta.note ?? ""} onChange={(v) => setM({ note: v })} placeholder={tr("např. Nekótované rozměry dle 3D modelu (STEP)")} />
+              <TextInput value={meta.note ?? ""} onChange={(v) => setM({ note: v, noteBy: "user" })} placeholder={tr("např. Nekótované rozměry dle 3D modelu (STEP)")} />
             </Row>
+            {(() => {
+              // nenápadná rada (vlna 23, R6): člověk smí víc, agent ne – nad razítkem strojařsky nejvýš 5 krátkých řádků
+              const lines = linesOf(freeTextLines({ drawings: [{ id: "", name: "", options: {}, meta: meta as unknown as Record<string, unknown>, annotations: ann }] }, [0]));
+              return lines > NOTE_MAX_LINES ? (
+                <p className="-mt-0.5 mb-1 text-[10.5px] leading-snug text-ink-700/45" data-notes-hint={lines}>
+                  {tr("Rada: nad razítkem je {0} řádků textu – strojařsky stačí {1} krátkých; údaje (tepelné zpracování, tvrdost, povrch, hrany, tolerance, drsnost) patří do razítka, popis plochy k ploše odkazem.", lines, NOTE_MAX_LINES)}
+                </p>
+              ) : null;
+            })()}
             <p className="-mt-0.5 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">
               {tr("Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.")}{" "}
               {!meta.tolerance && !meta.edges && !meta.note && (
@@ -1884,10 +1898,10 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
   );
   return (
     <div className="fixed z-[60] w-72 space-y-2 rounded-lg border border-ink-700/15 bg-white p-3 shadow-2xl" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
-      {kind === "note" && field("text", tr("Text poznámky"), tr("např. Ostré hrany srazit 0,5×45°"))}
+      {kind === "note" && field("text", tr("Text poznámky"), tr("např. Brousit (krátký popis u plochy)"))}
       {kind === "text" && (
         <>
-          {field("text", tr("Text"), tr("např. Kalit 58 ± 2 HRC"))}
+          {field("text", tr("Text"), tr("např. Odmastit"))}
           {field("size", tr("Výška písma [mm]"))}
         </>
       )}

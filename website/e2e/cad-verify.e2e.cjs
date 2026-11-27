@@ -69,7 +69,7 @@ const has = (bin) => { try { execFileSync('which', [bin]); return true; } catch 
   await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http'); }, null, { timeout: 20000 });
   await dlg.getByRole('button', { name: '1 den', exact: true }).click();
   await dlg.getByLabel('Heslo k odkazu').fill('nda-2026');
-  await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && /#s=1dp\./.test(t.value); }, null, { timeout: 20000 });
+  await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && /#s=1dpk\./.test(t.value); }, null, { timeout: 20000 });
   const urlPw = await dlg.getByLabel('Sdílený odkaz').inputValue();
   await dlg.getByRole('button', { name: 'Zavřít', exact: true }).last().click();
   const ctx2 = await b.newContext({ viewport: { width: 1500, height: 900 } });

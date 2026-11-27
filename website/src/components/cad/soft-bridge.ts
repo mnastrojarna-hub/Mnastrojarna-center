@@ -6,11 +6,14 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { SoftViewName } from "@/cad/soft-render";
 import type { Vec3 } from "@/cad/types";
+import type { ProbeHit, ProbeQuery } from "@/cad/screen-probe";
 import type { BoxRect } from "@/cad/box-select";
 import type { SelItem } from "./selection";
 import type { Hint, NeutralCam, ViewportProps } from "./viewport";
 
 export type SoftViewHandle = {
+  /** testovací háček (bod 20, kolo 7 – cad/screen-probe.ts): kde klik vybere plochu / hranu / vrchol; null = není vidět */
+  screenOf?: (q: ProbeQuery) => ProbeHit | null;
   setView: (v: SoftViewName) => void;
   fit: () => void;
   /** snímek náhledu jako data URL (PNG) */

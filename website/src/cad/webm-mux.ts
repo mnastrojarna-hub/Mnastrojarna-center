@@ -6,7 +6,17 @@
  */
 
 export type WebmFrame = { data: Uint8Array; /** čas snímku [ms] */ time: number; key: boolean };
-export type WebmInput = { codec: "V_VP8" | "V_VP9"; width: number; height: number; fps: number; frames: WebmFrame[]; /** délka videa [ms] (výchozí počet snímků / fps) */ duration?: number; app?: string };
+export type WebmInput = {
+  codec: "V_VP8" | "V_VP9";
+  width: number;
+  height: number;
+  fps: number;
+  frames: WebmFrame[];
+  /** délka videa [ms] (výchozí počet snímků / fps) */ duration?: number;
+  app?: string;
+  /** značky souboru (Matroska Tags/SimpleTag – např. MODEL_REVISION = revize modelu studie; vlna 22 kolo 7, bod 12) */
+  tags?: Record<string, string>;
+};
 
 /* ───────────────────────── zápis ───────────────────────── */
 
@@ -44,6 +54,11 @@ const ID = {
   Cues: 0x1c53bb6b,
   SeekHead: 0x114d9b74,
   Tags: 0x1254c367,
+  Tag: 0x7373,
+  Targets: 0x63c0,
+  SimpleTag: 0x67c8,
+  TagName: 0x45a3,
+  TagString: 0x4487,
   Void: 0xec,
 } as const;
 
@@ -138,7 +153,54 @@ export function muxWebm(v: WebmInput): Uint8Array {
     blocks.push(simpleBlock(1, t - start, f.key, f.data));
   }
   flush();
-  return concat([header, master(ID.Segment, [info, tracks, ...clusters])]);
+  return concat([header, master(ID.Segment, [info, tracks, ...clusters, ...tagsNode(v.tags)])]);
+}
+
+/** element Tags (jedna značka pro celý segment – prázdné Targets) nebo nic */
+function tagsNode(tags: Record<string, string> | undefined): Node[] {
+  const list = Object.entries(tags ?? {}).filter(([k, v]) => k && v !== undefined);
+  if (!list.length) return [];
+  return [master(ID.Tags, [master(ID.Tag, [master(ID.Targets, []), ...list.map(([k, v]) => master(ID.SimpleTag, [str(ID.TagName, k), str(ID.TagString, v)]))])])];
+}
+
+/**
+ * Připíše značky do hotového souboru WebM (vlna 22 kolo 7, bod 12 – revize modelu ve videu pohybové studie): element Tags na
+ * konec segmentu, délka segmentu se přepíše. Segment neznámé délky (MediaRecorder) = Tags se jen připojí na konec. Snímky
+ * a časy se nemění (bajty clusterů zůstávají stejné).
+ */
+export function tagWebm(bytes: Uint8Array, tags: Record<string, string>): Uint8Array {
+  const add = tagsNode(tags);
+  if (!add.length) return bytes;
+  const readId = (o: number): number => {
+    const b = bytes[o];
+    return b >= 0x80 ? 1 : b >= 0x40 ? 2 : b >= 0x20 ? 3 : b >= 0x10 ? 4 : 0;
+  };
+  let o = 0;
+  while (o < bytes.length) {
+    const il = readId(o);
+    if (!il) throw new Error("WebM: neplatné ID na " + o);
+    let id = 0;
+    for (let i = 0; i < il; i++) id = id * 256 + bytes[o + i];
+    const b0 = bytes[o + il];
+    let sl = 1;
+    while (sl <= 8 && !(b0 & (0x80 >> (sl - 1)))) sl++;
+    if (sl > 8) throw new Error("WebM: neplatná délka na " + (o + il));
+    let size = b0 & (0xff >> sl);
+    let ones = size === 0xff >> sl;
+    for (let i = 1; i < sl; i++) {
+      size = size * 256 + bytes[o + il + i];
+      if (bytes[o + il + i] !== 0xff) ones = false;
+    }
+    const body = o + il + sl;
+    if (id === ID.Segment) {
+      if (ones) return concat([bytes, ...add]); // neznámá délka: segment sahá do konce souboru
+      const end = body + size;
+      return concat([bytes.subarray(0, o), master(ID.Segment, [bytes.subarray(body, end), ...add]), bytes.subarray(end)]);
+    }
+    if (ones) break;
+    o = body + size;
+  }
+  throw new Error("WebM: soubor nemá segment");
 }
 
 /* ───────────────────────── WebP → VP8 ───────────────────────── */
@@ -164,9 +226,9 @@ export function webpVp8(bytes: Uint8Array): Uint8Array | null {
 /* ───────────────────────── čtení ───────────────────────── */
 
 export type WebmBlock = { time: number; key: boolean; size: number; track: number; /** otisk dat bloku (FNV-1a) */ hash: string };
-export type WebmInfo = { docType: string; timecodeScale: number; /** délka z hlavičky [ms] (null = chybí) */ duration: number | null; codec: string; width: number; height: number; defaultDuration: number | null; blocks: WebmBlock[] };
+export type WebmInfo = { docType: string; timecodeScale: number; /** délka z hlavičky [ms] (null = chybí) */ duration: number | null; codec: string; width: number; height: number; defaultDuration: number | null; blocks: WebmBlock[]; /** značky souboru (SimpleTag název → text) */ tags: Record<string, string> };
 
-const MASTER = new Set<number>([ID.EBML, ID.Segment, ID.Info, ID.Tracks, ID.TrackEntry, ID.Video, ID.Cluster, ID.BlockGroup, ID.Cues, ID.SeekHead, ID.Tags]);
+const MASTER = new Set<number>([ID.EBML, ID.Segment, ID.Info, ID.Tracks, ID.TrackEntry, ID.Video, ID.Cluster, ID.BlockGroup, ID.Cues, ID.SeekHead, ID.Tags, ID.Tag, ID.Targets]);
 /** elementy, které ukončí cluster neznámé délky */
 const TOP = new Set<number>([ID.Cluster, ID.Cues, ID.Tags, ID.SeekHead, ID.Info, ID.Tracks]);
 
@@ -182,7 +244,7 @@ function fnv(b: Uint8Array, from: number, to: number): string {
 /** Přečte WebM / Matroska: hlavičku, stopu videa a všechny bloky (i z MediaRecorderu s neznámou délkou segmentu a clusterů). */
 export function readWebm(bytes: Uint8Array): WebmInfo {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const out: WebmInfo = { docType: "", timecodeScale: 1_000_000, duration: null, codec: "", width: 0, height: 0, defaultDuration: null, blocks: [] };
+  const out: WebmInfo = { docType: "", timecodeScale: 1_000_000, duration: null, codec: "", width: 0, height: 0, defaultDuration: null, blocks: [], tags: {} };
   const readId = (o: number): [number, number] => {
     const b = bytes[o];
     const len = b >= 0x80 ? 1 : b >= 0x40 ? 2 : b >= 0x20 ? 3 : b >= 0x10 ? 4 : 0;
@@ -218,7 +280,21 @@ export function readWebm(bytes: Uint8Array): WebmInfo {
       const [size, sl] = readSize(o + il);
       const body = o + il + sl;
       const end = size === null ? to : Math.min(to, body + size);
-      if (MASTER.has(id)) {
+      if (id === ID.SimpleTag) {
+        // značka: TagName + TagString (vnořené SimpleTag se nečtou)
+        let name = "";
+        let text = "";
+        for (let q = body; q < end; ) {
+          const [cid, cil] = readId(q);
+          const [cs, csl] = readSize(q + cil);
+          const cb = q + cil + csl;
+          const ce = cs === null ? end : Math.min(end, cb + cs);
+          if (cid === ID.TagName) name = new TextDecoder().decode(bytes.subarray(cb, ce));
+          else if (cid === ID.TagString) text = new TextDecoder().decode(bytes.subarray(cb, ce));
+          q = ce;
+        }
+        if (name) out.tags[name] = text;
+      } else if (MASTER.has(id)) {
         if (id === ID.Cluster) {
           const stop = walk(body, end, size === null);
           o = size === null ? stop : end;

@@ -58,6 +58,8 @@ import {
   type TabInfo,
 } from "./agent-asm";
 import { getLang, tr } from "./i18n";
+import { bomCellIssue, type BomField } from "./drawing-notes-rules";
+import { scopedError } from "./engine/codes";
 import { csvCaption, supplyWord } from "./bom-model";
 import { copyFieldsText, refreshPlan, staleCopies, staleCopyText, staleHints } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
@@ -97,6 +99,7 @@ import {
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type LostRef, type Mate, type MateRef, type Vec3 } from "./types";
 import { designationNote, withDesignation } from "./material-designation";
+import { materialClass } from "./agent-strict";
 import type { ClashDetail, ClashPair } from "./clash-class";
 import type { ClrReq, ClrRes } from "./clearance-types";
 import type { ProcReq, ProcRes } from "./process-types";
@@ -752,6 +755,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         log.push(componentLines(d).slice(1)[i].trim());
         return done(d, false);
       }
+      // vlna 23, kolo 5 (bypass-F6 / correct-F2): buňky kusovníku z textové cesty = text agenta – věta, pokyn nebo tepelné
+      // zpracování / tvrdost / povrch v materiálu = ✗ (sestava se nezmění); zapsané pole nese původ „agent“
+      const cells: [BomField, string | undefined][] = [["name", p.name], ["number", p.number], ["group", p.group], ["material", p.material], ["alias", p.alias], ["catalog", p.supply?.catalog], ["vendor", p.supply?.vendor], ["size", p.supply?.size], ["grade", p.supply?.grade]];
+      for (const [f, v] of cells) {
+        const bi = v ? bomCellIssue(f, v) : null;
+        if (bi) throw scopedError(bi.code, tr("komponenta „{0}“", c0.name), bi.text);
+      }
+      const textSet = cells.some(([, v]) => !!v?.trim());
       let doc = d;
       if (p.fixed === false) doc = releaseComponent(doc, c0.id); // uvolnit zruší i vazbu Ukotvit (jinak by komponentu dál držel řešič)
       let c: AsmComponent = { ...doc.components!.find((x) => x.id === c0.id)!, placement: { position: [...c0.placement.position] as Vec3, rotation: [...c0.placement.rotation] as Vec3 } };
@@ -760,6 +771,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       const matCodes: { code: string; args?: unknown[] }[] = [];
       /** řádek „→ … uložen jako označení“ místo ✓, je-li hustota komponenty jen předpoklad */
       let assumed: string | undefined;
+      /** označení komponenty, kterému zadaná třída hustoty odporuje (zůstává v razítku – ⚠) */
+      let classConflict: string | undefined;
       const moved = !!(p.at || p.move || p.rotation || p.turn);
       if (p.at) c.placement.position = [...p.at] as Vec3;
       if (p.move) c.placement.position = c.placement.position.map((v, k) => Math.round((v + p.move![k]) * 1e6) / 1e6) as Vec3;
@@ -803,13 +816,23 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           // jedno pravidlo s příkazem dílu `materiál …` a polem označení v GUI (material-designation.ts, vlna 22 kolo 6):
           // známá třída = hustota; označení s rozpoznanou třídou (ČSN 11 423 → ocel) nastaví i třídu – ℹ material.class;
           // jiné označení = do razítka a kusovníku, hustota zůstává jako PŘEDPOKLAD – ⚠ material.density-assumed (ne ✓)
-          const sd = withDesignation({ ...c.source.doc }, p.material);
+          // třída hustoty (`materiál "nerez"`) = jako příkaz dílu `materiál nerez` a nabídka Materiál v GUI: třída se změní, označení
+          // v razítku ZŮSTÁVÁ; odporuje-li mu (ČSN 11 423 = ocel, třída nerez) → „→“ + ⚠, ne ✓ (vlna 22 kolo 7 – dřív komponenta
+          // označení tiše smazala, díl ho nechal: dva výsledky téhož textu)
+          const sd = id ? { ...c.source.doc, material: id } : withDesignation({ ...c.source.doc }, p.material);
           c = { ...c, source: { kind: "part", doc: sd } };
+          const n = sd.materialName?.trim();
+          const of = n ? materialClass(n) : null;
           const note = designationNote(sd.materialName, sd.material);
-          if (note) matCodes.push({ code: note.code, args: note.args });
+          if (!id && note) matCodes.push({ code: note.code, args: note.args });
+          else if (id && note && of && of !== id) {
+            classConflict = n;
+            matCodes.push({ code: note.code, args: note.args });
+          }
         }
         const cls = MATERIALS.find((m) => m.id === (c.source.kind === "part" ? c.source.doc.material : id));
-        if (matCodes.some((x) => x.code === "material.density-assumed") && c.source.kind === "part") {
+        if (classConflict) assumed = tr("→ komponenta „{0}“: materiál = {1} ({2} g/cm³) · označení „{3}“ v razítku zůstává – patří jiné třídě", c0.name, cls?.label ?? "?", cls?.density ?? "?", classConflict);
+        else if (matCodes.some((x) => x.code === "material.density-assumed") && c.source.kind === "part") {
           // hustota je PŘEDPOKLAD → žádné ✓ pro materiál (jako příkaz dílu `materiál …` v engine/ops/meta.ts): vlastní řádek „→“
           // (ℹ msg.note) vedle ⚠ material.density-assumed; ostatní změny téhož příkazu (poloha, barva …) dál ✓ (vlna 22 kolo 6)
           assumed = tr("→ komponenta „{0}“: materiál „{1}“ uložen jako označení do razítka – třída se z něj nepoznala, hustota zůstává podle třídy „{2}“ ({3} g/cm³); pro jinou hustotu zadejte: materiál {4}", c0.name, c.source.doc.materialName ?? p.material, cls?.label ?? "?", cls?.density ?? "?", MATERIALS.map((x) => x.id).join("|"));
@@ -846,6 +869,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           what.push(tr("přezdívka „{0}“", c.alias));
         }
       }
+      if (textSet) (c as AsmComponent & { textBy?: string }).textBy = "agent";
       doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? c : x)) };
       let st: Record<string, MateStatus> | undefined;
       let movedOthers: string[] = [];

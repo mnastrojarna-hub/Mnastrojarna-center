@@ -219,6 +219,17 @@ describe("textové příkazy (CS / EN / DE)", () => {
     expect(parseOutLine(["přepočítat", "vše"])).toEqual({ kind: "recompute" });
     expect(parseOutLine(["export", "step"])).toEqual({ kind: "export", format: "step" }); // export dál beze změny
   });
+  it("výkresy dílů [A4…] (bod 19, kolo 7) – CS / EN / DE, formát, chybný zápis", () => {
+    expect(parseOutputsLine(["výkresy", "dílů"])).toEqual({ kind: "partDrawings" });
+    expect(parseOutputsLine(["výkresy", "dílů", "a3"])).toEqual({ kind: "partDrawings", format: "A3" });
+    expect(parseOutputsLine(["part", "drawings", "A2"])).toEqual({ kind: "partDrawings", format: "A2" });
+    expect(parseOutputsLine(["drawings", "parts"])).toEqual({ kind: "partDrawings" });
+    expect(parseOutputsLine(["teilezeichnungen", "A1"])).toEqual({ kind: "partDrawings", format: "A1" });
+    expect(parseOutputsLine(["zeichnungen", "teile"])).toEqual({ kind: "partDrawings" });
+    expect(() => parseOutputsLine(["výkresy", "dílů", "A7"])).toThrow(/výkresy dílů: neznámé „a7“/);
+    expect(parseOutputsLine(["výkresy"])).toBeNull(); // samotné „výkresy“ není tento příkaz
+    expect(parseOutLine(["výkresy", "dílů", "A3"])).toEqual({ kind: "partDrawings", format: "A3" });
+  });
 });
 
 describe("skript z dokumentu", () => {

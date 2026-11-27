@@ -220,13 +220,17 @@ function DeliveryStep({
           className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
           data-testid="confirmed-dl-optional-link"
         >
-          <FileUp className="h-3.5 w-3.5" /> Nahrát potvrzený DL (nepovinné)
+          <FileUp className="h-3.5 w-3.5" /> Nahrát podepsaný DL
         </button>
       ) : (
-        // potvrzený DL od zákazníka je nepovinný — fakturu jde vystavit hned po dodání
-        <div className="space-y-2 rounded-lg border border-dashed p-2.5" data-testid="confirmed-dl-optional">
+        // podepsaný DL od zákazníka (27. 11.): teprve s ním Dodáno zákazníkovi a faktura
+        <div
+          className={cn("space-y-2 rounded-lg border p-2.5", delivered === "all" ? "border-amber-300 bg-amber-50/70 dark:border-amber-500/40 dark:bg-amber-500/10" : "border-dashed")}
+          data-testid="confirmed-dl-optional"
+        >
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Potvrzený DL od zákazníka</span> · nepovinné — vyfoť nebo nahraj podepsaný dodací list.
+            <span className="font-medium text-foreground">Podepsaný dodací list od zákazníka</span> — vyfoť nebo nahraj ho, až se zboží předá.
+            {" "}Pak se zakázka přepne na <strong className="font-semibold text-foreground">Dodáno zákazníkovi</strong> a půjde fakturovat.
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[9.5rem] flex-1 sm:flex-none">
@@ -341,9 +345,9 @@ function InvoiceStep({
             <ReceiptText className="text-emerald-600" /> Vystavit fakturu
           </Button>
         ) : delivered === "part" ? (
-          <p className="text-xs text-muted-foreground">Fakturu vystavíš, až bude dodáno vše (dílčí faktura na část dodávky zatím nejde) — potvrzený DL není podmínka.</p>
+          <p className="text-xs text-muted-foreground">Fakturu vystavíš, až bude dodáno vše a zákazník podepíše dodací list (dílčí faktura na část dodávky zatím nejde).</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Fakturu vystavíš hned po dodání (dodací list) — potvrzený DL není podmínka.</p>
+          <p className="text-xs text-muted-foreground">Fakturu vystavíš po nahrání podepsaného dodacího listu — nebo dřív přes ⋯ „Fakturovat před dodáním…“.</p>
         )
       )}
       {!invoiced && !margins && <FinanceNote />}
@@ -483,10 +487,10 @@ export function ClosingCard({
   const delivered = deliveredOf(job, closing, flow?.snapshot?.delivery);
   const invoiced = Boolean((closing.invoiceNumber ?? "").trim() || closing.invoiceDate);
   const paid = Boolean(closing.paidAt);
-  // na řadě: po dodání faktura — potvrzený DL není podmínka; po faktuře platba
+  // na řadě: dodání → podepsaný DL → faktura (27. 11.); po faktuře platba
   const s1: StepState = delivered === "all" ? "done" : delivered === "part" ? "current" : "todo";
   // faktura je na řadě po dodání všeho (dílčí faktura na část dodávky zatím není)
-  const s2: StepState = invoiced ? "done" : delivered === "all" ? "current" : "todo";
+  const s2: StepState = invoiced ? "done" : flow?.menu.includes("payment.invoice") ? "current" : "todo";
   const s3: StepState = paid ? "done" : invoiced ? "current" : "todo";
   const done = [delivered === "all", invoiced, paid].filter(Boolean).length;
 
@@ -498,7 +502,7 @@ export function ClosingCard({
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold leading-tight">Dodání, faktura a platba</h3>
-          <p className="text-xs text-muted-foreground">dodací list → faktura → zaplaceno</p>
+          <p className="text-xs text-muted-foreground">dodací list → podepsaný DL → faktura → zaplaceno</p>
         </div>
         <span className="shrink-0 text-sm font-bold tabular-nums">{done}<span className="text-muted-foreground">/3</span></span>
       </header>

@@ -25,7 +25,7 @@ import { isFault, touchTol } from "@/cad/clash-rules";
 import { countClasses } from "@/cad/clash-class";
 import type { ClashState, ResultId } from "@/cad/engine/result-key";
 import { tr } from "@/cad/i18n";
-import type { CadDoc, ClashRule } from "@/cad/types";
+import type { CadDoc, ClashRule, Vec3 } from "@/cad/types";
 import { clashHeader, clashNote, clashTitleClasses, type ClashPanelEntry } from "./clash-view";
 import { FloatPanel } from "./ui";
 
@@ -43,8 +43,10 @@ export function ClashPanel({
   onRecheck,
   onClose,
   onSelect,
+  onFocus,
   onRules,
   onTol,
+  focused,
 }: {
   /** aktivní sestava (názvy komponent, pravidla kolizí) */
   doc: CadDoc;
@@ -60,10 +62,14 @@ export function ClashPanel({
   onRecheck: () => void;
   onClose: () => void;
   onSelect: (compId: string) => void;
+  /** přiblížit 3D okno na místo průniku (kolo 7, bod 5): střed a obálka průniku ve světových souřadnicích */
+  onFocus?: (at: Vec3, box?: [Vec3, Vec3]) => void;
   /** přidat pravidla / odebrat pravidlo (vlna 22, bod 5); bez obsluhy panel pravidla jen ukáže */
   onRules?: (add: ClashRuleDraft[], removeId?: string) => void;
   /** tolerance dotyku [mm] */
   onTol?: (mm: number) => void;
+  /** cíl kamery po posledním přiblížení na místo průniku („x;y;z“, z 3D okna – e2e) */
+  focused?: string;
 }) {
   const valid = state === "ok" || state === "clash";
   const n = entry?.res.length ?? 0;
@@ -94,6 +100,7 @@ export function ClashPanel({
         data-clash-work={counts?.work ?? undefined}
         data-clash-groups={valid ? groups.length : undefined}
         data-clash-hl={valid ? [...faultLeafIds(list)].sort().join(" ") : undefined}
+        data-clash-focused={focused || undefined}
       >
         {valid && entry && (
           <>
@@ -132,6 +139,7 @@ export function ClashPanel({
                     g={g}
                     doc={doc}
                     onSelect={onSelect}
+                    onFocus={onFocus}
                     ruleOpen={ruleFor === gi}
                     onRuleOpen={(v) => setRuleFor(v ? gi : null)}
                     onRules={onRules}
@@ -200,7 +208,7 @@ export function ClashPanel({
 }
 
 /** jedna skupina nálezů: dvojice (instance), objem, místo, důvod; u závady volba pravidla pracovního kontaktu / závitu */
-function GroupRow({ g, doc, onSelect, ruleOpen, onRuleOpen, onRules }: { g: ClashGroup; doc: CadDoc; onSelect: (compId: string) => void; ruleOpen: boolean; onRuleOpen: (v: boolean) => void; onRules?: (add: ClashRuleDraft[], removeId?: string) => void }) {
+function GroupRow({ g, doc, onSelect, onFocus, ruleOpen, onRuleOpen, onRules }: { g: ClashGroup; doc: CadDoc; onSelect: (compId: string) => void; onFocus?: (at: Vec3, box?: [Vec3, Vec3]) => void; ruleOpen: boolean; onRuleOpen: (v: boolean) => void; onRules?: (add: ClashRuleDraft[], removeId?: string) => void }) {
   const fault = isFault(g.cls);
   const first = g.items[0];
   const place = placeText(first);
@@ -208,7 +216,17 @@ function GroupRow({ g, doc, onSelect, ruleOpen, onRuleOpen, onRules }: { g: Clas
   const canThread = !!onRules && g.why === "no-thread-feature";
   return (
     <div data-clash-group data-clash-cls={g.cls} data-clash-n={g.items.length} className={`rounded px-1.5 py-1 text-[11.5px] ${fault ? "hover:bg-[#fde3e1]" : "hover:bg-[#f3f6f9]"}`}>
-      <button type="button" onClick={() => onSelect(first.aPath?.[0] ?? first.a)} className="block w-full text-left">
+      <button
+        type="button"
+        data-clash-at={first.at ? first.at.map((v) => Math.round(v * 1000) / 1000).join(";") : undefined}
+        title={first.at && onFocus ? tr("Vybrat a přiblížit na místo průniku") : undefined}
+        onClick={() => {
+          onSelect(first.aPath?.[0] ?? first.a);
+          // přiblížení na místo průniku (kolo 7, bod 5 – dřív klik jen vybral komponentu)
+          if (first.at && onFocus) onFocus(first.at, first.box);
+        }}
+        className="block w-full text-left"
+      >
         <span className="font-medium">
           {g.items.length > 1 ? `${g.items.length}× ` : ""}
           {groupPairText(g)}

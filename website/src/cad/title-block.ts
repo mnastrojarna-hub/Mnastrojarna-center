@@ -14,6 +14,11 @@
  * - `toolmaker` – nástrojářská (180 × 64): všechna pole (zákazník, projekt, polotovar, počet kusů, tepelné a povrchové
  *   zpracování, nepředepsané tolerance délek / úhlů / sražení, hrany, kreslil / kontroloval / schválil, list).
  * Pole, která šablona nemá, se vypíšou v patičce nad razítkem („Zákazník: …“) – nic se tiše neztratí.
+ *
+ * Technické údaje (vlna 23, R1 – „klíčové věci vždy v hlavičce“): tepelné zpracování, tvrdost, povrchová úprava, hrany
+ * ISO 13715, nepředepsané tolerance (i úhlů / sražení) a obecná drsnost jsou VŽDY v buňkách razítka, nikdy jako text nad
+ * ním. Šablony ISO 7200 a kompaktní, které pro ně buňky nemají, dostanou nad sebou technický pás razítka (řádek buněk
+ * 180 × 10 mm, jen vyplněná pole) – razítko je pak o 10 mm vyšší; nástrojářská šablona má buňky pro všechna.
  */
 import { cadLocale, tr } from "./i18n";
 import type { DText, DrawingMeta, Poly, RevisionItem } from "./drawing";
@@ -52,7 +57,7 @@ export type GeneralTol =
 /** Pole razítka (klíč v `DrawingDoc.meta` / DrawingMeta). */
 export type TitleFieldKey =
   | "name" | "number" | "author" | "checkedBy" | "approvedBy" | "revision" | "date" | "material" | "stock" | "quantity"
-  | "heatTreatment" | "surfaceTreatment" | "tolerance" | "angleTol" | "chamferTol" | "edges" | "customer" | "project"
+  | "heatTreatment" | "hardness" | "surfaceTreatment" | "tolerance" | "angleTol" | "chamferTol" | "edges" | "roughness" | "customer" | "project"
   | "company" | "note";
 
 /** Buňka šablony: pole razítka nebo údaj listu (firma / logo, promítání, měřítko, formát, hmotnost, list). */
@@ -148,12 +153,14 @@ const TEMPLATES: Record<TitleTemplate, TemplateDef> = {
       T("material", 45, 22, 50, 10),
       T("stock", 95, 22, 50, 10),
       T("quantity", 145, 22, 35, 10, 3.2, true),
-      T("heatTreatment", 45, 32, 67.5, 10),
-      T("surfaceTreatment", 112.5, 32, 67.5, 10),
-      T("tolerance", 45, 42, 55, 12),
-      T("angleTol", 100, 42, 27, 12),
-      T("chamferTol", 127, 42, 27, 12),
-      T("edges", 154, 42, 26, 12),
+      T("heatTreatment", 45, 32, 50, 10),
+      T("hardness", 95, 32, 30, 10),
+      T("surfaceTreatment", 125, 32, 55, 10),
+      T("tolerance", 45, 42, 42, 12),
+      T("angleTol", 87, 42, 22, 12),
+      T("chamferTol", 109, 42, 22, 12),
+      T("edges", 131, 42, 27, 12),
+      T("roughness", 158, 42, 22, 12),
       T("author", 45, 54, 34, 10),
       T("checkedBy", 79, 54, 34, 10),
       T("approvedBy", 113, 54, 34, 10),
@@ -164,13 +171,42 @@ const TEMPLATES: Record<TitleTemplate, TemplateDef> = {
 
 /** šablona razítka listu (neznámá / chybějící = výchozí ISO 7200) */
 export const titleTemplateOf = (meta: Pick<DrawingMeta, "template"> | undefined): TitleTemplate => (meta?.template && meta.template in TEMPLATES ? meta.template : "iso7200");
-/** rozměr razítka listu [mm] podle šablony */
-export const titleBlockSize = (meta: Pick<DrawingMeta, "template"> | undefined): { w: number; h: number } => {
-  const t = TEMPLATES[titleTemplateOf(meta)];
+
+/** technické údaje razítka (R1): pořadí a poměr šířky buněk technického pásu */
+export const TECH_KEYS = ["heatTreatment", "hardness", "surfaceTreatment", "edges", "tolerance", "angleTol", "chamferTol", "roughness"] as const;
+const TECH_WEIGHT: Record<(typeof TECH_KEYS)[number], number> = { heatTreatment: 1.25, hardness: 0.85, surfaceTreatment: 1.1, edges: 1.05, tolerance: 1.3, angleTol: 0.75, chamferTol: 0.75, roughness: 0.85 };
+/** výška technického pásu razítka [mm] */
+export const TECH_ROW_H = 10;
+type TechMeta = Partial<Pick<DrawingMeta, "template" | "heatTreatment" | "hardness" | "surfaceTreatment" | "edges" | "tolerance" | "tolTable" | "angleTol" | "chamferTol" | "roughness">>;
+/** vyplněná technická pole, která šablona v buňkách nemá (ta dostanou technický pás) */
+export function techStripKeys(meta: TechMeta | undefined): string[] {
+  const def = TEMPLATES[titleTemplateOf(meta)];
+  const has = new Set(def.cells.map((c) => c.k as string));
+  const m = (meta ?? {}) as Record<string, unknown>;
+  return TECH_KEYS.filter((k) => !has.has(k) && (k === "tolerance" ? !!(m.tolTable as string[] | undefined)?.length || (typeof m.tolerance === "string" && !!m.tolerance.trim()) : typeof m[k] === "string" && !!(m[k] as string).trim()));
+}
+/** šablona listu včetně technického pásu (R1): buňky technických polí nad buňkami šablony */
+function effectiveTemplate(meta: TechMeta | undefined): TemplateDef {
+  const def = TEMPLATES[titleTemplateOf(meta)];
+  const keys = techStripKeys(meta);
+  if (!keys.length) return def;
+  const sum = keys.reduce((a, k) => a + TECH_WEIGHT[k as (typeof TECH_KEYS)[number]], 0);
+  let x = 0;
+  const strip = keys.map((k, i) => {
+    const w = i === keys.length - 1 ? def.w - x : Math.round((def.w * TECH_WEIGHT[k as (typeof TECH_KEYS)[number]]) / sum * 2) / 2;
+    const c = T(k as CellKey, x, 0, w, TECH_ROW_H, 2.6);
+    x += w;
+    return c;
+  });
+  return { w: def.w, h: def.h + TECH_ROW_H, cells: [...strip, ...def.cells.map((c) => ({ ...c, y: c.y + TECH_ROW_H }))] };
+}
+/** rozměr razítka listu [mm] podle šablony (s technickým pásem, když má list technické údaje mimo buňky šablony) */
+export const titleBlockSize = (meta: TechMeta | undefined): { w: number; h: number } => {
+  const t = effectiveTemplate(meta);
   return { w: t.w, h: t.h };
 };
-/** pole, která šablona zobrazuje v buňkách (ostatní jdou do patičky) */
-export const templateKeys = (t: TitleTemplate): string[] => TEMPLATES[t].cells.map((c) => c.k);
+/** pole, která šablona zobrazuje v buňkách (ostatní jdou do patičky); s `meta` včetně technického pásu */
+export const templateKeys = (t: TitleTemplate, meta?: TechMeta): string[] => (meta ? effectiveTemplate({ ...meta, template: t }) : TEMPLATES[t]).cells.map((c) => c.k);
 
 /** název šablony pro protokol a UI */
 export const templateLabel = (t: TitleTemplate): string => (t === "compact" ? tr("kompaktní") : t === "toolmaker" ? tr("nástrojářská (všechna pole)") : tr("ISO 7200 (výchozí)"));
@@ -407,6 +443,8 @@ export function fieldLabel(k: string): string {
     case "stock": return tr("Polotovar");
     case "quantity": return tr("Počet kusů");
     case "heatTreatment": return tr("Tepelné zpracování");
+    case "hardness": return tr("Tvrdost");
+    case "roughness": return tr("Obecná drsnost");
     case "surfaceTreatment": return tr("Povrchová úprava");
     case "tolerance": return tr("Nepředepsané tolerance");
     case "angleTol": return tr("Tolerance úhlů");
@@ -459,7 +497,8 @@ export function fieldValue(k: string, meta: DrawingMeta, ctx: TitleCtx): string 
 }
 
 /** pole, která se do patičky vypíšou, když je šablona nemá (pořadí = pořadí v patičce) */
-const FOOTER_EXTRA: string[] = ["customer", "project", "quantity", "stock", "heatTreatment", "surfaceTreatment", "angleTol", "chamferTol", "checkedBy", "approvedBy", "mass"];
+/** (technické údaje – tepelné zpracování, tvrdost, povrch, hrany, tolerance, drsnost – do patičky nikdy: mají buňky, R1) */
+const FOOTER_EXTRA: string[] = ["customer", "project", "quantity", "stock", "checkedBy", "approvedBy", "mass"];
 
 // ---------------------------------------------------------------- vykreslení
 
@@ -514,7 +553,7 @@ export type TitleDrawArgs = {
 export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
   const { meta, polys, texts, ctx } = a;
   const tpl = titleTemplateOf(meta);
-  const def = TEMPLATES[tpl];
+  const def = effectiveTemplate(meta);
   const x = a.W - a.margin - def.w;
   const y = a.H - a.margin - def.h;
   const fields: TitleFieldFit[] = [];
@@ -563,6 +602,24 @@ export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
     }
     const value = fieldValue(c.k, meta, ctx);
     if (!value) continue;
+    if (c.k === "roughness") {
+      // obecná drsnost ISO 1302: značka + hodnota a v závorce značka („ostatní plochy“)
+      const sz = Math.min(c.size ?? 3.2, (c.h - 5.2) * 0.9);
+      const base = cy + c.h - 2.2;
+      let tx = cx + 1.5;
+      tx += roughSymbol(polys, tx, base, sz) + 0.6;
+      const vw = textWidth(value, sz);
+      const room = c.w - 3 - (tx - cx - 1.5) - textWidth(" ()", sz) - sz * 1.3;
+      const vs = vw > room && room > 0 ? Math.max(FIT_FLOOR, (sz * room) / vw) : sz;
+      Tx(tx, base, value, vs);
+      tx += textWidth(value, vs) + 0.6;
+      Tx(tx, base, "(", vs);
+      tx += textWidth("(", vs) + 0.2;
+      tx += roughSymbol(polys, tx, base, vs * 0.8) + 0.2;
+      Tx(tx, base, ")", vs);
+      fields.push({ key: c.k, label: fieldLabel(c.k), value, size: round2(vs), lines: 1, shrunk: vs < sz - 1e-9, small: vs < FIT_MIN, where: "cell", cell: { x: cx, y: cy, w: c.w, h: c.h }, rows: [value] });
+      continue;
+    }
     const nominal = c.size ?? 3.2;
     const bold = !!c.bold;
     const f = fitText(value, c.w - 3, c.h - 5.2, nominal, bold);
@@ -572,7 +629,8 @@ export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
     f.lines.forEach((l, i) => Tx(cx + 1.5, base0 + i * 1.2 * f.size, l, f.size, bold));
     fields.push({ key: c.k, label: fieldLabel(c.k), value, size: round2(f.size), lines: n, shrunk: f.shrunk, small: f.small, where: "cell", cell: { x: cx, y: cy, w: c.w, h: c.h }, rows: f.lines });
   }
-  // patička nad razítkem a tabulkami: rozměry v mm, nepředepsané tolerance, hrany, pole mimo šablonu; poznámka a list
+  // patička nad razítkem a tabulkami: rozměry v mm, pole mimo šablonu (ne technické údaje – ty mají buňky), legenda
+  // oblastních úprav (R3), poznámka a list
   const keys = new Set(def.cells.map((c) => c.k as string));
   const req: string[] = [tr("Rozměry v mm")];
   if (!keys.has("tolerance") && g) req.push(tr("Nepředepsané tolerance {0}", generalTolText(g)));
@@ -587,10 +645,11 @@ export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
     req.push(`${fieldLabel(k)}: ${v}`);
     fields.push({ key: k, label: fieldLabel(k), value: v, size: 2.5, lines: 1, shrunk: false, small: false, where: "footer" });
   }
-  req.push(...(meta.formNotes ?? []));
+  // poznámky k plechu (křížový zlom) jedním řádkem
+  if (meta.formNotes?.length) req.push(meta.formNotes.join(", "));
   // revize modelu, ze které list vznikl (vlna 22, bod 20) – na konci řádku poznámky a čísla listu
   const noteRow = [meta.note?.trim() ?? "", keys.has("sheet") ? "" : tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1), meta.modelRev ? tr("Model {0}", meta.modelRev) : ""].filter(Boolean);
-  const footer = footerLines([req.join(" · "), noteRow.join(" · ")].filter(Boolean), def.w);
+  const footer = footerLines([req.join(" · "), ...(meta.zoneLegend ?? []), noteRow.join(" · ")].filter(Boolean), def.w);
   const ny = y - a.above;
   footer.lines.forEach((l, i) => Tx(x, ny - 1.8 - (footer.lines.length - 1 - i) * footer.pitch, l, footer.size));
   return {
@@ -609,6 +668,16 @@ export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Značka drsnosti ISO 1302 (základní, s požadavkem odebrání materiálu) na účaří `y`; vrací šířku [mm]. */
+function roughSymbol(polys: Poly[], x: number, y: number, h: number): number {
+  const k = h / 3.2;
+  const a: Vec2 = [x, y - 1.6 * k];
+  const b: Vec2 = [x + 0.95 * k, y];
+  const c: Vec2 = [x + 2.85 * k, y - 3.3 * k];
+  polys.push({ layer: "title", pts: [a, b, c, [x + 4.2 * k, y - 3.3 * k]] }, { layer: "title", pts: [a, [x + 1.9 * k, y - 1.6 * k]] });
+  return 4.2 * k;
+}
 
 /** Řádky patičky: každý řádek se vejde do šířky razítka (zmenšení do 1,8 mm, zalomení), nejvýš 4 řádky do 11,5 mm. */
 function footerLines(rows: string[], w: number): { lines: string[]; size: number; pitch: number } {
@@ -694,7 +763,7 @@ export function nearestAci(hex: string): number {
 // ---------------------------------------------------------------- nový list a výpis
 
 /** údaje razítka, které nový list převezme z aktivního (šablona, logo, firma, zákazník, projekt, schválil …) */
-export const INHERITED_TITLE: (keyof DrawingMeta)[] = ["name", "number", "author", "revision", "date", "tolerance", "tolTable", "template", "logo", "company", "customer", "project", "checkedBy", "approvedBy", "quantity", "stock", "heatTreatment", "surfaceTreatment", "angleTol", "chamferTol", "edges"];
+export const INHERITED_TITLE: (keyof DrawingMeta)[] = ["name", "number", "author", "revision", "date", "tolerance", "tolTable", "template", "logo", "company", "customer", "project", "checkedBy", "approvedBy", "quantity", "stock", "heatTreatment", "hardness", "surfaceTreatment", "angleTol", "chamferTol", "edges", "roughness"];
 export function inheritTitle(cur: Partial<DrawingMeta>): Partial<DrawingMeta> {
   const out: Record<string, unknown> = {};
   for (const k of INHERITED_TITLE) if (cur[k] !== undefined) out[k] = cur[k];

@@ -13,6 +13,7 @@ import type { CadDoc, PlaneName, Vec2, Vec3 } from "./types";
 import { auxView, booleanEach, brkInView, breakDir, breakLines, brokenOut, clipBreaks, compress1, compressQ, cutSection, decompress1, decompressQ, normBrks, pickParent, type AuxViewOpt, type Brk, type BrokenOutOpt, type CutSectionOpt, type ExtraViewData, type FaceLoops, type ViewBreakOpt } from "./drawing-views";
 import { fitOfSuffix, fitRows, fitSuffix, type FitShow } from "./drawing-fits";
 import { weldSymbolsOnSheet, type WeldMark } from "./drawing-welds";
+import { zoneLegendOf } from "./pmi-marks";
 import { absoluteSection, sectionCoord, sectionMiss, sectionOffsetRange } from "./drawing-section";
 import type { DrawingIssue } from "./drawing-issues";
 import { holeTableColumns, holeTableCounts, holeTableRows } from "./drawing-holetable";
@@ -25,7 +26,8 @@ import { layoutBalloons, type BView } from "./drawing-balloons";
 
 // ---------------------------------------------------------------- typy
 
-export type Layer = "visible" | "hidden" | "center" | "cut" | "dim" | "hatch" | "frame" | "thin" | "title";
+/** `chain` = tlustá čerchovaná čára ISO 128-2 typ 04.2 (oblastní tepelná / povrchová úprava – vlna 23, R3) */
+export type Layer = "visible" | "hidden" | "center" | "cut" | "dim" | "hatch" | "frame" | "thin" | "title" | "chain";
 /** `img` = obrázek na listu (logo v razítku): `pts` je jeho obdélník; SVG / PDF vloží bitmapu, DXF / DWG obrys (title-block.ts) */
 export type Poly = { pts: Vec2[]; layer: Layer; fill?: boolean; width?: number; img?: SheetImage };
 export type DText = {
@@ -53,6 +55,16 @@ export type DrawingMeta = {
   tolerance?: string;
   /** poznámka v patičce (např. „Nekótované rozměry dle 3D modelu (STEP)“); prázdné = nic – nedoplňuje se automaticky */
   note?: string;
+  /** kdo poznámku zapsal (vlna 23, R6): agent = textová cesta, user = GUI; chybí = starší dokument (ručně) */
+  noteBy?: "agent" | "user" | "loaded";
+  /** tvrdost (např. „58–60 HRC“) – buňka razítka (R1) */
+  hardness?: string;
+  /** obecná drsnost (např. „Ra 3,2“) – buňka razítka se značkou ISO 1302 (R1) */
+  roughness?: string;
+  /** popisy ploch a oblastní úpravy z modelu (PMI – `doc.functional` druhu note / treatment, vlna 23 R2, R3); doplní jádro */
+  pmi?: PmiMark[];
+  /** legenda oblastních úprav („Z1 tepelná: 58+2 HRC“) v patičce – řádky se počítají do limitu poznámek (R4) */
+  zoneLegend?: string[];
   /** opracování hran (např. „srazit 0,5×45°“); prázdné = neuvádí se */
   edges?: string;
   /** závitové díry: poloměr jádrového vrtání → popis (např. „M6 hl. 12“) – místo Ø jádra se kótuje označení závitu */
@@ -103,6 +115,12 @@ export type DrawingMeta = {
   /** zjednodušené pružiny (ISO 2162-1) – osy drátu v pohledech (drawing-doc.ts `springMarksOf`, doplní jádro) */
   springs?: SpringMark[];
 };
+
+/**
+ * Popis plochy / oblastní úprava z modelu pro výkres (vlna 23, R2 / R3): plocha `face` (index od 0), snímek geometrie
+ * z doby označení (kontrola, že index pořád ukazuje na tutéž plochu), text, u úpravy druh, rozsah a značka „Z1“.
+ */
+export type PmiMark = { id: string; kind: "note" | "treatment"; face: number; text: string; geom?: { t: "plane"; n: Vec3; c: Vec3 } | { t: "cyl"; axis: Vec3; c: Vec3; r: number } | { t: "other"; c: Vec3 }; what?: "heat" | "surface"; from?: number; to?: number; ref?: string };
 
 /** pozice sestavy: číslo, název, obálka všech výskytů a (vlna 22, bod 17) obálky jednotlivých výskytů – kotva odkazu na prvním */
 export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3]; boxes?: [Vec3, Vec3][] };
@@ -279,6 +297,12 @@ export type DrawingResult = {
   issues?: DrawingIssue[];
   /** řádky tabulky děr (je-li zapnutá) */
   holes?: HoleRow[];
+  /**
+   * popisy ploch a oblastní úpravy z modelu na listu (vlna 23, R2 / R3): `ok` = nakresleno v pohledu `view` (šipka na hranu,
+   * tečka na ploše, tlustá čerchovaná čára), `lost` = plocha modelu se změnila (index neukazuje na tutéž plochu – nekreslí
+   * se), `unplaced` = žádný pohled plochu neukazuje vhodně (úprava potřebuje plochu z boku)
+   */
+  pmi?: { id: string; kind: "note" | "treatment"; state: "ok" | "lost" | "unplaced"; view?: string; how?: "arrow" | "dot" | "chain"; ref?: string; text: string; face: number; /** rozsah úpravy přesahuje plochu (délka plochy v pohledu) – na listu oříznut */ range?: { len: number; from: number; to: number } }[];
   /** tabulka děr: pohled, ze kterého jsou díry (s osou ve směru pohledu), a díry s jinou osou, které v ní nejsou (průměr, osa) */
   holeTableInfo?: { view: string; other: { d: number; axis: string }[] };
   /** počet tabulek údajů pružin na listu (volba springTable) */
@@ -1136,7 +1160,8 @@ function sectionCam(plane: PlaneName, rot: ViewRotation): Cam {
 /** dělicí přímka polovičního řezu v obraze (osa souměrnosti): `axis` 0 = svislá přímka u = c, 1 = vodorovná v = c */
 type SplitLine = { axis: 0 | 1; c: number };
 /** `loops` = obrysy řezných ploch po plochách (šrafují se po plochách – překrývající se tělesa se navzájem nevyruší) */
-type SectionData = { view: View; loops: FaceLoops; split?: SplitLine };
+/** `loopSolid[i]` = pořadí tělesa (komponenty sestavy) řezné plochy `loops[i]` – šrafy sousedních komponent se liší (kolo 7) */
+type SectionData = { view: View; loops: FaceLoops; split?: SplitLine; loopSolid?: number[] };
 
 /** Osy, na kterých leží 3 a více různých průměrů (soustružený díl): směr, bod osy nejblíž počátku a počet kružnic. */
 function turnedAxes(circles: Circle[]): { a: Vec3; base: Vec3; n: number }[] {
@@ -1215,9 +1240,19 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
     view.ents = view.ents.filter((e) => !(e.t === "line" && onLine(e.a, line) && onLine(e.b, line)));
   }
   const loops: FaceLoops = [];
+  const loopSolid: number[] = [];
   const tol = Math.max(1e-4, pad * 1e-6);
   let cutFaces = 0;
-  for (const f of cut.faces) {
+  // po tělesech (kolo 7): u sestavy dostane každá komponenta vlastní vzor šraf (ISO 128-50 – sousední díly se liší)
+  let solids: r.Shape3D[] = [];
+  try {
+    solids = ((cut as unknown as { solids?: r.Shape3D[] }).solids ?? []) as r.Shape3D[];
+  } catch {
+    solids = [];
+  }
+  const groups: [Iterable<r.Face>, number][] = solids.length > 1 ? solids.map((sd, k) => [sd.faces, k] as [Iterable<r.Face>, number]) : [[cut.faces, 0]];
+  for (const [faces, solidK] of groups)
+  for (const f of faces) {
     try {
       if (f.geomType !== "PLANE") continue;
       const c = V(f.center);
@@ -1233,13 +1268,16 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
         face.push(pts);
       }
       if (springs.length && inSpringEnvelope(face.flat(), springs, tol * 10)) continue; // řez obalem pružiny: bez šraf
-      if (face.length) loops.push(face.map((pts) => pts.map((q) => proj(cam, q))));
+      if (face.length) {
+        loops.push(face.map((pts) => pts.map((q) => proj(cam, q))));
+        loopSolid.push(solidK);
+      }
     } catch {
       /* plocha bez geometrie */
     }
   }
   if (!cutFaces) return null;
-  return { view, loops, split };
+  return { view, loops, split, loopSolid };
 }
 
 const onLine = (p: Vec2, l: SplitLine, tol = 1e-4) => Math.abs(p[l.axis] - l.c) < tol;
@@ -1703,14 +1741,29 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       const ext = boundsOf(feet);
       let fits = ext.w <= area.w + 1e-6 && ext.h <= area.h + 1e-6;
       let off: Vec2 = [area.x - ext.x, area.y - ext.y];
+      // kolo 3 (D6): místo pro kóty se zmenšilo jen kvůli výšce (vyšší razítko s technickým pásem) – vodorovně, kde místo je,
+      // se mřížka posune o chybějící rezervu (kóty vlevo od pohledů jinak přetínaly rám: korpus 79 „20“ / „60“)
+      if (fits && room < ROOM) {
+        // posun nejvýš na střed volného místa a ne pod tabulku revizí / jiné pevné tabulky ve výšce mřížky
+        let shift = Math.max(0, area.w - ext.w) / 2;
+        const top = ext.y + off[1];
+        for (const q of fixed) if (q.y < top + ext.h && q.y + q.h > top) shift = Math.min(shift, q.x - 3 - (ext.x + off[0] + ext.w));
+        if (shift > 0) off[0] += shift;
+      }
       let beside = false;
       if (!fits && ext.w <= frame.w + 1e-6 && ext.h <= frame.h + 1e-6) {
         // Pás nad razítkem nestačí (vysoké razítko – nástrojářská šablona 180×64, tabulky): než se zmenší měřítko, mřížka se
         // posune kamkoli do rámu, kde žádný její okraj pro kóty nezasáhne razítko ani tabulky – vedle razítka, nad ním (vlna 22,
         // bod 19, kolo 6: dřív jen vlevo nahoře a jen u Chytrých kót → ISO 7200 1:1, nástrojářská šablona 1:2). Polohy přisazené
         // k rámu a k hranám razítka / tabulek; přednost má poloha nejvýš vlevo.
-        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w]);
-        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h]);
+        // vlna 23: přisazení k rámu nechá před rámem rezervu EDGE (vícenásobné Chytré kóty sahají dál než DIM_ROOM – vyšší
+        // razítko s technickým pásem jinak posunulo pohled až k rámu a kóta ho přetínala); bez rezervy jen, když jinak nevyjde
+        // kolo 3 (D6): rezerva 12 mm, když se vejde (kóty Chytrých kót ve více řadách – korpus 79: svislá „20“ / „60“ přetínala
+        // rám i s rezervou 6), jinak 6 mm, jinak bez rezervy
+        const EDGE = 6;
+        const EDGE2 = 12;
+        const sxs = new Set<number>([frame.x - ext.x, frame.x + frame.w - ext.x - ext.w, frame.x + EDGE - ext.x, frame.x + frame.w - EDGE - ext.x - ext.w, frame.x + EDGE2 - ext.x, frame.x + frame.w - EDGE2 - ext.x - ext.w]);
+        const sys = new Set<number>([frame.y - ext.y, frame.y + frame.h - ext.y - ext.h, frame.y + EDGE - ext.y, frame.y + frame.h - EDGE - ext.y - ext.h, frame.y + EDGE2 - ext.y, frame.y + frame.h - EDGE2 - ext.y - ext.h]);
         for (const q of fixed)
           for (const f of feet) {
             sxs.add(q.x - f.x - f.w);
@@ -1723,7 +1776,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
           for (const dy of sys) {
             if (!inside({ x: ext.x + dx, y: ext.y + dy, w: ext.w, h: ext.h }, frame)) continue;
             if (feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)))) continue;
-            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y);
+            // rezerva zvlášť vodorovně a svisle (svislá rezerva nad vysokým razítkem často nejde – vodorovná ano)
+            const cx = Math.min(ext.x + dx - frame.x, frame.x + frame.w - ext.x - dx - ext.w);
+            const cy = Math.min(ext.y + dy - frame.y, frame.y + frame.h - ext.y - dy - ext.h);
+            const pen = (c: number) => (c < EDGE - 1e-6 ? 1e5 : c < EDGE2 - 1e-6 ? 1e4 : 0);
+            const sc = ext.x + dx - area.x + 1.2 * (ext.y + dy - area.y) + pen(cx) + pen(cy);
             if (!best || sc < best.sc - 1e-9) best = { o: [dx, dy], sc };
           }
         if (best) {
@@ -1955,7 +2012,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // řez: šrafy + označení
   const sec = placed.get("section");
   if (section && sec && opts.section) {
-    hatchView(sec, section.loops, polys);
+    // sestava (kusovník na listu): šrafy po komponentách – sousední komponenty jiný směr / rozteč (kolo 7); díl beze změny
+    hatchView(sec, section.loops, polys, meta.bom?.length ? section.loopSolid : undefined);
     // označení nad řezem (nad řadou kót, leží-li nad pohledem)
     const above = stacks.filter((q) => q.key === "section" && q.side === "t").reduce((m, q) => Math.max(m, q.base0 + q.items.length * STACK_PITCH + 2), 0);
     texts.push({ x: sec.px + (sec.w * scale) / 2, y: sec.py - 6 - above, s: "A–A", size: 5, anchor: "middle", bold: true, layer: "text" });
@@ -2091,10 +2149,34 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     weldSymbolsOnSheet(meta.welds, wv, polys, texts, { left: M_LEFT + 3, right: SW - M - 3, top: M + 3, bottom: SH - M - 3 }, busy);
   }
 
+  // popisy ploch a oblastní úpravy z modelu (vlna 23, R2 / R3) – odkaz se šipkou / tečkou, tlustá čerchovaná čára 04.2
+  let pmiOut: NonNullable<DrawingResult["pmi"]> = [];
+  if (meta.pmi?.length) {
+    const occ = new Occupancy();
+    for (const pl of polys) if (!pl.fill) occ.addPoly(pl.pts);
+    for (const t of texts) occ.addText(t);
+    occ.addRect({ x: SW - M - TB.w - 2, y: SH - M - TBH - 14, w: TB.w + 2, h: TBH + 14 });
+    pmiOut = pmiOnSheet(shape, meta.pmi, ortho.filter((p) => p.key in VIEW_LABEL && p.key !== "iso"), polys, texts, { x: M_LEFT + 2, y: M + 2, w: SW - M_LEFT - M - 4, h: SH - 2 * M - 4 }, occ);
+    for (const o of pmiOut) {
+      if (o.range) {
+        const text = tr("oblastní úprava {0} „{1}“ (F{2}): rozsah {3}–{4} mm přesahuje plochu dlouhou {5} mm – na listu oříznuto; opravte rozsah v modelu (úprava F{2} … od a do b)", o.ref ?? "", o.text, o.face + 1, fmt(o.range.from), fmt(o.range.to), fmt(o.range.len));
+        warnings.push(text);
+        issues.push({ level: "warn", code: "drawing.pmi-range", kind: "other", text, data: { id: o.id, face: o.face + 1, len: o.range.len } });
+      }
+      if (o.state === "ok") continue;
+      const what = o.kind === "treatment" ? tr("oblastní úprava {0} „{1}“ (F{2})", o.ref ?? "", o.text, o.face + 1) : tr("popis „{0}“ (F{1})", o.text, o.face + 1);
+      const text = o.state === "lost" ? tr("{0}: plocha modelu se změnila – na listu se nekreslí; označte plochu znovu (výkres stav ukáže plochy)", what) : o.kind === "treatment" ? tr("{0}: žádný pohled neukazuje plochu z boku – přidejte pohled (výkres pohledy …)", what) : tr("{0}: plocha není vidět v žádném pohledu – přidejte pohled", what);
+      warnings.push(text);
+      issues.push({ level: "warn", code: o.state === "lost" ? "drawing.pmi-lost" : "drawing.pmi-unplaced", kind: "other", text, data: { id: o.id, face: o.face + 1, state: o.state } });
+    }
+  }
+  const legend = zoneLegendOf(meta.pmi?.filter((m) => pmiOut.some((o) => o.id === m.id && o.state === "ok")));
+  const tbMeta: DrawingMeta = legend.length ? { ...meta, zoneLegend: legend } : meta.zoneLegend ? { ...meta, zoneLegend: undefined } : meta;
+
   // rám, centrovací značky, zóny, razítko
   const marks = frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
-  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, tablesH, bomPlan.h0);
+  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, tbMeta, polys, texts, tablesH, bomPlan.h0);
   let yTop = SH - M - TB.h;
   const tables: NonNullable<DrawingResult["tables"]> = [{ kind: "title", x: SW - M - TB.w, y: SH - M - TB.h, w: TB.w, h: TB.h }];
   if (bomPlan.mode === "above" || bomPlan.mode === "columns") {
@@ -2179,7 +2261,202 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     revZoneAt: revZoneAt.length ? revZoneAt : undefined,
     revHide: meta.revisions?.filter((x) => x.marks === false).map((x) => x.rev),
     titleBlock: tbInfo,
+    ...(pmiOut.length ? { pmi: pmiOut } : {}),
   };
+}
+
+// ---------------------------------------------------------------- popisy ploch a oblastní úpravy z modelu (vlna 23)
+
+/** nejmenší vzdálenost bodu od čar vrstvy „visible“ pohledu (souřadnice obrazu) */
+function distToVisible(p: Placed, q: Vec2): number {
+  let best = Infinity;
+  for (const pl of p.polys) {
+    if (pl.layer !== "visible") continue;
+    for (let i = 1; i < pl.pts.length; i++) {
+      const a = pl.pts[i - 1];
+      const b = pl.pts[i];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const L2 = dx * dx + dy * dy || 1e-12;
+      const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2));
+      best = Math.min(best, Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy));
+    }
+  }
+  return best;
+}
+
+/** plocha `index` tělesa pořád odpovídá snímku z doby označení (rovina: normála a bod; válec: osa a poloměr) */
+function pmiFace(shape: r.Shape3D, m: PmiMark): { f: r.Face; n?: Vec3; c: Vec3 } | null {
+  const f = shape.faces[m.face];
+  if (!f) return null;
+  try {
+    const c = V(f.center);
+    const g = m.geom;
+    if (!g || g.t === "other") return { f, c };
+    if (g.t === "plane") {
+      if (f.geomType !== "PLANE") return null;
+      const n = unit(V(f.normalAt(f.center)));
+      const gn = unit(g.n);
+      if (dot(n, gn) < 0.999 || Math.abs(dot(sub(c, g.c), gn)) > 0.05) return null;
+      return { f, n, c };
+    }
+    if (f.geomType !== "CYLINDRE") return null;
+    const P = V(f.pointOnSurface(0.5, 0.5));
+    const N = unit(V(f.normalAt(f.pointOnSurface(0.5, 0.5))));
+    const a = unit(g.axis);
+    const onAxis = (q: Vec3) => len(cross(sub(q, g.c), a));
+    if (Math.abs(dot(N, a)) > 1e-3 || Math.min(onAxis(sub(P, mul(N, g.r))), onAxis(add(P, mul(N, g.r)))) > 0.05) return null;
+    return { f, c };
+  } catch {
+    return null;
+  }
+}
+
+/** tečka (konec odkazové čáry na ploše, ISO 128-22) */
+function leaderDot(polys: Poly[], q: Vec2, r0 = 0.6) {
+  const pts: Vec2[] = [];
+  for (let i = 0; i <= 16; i++) pts.push([q[0] + r0 * Math.cos((i / 16) * TWO_PI), q[1] + r0 * Math.sin((i / 16) * TWO_PI)]);
+  polys.push({ layer: "dim", fill: true, pts });
+}
+
+/**
+ * Odkaz s textem od bodu `tip` (list): směrem do volného rohu mimo obrys pohledu, police s textem; vrací true, když se
+ * vešel bez překryvu (jinak nakreslí první návrh).
+ */
+function pmiLeader(p: Placed, tip: Vec2, text: string, end: "arrow" | "dot", polys: Poly[], texts: DText[], frame: Rect, occ: Occupancy) {
+  const R: Rect = { x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s };
+  const C: Vec2 = [R.x + R.w / 2, R.y + R.h / 2];
+  const size = 3.5;
+  const tw = text.length * size * CHAR_W + 1.5;
+  const dirs: Vec2[] = [[1, -1], [-1, -1], [1, 1], [-1, 1]].map(([x, y]) => [x / Math.SQRT2, y / Math.SQRT2] as Vec2);
+  const want: Vec2 = [tip[0] - C[0], tip[1] - C[1]];
+  dirs.sort((a, b) => b[0] * want[0] + b[1] * want[1] - (a[0] * want[0] + a[1] * want[1]));
+  type Spot = { knee: Vec2; right: boolean; box: Rect };
+  let pick: Spot | null = null;
+  let first: Spot | null = null;
+  for (const u of dirs) {
+    // za pásem kót u pohledu (Chytré kóty se kreslí až nad listem – obsazenost je nezná)
+    for (const extra of [18, 26, 34, 10]) {
+      const L = exitDist(tip, u, R.x, R.y, R.x + R.w, R.y + R.h) + extra;
+      const knee: Vec2 = [tip[0] + u[0] * L, tip[1] + u[1] * L];
+      const right = u[0] >= 0;
+      const box: Rect = { x: right ? knee[0] : knee[0] - tw - 1, y: knee[1] - size - 1, w: tw + 1, h: size + 1.6 };
+      const cand = { knee, right, box };
+      first ??= cand;
+      if (inside(box, frame) && occ.free(box)) {
+        pick = cand;
+        break;
+      }
+    }
+    if (pick) break;
+  }
+  const { knee, right, box } = pick ?? first!;
+  const shelfEnd: Vec2 = [right ? knee[0] + tw : knee[0] - tw, knee[1]];
+  polys.push({ layer: "dim", pts: [tip, knee, shelfEnd] });
+  if (end === "arrow") {
+    const L = Math.hypot(knee[0] - tip[0], knee[1] - tip[1]) || 1;
+    arrow(polys, tip[0], tip[1], (knee[0] - tip[0]) / L, (knee[1] - tip[1]) / L);
+  } else leaderDot(polys, tip);
+  texts.push({ x: right ? knee[0] + 0.8 : knee[0] - 0.8, y: knee[1] - 1, s: text, size, anchor: right ? "start" : "end", layer: "text" });
+  occ.addRect(box);
+  occ.addPoly([tip, knee, shelfEnd]);
+}
+
+/**
+ * Popisy ploch (odkaz se šipkou na hranu plochy viděné z boku, jinak tečka na ploše viděné zepředu) a oblastní úpravy
+ * (tlustá čerchovaná čára 04.2 rovnoběžně s plochou viděnou z boku, 1,5 mm vně materiálu, kóta rozsahu a značka „Z1“).
+ */
+function pmiOnSheet(shape: r.Shape3D, marks: PmiMark[], views: Placed[], polys: Poly[], texts: DText[], frame: Rect, occ: Occupancy): NonNullable<DrawingResult["pmi"]> {
+  const out: NonNullable<DrawingResult["pmi"]> = [];
+  for (const m of marks) {
+    const base = { id: m.id, kind: m.kind, text: m.text, face: m.face, ...(m.ref ? { ref: m.ref } : {}) };
+    const hit = pmiFace(shape, m);
+    if (!hit) {
+      out.push({ ...base, state: "lost" });
+      continue;
+    }
+    const g = m.geom;
+    let done = false;
+    if (m.kind === "note") {
+      // 1) plocha z boku (hrana na obrysu): šipka; 2) plocha zepředu: tečka na ploše
+      type Cand = { p: Placed; tip3: Vec3; end: "arrow" | "dot" };
+      const cands: Cand[] = [];
+      for (const p of views) {
+        const d = p.cam.d;
+        if (g?.t === "cyl") {
+          const a = unit(g.axis);
+          const mid = add(g.c, mul(a, dot(sub(hit.c, g.c), a)));
+          if (Math.abs(dot(d, a)) < 1e-3) {
+            const w = unit(cross(a, d));
+            for (const sgn of [1, -1]) {
+              const tip3 = add(mid, mul(w, sgn * g.r));
+              if (distToVisible(p, proj(p.cam, tip3)) < 0.02 + 1e-3 * Math.max(p.w, p.h)) cands.push({ p, tip3, end: "arrow" });
+            }
+          } else if (Math.abs(Math.abs(dot(d, a)) - 1) < 1e-3) {
+            const tip3 = add(mid, mul(unit(add(p.cam.x, upOf(p.cam))), g.r));
+            if (distToVisible(p, proj(p.cam, tip3)) < 0.02 + 1e-3 * Math.max(p.w, p.h)) cands.push({ p, tip3, end: "arrow" });
+          }
+        } else if (hit.n) {
+          const dn = dot(d, hit.n);
+          if (Math.abs(dn) < 1e-3 && distToVisible(p, proj(p.cam, hit.c)) < 0.02 + 1e-3 * Math.max(p.w, p.h)) cands.unshift({ p, tip3: hit.c, end: "arrow" });
+          else if (dn > 0.999) cands.push({ p, tip3: hit.c, end: "dot" });
+        } else cands.push({ p, tip3: hit.c, end: "dot" });
+      }
+      const c = cands.find((x) => x.end === "arrow") ?? cands[0];
+      if (c) {
+        pmiLeader(c.p, at(c.p, c.tip3), m.text, c.end, polys, texts, frame, occ);
+        out.push({ ...base, state: "ok", view: c.p.key, how: c.end });
+        done = true;
+      }
+    } else if (hit.n) {
+      // oblastní úprava: plocha z boku – úsečka plochy v pohledu z obalu plochy, čára vně materiálu (ve směru normály)
+      for (const p of views) {
+        const d = p.cam.d;
+        if (Math.abs(dot(d, hit.n)) > 1e-3) continue;
+        const pc = proj(p.cam, hit.c);
+        if (distToVisible(p, pc) > 0.02 + 1e-3 * Math.max(p.w, p.h)) continue;
+        const nv0: Vec2 = [dot(hit.n, p.cam.x), -dot(hit.n, upOf(p.cam))];
+        const nl = Math.hypot(nv0[0], nv0[1]) || 1;
+        const nv: Vec2 = [nv0[0] / nl, nv0[1] / nl];
+        // směr podél plochy: začátek vlevo (u svislé plochy nahoře)
+        let L: Vec2 = [-nv[1], nv[0]];
+        if (L[0] < -1e-9 || (Math.abs(L[0]) <= 1e-9 && L[1] < 0)) L = [-L[0], -L[1]];
+        const [[x0, y0, z0], [x1, y1, z1]] = hit.f.boundingBox.bounds as [Vec3, Vec3];
+        const ts = [[x0, y0, z0], [x1, y0, z0], [x0, y1, z0], [x1, y1, z0], [x0, y0, z1], [x1, y0, z1], [x0, y1, z1], [x1, y1, z1]].map((q) => {
+          const v = proj(p.cam, q as Vec3);
+          return (v[0] - pc[0]) * L[0] + (v[1] - pc[1]) * L[1];
+        });
+        const t0 = Math.min(...ts);
+        const len0 = Math.max(...ts) - t0;
+        const from = Math.max(0, Math.min(len0, m.from ?? 0));
+        const to = Math.max(from, Math.min(len0, m.to ?? len0));
+        // rozsah mimo plochu se na listu ořízne – výkres a model by si odporovaly, proto se to ohlásí (⚠ drawing.pmi-range)
+        const outOf = (v: number | undefined) => v !== undefined && (v < -0.05 || v > len0 + 0.05);
+        const clamp = outOf(m.from) || outOf(m.to) ? { len: Math.round(len0 * 100) / 100 } : null;
+        if (to - from < 1e-6) continue;
+        const P = (t: number): Vec2 => toSheet(p, [pc[0] + L[0] * (t0 + t), pc[1] + L[1] * (t0 + t)]);
+        const S0 = P(0);
+        const A = P(from);
+        const B = P(to);
+        const off = 1.5;
+        const Ac: Vec2 = [A[0] + nv[0] * off, A[1] + nv[1] * off];
+        const Bc: Vec2 = [B[0] + nv[0] * off, B[1] + nv[1] * off];
+        polys.push({ layer: "chain", pts: [Ac, Bc] });
+        // kóta rozsahu (délka oblasti) a poloha oblasti od začátku plochy, je-li oblast jen část plochy
+        linearDim(polys, texts, A, B, nv, 7, to - from);
+        if (from > 1e-6) linearDim(polys, texts, S0, A, nv, 13, from);
+        const ref = m.ref ?? "Z";
+        const Ls: Vec2 = [(B[0] - A[0]) / (Math.hypot(B[0] - A[0], B[1] - A[1]) || 1), (B[1] - A[1]) / (Math.hypot(B[0] - A[0], B[1] - A[1]) || 1)];
+        texts.push({ x: Bc[0] + Ls[0] * 2 + nv[0] * 1.5, y: Bc[1] + Ls[1] * 2 + nv[1] * 1.5 + 1.2, s: ref, size: 3.5, bold: true, anchor: "start", layer: "text" });
+        occ.addPoly([Ac, Bc]);
+        out.push({ ...base, state: "ok", view: p.key, how: "chain", ...(clamp ? { range: { len: clamp.len, from: m.from ?? 0, to: m.to ?? clamp.len } } : {}) });
+        done = true;
+        break;
+      }
+    }
+    if (!done) out.push({ ...base, state: "unplaced" });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení
@@ -2290,14 +2567,20 @@ function faceDir(shape: r.Shape3D, face: number): Vec3 | null {
 }
 
 /** Šrafy řezných ploch pohledu (obrysy v souřadnicích obrazu); u přerušeného pohledu se šrafy v mezeře vynechají. */
-function hatchView(p: Placed, faces: FaceLoops, polys: Poly[]) {
+/** vzor šraf komponenty sestavy v řezu (ISO 128-50): k-té těleso – směr 45° / 135° a rozteč ×1 / ×1,6 se střídají */
+export function solidHatch(k: number): { angle: number; factor: number } {
+  return { angle: k % 2 ? 135 : 45, factor: Math.floor(k / 2) % 2 ? 1.6 : 1 };
+}
+
+function hatchView(p: Placed, faces: FaceLoops, polys: Poly[], solidOf?: number[]) {
   const s = p.s;
   const spacing = Math.max(1.5, Math.min(4, Math.sqrt(p.w * p.h * s * s) / 25));
   // po plochách: sudo-liché pravidlo přes všechny obrysy by vyrušilo šrafy tam, kde se řezné plochy dvou těles překrývají
   // (šrafy leží na společné mřížce listu, sousední plochy na sebe navazují)
-  for (const loops of faces) {
+  for (const [fi, loops] of faces.entries()) {
     const big = loops.map((l) => l.map((q): Vec2 => [q[0] * s, q[1] * s]));
-    for (const h of hatch(big, spacing)) {
+    const pat = solidOf ? solidHatch(solidOf[fi] ?? 0) : { angle: 45, factor: 1 };
+    for (const h of hatch(big, spacing * pat.factor, pat.angle)) {
       const hv = h.map((q): Vec2 => [q[0] / s, q[1] / s]);
       for (const part of clipBreaks(hv, p.brk)) polys.push({ layer: "hatch", pts: part.map((q) => toSheet(p, q)) });
     }
@@ -3517,6 +3800,7 @@ const STYLE: Record<Layer, { w: number; dash?: string; color: string }> = {
   visible: { w: 0.5, color: "#111" },
   hidden: { w: 0.25, dash: "3 1.5", color: "#333" },
   center: { w: 0.18, dash: "12 3 1.5 3", color: "#333" },
+  chain: { w: 0.7, dash: "12 3 1.5 3", color: "#111" },
   cut: { w: 0.18, dash: "12 3 1.5 3", color: "#111" },
   dim: { w: 0.18, color: "#111" },
   hatch: { w: 0.18, color: "#333" },
@@ -3561,6 +3845,7 @@ const DXF_LAYER: Record<Layer, string> = {
   thin: "OBRYS",
   hidden: "SKRYTE",
   center: "OSY",
+  chain: "UPRAVY",
   cut: "OSY",
   dim: "KOTY",
   hatch: "SRAFY",
@@ -3603,6 +3888,7 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
     ["OBRYS", 7, "CONTINUOUS"],
     ["SKRYTE", 8, "HIDDEN"],
     ["OSY", 5, "CENTER"],
+    ["UPRAVY", 1, "CENTER"],
     ["KOTY", 3, "CONTINUOUS"],
     ["SRAFY", 9, "CONTINUOUS"],
     ["RAM", 7, "CONTINUOUS"],
@@ -3630,12 +3916,20 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
       add(0, "SOLID", 8, layer, 10, f(a[0]), 20, f(H - a[1]), 30, 0, 11, f(b[0]), 21, f(H - b[1]), 31, 0, 12, f(c[0]), 22, f(H - c[1]), 32, 0, 13, f(c[0]), 23, f(H - c[1]), 33, 0);
       continue;
     }
+    if (p.pts.length < 2) continue;
+    if (p.layer === "chain") {
+      // tlustá čerchovaná 04.2 (oblastní úprava – vlna 23, R3): R12 nemá tloušťku čáry hladiny (370) – POLYLINE se šířkou
+      // 0,7 mm (40/41) a typem CENTER, ať se v DXF neliší od tenké osy 04.1 jen barvou
+      add(0, "POLYLINE", 8, layer, 6, "CENTER", 66, 1, 10, 0, 20, 0, 30, 0, 40, f(0.7), 41, f(0.7), 70, 128);
+      for (const [x, y] of p.pts) add(0, "VERTEX", 8, layer, 10, f(x), 20, f(H - y), 30, 0, 40, f(0.7), 41, f(0.7));
+      add(0, "SEQEND", 8, layer);
+      continue;
+    }
     if (p.pts.length === 2) {
       const [[x1, y1], [x2, y2]] = p.pts;
       add(0, "LINE", 8, layer, 10, f(x1), 20, f(H - y1), 30, 0, 11, f(x2), 21, f(H - y2), 31, 0);
       continue;
     }
-    if (p.pts.length < 2) continue;
     // POLYLINE se souvislým generováním typu čáry (70: 128)
     add(0, "POLYLINE", 8, layer, 66, 1, 10, 0, 20, 0, 30, 0, 70, 128);
     for (const [x, y] of p.pts) add(0, "VERTEX", 8, layer, 10, f(x), 20, f(H - y), 30, 0);

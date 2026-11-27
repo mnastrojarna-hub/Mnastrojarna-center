@@ -16,13 +16,18 @@
 //     plochou (data-mate-spring, data-springs-lost), nic se nepřichytí jinam, panel pružiny ✗ bez délky; oprava = Upravit pružinu → ✓.
 //  kolo 5: `stav` stručně nese `springs.lost=1` v = status / D / Σ (i sestava jen s pružinou bez vazeb); „Odebrat pružinu“ v seznamu
 //     vazeb jde textovým příkazem `sestava pružina #k odebrat` (✓ pružina odebrána).
-// Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
+// Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (výchozí = oba průchody, E2E_NOGL=1 jen bez WebGL, E2E_NOGL=0 jen WebGL)
 const { chromium } = require('playwright');
-const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+// průchody s WebGL i bez WebGL v KAŽDÉM výchozím běhu (kolo 7, bod 23 – dřív bez WebGL jen s E2E_NOGL=1); přípona průchodu u kontroly
+const { glPasses } = require('./lib/gl-passes.cjs');
+const PASSES = glPasses(process.env);
+let tag = '';
+let pass = null;
+const counts = {};
+const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m + tag); if (pass) counts[pass] = (counts[pass] || 0) + 1; if (!c) process.exitCode = 1; };
 const BASE = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, '');
-const NO_GL = ['--disable-3d-apis', '--disable-webgl', '--disable-webgl2', '--disable-gpu'];
-const GL = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'];
-const NOGL = process.env.E2E_NOGL === '1';
+/** aktuální průchod (nastaví hlavní smyčka na konci souboru) */
+let NOGL = false;
 const SHOTS = process.argv[2] ? process.argv[2].replace(/\/?$/, '/shots/') : null;
 const line = (log, re) => (String(log).split('\n').find((l) => re.test(l)) || '').trim();
 // vlna 22 C2: souhrn bez průniku teď zní „Kolize: žádný průnik v N polohách“ – musí ho chytit i tento negativní test
@@ -42,8 +47,8 @@ async function open(b, path) {
   return { ctx, p };
 }
 
-(async () => {
-  const b = await chromium.launch({ args: NOGL ? NO_GL : GL });
+async function mainPass(args) {
+  const b = await chromium.launch({ args });
   const { p } = await open(b, '/cad');
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -502,6 +507,11 @@ async function open(b, path) {
   await openPanel();
   await mp.locator('[data-motor-new]').click();
   await mp.locator('[data-motor-kind="linear"]').click();
+  // kolo 7 (bod 10): nabídka vazeb ve dvou skupinách – hodnota vazby (hlavní zdvih, předvybraná) × vedení; vazba s motorem to řekne
+  const gVal = await mp.locator('[data-motor-mate] optgroup[data-motor-mate-group="value"] option').allInnerTexts();
+  const gGuide = await mp.locator('[data-motor-mate] optgroup[data-motor-mate-group="guide"] option').allInnerTexts();
+  const pre = await mp.locator('[data-motor-mate]').evaluate((s) => s.options[s.selectedIndex]?.text || '');
+  ok(gVal.length === 1 && /ZDVIH.* – pohání motor 1/.test(gVal[0]) && gGuide.length === 1 && /VEDENÍ/.test(gGuide[0]) && /ZDVIH/.test(pre), `bod 10 (kolo 7): skupiny vazeb motoru – hodnota [${gVal.join(' | ')}] · vedení [${gGuide.join(' | ')}] · předvybráno „${pre}“`);
   const vOpt = (await mp.locator('[data-motor-mate] option').allInnerTexts()).find((o) => /VEDENÍ/.test(o));
   if (vOpt) await mp.locator('[data-motor-mate]').selectOption({ label: vOpt });
   let conf = 0;
@@ -575,6 +585,26 @@ async function open(b, path) {
   ok(removedNote && compR && !compR.spring && (await p.locator('[data-mate-spring]').count()) === 0, `kolo 5: „Odebrat pružinu“ jde textovým příkazem (hláška ✓ pružina odebrána ${removedNote ? 'ano' : 'ne'}), pružina bez definice, komponenta zůstává`);
   ok(errs.length === 0, 'kolo 4: bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
 
+  // ── kolo 7 (bod 8, oponent kola 7): dynamika s „na mezi chyba“ – souhrn a graf jen z platných kroků ──
+  {
+    const o = await open(b, '/cad');
+    const r2 = async (t) => String(await o.p.evaluate((x) => window.mncad.run(x), t));
+    await r2(['nový díl "Rám"', 'kvádr 100 100 10', 'nový díl "Deska A"', 'kvádr 100 100 10', 'nový díl "Přidržovač"', 'kvádr 60 60 8'].join('\n'));
+    const l2 = await r2(['nová sestava "Mechanika"', 'vložit "Rám" ukotvit', 'vložit "Deska A" v 0 0 67.5', 'vložit "Přidržovač" v 0 0 34.5', 'sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"', 'sestava vazba vzdálenost "Přidržovač" spodní "Rám" horní hodnota 24.5 název "PEVNÁ"', 'sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"', 'pohyb dynamika čas 2 krok 0.002 snímky 12', 'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 rychlost 30.35 na mezi chyba'].join('\n'));
+    const dz = (/„Deska A“: ΔZ −([\d,]+) mm/.exec(l2) || [])[1];
+    const st = (/„Deska A“ [\d,]+ kg \([^)]*\): zdvih Z ([\d,]+) mm/.exec(l2) || [])[1];
+    ok(dz && dz === st && /⚠ neplatné kroky 4–12 /.test(l2) && !/\(min 5 mm\): dotyk [\d,]+–2 s/.test(l2), `bod 8 (kolo 7): protokol dynamiky – zdvih Z ${st} mm = ΔZ −${dz} mm, ⚠ neplatné kroky, dotyk dorazu nekončí v 2 s`);
+    const pan = o.p.locator('[data-motion-panel]');
+    const shown = await pan.waitFor({ timeout: 30000 }).then(() => true, () => false);
+    if (shown && !(await pan.locator('[data-motion-chart]').isVisible().catch(() => false))) await pan.locator('[data-motion-run]').click().catch(() => {});
+    const chart = shown && (await pan.locator('[data-motion-chart]').waitFor({ timeout: 180000 }).then(() => true, () => false));
+    const gaps = chart ? Number(await pan.locator('[data-motion-chart]').getAttribute('data-motion-chart-gaps')) : -1;
+    const sum = shown ? await pan.locator('[data-motion-summary]').innerText({ timeout: 5000 }).catch(() => '') : '';
+    ok(chart && gaps >= 9 && /neplatné kroky 4–12/.test(sum) && new RegExp(`zdvih Z ${dz} mm`).test(sum), `bod 8 (kolo 7): panel – graf bez hodnot v neplatných krocích (${gaps} mezer), souhrn „neplatné kroky 4–12“ a zdvih ${dz} mm`);
+    if (SHOTS) await o.p.screenshot({ path: SHOTS + `w22-m-r7-dyn-invalid${NOGL ? '-nogl' : ''}.png` });
+    await o.ctx.close();
+  }
+
   // ── EN a DE: stejný příkaz, protokol i panel bez českých zlomků ──
   for (const [path, cmd, re] of [
     ['/en/cad', 'motion motor linear mate 1 57.5..27.15 speed 15.175', /✓ motor 1: linear motor · ZDVIH „Deska B“ → „Rám“ · mate value 57\.5 → 27\.15 mm ↓ stroke 30\.35 mm · 15\.175 mm\/s · 2 s/],
@@ -595,4 +625,22 @@ async function open(b, path) {
     await o.ctx.close();
   }
   await b.close();
+}
+
+(async () => {
+  for (const ps of PASSES) {
+    pass = ps.id;
+    NOGL = ps.nogl;
+    tag = ps.tag;
+    console.log(`=== průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'} ===`);
+    // průchod musí být opravdu ten, za který se vydává
+    const probe = await chromium.launch({ args: ps.args });
+    const pg = await probe.newPage();
+    const gl = await pg.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => null);
+    await probe.close();
+    ok(gl === !ps.nogl, `průchod: WebGL v prohlížeči ${gl ? 'je' : 'není'} k dispozici (čekáno ${ps.nogl ? 'není' : 'je'})`);
+    await mainPass(ps.args).catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e) + tag); process.exitCode = 1; });
+  }
+  tag = '';
+  for (const ps of PASSES) ok((counts[ps.id] || 0) > 1, `průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'}: ${counts[ps.id] || 0} kontrol`);
 })().catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; });

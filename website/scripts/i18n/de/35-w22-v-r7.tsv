@@ -1,0 +1,13 @@
+# vlna 22, kolo 7, stopa V (body 13, 14, 21, čela řezu)
+Zobrazení:	Ansicht:
+3D okno (WebGL)	3D-Fenster (WebGL)
+model se nezobrazuje	das Modell wird nicht angezeigt
+Plovoucí	Schwebend
+Ukotvit ⇥	Andocken ⇥
+Ukotvit panel studie vpravo vedle 3D okna (nepřekrývá model)	Studienbereich rechts neben dem 3D-Fenster andocken (verdeckt das Modell nicht)
+Uvolnit panel studie (plovoucí nad modelem)	Studienbereich lösen (schwebend über dem Modell)
+snímek {0}: prohlížeč nevrátil obrázek PNG	Bild {0}: der Browser hat kein PNG-Bild geliefert
+poškozený soubor	beschädigte Datei
+{0} snímků místo {1}	{0} Bilder statt {1}
+délka {0} s místo {1} s	Länge {0} s statt {1} s
+Prohlížeč neumí kódovat WebM – uloženo animované PNG (APNG) se stejným časováním: {0}; soubor má délku {1} s a {2} snímků	Der Browser kann kein WebM kodieren – animiertes PNG (APNG) mit gleichem Timing gespeichert: {0}; die Datei ist {1} s lang und hat {2} Bilder

@@ -14,7 +14,7 @@ import { tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { defaultDyn } from "@/cad/motion-dynamic";
 import { modeHelp, studyMode } from "@/cad/motion-mode";
-import { dynCharts, isDyn } from "@/cad/motion-dynamic-report";
+import { dynCharts, isDyn, valueRuns } from "@/cad/motion-dynamic-report";
 import type { MotionResult } from "@/cad/motion";
 import type { CadDoc, MotionDynamic, MotionStudy, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -221,7 +221,7 @@ export function DynChart({ res, doc, step }: { res: MotionResult; doc: CadDoc; s
   const y = (v: number) => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
   const cur = ch.t[Math.min(step, ch.t.length - 1)] ?? t0;
   return (
-    <div data-motion-chart={ch.key} className="space-y-1">
+    <div data-motion-chart={ch.key} data-motion-chart-gaps={ch.series.reduce((n, s) => n + s.values.filter((v) => !Number.isFinite(v)).length, 0)} className="space-y-1">
       <div className="flex flex-wrap gap-1">
         {charts.map((c) => (
           <button key={c.key} type="button" data-motion-chart-btn={c.key} onClick={() => setKey(c.key)} className={cn("rounded px-1.5 py-0.5 text-[11px]", c.key === ch.key ? "bg-[#272425] text-white" : "border border-[#cfd6de] bg-white")}>
@@ -247,9 +247,12 @@ export function DynChart({ res, doc, step }: { res: MotionResult; doc: CadDoc; s
         <text x={W - pad.r} y={H - 4} textAnchor="end" fontSize="8" fill="#6b7785">
           {fmt(t1, 3)} s
         </text>
-        {ch.series.map((s, i) => (
-          <polyline key={s.id} data-series={s.name} fill="none" stroke={COLORS[i % COLORS.length]} strokeWidth="1.3" points={s.values.map((v, k) => (Number.isFinite(v) ? `${x(ch.t[k]).toFixed(1)},${y(v).toFixed(1)}` : "")).filter(Boolean).join(" ")} />
-        ))}
+        {/* souvislé úseky: neplatný krok (motor za mezí – bez hodnoty) graf přeruší, nespojí body přes mezeru (kolo 7) */}
+        {ch.series.flatMap((s, i) =>
+          valueRuns(s.values).map((run, j) => (
+            <polyline key={`${s.id}:${j}`} data-series={s.name} data-series-run={j} fill="none" stroke={COLORS[i % COLORS.length]} strokeWidth="1.3" points={run.map((k) => `${x(ch.t[k]).toFixed(1)},${y(s.values[k]).toFixed(1)}`).join(" ")} />
+          )),
+        )}
         <line x1={x(cur)} x2={x(cur)} y1={pad.t} y2={H - pad.b} stroke="#272425" strokeWidth="0.8" strokeDasharray="2 2" />
       </svg>
       <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-[#4a5664]">

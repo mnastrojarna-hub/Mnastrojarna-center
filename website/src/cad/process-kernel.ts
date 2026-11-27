@@ -411,6 +411,7 @@ async function planOf(req: ProcReq): Promise<ProcRes> {
   const pBox = pe.result.metrics?.bbox ?? (P.boundingBox.bounds as [Vec3, Vec3]);
   const corners = Array.from({ length: 8 }, (_, c) => [c & 1 ? pBox[1][0] : pBox[0][0], c & 2 ? pBox[1][1] : pBox[0][1], c & 4 ? pBox[1][2] : pBox[0][2]] as Vec3);
   const gaps: NonNullable<ProcRes["gaps"]> = [];
+  const near: number[] = [];
   for (let i = 1; i < req.rels.length; i++) {
     const a = req.rels[i - 1];
     const b = req.rels[i];
@@ -422,6 +423,7 @@ async function planOf(req: ProcReq): Promise<ProcRes> {
       [Math.max(ba[1][0], bb[1][0]), Math.max(ba[1][1], bb[1][1]), Math.max(ba[1][2], bb[1][2])],
     ];
     if (!overlap(swept, tBox)) continue;
+    near.push(i);
     let disp = 0;
     for (const c of corners) {
       const p = ap(a, c);
@@ -449,7 +451,7 @@ async function planOf(req: ProcReq): Promise<ProcRes> {
     if (need < 1) continue;
     gaps.push({ i, n: Math.min(PROC_MAX_SUB, need), ...(need > PROC_MAX_SUB ? { capped: true as const } : {}) });
   }
-  return { ...base, ...(gaps.length ? { gaps } : {}), ms: Date.now() - t0 };
+  return { ...base, ...(gaps.length ? { gaps } : {}), ...(near.length ? { near } : {}), ms: Date.now() - t0 };
 }
 
 /** T ∩ P(m) (zapamatováno podle matice); prázdný průnik / selhání → null */

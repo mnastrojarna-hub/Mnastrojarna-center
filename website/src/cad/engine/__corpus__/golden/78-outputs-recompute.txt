@@ -19,7 +19,7 @@ kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontr
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A3 – výsledek po vyhodnocení listu níže
 → list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
-✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty, poznámky a razítko)
 ℹ export STEP: Nastroj.step · 32 kB · STEP AP214 – staženo (bez dialogu) · kontrola níže
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 12
   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 2, objem 132 000 mm³ (rozdíl 0,0000 %), obálka 100,00 × 60,00 × 30,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
@@ -45,8 +45,8 @@ kolize: 1 – šroub v závitu 0, skutečné 1
 Přepočítat vše – dokument „Nástroj“, revize modelu r·?:
 Přepočteno (3):
   ✓ kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)
-  ✓ kontrola kolizí znovu (kolize)
   ✓ list „List 1“ přepočten z modelu r·?
+  ⚠ kontrola kolizí znovu (kolize) – nalezeno kolizí: 1 – viz ⚠ výše
 Zbývá udělat ručně (2) – program to sám neudělá:
   ⚠ list „List 1“ rev. A – vydán z modelu r·?, model je teď r·? → výkres vydat B
   ⚠ STEP „Nastroj.step“ – exportováno z modelu r·? (?.?.????), model je teď r·? → export step

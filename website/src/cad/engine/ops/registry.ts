@@ -40,7 +40,15 @@ export interface RunState {
    * co běh zapsal do záložek PŘED koncem (`flush` při přechodu na jiný dokument – vlna 22, bod 12): nově založené záložky
    * (zrušený běh je zavře) a názvy dokumentů zapsaných krokem historie (zrušený běh je vyjmenuje – nikdy „beze změny“)
    */
-  wrote?: { opened: { id: string; name: string; /** záložka byla prázdná úvodní – zrušení vrátí tento dokument */ prev?: CadDoc }[]; committed: string[] };
+  wrote?: {
+    opened: { id: string; name: string; /** záložka byla prázdná úvodní – zrušení vrátí tento dokument */ prev?: CadDoc }[];
+    committed: string[];
+    /**
+     * dřívější záložky, do kterých běh zapsal (kolo 7, bod 12): stav před prvním zápisem běhu (`prev`) a otisk celého
+     * dokumentu po posledním zápisu (`lastSig`) – zrušení stav vrátí, nezměnil-li záložku mezitím nikdo jiný (čímkoli)
+     */
+    restore?: { id: string; name: string; prev: CadDoc; /** otisk celého dokumentu po posledním zápisu běhu (engine/doc-sig.ts) */ lastSig: string }[];
+  };
   /** záložka aktivní na začátku běhu (zrušený běh se do ní vrátí) */
   startTab?: string;
   /** prvky přidané během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě */

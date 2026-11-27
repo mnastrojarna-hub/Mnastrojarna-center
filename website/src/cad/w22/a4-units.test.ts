@@ -64,7 +64,10 @@ describe("bod 16: useknutý × změněný odkaz, ověření odkazu", () => {
 
   it("odkaz s heslem: bez hesla = password; useknutý šifrovaný = password s upozorněním na useknutí (nejde rozlišit)", async () => {
     const r = await createShareLink(part(), { days: 10, mode: "link", base: BASE, password: "tajne" });
-    const hash = new URL(r.url).hash;
+    // kolo 7 (bod 16): nový odkaz nese kontrolu úplnosti (`1dpk`, viz w22/r7-a.test.ts) – tady starší tvar `1dp` bez ní,
+    // u kterého useknutí od hesla odlišit nejde (otevírá se dál a text to musí říct)
+    const hash = new URL(r.url).hash.replace(/^#s=1dpk\.([^.]+)\.\d+\.[A-Za-z0-9_-]{8}\./, "#s=1dp.$1.");
+    expect(hash).toMatch(/^#s=1dp\./);
     expect(await openShareLink(parseShareHash(hash)!)).toMatchObject({ ok: false, reason: "password" });
     const cut = await openShareLink(parseShareHash(hash.slice(0, -8))!, "tajne");
     expect(cut).toMatchObject({ ok: false, reason: "password" });

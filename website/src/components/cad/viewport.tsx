@@ -12,6 +12,7 @@ import { toWorld } from "@/cad/defaults";
 import { sectionKey, sectionPlane, type SectionState } from "@/cad/section-plane";
 import { entityPath } from "@/cad/sketch";
 import type { Feature, MeshData, Vec3 } from "@/cad/types";
+import { entityCandidates, findOnScreen, type ProbeHit, type ProbeQuery } from "@/cad/screen-probe"; // testovací háček screenOf (bod 20, kolo 7)
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { drawSurfOverlay } from "./viewport-surf-overlay";
 import type { SurfOverlay } from "./surf-overlay";
@@ -20,8 +21,8 @@ import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge"
 import type { BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, mouseButtons, queryBox, type BoxMode, type BoxResolve, type BoxSceneOf, type DragAction, type LeftDrag } from "./box-pick-3d";
-import { bodyOpacity, capStyles } from "@/cad/section-cap";
-import { capMesh, isCapObject } from "./section-cap-gl";
+import { bodyOpacity, capModule, capStyles } from "@/cad/section-cap";
+import { capMesh, capOutline, isCapObject, updateCapOutline } from "./section-cap-gl";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -66,6 +67,11 @@ export type Gizmo = { id: string; matrix: number[]; mode: "translate" | "rotate"
 export type Hint = { id: string; kind: "face" | "edge" | "vertex"; index: number; x: number; y: number; p: Vec3; title: string };
 const axisName = (n: THREE.Vector3): string => (Math.abs(n.x) > 0.95 ? (n.x > 0 ? "+X" : "-X") : Math.abs(n.y) > 0.95 ? (n.y > 0 ? "+Y" : "-Y") : Math.abs(n.z) > 0.95 ? (n.z > 0 ? "+Z" : "-Z") : "");
 export type ViewportHandle = {
+  /**
+   * testovací háček (vlna 22 kolo 7, bod 20 – cad/screen-probe.ts): souřadnice klienta, kde klik myší vybere plochu / hranu /
+   * vrchol komponenty (ověřeno týmž výběrem jako klik); null = entita není vidět. Výběr sám nemění.
+   */
+  screenOf?: (q: ProbeQuery) => ProbeHit | null;
   hintList: () => Omit<Hint, "p">[];
   clickHint: (id: string, additive?: boolean) => boolean;
   setView: (v: ViewName) => void;
@@ -251,6 +257,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const S = useRef<St | null>(null);
   const boxApi = useRef<ViewportHandle["boxPick"]>(undefined);
   const propsRef = useRef(props);
+  /** výběr v bodě klienta podle filtru – tentýž `pickSel` jako klik (testovací háček `screenOf`) */
+  const probePick = useRef<((x: number, y: number, f: SelFilter) => SelItem | null) | null>(null);
   propsRef.current = props;
   /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
   const softOn = useSoftViewActive();
@@ -456,6 +464,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     scene.add(sketchGroup);
     const asmGroup = new THREE.Group();
     scene.add(asmGroup);
+    // kolo 7: obrysy čel řezu se přepočítají před každým snímkem (i snímek / video studie), jen když se rovina vůči
+    // komponentě pohnula (section-cap-gl `updateCapOutline`, mezipaměť v section-contour)
+    const outlineSize = new THREE.Vector2();
+    scene.onBeforeRender = (r) => {
+      r.getSize(outlineSize);
+      for (const o of asmGroup.children) if (o.userData.capOutline) updateCapOutline(o, outlineSize);
+    };
 
     const axes = new THREE.Group();
     const ax = (dir: THREE.Vector3, color: number) => {
@@ -641,11 +656,11 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const capTargets = (): THREE.Mesh[] => {
       const s = S.current!;
       if (!isAsm() || !propsRef.current.section) return [];
-      return s.asmGroup.children.filter((o) => isCapObject(o) && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
+      return s.asmGroup.children.filter((o) => isCapObject(o) && !o.userData.capOutline && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
     };
     const edgeTargets = (): THREE.LineSegments[] => {
       const s = S.current!;
-      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.LineSegments).isLineSegments && o.visible) as THREE.LineSegments[];
+      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.LineSegments).isLineSegments && o.visible && !isCapObject(o)) as THREE.LineSegments[];
       return s.edges && !propsRef.current.bodyHidden ? [s.edges] : [];
     };
     /** nejbližší zásah tělesa NEBO čela řezu; u čela je vzdálenost = rovina řezu (čelo leží v ní, ne na zadní stěně) */
@@ -838,6 +853,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         }
       }
     };
+    probePick.current = (x, y, f) => pickSel({ clientX: x, clientY: y } as MouseEvent, f);
     const legacyPick = (e: PointerEvent) => {
       const s = S.current!;
       setRay(e);
@@ -1538,6 +1554,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.asmGroup.remove(o);
       const mt = (o as THREE.Mesh).material as THREE.Material | undefined;
       mt?.dispose?.();
+      // obrys čela má vlastní geometrii (body jsou ze sdílené mezipaměti obrysů)
+      if (o.userData.capOutline) (o as THREE.Mesh).geometry.dispose();
     }
     const used = new Set(list.map((c) => c.key));
     for (const [k, g] of s.asmGeo)
@@ -1550,11 +1568,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const clipping = props.section ? [s.clip] : [];
     applyClip();
     // vlna 22 (zpráva 20. 11.): čelo řezu pro každou komponentu – barva komponenty, šrafy, stejná průhlednost jako tělo
-    const caps = props.section ? capStyles(list, display) : null;
+    // kolo 7: modul šraf ze sestavy (rozteč v mm, stejný jako softwarový náhled) a obrys čela
+    const caps = props.section ? capStyles(list, display, capModule(list)) : null;
     const pr = s.renderer.getPixelRatio();
     let capCount = 0;
     const capHex: string[] = [];
     const capHatch: string[] = [];
+    const capMm: string[] = [];
+    const capLine: string[] = [];
     for (const [ci, c] of list.entries()) {
       let g = s.asmGeo.get(c.key);
       if (!g || g.mesh !== c.mesh) {
@@ -1595,9 +1616,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       if (st) {
         // nese id komponenty (gizmo ho posune s tělem), ale `cap: true` ho vyřadí z výběru, najetí myší, okna a rozměru scény
         s.asmGroup.add(capMesh(g.geo, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, pr));
+        // obrys čela: průsečnice roviny se sítí, nepatrně před čelem (do odebrané strany), aby s ním nezápasil o hloubku
+        s.asmGroup.add(capOutline(c.mesh, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, -Math.max(1e-3, s.radius * 2e-4)));
         capCount++;
         capHex.push(st.hex);
         capHatch.push(st.hatch.hex);
+        capMm.push(String(st.hatch.stepMm));
+        capLine.push(st.outlineHex);
       }
     }
     // stav pro e2e a diagnostiku: počet čel a jejich barvy (stejné pořadí jako komponenty)
@@ -1607,10 +1632,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         hostEl.dataset.sectionCaps = String(capCount);
         hostEl.dataset.sectionCapColors = capHex.join(",");
         hostEl.dataset.sectionCapHatch = capHatch.join(",");
+        hostEl.dataset.sectionCapHatchMm = capMm.join(",");
+        hostEl.dataset.sectionCapOutline = capLine.join(",");
       } else {
         delete hostEl.dataset.sectionCaps;
         delete hostEl.dataset.sectionCapColors;
         delete hostEl.dataset.sectionCapHatch;
+        delete hostEl.dataset.sectionCapHatchMm;
+        delete hostEl.dataset.sectionCapOutline;
       }
     }
     if (list.length) {
@@ -1766,6 +1795,24 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.controls.update();
       s.render();
     },
+    screenOf: (q: ProbeQuery) => {
+      if (softView.current) return softView.current.screenOf?.(q) ?? null;
+      const s = S.current;
+      const pick = probePick.current;
+      if (!s || !pick) return null;
+      const pr = propsRef.current;
+      const av = q.compId !== undefined ? pr.assembly?.find((a) => a.id === q.compId) : undefined;
+      if (q.compId !== undefined && !av) return null;
+      const obj = av ? (s.asmGroup.children.find((o) => (o as THREE.Mesh).isMesh && !isCapObject(o) && o.userData.id === av.id) as THREE.Mesh | undefined) : undefined;
+      const src = av ? { mesh: av.mesh, vertices: av.vertices, matrix: obj ? obj.matrix.elements : av.matrix } : { mesh: pr.mesh, vertices: pr.vertices, matrix: s.model.matrix.elements };
+      const rect = s.renderer.domElement.getBoundingClientRect();
+      const project = (p: Vec3): [number, number] | null => {
+        const v = new THREE.Vector3(p[0], p[1], p[2]).project(s.camera);
+        if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 0.98 || Math.abs(v.y) > 0.98) return null;
+        return [((v.x + 1) / 2) * rect.width + rect.left, ((1 - v.y) / 2) * rect.height + rect.top];
+      };
+      return findOnScreen(entityCandidates(src, q.kind, q.index), q, project, (x, y) => pick(x, y, q.kind));
+    },
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
     hintList: () => softView.current?.hintList?.() ?? hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
     /** „klikne“ na popisek (syntetické pointer události na plátně – stejná cesta jako myš) */
@@ -1786,6 +1833,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
     },
     focus: (center: Vec3, radius: number) => {
+      // softwarový náhled (bez WebGL): tentýž směr pohledu, cíl = střed, viditelná výška ≈ 2,4 × poloměr (kolo 7, bod 5 – přiblížení
+      // na místo průniku z panelu Kolize; dřív focus softwarový náhled ignoroval)
+      if (softView.current) {
+        const v = softView.current.viewState?.();
+        if (v && softView.current.setViewState) softView.current.setViewState({ dir: v.dir, target: [center[0], center[1], center[2]], height: Math.max(2.4 * radius, 1e-3) });
+        return;
+      }
       const s = S.current;
       if (!s) return;
       const c = new THREE.Vector3(...center);
@@ -1822,7 +1876,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
 
   return (
     <div className={softOn ? "invisible absolute inset-0" : "absolute inset-0"}>
-      <div ref={host} className="absolute inset-0" />
+      <div ref={host} data-gl-host className="absolute inset-0" />
       {/* popisky kót měření */}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden">
         {(props.measure?.labels ?? []).map((l, i) => (

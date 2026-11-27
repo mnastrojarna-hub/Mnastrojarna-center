@@ -115,17 +115,16 @@ function DeliveryShortcut() {
   if (!flow || !summaryOffersDelivery(flow)) return null;
   return (
     <a
-      href="#dodani-zakaznikovi"
+      href="?tab=dodani"
       onClick={(e) => {
-        const card = document.getElementById("dodani-zakaznikovi");
-        if (!card) return;
+        // dodání zákazníkovi je od 28. 11. ve vlastní záložce „Dodání & faktura"
         e.preventDefault();
-        card.scrollIntoView({ behavior: "smooth", block: "start" });
+        flow.goTab("dodani");
       }}
       className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-green-700 hover:underline dark:text-green-400"
       data-testid="summary-delivery"
     >
-      <Truck className="h-3.5 w-3.5" /> Hotové kusy dodáš i během výroby — Dodání zákazníkovi ↓
+      <Truck className="h-3.5 w-3.5" /> Hotové kusy dodáš i během výroby — Dodání & faktura →
     </a>
   );
 }

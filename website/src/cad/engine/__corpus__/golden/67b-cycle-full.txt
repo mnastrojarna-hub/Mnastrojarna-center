@@ -81,12 +81,12 @@ Pohybová studie: 60 kroků · 2 s · motory: lineární motor · ZDVIH „Horn�
  „Horní deska“ + 2 díly (tuhá skupina – zámek / pevné vazby): ΔZ −21,5 mm · na konci zpět ve výchozí poloze
  „Přidržovač“: ΔZ −19 mm · na konci zpět ve výchozí poloze
  stojí: 2 („Deska A“, „Plech“)
-Kolize v pohybu: kroků s kolizí 1 z 61 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 29 · pracovní kontakt 2 dvojic
+Kolize v pohybu: kroků s kolizí 1 z 61 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v kroku 29 · pracovní kontakt 2 dvojic
  spojitě jen částečně: 61 poloh + 56 mezipoloh, mezi polohami nepotvrzeno v 2 úsecích (od kroku 26, 33; dotyk bez objemu v poloze 2×) – tam jen v polohách
 Vazby splněny ve všech krocích
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
- střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
- otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
+ střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v mezipoloze mezi kroky 29 a 30 (t = 0,986 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+ otisk 2 „Značka“ → „Plech“: záběr od mezipolohy mezi kroky 29 a 30 (t = 0,986 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
 Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 ⚠ řádek 39: v pohybu „Plech“ × „Značka“ od kroku 29 (t = 0,967 s): kroků 1, dvojic komponent 1, největší průnik 8,011 mm³ – místo [25; 75; 10,86] v kroku 29
@@ -103,8 +103,8 @@ Procesní operace: 2
   1. střih „Razník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
   2. otisk „Značka“ → „Plech“ · hloubka 0,3 mm · se začátkem fáze „Značení“
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
- střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
- otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
+ střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v mezipoloze mezi kroky 29 a 30 (t = 0,986 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+ otisk 2 „Značka“ → „Plech“: záběr od mezipolohy mezi kroky 29 a 30 (t = 0,986 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
 Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 Krok 60 (t = 2 s, motory 71):
@@ -131,7 +131,7 @@ Vazby: 7 (6 ok, 1 potlačeno)
 Pohybová studie: motorů 1 · kroků 60 · 2 s · kolize – pohyb stav
 Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 100 × 100 × 91 mm · objem Σ 224,08 cm³ · hmotnost Σ 1,759 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 krocích, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 kroku, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
 === run 2 ===
 ✓ dokument „Cyklus“ (0 prvků) – otevře se v nové záložce
 ℹ řádek 1: záložka „Cyklus“ už je otevřená, ale nezaložil ji stejný druh příkazu běhu (otevřený soubor, JSON, ruční práce) – dokument je v nové záložce (u nový díl / nová sestava ji převezme volba „znovu“)
@@ -155,12 +155,12 @@ Procesní operace: 2
  „Horní deska“ + 2 díly (tuhá skupina – zámek / pevné vazby): ΔZ −21,5 mm · na konci zpět ve výchozí poloze
  „Přidržovač“: ΔZ −19 mm · na konci zpět ve výchozí poloze
  stojí: 2 („Deska A“, „Plech“)
-Kolize v pohybu: kroků s kolizí 1 z 61 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 29 · pracovní kontakt 2 dvojic
+Kolize v pohybu: kroků s kolizí 1 z 61 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v kroku 29 · pracovní kontakt 2 dvojic
  spojitě jen částečně: 61 poloh + 56 mezipoloh, mezi polohami nepotvrzeno v 2 úsecích (od kroku 26, 33; dotyk bez objemu v poloze 2×) – tam jen v polohách
 Vazby splněny ve všech krocích
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
- střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
- otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
+ střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v mezipoloze mezi kroky 29 a 30 (t = 0,986 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+ otisk 2 „Značka“ → „Plech“: záběr od mezipolohy mezi kroky 29 a 30 (t = 0,986 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
 Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 ⚠ řádek 2: v pohybu „Plech“ × „Značka“ od kroku 29 (t = 0,967 s): kroků 1, dvojic komponent 1, největší průnik 8,011 mm³ – místo [25; 75; 10,86] v kroku 29
@@ -171,8 +171,8 @@ Procesní operace: 2
   1. střih „Razník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
   2. otisk „Značka“ → „Plech“ · hloubka 0,3 mm · se začátkem fáze „Značení“
 Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
- střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v kroku 30 (t = 1 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
- otisk 2 „Značka“ → „Plech“: záběr od kroku 30 (t = 1 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
+ střih 1 „Razník“ → „Plech“: záběr od kroku 28 (t = 0,933 s) · prostřiženo v mezipoloze mezi kroky 29 a 30 (t = 0,986 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+ otisk 2 „Značka“ → „Plech“: záběr od mezipolohy mezi kroky 29 a 30 (t = 0,986 s) · odebráno 8,482 mm³ · hloubka 0,3 mm
  „Plech“: 2 operací, celkem odebráno 322,642 mm³ (sjednocení – společný objem operací jen jednou; součet operací 322,642 mm³)
 Stav výrobku „Plech“: plný (kroky 0–27) → v záběru (kroky 28–29) → děrovaný + v záběru (kroky 30–31) → děrovaný + označený (kroky 32–60)
 Krok 60 (t = 2 s, motory 71):
@@ -192,4 +192,4 @@ Vazby: 7 (6 ok, 1 potlačeno)
 Pohybová studie: motorů 1 · kroků 60 · 2 s · kolize – pohyb stav
 Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 100 × 100 × 91 mm · objem Σ 224,08 cm³ · hmotnost Σ 1,759 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 krocích, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 60 kroků, vazby splněny, průnik těles v 1 kroku, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný + označený, odebráno 322,642 mm³, odpad 1 (podrobně pohyb stav)

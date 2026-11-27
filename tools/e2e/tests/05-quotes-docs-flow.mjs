@@ -1092,7 +1092,7 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   await panel.locator('[role="alert"]').filter({ hasText: "Dodací list vzniká se zápisem dodání" }).waitFor({ timeout: 30_000 });
   expect(sql(`select coalesce(delivery_note_number, '-') from orders where id = ${lit(DOC1.id)}`) === "-", "bez dodání se číslo DL nespotřebovalo");
   const toCard = panel.getByRole("link", { name: /Zapsat dodání a dodací list/ });
-  expect((await toCard.getAttribute("href")) === `/orders/${DOC1.id}?tab=vyroba&akce=delivery.record`, "odkaz do karty na zápis dodání");
+  expect((await toCard.getAttribute("href")) === `/orders/${DOC1.id}?tab=dodani&akce=delivery.record`, "odkaz do karty na zápis dodání");
   await shot(page, S("53-documents-dl"));
   await toCard.click();
   const ddlg = page.getByRole("dialog");

@@ -39,12 +39,12 @@ Krok 2 (t = 1 s, motory 30):
  Vodítko [0; 0; 0]
  Jezdec [-30; 0; 10]
 CSV pohybové studie (5 řádků):
-Krok;Čas [s];Motor 1 [mm];Vodítko X;Vodítko Y;Vodítko Z;Vodítko RX;Vodítko RY;Vodítko RZ;Jezdec X;Jezdec Y;Jezdec Z;Jezdec RX;Jezdec RY;Jezdec RZ;Nesplněné vazby
-0;0;10;0;0;0;0;0;0;-10;0;10;0;0;0;0
-1;0,5;20;0;0;0;0;0;0;-20;0;10;0;0;0;0
-2;1;30;0;0;0;0;0;0;-30;0;10;0;0;0;0
-3;1,5;40;0;0;0;0;0;0;-40;0;10;0;0;0;0
-4;2;50;0;0;0;0;0;0;-50;0;10;0;0;0;0
+Krok;Čas [s];Motor 1 [mm];Vodítko X;Vodítko Y;Vodítko Z;Vodítko RX;Vodítko RY;Vodítko RZ;Jezdec X;Jezdec Y;Jezdec Z;Jezdec RX;Jezdec RY;Jezdec RZ;Nesplněné vazby;Revize modelu
+0;0;10;0;0;0;0;0;0;-10;0;10;0;0;0;0;r·?
+1;0,5;20;0;0;0;0;0;0;-20;0;10;0;0;0;0;r·?
+2;1;30;0;0;0;0;0;0;-30;0;10;0;0;0;0;r·?
+3;1,5;40;0;0;0;0;0;0;-40;0;10;0;0;0;0;r·?
+4;2;50;0;0;0;0;0;0;-50;0;10;0;0;0;0;r·?
 
 Dokument: „Pohyb“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Vodítko [0; 0; 0] ⚓ · Jezdec [-10; 0; 10]
@@ -52,4 +52,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 110 × 20 × 20 mm · objem Σ 24 cm³ · hmotnost Σ 0,188 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

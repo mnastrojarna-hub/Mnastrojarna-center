@@ -1,0 +1,90 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Razník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Střižník“ – nová záložka
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 817,1 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 3200 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 12566,4 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 15,71 mm³ · těleso platné
+
+Dokument: „Střižník“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 0,2 mm (X -5…5, Y -5…5, Z 0…0,2) · objem 0,02 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 2 [cylinder, id #] ✓ přidáno 15,71 mm³ · těleso platné – Ø10 × 0,2 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Lis“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy (ukotvená)
+✓ komponenta „Razník“ vložena do sestavy
+✓ komponenta „Střižník“ vložena do sestavy
+✓ vazba Souosost „Razník“ F1 → „Deska A“ F7: ok · poloha beze změny
+✓ vazba ZDVIH „Razník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
+✓ vazba Souosost „Střižník“ F1 → „Deska A“ F8: ok · poloha beze změny
+✓ vazba ZDVIH B „Střižník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+ pohání: „Razník“ · směr −Z
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −61 mm
+ stojí: 3 („Deska A“, „Plech“, „Střižník“)
+Vazby splněny ve všech krocích
+⚠ řádek 10: motor 1: hodnota vazby „ZDVIH“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+✓ motor 2: lineární motor · ZDVIH B „Střižník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+ pohání: „Střižník“ · směr −Z
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm; lineární motor · ZDVIH B „Střižník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“ + 1 díl (tuhá skupina – stejný pohyb): ΔZ −61 mm
+ stojí: 2 („Deska A“, „Plech“)
+Vazby splněny ve všech krocích
+⚠ řádek 11: motor 1: hodnota vazby „ZDVIH“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+⚠ řádek 11: motor 2: hodnota vazby „ZDVIH B“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+ℹ procesní operace 1. střih „Razník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm; lineární motor · ZDVIH B „Střižník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“ + 1 díl (tuhá skupina – stejný pohyb): ΔZ −61 mm
+ stojí: 2 („Deska A“, „Plech“)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ střih 1 „Razník“ → „Plech“: záběr od mezipolohy mezi kroky 0 a 1 (t = 0,5 s) · prostřiženo v mezipoloze mezi kroky 0 a 1 (t = 0,5 s) · odebráno 157,08 mm³ · hloubka 0,5 mm · odpad 1 ks, 157,08 mm³ (s nástrojem, pak padá)
+Stav výrobku „Plech“: plný (krok 0) → děrovaný (krok 1)
+⚠ řádek 12: motor 1: hodnota vazby „ZDVIH“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+⚠ řádek 12: motor 2: hodnota vazby „ZDVIH B“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+ℹ procesní operace 2. střih „Střižník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
+Pohybová studie: 1 krok · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm; lineární motor · ZDVIH B „Střižník“ → „Deska A“ · hodnota vazby 10 → -51 mm ↓ zdvih 61 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“ + 1 díl (tuhá skupina – stejný pohyb): ΔZ −61 mm
+ stojí: 2 („Deska A“, „Plech“)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ střih 1 „Razník“ → „Plech“: záběr od mezipolohy mezi kroky 0 a 1 (t = 0,5 s) · prostřiženo v mezipoloze mezi kroky 0 a 1 (t = 0,5 s) · odebráno 157,08 mm³ · hloubka 0,5 mm · odpad 1 ks, 157,08 mm³ (s nástrojem, pak padá)
+ střih 2 „Střižník“ → „Plech“: záběr jen mezi kroky – výsledek procesu nezjištěn (úsek před krokem 1 by potřeboval víc než 64 mezipoloh)
+ „Plech“: 2 operací, odebráno nejméně 157,08 mm³ – výsledek některé operace nezjištěn (sjednocení spočítaných operací; jejich součet 157,08 mm³)
+Stav výrobku „Plech“: plný (krok 0) → děrovaný (krok 1)
+⚠ řádek 13: procesní operace střih 2: nástroj „Střižník“ mohl obrobek „Plech“ zasáhnout jen mezi kroky – úsek by potřeboval víc než 64 mezipoloh, výsledek procesu nezjištěn (jemnější kroky: pohyb kroky N)
+⚠ řádek 13: motor 1: hodnota vazby „ZDVIH“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+⚠ řádek 13: motor 2: hodnota vazby „ZDVIH B“ klesne pod nulu (-51 mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)
+Krok 1 (t = 2 s, motory -51; -51):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Razník [30; 50; -41]
+ Střižník [70; 50; -41]
+ stav výrobku „Plech“: děrovaný · odebráno nejméně 157,08 mm³ · hloubka 0,5 mm · odpad 1 oddělen
+ zásah střih 1: 0,5 mm (geometrická aproximace)
+
+Dokument: „Lis“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [10; 10; 10] ⚓ · Razník [30; 50; 20] · Střižník [70; 50; 20]
+Vazby: 4 (4 ok)
+Pohybová studie: motorů 2 · kroků 1 · 2 s – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 60 mm · objem Σ 111,76 cm³ · hmotnost Σ 0,877 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 1 krok, vazby splněny, kolize nekontrolovány, procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný, odebráno nejméně 157,08 mm³, odpad 1, ⚠ upozornění k motorům: 3 (podrobně pohyb stav)

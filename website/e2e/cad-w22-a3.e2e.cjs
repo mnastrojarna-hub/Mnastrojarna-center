@@ -323,6 +323,63 @@ async function drawing(p, tag, lang) {
   } else ok(false, `${tag}22f: přepínač pohledu iso nenalezen (selektor data-view-toggle)`);
 }
 
+/*
+ * 22f kolo 7: přesně scénář majitele – výkres ULOŽENÝ s formátem A2, rychlá změna A2 → A3 a hned zavření výkresu, pak zavření
+ * karty prohlížeče. Dřív e2e začínal z „auto“ a dotaz při zavření karty měl jen ověřovací sondu. Teď: uložený soubor má A2,
+ * po změně jen výkresu se při zavření karty objeví skutečný dotaz beforeunload (změna se tedy počítá jako neuložená) a dokument
+ * v tu chvíli nese A3; po Ctrl+S má soubor A3, znovu otevřený soubor také a zavření karty už se neptá.
+ */
+async function drawingUnload(b, tag) {
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
+  await ctx.addInitScript(fsInit); // běžný uživatel (ne automatizace) – jinak se dotaz při zavření karty vypíná
+  const p = await ctx.newPage();
+  const dialogs = [];
+  p.on('dialog', (d) => { dialogs.push(d.type()); d.dismiss().catch(() => {}); });
+  try {
+    await start(p, `${BASE}/cad`);
+    await p.evaluate((t) => window.mncad.run(t), 'nový díl "Deska U"\nkvádr 60 40 10\nvýkres');
+    await p.waitForSelector('[data-sheet]', { timeout: 120000 }); await p.waitForTimeout(800);
+    const sel = p.getByLabel('Formát listu');
+    await sel.click(); await p.keyboard.press('Escape'); // skutečný klik myší (uživatelská aktivace stránky)
+    await sel.selectOption('A2');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    const n0 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved = await lastWrite(p, n0, 20000);
+    const s0 = findDoc(saved, 'Deska U');
+    ok(s0?.drawings?.[0]?.options?.sheet === 'A2', `${tag}22f kolo 7: výchozí stav = uložený výkres s formátem A2 (${s0?.drawings?.[0]?.options?.sheet})`);
+    // změna A2 → A3 a hned zavření výkresu (Esc do 100 ms), pak hned zavření karty
+    await p.evaluate((t) => window.mncad.run(t), 'výkres');
+    await p.waitForSelector('[data-sheet]', { timeout: 120000 }); await p.waitForTimeout(500);
+    await p.getByLabel('Formát listu').selectOption('A3');
+    await p.keyboard.press('Escape');
+    await p.close({ runBeforeUnload: true });
+    await new Promise((r) => setTimeout(r, 1500)); // stránka se smí zavřít – čekání nesmí záviset na ní
+    ok(!p.isClosed() && dialogs[0] === 'beforeunload', `${tag}22f kolo 7: zavření karty po změně jen výkresu → skutečný dotaz beforeunload (dialogy: ${dialogs.join(',') || 'žádný'}, karta ${p.isClosed() ? 'zavřena' : 'zůstala'})`);
+    if (p.isClosed()) return;
+    const d = await p.evaluate(() => window.mncad.getDocument());
+    ok(d.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: dokument v okamžiku dotazu nese A3 (${d.drawings?.[0]?.options?.sheet})`);
+    const n1 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved2 = await lastWrite(p, n1, 20000);
+    const s1 = findDoc(saved2, 'Deska U');
+    ok(s1?.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: Ctrl+S po dotazu zapsal A3 (${s1?.drawings?.[0]?.options?.sheet})`);
+    if (saved2) {
+      await p.locator('input[type=file]:not([data-insert-input])').first().setInputFiles({ name: 'deska-u.mncad', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved2)) });
+      await p.waitForTimeout(2500);
+      const re = await p.evaluate(() => window.mncad.getDocument());
+      ok(re.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: znovu otevřený soubor má A3 (${re.drawings?.[0]?.options?.sheet})`);
+    }
+    await p.keyboard.press('Control+s'); await p.waitForTimeout(1500); // otevřený soubor uložit → čistý stav
+    const before = dialogs.length;
+    await p.close({ runBeforeUnload: true });
+    await new Promise((r) => setTimeout(r, 1500)); // stránka se smí zavřít – čekání nesmí záviset na ní
+    ok(p.isClosed() && dialogs.length === before, `${tag}22f kolo 7: po uložení se zavření karty už neptá (dialogů navíc ${dialogs.length - before}, karta ${p.isClosed() ? 'zavřena' : 'zůstala'})`);
+  } finally {
+    await ctx.close();
+  }
+}
+
 /* ───────────────────────── 22h: export z menu s dialogem „Uložit jako“ (FS Access) a zrušení ───────────────────────── */
 async function menuExport(b, tag) {
   const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
@@ -428,6 +485,62 @@ async function undoAfterExport(p, tag) {
   ok(/odpovídá modelu/.test(line2), `${tag}kolo 4: Ctrl+Y vrátí model exportu – záznam zase „odpovídá modelu“ (${line2})`);
 }
 
+/**
+ * Kolo 7 (bod 12, oponentura): video WebM pohybové studie nese revizi modelu – značka MODEL_REVISION v souboru (zápis vlastním
+ * muxerem cad/webm-mux.ts, ne MediaRecorder), kontrola exportu ji přečte zpět; zpráva exportu ji uvádí („z modelu r·…“) a je
+ * stejná jako sloupec „Revize modelu“ v CSV téže studie (mncad.motion().csv). Po změně modelu nový export = nová revize.
+ */
+async function motionWebmRev(b, tag) {
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 }, acceptDownloads: true });
+  const p = await ctx.newPage();
+  await start(p, `${BASE}/cad`);
+  const run = (t) => p.evaluate((x) => window.mncad.run(x), t);
+  const log = await run(['nový díl "Deska W"', 'kvádr 200 100 10', 'nový díl "Přidržovač W"', 'kvádr 200 100 10', 'nová sestava "Studie W"', 'vložit "Deska W" ukotvit', 'vložit "Přidržovač W" v 0 0 67,5', 'sestava vazba vzdálenost "Přidržovač W" spodní "Deska W" horní hodnota 57,5 název "ZDVIH"', 'sestava vazba rovnoběžně "Přidržovač W" +X "Deska W" +X', 'sestava vazba rovnoběžně "Přidržovač W" +Y "Deska W" +Y', 'pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 12 čas 0,4', 'pohyb spustit'].join('\n'));
+  ok(!/^✗/m.test(log), `${tag}12 webm: studie spočtena`);
+  const revOfCsv = async () => {
+    const m = await p.evaluate(() => window.mncad.motion());
+    const row = String(m && m.csv || '').replace(/^\uFEFF/, '').trim().split(/\r?\n/)[1] || '';
+    return (/;(r·[0-9a-f]{6})$/.exec(row) || [])[1] || null;
+  };
+  const exportOnce = async (name) => {
+    const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);
+    await run('pohyb export webm');
+    const f = await dl;
+    if (!f) return { file: null, rep: null };
+    const file = S + name;
+    await f.saveAs(file);
+    await p.waitForFunction(() => !!document.querySelector('[data-video-report]'), null, { timeout: 30000 }).catch(() => {});
+    const rep = await p.locator('[data-video-report]').textContent().catch(() => '');
+    return { file, rep, name: f.suggestedFilename() };
+  };
+  /** značka MODEL_REVISION ze souboru: SimpleTag (0x67C8) → TagName (0x45A3) + TagString (0x4487), čteno bez aplikace */
+  const tagOf = (buf) => {
+    const name = Buffer.from('MODEL_REVISION');
+    const i = buf.indexOf(name);
+    if (i < 0) return null;
+    const o = i + name.length;
+    if (buf[o] !== 0x44 || buf[o + 1] !== 0x87) return null;
+    const len = buf[o + 2] & 0x7f; // délka jako 1bajtový EBML vint
+    return buf.slice(o + 3, o + 3 + len).toString('utf8');
+  };
+  const rev1 = await revOfCsv();
+  ok(/^r·[0-9a-f]{6}$/.test(rev1 || ''), `${tag}12 webm: revize studie z CSV ${rev1}`);
+  const a = await exportOnce(`w22a3-rev-1${tag ? '-nogl' : ''}.webm`);
+  ok(!!a.file && /\.webm$/.test(a.name || ''), `${tag}12 webm: soubor WebM stažen (${a.name})`);
+  if (a.file) {
+    const t1 = tagOf(fs.readFileSync(a.file));
+    ok(t1 === rev1, `${tag}12 webm: soubor nese MODEL_REVISION = ${t1} (CSV ${rev1})`);
+    ok(new RegExp(`z modelu ${rev1}`).test(a.rep || ''), `${tag}12 webm: zpráva exportu uvádí revizi – ${(a.rep || '').slice(-80)}`);
+  }
+  // změna modelu → nová studie a nový export nesou NOVOU revizi (ne starou)
+  await run(['sestava upravit "Deska W"', 'kvádr 20 20 5 v 0 0 10', 'sestava hotovo', 'pohyb spustit'].join('\n'));
+  const rev2 = await revOfCsv();
+  ok(!!rev2 && rev2 !== rev1, `${tag}12 webm: po změně modelu jiná revize (${rev1} → ${rev2})`);
+  const c = await exportOnce(`w22a3-rev-2${tag ? '-nogl' : ''}.webm`);
+  if (c.file) ok(tagOf(fs.readFileSync(c.file)) === rev2, `${tag}12 webm: nový soubor nese novou revizi ${rev2}`);
+  await ctx.close();
+}
+
 const browsers = [];
 const launch = async (o) => { const x = await chromium.launch(o); browsers.push(x); return x; };
 (async () => {
@@ -448,6 +561,8 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
     await ctx.close();
   }
   await menuExport(b, '');
+  await drawingUnload(b, '');
+  await motionWebmRev(b, '');
   for (const [tag, url, lang] of [['', `${BASE}/cad`, 'cs'], ['[en] ', `${BASE}/en/cad`, 'en'], ['[de] ', `${BASE}/de/cad`, 'de']]) await ctrlSave(b, tag, url, lang);
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
@@ -460,6 +575,8 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
   await ctrlSave(nogl, '[bez WebGL] ', `${BASE}/cad`, 'cs');
+  await drawingUnload(nogl, '[bez WebGL] ');
+  await motionWebmRev(nogl, '[bez WebGL] ');
   await nogl.close();
 })()
   .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })

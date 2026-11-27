@@ -66,7 +66,7 @@ export function exportRun(tracker: RunTracker, o: { format: ExportFormat3d; labe
           return data.length;
         },
       });
-      ctl.set({ result: { ok: !r.check || r.check.ok, bytes: r.data.length, modelRev: r.modelRev, written: true, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗]\s*/, "") } } : {}) } });
+      ctl.set({ result: { ok: !r.check || r.check.ok, bytes: r.data.length, modelRev: r.modelRev, written: true, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗ℹ]\s*/, ""), ...(r.check.level === "note" ? { note: true } : {}) } } : {}) } });
       return r;
     } catch (e) {
       const removed = await discardTarget(o.target);
@@ -99,7 +99,7 @@ export function recordExportJob(cur: CadDoc, o: { format: string; file: string; 
     format: o.format,
     file: o.file,
     from: o.job.doc,
-    job: { ...(o.id ? { id: o.id } : {}), state: "done", ms, phases: o.job.phases.map((p) => ({ phase: p.phase, ms: p.ms })), ...(c ? { check: { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") } } : {}) },
+    job: { ...(o.id ? { id: o.id } : {}), state: "done", ms, phases: o.job.phases.map((p) => ({ phase: p.phase, ms: p.ms })), ...(c ? { check: { ok: c.ok, text: c.line.replace(/^[✓⚠✗ℹ]\s*/, "") } } : {}) },
   });
   return { doc, rec, changed: modelId(cur).sig !== modelId(o.job.doc).sig };
 }

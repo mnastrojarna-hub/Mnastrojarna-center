@@ -83,7 +83,7 @@ export const DETECT_PHOTO_OVERVIEW_SCHEMA = obj({
 export const DETECT_PHOTO_LINES_SCHEMA = obj({
   tiles: arr(obj({
     img: int,
-    lines: arr(obj({ quad: arr(int), text: str, redact: bool, category: en(CATEGORY_ENUM), reason: en(REASONS), keepField: en([...KEEP_FIELDS, "none"]) })),
+    lines: arr(obj({ quad: arr(int), text: str, redact: bool, redactText: str, category: en(CATEGORY_ENUM), reason: en(REASONS), keepField: en([...KEEP_FIELDS, "none"]) })),
     graphics: arr(obj({ quad: arr(int), kind: en(GRAPHIC_KINDS), confidence: num })),
   })),
   confidence: num,
@@ -123,7 +123,7 @@ export interface OverviewResult {
 export interface LinesResult {
   tiles: {
     img: number;
-    lines: { quad: number[]; text: string; redact: boolean; category: AnonCategory; reason: Reason; keepField: (typeof KEEP_FIELDS)[number] | "none" }[];
+    lines: { quad: number[]; text: string; redact: boolean; redactText?: string; category: AnonCategory; reason: Reason; keepField: (typeof KEEP_FIELDS)[number] | "none" }[];
     graphics: { quad: number[]; kind: (typeof GRAPHIC_KINDS)[number]; confidence: number }[];
   }[];
   confidence: number;
@@ -209,6 +209,9 @@ v obrázku přehledu nebo výřezu). Ze SEZNAMU ŘÁDKŮ vyber řádky k vymazá
 řádek = celý text). Pro grafiku, kterou seznam řádků neobsahuje (logo, vektorové logo z křivek, podpis, otisk razítka,
 QR/čárový kód, vodoznak), vrať boxes v pixelech konkrétního obrázku. Označ keep pole (id řádku a druh) a řádky
 s podnikovou normou zákazníka. Vrať jen to, co opravdu vede k zákazníkovi nebo projektantovi.
+MAŽE SE JEN NÁZEV FIRMY (a její logo): substring = přesně název firmy, nikdy celý řádek s dalšími údaji. NIKDY nemaž
+materiál, tepelné zpracování (kalení, popouštění, nitridace, cementace, HRC), povrchovou úpravu, povlak, zinkování,
+eloxování, tolerance, drsnost, rozměry, hmotnost, měřítko, číslo výkresu, revize ani poznámky. Box loga obepíná jen logo.
 Do companies vypiš KAŽDÝ název firmy / organizace, který je na stránce VIDĚT (razítko, rám, doložka, logo, poznámky):
 box v pixelech obrázku (img), doslovný text (u loga bez čitelného textu prázdný), role (owner = vlastník výkresu,
 customer = zákazník, designer = projektant / konstrukční kancelář, other_company = jiná firma, referenced_maker = výrobce
@@ -229,7 +232,9 @@ a kandidáty na citlivá místa mimo razítko (logo, otisk razítka, podpis, kó
 
 const LINES_TASK = `ÚKOL (fotka/sken — přesně): Obrázky jsou výřezy v plném rozlišení (razítko, revize, kandidáti a okrajové pásy listu).
 Na KAŽDÉM obrázku vrať VŠECHNY řádky textu jako čtyřúhelník v pixelech toho obrázku s doslovným přepisem (text),
-s rozhodnutím redact (smazat ano/ne), kategorií, důvodem a keepField (keep pole, jinak "none"). Vrať i grafiku k smazání
+s rozhodnutím redact (smazat ano/ne), redactText (PŘESNÝ podřetězec, který se smaže — jen samotný název firmy, ne celý
+řádek; když se maže celý řádek, opakuj celý text; když redact=false, prázdný), kategorií, důvodem a keepField (keep pole,
+jinak "none"). Vrať i grafiku k smazání
 (logo, otisk razítka, podpis, kód) jako čtyřúhelník. Řádky, které zůstávají, vracej také (redact=false) — slouží ke kontrole.`;
 
 const VERIFY_TASK = `ÚKOL (přepis): Přepiš doslova všechny čitelné řádky textu na každém obrázku, včetně zlomků a částečně čitelných

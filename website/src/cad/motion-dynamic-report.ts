@@ -7,6 +7,8 @@ import { getLang, tr } from "./i18n";
 import { motionCsv, motionSummary, type MotionResult } from "./motion";
 import type { DynMotionStep, DynResult } from "./motion-dynamic";
 import type { CadDoc } from "./types";
+import { csvWithRev } from "./motion-export-rev";
+import { modelRev } from "./engine/result-key";
 
 /** číslo do CSV (středník, desetinná čárka pro Excel – jako motionCsv v cad/motion.ts) */
 const num = (v: number, d = 3) => (Math.round(v * 10 ** d) / 10 ** d || 0).toString().replace(".", ",");
@@ -34,11 +36,38 @@ export function mainAxis(res: DynResult, id: string): 0 | 1 | 2 {
   }
   return best;
 }
+/** poloha tělesa v hlavní ose ve snímcích s `dyn` (neplatný snímek – motor za mezí – ho nemá a do rozsahu nejde, kolo 7) */
+const axisValues = (res: DynResult, id: string, k: 0 | 1 | 2) => (res.steps as DynMotionStep[]).map((s) => s.dyn?.[id]?.p[k]).filter((x): x is number => x !== undefined);
 const moved = (res: DynResult, id: string) => {
-  const k = mainAxis(res, id);
-  const v = (res.steps as DynMotionStep[]).map((s) => s.dyn?.[id]?.p[k] ?? 0);
-  return Math.max(...v) - Math.min(...v) > 1e-6;
+  const v = axisValues(res, id, mainAxis(res, id));
+  return v.length > 0 && Math.max(...v) - Math.min(...v) > 1e-6;
 };
+/** souvislé úseky indexů s konečnou hodnotou (graf: neplatný krok bez hodnoty čáru přeruší, nespojí body přes mezeru) */
+export function valueRuns(values: readonly number[]): number[][] {
+  const out: number[][] = [];
+  let cur: number[] = [];
+  values.forEach((v, k) => {
+    if (Number.isFinite(v)) cur.push(k);
+    else if (cur.length) {
+      out.push(cur);
+      cur = [];
+    }
+  });
+  if (cur.length) out.push(cur);
+  return out;
+}
+/** úseky neplatných snímků („4–12“, „2, 7–9“) */
+export function invalidSpans(steps: DynMotionStep[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    if (steps[i].status !== "invalid") continue;
+    let j = i;
+    while (j + 1 < steps.length && steps[j + 1].status === "invalid") j++;
+    out.push(i === j ? `${steps[i].i}` : `${steps[i].i}–${steps[j].i}`);
+    i = j;
+  }
+  return out.join(", ");
+}
 
 const srcText = (s: string) => (s === "manual" ? tr("zadaná") : s === "default" ? tr("neznámá – náhradní 1 g") : tr("z objemu × hustoty"));
 
@@ -50,9 +79,13 @@ export function dynamicLines(res: DynResult, doc: CadDoc): string[] {
   const g = d.gravity ? `${d.gravity.map((v, k) => (Math.abs(v) > 0.999 ? `${v < 0 ? "−" : "+"}${AXES[k]}` : "")).join("") || `[${d.gravity.map((v) => txt(v)).join("; ")}]`}` : tr("vyp");
   out.push(tr("Dynamika: {0} s · krok {1} ms · {2} kroků · gravitace {3} · tlumení {4} N·s/mm · odraz {5} · výpočet {6} s", txt(steps[steps.length - 1]?.t ?? 0, 4), txt(d.dt * 1000, 4), d.n, g, txt(d.damping, 4), txt(d.restitution, 2), txt(d.ms / 1000, 2)));
   if (!d.bodies.length) out.push(tr(" ⚠ žádná pohyblivá komponenta – dynamika potřebuje díly vedené vazbami (Souosost, Drážka, Závěs, Mez vzdálenosti…)"));
+  // neplatné kroky (motor „na mezi chyba“ za mezí): stav integrátoru v nich je nefyzikální – statistiky jen z platných (kolo 7)
+  const bad = invalidSpans(steps);
+  if (bad) out.push(tr(" ⚠ neplatné kroky {0} (motor za mezí – na mezi chyba): zdvih, rychlosti, zrychlení, dotyky, síly pružin a energie jen z platných kroků; v CSV a grafu vynechány", bad));
   for (const b of d.bodies) {
     const k = mainAxis(res, b.id);
-    const p = steps.map((s) => s.dyn?.[b.id]?.p[k] ?? 0);
+    const p = axisValues(res, b.id, k);
+    if (!p.length) p.push(0);
     // špičky ze všech integračních kroků (ne jen ze zaznamenaných snímků); zrychlení bez rázů na dorazech
     const pk = d.peaks?.[b.id];
     const vMax = pk ? pk.v : Math.max(...steps.map((s) => Math.hypot(...(s.dyn?.[b.id]?.v ?? [0, 0, 0]))));
@@ -86,7 +119,8 @@ export function dynamicLines(res: DynResult, doc: CadDoc): string[] {
     else if (back && c.intervals[0][0] > 0 && moved(res, d.bodies[0]?.id ?? "")) out.push(tr("  první dotyk v t = {0} s", txt(back[0], 4)));
   }
   const e = d.energy;
-  if (e.drift !== null) out.push(tr(" Kontrola energie: odchylka {0} % z {1} J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení {2} J, dotyky {3} J, zadané síly {4} J)", txt(e.drift * 100, 3), txt(e.ref ?? e.kinMax, 5), txt(e.damping, 4), txt(e.contacts, 4), txt(e.applied, 4)));
+  if (e.endT !== undefined) out.push(tr(" Energie: na začátku {0} J, v posledním platném kroku (t = {1} s) {2} J (motor koná práci – bilance se nekontroluje)", txt(e.e0, 4), txt(e.endT, 4), txt(e.end, 4)));
+  else if (e.drift !== null) out.push(tr(" Kontrola energie: odchylka {0} % z {1} J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení {2} J, dotyky {3} J, zadané síly {4} J)", txt(e.drift * 100, 3), txt(e.ref ?? e.kinMax, 5), txt(e.damping, 4), txt(e.contacts, 4), txt(e.applied, 4)));
   else out.push(tr(" Energie: na začátku {0} J, na konci {1} J (motor koná práci – bilance se nekontroluje)", txt(e.e0, 4), txt(e.end, 4)));
   return out;
 }
@@ -97,8 +131,16 @@ export function studySummary(res: MotionResult, doc: CadDoc, o: Parameters<typeo
   return isDyn(res) ? [...base, ...dynamicLines(res, doc)] : base;
 }
 
-/** CSV studie: u dynamiky navíc poloha těžiště, rychlost a zrychlení každého tělesa v hlavní ose. */
+/**
+ * CSV studie: u dynamiky navíc poloha těžiště, rychlost a zrychlení každého tělesa v hlavní ose. Poslední sloupec „Revize
+ * modelu“ = revize sestavy, ze které výsledek vznikl (vlna 22 kolo 7, bod 12 – cad/motion-export-rev.ts). Jedna funkce pro
+ * všechny cesty: soubor z panelu Pohyb, ZIP snímků, `pohyb export csv` (soubor i výpis v konzoli) a `mncad.motion().csv`.
+ */
 export function studyCsv(res: MotionResult, doc: CadDoc): string {
+  return csvWithRev(studyCsvCols(res, doc), modelRev(doc));
+}
+
+function studyCsvCols(res: MotionResult, doc: CadDoc): string {
   const csv = motionCsv(res, doc);
   if (!isDyn(res)) return csv;
   const lines = csv.replace(/^﻿/, "").replace(/\r\n$/, "").split("\r\n");
@@ -141,7 +183,7 @@ export function dynCharts(res: DynResult, doc: CadDoc): DynChart[] {
 }
 
 /** Výsledek dynamiky pro `window.mncad.motion` (názvy místo id); u kinematiky prázdný objekt. */
-export function dynApi(res: MotionResult, doc: CadDoc): { dynamic?: { bodies: { name: string; mass: number; source: string }[]; springMax: { name: string; force: number; t: number } | null; contacts: { label: string; bound: string; limit: number; intervals: [number, number][]; impacts: { t: number; v: number }[] }[]; energy: { e0: number; end: number; drift: number | null; damping: number; contacts: number } } } {
+export function dynApi(res: MotionResult, doc: CadDoc): { dynamic?: { bodies: { name: string; mass: number; source: string }[]; springMax: { name: string; force: number; t: number } | null; contacts: { label: string; bound: string; limit: number; intervals: [number, number][]; impacts: { t: number; v: number }[] }[]; energy: { e0: number; end: number; endT?: number; drift: number | null; damping: number; contacts: number } } } {
   if (!isDyn(res)) return {};
   const d = res.dynamic;
   const nm = (id: string) => (doc.components?.some((c) => c.id === id) ? instanceKey(doc, id) : id);
@@ -150,7 +192,7 @@ export function dynApi(res: MotionResult, doc: CadDoc): { dynamic?: { bodies: { 
       bodies: d.bodies.map((b) => ({ name: nm(b.id), mass: b.mass, source: b.source })),
       springMax: d.springMax ? { name: nm(d.springMax.id), force: d.springMax.force, t: d.springMax.t } : null,
       contacts: d.contacts.map((c) => ({ label: c.label, bound: c.bound, limit: c.limit, intervals: c.intervals, impacts: c.impacts })),
-      energy: { e0: d.energy.e0, end: d.energy.end, drift: d.energy.drift, damping: d.energy.damping, contacts: d.energy.contacts },
+      energy: { e0: d.energy.e0, end: d.energy.end, ...(d.energy.endT !== undefined ? { endT: d.energy.endT } : {}), drift: d.energy.drift, damping: d.energy.damping, contacts: d.energy.contacts },
     },
   };
 }

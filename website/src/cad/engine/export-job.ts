@@ -53,6 +53,8 @@ export type ExportJobOptions = {
   rebuild?: boolean;
   /** zápis až po kontrole (výchozí) – false = zapsat hned po převodu a kontrolovat potom (pořadí řádků protokolu textu) */
   verifyFirst?: boolean;
+  /** rychlá kontrola platnosti souboru i nad mezí ploch (`EXPORT_VALID_FACES`) – přísný režim (22c kolo 7) */
+  fullCheck?: boolean;
   /** komponenty sestavy bez tělesa / s volnými plochami – jména do hlášky kontroly (vlna 22, bod 22c – solid-check.ts) */
   parts?: SolidParts;
 };
@@ -125,6 +127,15 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
     cur = null;
   };
   const rev = exportModelRev(doc);
+  try {
+    return await jobBody();
+  } catch (e) {
+    // fáze, ve které úloha skončila – trvalý záznam neúspěšného exportu (bod 22h kolo 7, cad/export-failures.ts)
+    const at = (cur as { phase: ExportPhase } | null)?.phase;
+    if (at && e && typeof e === "object" && !("exportPhase" in e)) Object.defineProperty(e, "exportPhase", { value: at, enumerable: false });
+    throw e;
+  }
+  async function jobBody(): Promise<ExportJobResult<T>> {
   // prázdný model a 2D výkres: bez přestavby – převod skončí srozumitelnou chybou (`modelBytes`)
   const rebuild = o.rebuild ?? (doc.kind !== "assembly" && doc.kind !== "draft" && !isEmptyDoc(doc));
   let built: CheckOut | undefined;
@@ -146,12 +157,12 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
     out = await deps.write(data);
     if (wantCheck) {
       step("verify");
-      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts);
+      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts, o.fullCheck === true);
     }
   } else {
     if (wantCheck) {
       step("verify");
-      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts);
+      check = await verifyExport(deps.kernel, doc, data, format as "step" | "brep", o.parts, o.fullCheck === true);
     }
     const held = check && deps.hold ? deps.hold(check) : null;
     if (held) out = held.out;
@@ -162,4 +173,5 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
   }
   close();
   return { doc, data, out, ...(check ? { check } : {}), modelRev: rev, phases };
+  }
 }

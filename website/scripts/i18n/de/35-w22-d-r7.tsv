@@ -1,0 +1,30 @@
+# vlna 22, fáze 2, kolo 7 (stopa D): přepočítat vše bez falešné zelené, třída materiálu razítka, výkresy dílů
+{0} – nedoběhlo, výsledek nezkontrolován	{0} – nicht abgeschlossen, Ergebnis nicht geprüft
+{0} – s varováním: {1}	{0} – mit Warnung: {1}
+{0} kopií zůstává starších než díl	{0} Kopien bleiben älter als das Teil
+nalezeno kolizí: {0} – viz ⚠ výše	Kollisionen gefunden: {0} – siehe ⚠ oben
+nesplněno vazeb: {0} (sestava vazby)	nicht erfüllte Verknüpfungen: {0} (baugruppe verknüpfungen)
+vazba {0} – ztracená reference po úpravě dílu	Verknüpfung {0} – verlorene Referenz nach der Teileänderung
+sestava vazba {0} plocha … / sestava vazba {0} smazat	baugruppe verknüpfung {0} fläche … / baugruppe verknüpfung {0} löschen
+vazba {0} – nesplněna ({1})	Verknüpfung {0} – nicht erfüllt ({1})
+→ materiál = {0} · označení „{1}“ v razítku zůstává	→ Werkstoff = {0} · Bezeichnung „{1}“ bleibt im Schriftfeld
+✓ materiál = {0} · označení „{1}“ v razítku zůstává	✓ Werkstoff = {0} · Bezeichnung „{1}“ bleibt im Schriftfeld
+{0} ({1} listů)	{0} ({1} Blätter)
+{0} (bez výkresu)	{0} (ohne Zeichnung)
+exporty [vymazat] · výstupy [zastaralé] · přepočítat vše · výkresy dílů [A4|A3|A2|A1|A0]	exporte [löschen] · ausgaben [veraltet] · alles neu berechnen · teilezeichnungen [A4|A3|A2|A1|A0]
+Kopie dílů v sestavě se samy neobnoví: výkresy přibudou do výstupů sestavy po sestava obnovit vše	Teilekopien in der Baugruppe werden nicht selbst aktualisiert: die Zeichnungen kommen nach baugruppe aktualisieren alle zu den Baugruppenausgaben
+Nezaloženo – díl není otevřený v záložce ({0}); otevřete díl a zadejte výkres {1}:	Nicht angelegt – das Teil ist in keinem Tab geöffnet ({0}); Teil öffnen und zeichnung {1} eingeben:
+Nezaloženo – list se nevytvořil ({0}):	Nicht angelegt – das Blatt wurde nicht erstellt ({0}):
+Sestava nemá vyráběné díly – není co založit	Die Baugruppe hat keine Fertigungsteile – nichts anzulegen
+Výkres už mají ({0}) – beze změny:	Haben schon eine Zeichnung ({0}) – unverändert:
+Výkresy dílů sestavy „{0}“ – vyráběných dílů {1} (normálie {2} a nakupované {3} výkres nedostanou):	Teilezeichnungen der Baugruppe „{0}“ – Fertigungsteile {1} (Normteile {2} und Kaufteile {3} erhalten keine Zeichnung):
+výkresy dílů: jen v sestavě – výkres dílu: výkres {0} v jeho záložce	teilezeichnungen: nur in einer Baugruppe – Teilezeichnung: zeichnung {0} in seinem Tab
+výkresy dílů: neznámé „{0}“ – výkresy dílů [A4|A3|A2|A1|A0]	teilezeichnungen: unbekannt „{0}“ – teilezeichnungen [A4|A3|A2|A1|A0]
+Založeno ({0}, {1}, Chytré kóty):	Angelegt ({0}, {1}, Intelligente Bemaßung):
+„{0}“ dílu „{1}“	„{0}“ des Teils „{1}“
+{0} – list „{1}“ s varováním: {2}	{0} – Blatt „{1}“ mit Warnung: {2}
+{0} – list „{1}“ vyhodnocen bez nálezů	{0} – Blatt „{1}“ ohne Befund ausgewertet
+Výrobní dokumentace	Fertigungsunterlagen
+Založí list výkresu každému vyráběnému dílu otevřenému v záložce, který výkres nemá (text: výkresy dílů)	Legt jedem in einem Tab geöffneten Fertigungsteil ohne Zeichnung ein Zeichnungsblatt an (Text: teilezeichnungen)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+materiál „{0}“ je třídy {1}, hustota se ale počítá podle třídy {2} ({3} g/cm³) – označení v razítku a třída si odporují: opravte označení, nebo zvolte třídu {1}	Werkstoff „{0}“ gehört zur Klasse {1}, die Dichte wird aber nach Klasse {2} ({3} g/cm³) berechnet – Bezeichnung im Schriftfeld und Klasse widersprechen sich: Bezeichnung korrigieren oder Klasse {1} wählen

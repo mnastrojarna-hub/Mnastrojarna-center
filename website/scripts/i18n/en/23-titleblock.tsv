@@ -52,7 +52,6 @@ Nahrát obrázek loga (PNG, JPEG, SVG) – zmenší se na nejvýš 600 × 300 px
 Nahrát…	Upload…
 např. černit	e.g. black oxide
 např. DIN ISO 2768-mK	e.g. DIN ISO 2768-mK
-např. kalit 58–60 HRC	e.g. harden 58–60 HRC
 např. plech 40×160×185	e.g. plate 40×160×185
 nástrojářská (všechna pole)	toolmaker (all fields)
 nepodporovaný barevný typ PNG {0}	unsupported PNG colour type {0}
@@ -111,6 +110,5 @@ v – velmi hrubá	v – very coarse
 velmi hrubá	very coarse
 Vlastní text	Custom text
 Výkres nemá nepředepsané tolerance{0} – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)	The drawing has no general tolerances{0} – enter them: drawing general ISO 2768-mK (class f/m/c/v + H/K/L) or drawing general decimals (X. ±0.1 / X.X ±0.1 / X.XX ±0.01 / X.XXX ±0.005)
-výkres razítko název="…" číslo="…" kreslil="…" kontroloval="…" schválil="…" revize="…" datum="…" materiál="…" polotovar="…" počet="…" tepelné="…" povrch="…" nepředepsané="ISO 2768-mK|desetinná" úhly="…" sražení="…" hrany="…" zákazník="…" projekt="…" firma="…" logo="soubor.png" šablona=iso7200|kompaktní|nástrojářská poznámka="…"	drawing titleblock name="…" number="…" author="…" checked="…" approved="…" revision="…" date="…" material="…" stock="…" quantity="…" heat="…" surface="…" general="ISO 2768-mK|decimals" angles="…" chamfers="…" edges="…" customer="…" project="…" company="…" logo="file.png" template=iso7200|compact|toolmaker note="…"
 zákazník	customer
 Zákazník	Customer

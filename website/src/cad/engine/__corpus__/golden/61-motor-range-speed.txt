@@ -44,14 +44,14 @@ Pohybová studie: 6 kroků · 3 s · motory: lineární motor · ZDVIH „Deska 
 Vazby splněny ve všech krocích
 ℹ řádek 2: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 CSV pohybové studie (7 řádků):
-Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A X;Deska A Y;Deska A Z;Deska A RX;Deska A RY;Deska A RZ;Nesplněné vazby
-0;0;57,5;0;0;0;0;0;0;0;0;67,5;0;0;0;0
-1;0,5;49,9125;0;0;0;0;0;0;0;0;59,9125;0;0;0;0
-2;1;42,325;0;0;0;0;0;0;0;0;52,325;0;0;0;0
-3;1,5;34,7375;0;0;0;0;0;0;0;0;44,7375;0;0;0;0
-4;2;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
-5;2,5;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
-6;3;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
+Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A X;Deska A Y;Deska A Z;Deska A RX;Deska A RY;Deska A RZ;Nesplněné vazby;Revize modelu
+0;0;57,5;0;0;0;0;0;0;0;0;67,5;0;0;0;0;r·?
+1;0,5;49,9125;0;0;0;0;0;0;0;0;59,9125;0;0;0;0;r·?
+2;1;42,325;0;0;0;0;0;0;0;0;52,325;0;0;0;0;r·?
+3;1,5;34,7375;0;0;0;0;0;0;0;0;44,7375;0;0;0;0;r·?
+4;2;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0;r·?
+5;2,5;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0;r·?
+6;3;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0;r·?
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
  pohání: „Deska A“ · směr −Z
 Pohybová studie: 4 kroky · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
@@ -68,7 +68,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 4 ===
 ✗ řádek 2: motor: rozsah 30,35 mm rychlostí 15,175 mm/s trvá 2 s, zadaný čas 1 s nestačí – vynechte čas (délka studie bude 2 s), nebo rychlost (motor projede rozsah za 1 s) (skript ze starší verze: dřívější význam – jet od začátku rychlostí bez konce – zapíšete „od A rychlost V“)
 
@@ -78,7 +78,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 5 ===
 ✗ řádek 1: motor: rychlost -15,175 je záporná, ale rozsah 27,15 → 57,5 mm roste – zadejte kladnou rychlost (směr určuje rozsah), nebo rozsah otočte
 
@@ -88,7 +88,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 6 ===
 Pohybová studie: motorů 1 · kroků 4
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
@@ -115,4 +115,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

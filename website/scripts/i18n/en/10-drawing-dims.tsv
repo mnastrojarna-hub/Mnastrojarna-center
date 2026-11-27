@@ -18,7 +18,6 @@
 ✓ kóty: žádné automatické (odstraněno vygenerovaných: {0})	✓ dimensions: no automatic ones (generated removed: {0})
 ✓ nepředepsané tolerance {0}	✓ general tolerances {0}
 ✓ nový list výkresu „{0}“ (Chytré kóty)	✓ new drawing sheet “{0}” (Smart dimensions)
-✓ obecná drsnost {0} (poznámka u razítka)	✓ general roughness {0} (note at the title block)
 ✓ poznámka: {0}	✓ note: {0}
 ✓ tolerance {0} → {1} ({2})	✓ tolerance {0} → {1} ({2})
 ✓ výkres: {0}	✓ drawing: {0}
@@ -50,7 +49,6 @@ měřítko: 1:2, 2:1, 1:1 nebo auto	scale: 1:2, 2:1, 1:1 or auto
 na šířku	landscape
 na výšku	portrait
 Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou	Replaces only generated dimensions – your own dimensions and notes stay
-Nepředepsaná drsnost {0}	General surface roughness {0}
 neznámý pohled „{0}“ – přední, horní, levý, pravý, zadní, spodní, iso	unknown view “{0}” – front, top, left, right, back, bottom, iso
 od základny	baseline
 osy	centre lines

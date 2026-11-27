@@ -18,6 +18,7 @@ import { applyClashPolicy, isFault, staticRuleCtx, stepRuleCtx, touchTol, type M
 import { getLang, tr } from "./i18n";
 import type { AsmComponent, CadDoc, ClashRule, Placement, Vec3 } from "./types";
 import type { BetweenHit, SweepInfo } from "./motion-clearance";
+import { lostSpringComps } from "./spring-lost";
 import { sweepKv, sweepLabel } from "./clearance-report";
 import { fmtNum as kvNum } from "./engine/protocol";
 
@@ -232,10 +233,23 @@ export function undeterminedWhy(x: Pick<ClashDetail, "why" | "hole" | "note">): 
  * Text jednoho nálezu (skupiny) do protokolu a panelu: „4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4, #5, #6] (365,2 mm³) –
  * místo [15; 30; 31,5]; …“.
  */
+/**
+ * Pružina se ztracenou dosedací plochou (⚠ spring.lost) stojí v NEOVĚŘENÉ délce – kolize s ní to řekne u dvojice (bod 7, kolo 7:
+ * dřív „kolize „Deska A“ × „Pružina“ (445,6 mm³)“ bez souvislosti s tím, že délka pružiny se nekontrolovala). Jen komponenty
+ * nejvyšší úrovně (pružina sestavy). Bez takové pružiny prázdné.
+ */
+export function lostSpringNote(d: CadDoc, items: readonly Pick<ClashDetail, "a" | "b" | "aPath" | "bPath">[]): string {
+  const lost = new Set(lostSpringComps(d).map((c) => c.id));
+  if (!lost.size) return "";
+  // pružina jako instance („Pružina #3“, „Pružina [P2]“) – víc pružin stejného názvu se rozliší (oponent kola 7: dřív holý název)
+  const names = new Set(items.flatMap((x) => [pathA(x), pathB(x)].flatMap((p) => (p.length === 1 && lost.has(p[0]) ? [leafLabel(d, p)] : []))));
+  return [...names].map((n) => tr(" · pružina „{0}“ v neověřené délce (ztracená dosedací plocha – spring.lost)", n)).join("");
+}
+
 export function groupText(g: ClashGroup, doc: CadDoc): string {
   const n = g.items.length > 1 ? `${g.items.length}× ` : "";
   const where = groupPlaces(g);
-  const place = where ? ` – ${tr("místo")} ${where}` : "";
+  const place = (where ? ` – ${tr("místo")} ${where}` : "") + (isFault(g.cls) ? lostSpringNote(doc, g.items) : "");
   const pair = groupPairText(g);
   switch (g.cls) {
     case "real":
@@ -312,7 +326,8 @@ export function ruleText(doc: CadDoc, r: ClashRule): string {
   const kind = r.kind === "work" ? tr("pracovní kontakt") : tr("závit bez prvku");
   const w = r.when;
   let when = tr("vždy");
-  if (w?.steps) when = tr("v krocích {0}–{1}", w.steps[0], w.steps[1]);
+  // jeden krok 6. pádem „v kroku 6“ (kolo 7 – dřív „v krocích 6–6“)
+  if (w?.steps) when = w.steps[0] === w.steps[1] ? tr("v kroku {0}", w.steps[0]) : tr("v krocích {0}–{1}", w.steps[0], w.steps[1]);
   else if (w?.mate !== undefined) {
     const m = doc.mates?.find((x) => x.id === w.mate);
     when = tr("při hodnotě vazby „{0}“ {1}–{2}", m?.name ?? w.mate, nf(w.from ?? -Infinity, 3), nf(w.to ?? Infinity, 3));
@@ -453,12 +468,12 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
   const extra = [quiet.work.size ? tr(" · pracovní kontakt {0} dvojic", quiet.work.size) : "", quiet.touch.size ? tr(" · dotyk {0} dvojic", quiet.touch.size) : "", betweenFaults ? tr(" · mezi kroky (zjemněno) {0}×", betweenFaults) : ""].join("");
   const lines = [
     // „kroků s kolizí“ = kroky se SKUTEČNOU (nebo nevyhodnotitelnou) kolizí; šrouby v závitu jsou v textu zvlášť (vlna 22, bod 5)
-    `${tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", faultSteps.size, of, threadPairs.size, range ? tr(" (kroky {0})", range) : "", faults.length ? (first ? tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", faults.length, faultSteps.size, first.step) : tr("{0} dvojic dílů jen mezi kroky (nalezeno zjemněním)", faults.length)) : tr("žádné"))}${extra}`,
+    `${tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", faultSteps.size, of, threadPairs.size, range ? tr(" (kroky {0})", range) : "", faults.length ? (first ? (faultSteps.size === 1 ? tr("{0} dvojic dílů v kroku {1}", faults.length, first.step) : tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", faults.length, faultSteps.size, first.step)) : tr("{0} dvojic dílů jen mezi kroky (nalezeno zjemněním)", faults.length)) : tr("žádné"))}${extra}`,
     ...(sample ? [sample] : []),
     how,
   ];
   const codes: ClashCode[] = [];
-  if (threadPairs.size) codes.push({ code: "clash.thread", text: tr("šroub v závitu: {0} dvojic v krocích {1}", threadPairs.size, range) });
+  if (threadPairs.size) codes.push({ code: "clash.thread", text: threadSteps.length === 1 ? tr("šroub v závitu: {0} dvojic v kroku {1}", threadPairs.size, range) : tr("šroub v závitu: {0} dvojic v krocích {1}", threadPairs.size, range) });
   const pairText = (g: G) => {
     const ps = [...g.pairs.values()];
     if (ps.length === 1) return { a: ps[0].la, b: ps[0].lb };
@@ -484,6 +499,8 @@ export function motionClashSummary(res: ClashStudy, d: CadDoc, o: { every?: numb
     const steps = [...g.steps].sort((x, y) => x - y);
     // kontakt jen mezi kroky (zjemnění): „mezi kroky 0 a 1“ – dřív „v krocích mezi kroky“
     if (!steps.length && g.between) codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ mezi kroky {2} a {3} (pravidlo {4}), největší průnik {5} mm³", g.na, g.nb, g.between[0], g.between[1], g.rule ?? "?", n3(g.volume)) });
+    // jeden krok 6. pádem „v kroku 6“ (kolo 7 – dřív „v krocích 6“)
+    else if (steps.length === 1) codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v kroku {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, steps[0], g.rule ?? "?", n3(g.volume)) });
     else codes.push({ code: "clash.work", text: tr("pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³", g.na, g.nb, span(steps) || tr("mezi kroky"), g.rule ?? "?", n3(g.volume)) });
   }
   if (quiet.touch.size) codes.push({ code: "clash.touch", text: tr("dotyk pod tolerancí {0} mm: {1} dvojic", nf(touchTol(d), 6), quiet.touch.size) });
@@ -516,7 +533,7 @@ export function stepClashReport(d: CadDoc, s: ClashStep): { lines: string[]; cod
   for (const x of list.filter((y) => isFault(y.cls))) {
     const a = leafLabel(d, pathA(x));
     const b = leafLabel(d, pathB(x));
-    const place = x.at ? ` – ${tr("místo")} ${placeText(x)}` : "";
+    const place = (x.at ? ` – ${tr("místo")} ${placeText(x)}` : "") + lostSpringNote(d, [x]);
     if (x.cls === "real") codes.push({ code: "clash.real", args: [a, b, fmtVol(x.volume)], text: `${tr("kolize „{0}“ × „{1}“ ({2} mm³)", a, b, fmtVol(x.volume))}${place}` });
     else codes.push({ code: "clash.undetermined", args: [a, b], text: `${tr("kolizi „{0}“ × „{1}“ nelze vyhodnotit", a, b)}: ${undeterminedWhy(x)}${place}` });
   }

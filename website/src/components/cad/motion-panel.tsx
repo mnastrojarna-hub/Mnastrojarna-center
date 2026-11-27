@@ -24,7 +24,7 @@ import { levelLine, levelOf, studyMode } from "@/cad/motion-mode";
 import { devText } from "@/cad/motion-quasi";
 import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
 import { stepHasFault } from "@/cad/clash-report"; // štítek kroku jen u skutečné kolize (vlna 22, bod 5)
-import { buildMotor, fitDuration, motorArrow, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, motorSpan, type MotorInput } from "@/cad/motor-model";
+import { buildMotor, fitDuration, motorArrow, motorCurrent, motorIsAbsolute, motorMateGroups, motorMeaningText, motorNotes, motorRangeText, motorSpan, type MotorInput } from "@/cad/motor-model";
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
 import { MotionPhases, PhaseTimeline } from "./motion-phases-panel";
@@ -43,6 +43,7 @@ import { findView } from "@/cad/motion-views";
 import { studySpan } from "@/cad/motion-video";
 import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
 import { MotionPlayer, type PlayerHost } from "./motion-player";
+import { MotionDockButton, useMotionDockTarget } from "./motion-dock"; // ukotvení plného panelu (kolo 7, bod 14)
 import { appRuns } from "./run-host";
 import { motionRunOf, trackedMotion } from "./motion-runs";
 import { modelRev } from "@/cad/engine/result-key";
@@ -202,6 +203,7 @@ export function MotionPanel({
   const cancel = useRef(false);
   const [speed, setSpeed] = useState(1);
   const [compact, setCompactState] = useState(readCompact);
+  const dockTarget = useMotionDockTarget();
   const setCompact = (on: boolean) => {
     setCompactState(on);
     try {
@@ -237,7 +239,12 @@ export function MotionPanel({
     const m = doc.mates?.find((x) => x.id === id);
     return m ? `${(doc.mates ?? []).indexOf(m) + 1}. ${mateLabel(m)} · ${name(m.a.compId)} → ${name(m.b.compId)}` : tr("(vazba chybí)");
   };
-  const okMates = (kind: "rotary" | "linear") => mates.filter((m) => (kind === "rotary" ? ROTARY_MOTOR_TYPES : LINEAR_MOTOR_TYPES).has(m.type));
+  // vazby pro motor ve dvou skupinách (bod 10, kolo 7): s hodnotou (hlavní zdvih) první, pak vodicí; předvybraná první s hodnotou
+  const mateGroups = (kind: "rotary" | "linear") => motorMateGroups(mates.filter((m) => (kind === "rotary" ? ROTARY_MOTOR_TYPES : LINEAR_MOTOR_TYPES).has(m.type)), kind, study.motors);
+  const okMates = (kind: "rotary" | "linear") => {
+    const g = mateGroups(kind);
+    return [...g.value, ...g.guide];
+  };
   const draftMate = okMates(draft.kind).some((m) => m.id === draft.mate) ? draft.mate : (okMates(draft.kind)[0]?.id ?? "");
 
   /* ───────── výsledek: jen ten, který platí pro tento dokument v jeho nynějším stavu ───────── */
@@ -605,7 +612,7 @@ export function MotionPanel({
     <>
     {/* kompaktní režim (vlna 22, bod 14): jen lišta přehrávání dole ve 3D okně, plný panel skrytý */}
     {!compact && (
-    <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
+    <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose} dock={dockTarget} extra={<MotionDockButton />}>
       <div data-motion-panel data-motion-state={state} data-motion-verdict={verdict} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
         <MotionModeSwitch study={study} onStudy={setStudy} doc={doc} />
@@ -666,11 +673,25 @@ export function MotionPanel({
             )}
             {okMates(draft.kind).length ? (
               <select data-motor-mate aria-label={tr("Vazba motoru")} value={draftMate} onChange={(e) => setDraft({ ...newDraft(draft.kind), mode: draft.mode, end: draft.end, speed: draft.speed, mate: e.target.value })} className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12px]">
-                {okMates(draft.kind).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {mateName(m.id)}
-                  </option>
-                ))}
+                {(() => {
+                  const g = mateGroups(draft.kind);
+                  const opt = (m: (typeof mates)[number]) => (
+                    <option key={m.id} value={m.id} data-motor-mate-role={g.value.includes(m) ? "value" : "guide"}>
+                      {mateName(m.id)}
+                      {g.driven.get(m.id)?.length ? tr(" – pohání motor {0}", g.driven.get(m.id)!.join(", ")) : ""}
+                    </option>
+                  );
+                  // jedna skupina (rotační motor, jen vazby s hodnotou / jen vodicí): bez nadpisů
+                  if (!g.value.length || !g.guide.length) return [...g.value, ...g.guide].map(opt);
+                  return [
+                    <optgroup key="value" data-motor-mate-group="value" label={tr("Hodnota vazby – hlavní zdvih (začátek a konec = hodnoty vazby)")}>
+                      {g.value.map(opt)}
+                    </optgroup>,
+                    <optgroup key="guide" data-motor-mate-group="guide" label={tr("Vedení – posuv od výchozí polohy (Souosost, Drážka, Dráha, Šroub)")}>
+                      {g.guide.map(opt)}
+                    </optgroup>,
+                  ];
+                })()}
               </select>
             ) : (
               <p className="text-[11px] text-brand-600">{draft.kind === "rotary" ? tr("Sestava nemá vazbu Závěs, Souosost ani Šroub.") : tr("Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.")}</p>

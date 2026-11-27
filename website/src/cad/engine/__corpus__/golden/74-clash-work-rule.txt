@@ -68,4 +68,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize – pohyb stav
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 60 × 60 × 61 mm · objem Σ 62,43 cm³ · hmotnost Σ 0,490 kg
 Kolize: 1 – skutečné 1: Plech × Razník (78,5 mm³) v místě [30; 30; 11,5] (zkontrolováno ?)
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, průnik těles v 5 krocích (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, průnik těles v 5 krocích (podrobně pohyb stav)

@@ -86,7 +86,18 @@ export const isFrameBlock = (n: string) => /^ISO5457_/i.test(n);
 /** okraje rámečku ISO 5457: vlevo 20 (vazba), jinde 10 mm */
 export const FRAME = { left: 20, other: 10 };
 /** rozměr razítka ISO 7200 */
-export const TB = { w: 180, h: 38 };
+export const TB = { w: 180, h: 48 };
+/** výška technického pásu razítka nahoře (vlna 23, R1: tepelné zpracování, tvrdost, povrch, hrany, nepředepsané tolerance, drsnost) */
+export const TB_TECH = 10;
+/** atributy technického pásu razítka (štítek, výzva) – 2D výkres agenta je plní místo poznámek nad razítkem */
+export const TB_TECH_TAGS: [string, string][] = [
+  ["TEPELNE", "Tepelné zpracování"],
+  ["TVRDOST", "Tvrdost"],
+  ["POVRCH", "Povrchová úprava"],
+  ["HRANY", "Hrany ISO 13715"],
+  ["TOLERANCE", "Nepředepsané tolerance"],
+  ["DRSNOST", "Obecná drsnost"],
+];
 
 type NE = NewEntity & { id: string; layer: string };
 let localSeq = 0;
@@ -119,14 +130,20 @@ export function frameBlock(size: string, landscape: boolean, W: number, Hh: numb
   };
 }
 
+/** pevné texty bloku razítka (popisky buněk, firma, promítání) – klíče tr(); cad/draft/agent-notes.ts podle nich pozná
+ *  skutečné razítko rozvržení (vlna 23, kolo 4 – blok téhož jména od agenta s vlastním textem razítkem není) */
+export const TITLE_BLOCK_LABEL_KEYS = ["Váš partner ve strojírenství", "Promítání", "Název", "Číslo výkresu", "Materiál", "Měřítko", "Formát", "Hmotnost", "Kreslil", "Datum", ...TB_TECH_TAGS.map(([, l]) => l)];
+export const TITLE_BLOCK_LITERALS = ["Mnástrojárna s.r.o.", "www.mnastrojarna.cz", "ISO E", "Rev."];
+
 /**
- * Blok rohového razítka ČSN EN ISO 7200 (180 × 38 mm, stejné rozvržení jako razítko výkresu 3D dílu): firma,
- * promítání ISO E, atributy NAZEV, CISLO_VYKRESU, MATERIAL, MERITKO, FORMAT, HMOTNOST, KRESLIL, DATUM, REVIZE, nad
- * razítkem POZNAMKA a LIST. Bod vložení = pravý dolní roh.
+ * Blok rohového razítka ČSN EN ISO 7200 (180 × 38 mm, stejné rozvržení jako razítko výkresu 3D dílu) s technickým pásem
+ * 10 mm nahoře (vlna 23, R1 – TEPELNE, TVRDOST, POVRCH, HRANY, TOLERANCE, DRSNOST): firma, promítání ISO E, atributy NAZEV,
+ * CISLO_VYKRESU, MATERIAL, MERITKO, FORMAT, HMOTNOST, KRESLIL, DATUM, REVIZE, nad razítkem POZNAMKA a LIST. Bod vložení =
+ * pravý dolní roh.
  */
 export function titleBlock(): DraftBlock {
   const W = TB.w;
-  const Hh = TB.h;
+  const Hh = TB.h - TB_TECH; // původní razítko 180 × 38 dole, technický pás nad ním
   const y = (yDown: number) => Hh - yDown;
   const L = 55;
   const r1 = 13;
@@ -168,8 +185,16 @@ export function titleBlock(): DraftBlock {
   cell(117, r2, tr("Kreslil"), "KRESLIL", tr("Kreslil"), "");
   cell(145, r2, tr("Datum"), "DATUM", tr("Datum"), "", 2.8);
   cell(166, r2, "Rev.", "REVIZE", tr("Revize"), "–");
-  ents.push(ad("POZNAMKA", tr("Poznámka nad razítkem"), tr("Rozměry v mm"), [0, Hh + 5.5], H(2.5)));
-  ents.push(ad("LIST", tr("List"), tr("List {0}/{1}", 1, 1), [0, Hh + 1.8], H(2.5)));
+  // technický pás (vlna 23, R1): klíčové údaje celého dílu v buňkách razítka, ne jako poznámky nad ním
+  ents.push(pl([[0, Hh], [W, Hh], [W, TB.h], [0, TB.h]], 0.7, true));
+  const cw = W / TB_TECH_TAGS.length;
+  TB_TECH_TAGS.forEach(([tag, label], i) => {
+    if (i) ents.push(ln([i * cw, Hh], [i * cw, TB.h], 0.35));
+    ents.push(tx([i * cw + 1.2, TB.h - 2.6], H(1.8), tr(label)));
+    ents.push(ad(tag, tr(label), "", [i * cw + 1.2, Hh + 2.2], H(2.6)));
+  });
+  ents.push(ad("POZNAMKA", tr("Poznámka nad razítkem"), tr("Rozměry v mm"), [0, TB.h + 5.5], H(2.5)));
+  ents.push(ad("LIST", tr("List"), tr("List {0}/{1}", 1, 1), [0, TB.h + 1.8], H(2.5)));
   return { name: TITLE_BLOCK, base: [W, 0], desc: tr("Rohové razítko ČSN EN ISO 7200"), entities: ents };
 }
 

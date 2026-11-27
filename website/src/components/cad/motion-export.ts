@@ -4,17 +4,20 @@
  * Žádný záznam obrazovky v reálném čase: snímek i ukáže polohu studie v čase z plánu (cad/motion-video.ts – interpolace mezi
  * vypočtenými kroky), 3D okno (WebGL i softwarový náhled bez WebGL) se vykreslí, obraz se sejme z plátna, složí s dlaždicemi
  * dalších uložených pohledů (synchronní pohledy), vypálí se anotace polohy a snímek se zakóduje s časovou značkou i/fps:
- * WebCodecs VideoEncoder (VP8 / VP9), jinak klíčové snímky VP8 z obrázku WebP, jinak snímky PNG v ZIP s časovým plánem.
+ * WebCodecs VideoEncoder (VP8 / VP9), jinak klíčové snímky VP8 z obrázku WebP, jinak (Safari bez WebCodecs i WebP – kolo 7)
+ * animované PNG (APNG) se stejným pevným časováním; snímky PNG v ZIP s časovým plánem jen na výslovné `pohyb export png`.
  * Hotový soubor se zpětně přečte (cad/webm-mux.ts) a porovná s plánem; obraz se kontroluje, že sleduje pohyb (otisky snímků) –
  * „mrtvé“ plátno (poloha se mění, obraz ne) video neuloží a řekne proč.
  */
+import { assembleApng, readApng } from "@/cad/apng";
 import { writeZip } from "@/cad/formats/zip";
 import { tr } from "@/cad/i18n";
 import type { MotionResult } from "@/cad/motion";
 import { annotRows, cameraDir, type AnnotRow } from "@/cad/motion-views";
 import { checkFrames, checkText, combineChecks, frameSig, planText, poseAt, poseKey, sigChanged, stepPlan, studySpan, videoPlan, type FrameCheck, type FrameRecord, type PoseAt, type VideoPlan } from "@/cad/motion-video";
 import type { CadDoc, MotionAnnotSettings, MotionView, StudySection, Vec3 } from "@/cad/types";
-import { checkWebm, muxWebm, readWebm, webpVp8, type WebmFrame } from "@/cad/webm-mux";
+import { checkWebm, muxWebm, readWebm, tagWebm, webpVp8, type WebmFrame } from "@/cad/webm-mux";
+import { modelRev } from "@/cad/engine/result-key"; // revize modelu ve videu (vlna 22 kolo 7, bod 12)
 import type { NeutralCam } from "./viewport";
 
 export type ExportHost = {
@@ -56,7 +59,7 @@ export type ExportReport = {
   level: "ok" | "warn" | "error" | "info";
   kind: "webm" | "png";
   plan: VideoPlan | null;
-  encoder: "webcodecs-vp8" | "webcodecs-vp9" | "webp-vp8" | "png" | "none";
+  encoder: "webcodecs-vp8" | "webcodecs-vp9" | "webp-vp8" | "apng" | "png" | "none";
   check: FrameCheck | null;
   file: string | null;
   bytes: number;
@@ -206,7 +209,7 @@ async function makeEncoder(kind: "webm" | "png", W: number, H: number, plan: Vid
       };
     }
   }
-  // WebP: ztrátový obrázek = klíčový snímek VP8 (Chrome, Edge, Firefox); bez WebP (Safari) → PNG ZIP s časovým plánem
+  // WebP: ztrátový obrázek = klíčový snímek VP8 (Chrome, Edge, Firefox); bez WebP (Safari) → APNG s časovým plánem
   const test = await blobOf(probe, "image/webp", 0.9);
   if (test?.type === "image/webp" && webpVp8(await bytesOf(test))) {
     const frames: WebmFrame[] = [];
@@ -221,7 +224,17 @@ async function makeEncoder(kind: "webm" | "png", W: number, H: number, plan: Vid
       finish: async () => (frames.length ? { data: muxWebm({ codec: "V_VP8", width: W, height: H, fps, frames, duration: plan.seconds * 1000 }), mime: "video/webm", ext: "webm" } : null),
     };
   }
-  return pngZip();
+  // kolo 7: prohlížeč bez kodéru videa (Safari) – animované PNG se stejným časováním místo ZIPu snímků
+  const pngs: Uint8Array[] = [];
+  return {
+    kind: "apng",
+    add: async (cv) => {
+      const b = await blobOf(cv, "image/png");
+      if (!b) throw new Error(tr("snímek {0}: prohlížeč nevrátil obrázek PNG", pngs.length));
+      pngs.push(await bytesOf(b));
+    },
+    finish: async () => (pngs.length ? { data: assembleApng(pngs, fps), mime: "image/apng", ext: "png" } : null),
+  };
 }
 
 /* ───────────────────────── export ───────────────────────── */
@@ -310,23 +323,38 @@ export async function exportMotion(res: MotionResult, doc: CadDoc, o: ExportOpts
     if (!out) return { ...fail(tr("✗ kodér nevrátil žádný snímek – nic se neuložilo"), plan), encoder: enc.kind, check };
     let fileSeconds: number | null = null;
     if (out.ext === "webm") {
+      // revize modelu, ze kterého snímky vznikly, do souboru (značka MODEL_REVISION – kolo 7, bod 12); kontrola ji čte zpět
+      out.data = tagWebm(out.data, { MODEL_REVISION: modelRev(doc), TITLE: doc.name || tr("sestava") });
       const info = readWebm(out.data);
       fileSeconds = info.duration !== null ? info.duration / 1000 : null;
-      const bad = checkWebm(info, plan);
+      const bad = [...checkWebm(info, plan), ...(info.tags.MODEL_REVISION === modelRev(doc) ? [] : [tr("revize modelu v souboru chybí")])];
       if (bad.length) return { ...fail(tr("✗ Video neuloženo: hotový soubor neodpovídá plánu ({0}) – {1}", bad.join(", "), planText(plan)), plan), encoder: enc.kind, check, fileSeconds };
     }
-    const file = `${o.name || tr("sestava")}-pohyb${o.kind === "png" || out.ext === "zip" ? "-snimky" : ""}.${out.ext}`;
+    if (enc.kind === "apng") {
+      // APNG se ověří stejně jako WebM: počet snímků a délka ze souboru = plán (jinak ✗, nic se neuloží)
+      const a = readApng(out.data);
+      fileSeconds = a.seconds;
+      const bad: string[] = [];
+      if (!a.crcOk) bad.push(tr("poškozený soubor"));
+      if (a.frames !== plan.frames || a.delays.length !== plan.frames) bad.push(tr("{0} snímků místo {1}", a.delays.length, plan.frames));
+      if (Math.abs(a.seconds - plan.seconds) > 1 / plan.fps / 2) bad.push(tr("délka {0} s místo {1} s", Math.round(a.seconds * 1000) / 1000, Math.round(plan.seconds * 1000) / 1000));
+      if (bad.length) return { ...fail(tr("✗ Video neuloženo: hotový soubor neodpovídá plánu ({0}) – {1}", bad.join(", "), planText(plan)), plan), encoder: enc.kind, check, fileSeconds };
+    }
+    const file = `${o.name || tr("sestava")}-pohyb${o.kind === "png" || out.ext === "zip" ? "-snimky" : enc.kind === "apng" ? "-video" : ""}.${out.ext}`;
     host.save(file, out.data as BlobPart, out.mime);
-    const level: ExportReport["level"] = out.ext === "zip" && o.kind === "webm" ? "warn" : check.verdict === "partial" ? "warn" : check.verdict === "static" ? "info" : "ok";
+    // WebM nevzniklo (APNG / ZIP) = ⚠: soubor má správné časování, ale jiný formát, než byl požadován
+    const level: ExportReport["level"] = (out.ext === "zip" || enc.kind === "apng") && o.kind === "webm" ? "warn" : check.verdict === "partial" ? "warn" : check.verdict === "static" ? "info" : "ok";
     const mark = level === "ok" ? "✓" : level === "warn" ? "⚠" : "ℹ";
     const head =
       o.kind === "webm" && out.ext === "webm"
         ? tr("Video WebM uloženo ({0}): {1}; soubor má délku {2} s a {3} snímků", enc.kind === "webp-vp8" ? "VP8/WebP" : enc.kind === "webcodecs-vp9" ? "VP9" : "VP8", planText(plan), fileSeconds !== null ? (Math.round(fileSeconds * 1000) / 1000).toString() : "?", plan.frames)
-        : o.kind === "webm"
+        : o.kind === "webm" && enc.kind === "apng"
+          ? tr("Prohlížeč neumí kódovat WebM – uloženo animované PNG (APNG) se stejným časováním: {0}; soubor má délku {1} s a {2} snímků", planText(plan), fileSeconds !== null ? (Math.round(fileSeconds * 1000) / 1000).toString() : "?", plan.frames)
+          : o.kind === "webm"
           ? tr("Prohlížeč neumí kódovat video – uloženy snímky PNG s časovým plánem (ZIP, příkaz ffmpeg uvnitř): {0}", planText(plan))
           : tr("Snímky PNG ({0}) s časovým plánem uloženy (ZIP): {1}", plan.frames, planText(plan));
     const viewsText = o.views.length ? ` · ${tr("pohledy: {0}", o.views.map((v) => `„${v.name}“`).join(", "))}` : "";
-    return { ok: true, level, kind: o.kind, plan, encoder: enc.kind, check, file, bytes: out.data.length, fileSeconds, text: `${mark} ${head}${viewsText} · ${checkText(check)}` };
+    return { ok: true, level, kind: o.kind, plan, encoder: enc.kind, check, file, bytes: out.data.length, fileSeconds, text: `${mark} ${head}${viewsText} · ${checkText(check)} · ${tr("z modelu {0}", modelRev(doc))}` };
   } catch (e) {
     return fail(`✗ ${tr("Export se nepodařil: {0}", (e as Error).message)}`, plan);
   } finally {

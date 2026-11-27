@@ -214,7 +214,9 @@ describe("kontrola exportu STEP / BREP", () => {
   it("počet těles neznámý (velký model bez kontroly) → věta bez počtu", () => {
     const c = exportCheck({ volume: 10, bbox: box(1, 2, 5) }, { volume: 10, bbox: box(1, 2, 5) }, "BREP");
     expect(c.ok).toBe(true);
-    expect(c.line).toMatch(/^✓ kontrola BREP: soubor znovu načten jádrem – objem 10,00 mm³/);
+    // vlna 22, 22c kolo 7 (test vědomě upraven): platnost souboru se nekontrolovala vůbec → ℹ, ne ✓ (dřív ✓ s „nezkontrolována“)
+    expect(c.line).toMatch(/^ℹ kontrola BREP: soubor znovu načten jádrem – objem 10,00 mm³/);
+    expect(c.level).toBe("note");
     // platnost souboru se nekontrolovala vůbec → řečeno, žádná „věrná kopie“ (22a)
     expect(c.line).toMatch(/→ odpovídá modelu; platnost souboru nezkontrolována$/);
     expect(c.validCheck).toBe("none");

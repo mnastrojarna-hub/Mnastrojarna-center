@@ -11,7 +11,6 @@
 exportováno z modelu {0} ({1}), model je teď {2}	aus Modell {0} exportiert ({1}), das Modell ist jetzt {2}
 Exporty ({0}, zastaralých {1}) · model je teď {2}:	Exporte ({0}, veraltet {1}) · das Modell ist jetzt {2}:
 Exporty ({0})	Exporte ({0})
-exporty [vymazat] · výstupy [zastaralé] · přepočítat vše	exporte [löschen] · ausgaben [veraltet] · alles neu berechnen
 Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exporte: {0} – alle aus der aktuellen Modellrevision (Liste: exporte)
 Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exporte: {0} von {1} aus einer älteren Modellrevision – {2} (Liste: exporte)
 exporty: neznámé „{0}“ – {1}	exporte: unbekannt „{0}“ – {1}
@@ -83,7 +82,6 @@ Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu
 změna modelu {0} → {1}	Modelländerung {0} → {1}
 Zrušit vydání	Freigabe zurückziehen
 vydání listu: písmeno revize + revize modelu r·… + datum (chybí-li revize v tabulce, přidá se); po změně modelu je vydaný list zastaralý – ⚠ drawing.stale ve výkres stav, stav, na konci běhu, při exportu se stejným písmenem (přísně ✗), řádek D stale=drawing; vydejte novou revizi	Blattfreigabe: Revisionsbuchstabe + Modellrevision r·… + Datum (fehlt die Revision in der Tabelle, wird sie ergänzt); nach einer Modelländerung ist das freigegebene Blatt veraltet – ⚠ drawing.stale in zeichnung status, status, am Laufende, beim Export mit demselben Buchstaben (streng ✗), D-Zeile stale=drawing; neue Revision freigeben
-záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)	Exporteinträge im Dokument (Format, Datei, Modellrevision r·…, Zeit; nach einer Modelländerung ⚠ veraltet mit dem Befehl, der den Export wiederholt); Liste veralteter Ausgaben (freigegebene Blätter, Exporte, Analysen, Teilekopien in der Baugruppe); alles neu berechnen = aktualisiert Teilekopien, Verknüpfungszustand, Kollisionen, Bewegung und Blätter und listet, was ein Mensch tun muss (neue Blattrevision, neuer Export)
 soubor nese rev. {0}, která byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu	die Datei trägt Rev. {0}, die aus einer anderen Modellrevision freigegeben wurde – neue Revision freigeben und erneut exportieren
 NESE ZASTARALÉ PÍSMENO REVIZE: rev. {0} byla vydána z jiné revize modelu – vydejte novou revizi a exportujte znovu: {1}	TRÄGT EINEN VERALTETEN REVISIONSBUCHSTABEN: Rev. {0} wurde aus einer anderen Modellrevision freigegeben – neue Revision freigeben und erneut exportieren: {1}
 #!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)

@@ -491,28 +491,49 @@ export async function runMotion(
         const tolT = Math.max(1e-9, (b.t - a.t) * 1e-3);
         let triedA = false;
         let triedB = false;
-        for (let it = 0; it < 16 && b.t - a.t > tolT; it++) {
+        // kolikrát po sobě sečna posunula týž kraj: u dotyku (hodnota za okamžikem dosednutí stojí na mezi) sečna zůstává na straně
+        // „splněno“ a kraj „nesplněno“ se nehne – po dvou takových krocích se půlí (Illinois); dřív 16 sečen skončilo ~0,3 ms pozdě
+        let sameB = 0;
+        for (let it = 0; it < 32 && b.t - a.t > tolT; it++) {
           const w = b.t - a.t;
           let x = crossTime(c, a, b);
           // sečna u kraje intervalu: jednou zkusit těsně u kraje (průchod přesně v kroku k / těsně za k−1), jinak půlit
           let edge = false;
-          if (x >= b.t - 0.05 * w) {
+          let bis = false;
+          if (sameB >= 2) {
+            bis = true;
+            x = a.t + 0.5 * w;
+          } else if (x >= b.t - 0.05 * w) {
             edge = !triedB;
+            bis = triedB;
             x = triedB ? a.t + 0.5 * w : b.t - tolT;
             triedB = true;
           } else if (x <= a.t + 0.05 * w) {
             edge = !triedA;
+            bis = triedA;
             x = triedA ? a.t + 0.5 * w : a.t + tolT;
             triedA = true;
           }
           const vm = at(x);
           solved = x;
           if (vm === null) break;
-          if (!met(x, vm)) a = { t: x, v: vm };
-          else {
+          if (!met(x, vm)) {
+            a = { t: x, v: vm };
+            sameB = 0;
+          } else {
             b = { t: x, v: vm };
-            // průběh, který hodnotu protne: sečna zasáhne přesně – okamžik nalezen
-            if (!edge && Math.abs(vm - c.value) <= exactTol) break;
+            sameB = bis ? 0 : sameB + 1;
+            // průběh, který hodnotu protne: SEČNA zasáhne přesně – okamžik nalezen, ale jen když těsně před ním podmínka ještě neplatí
+            // (průchod). Bod s hodnotou na mezi sám nic neříká: u dotyku hodnota na mezi „sedí“ celý zbytek intervalu a konec v prvním
+            // takovém bodě dal začátek fáze o půl kroku pozdě (oponent kola 6: `Dosed <= 0` t = 0,812 s místo 0,807 s, slabší práh
+            // začal nejpozději) – pak se hledá dál až na tolT
+            if (!edge && !bis && Math.abs(vm - c.value) <= exactTol) {
+              const x0 = Math.max(a.t, x - tolT);
+              const v0 = at(x0);
+              solved = x0;
+              if (v0 !== null && !met(x0, v0)) break;
+              if (v0 !== null) b = { t: x0, v: v0 };
+            }
           }
         }
         tau = b.t;
@@ -901,6 +922,11 @@ export function stepsWord(n: number): string {
   return a === 1 ? tr("{0} krok", n) : a >= 2 && a <= 4 ? tr("{0} kroky", n) : tr("{0} kroků", n);
 }
 
+/** „v 1 kroku“ / „v 4 krocích“ (6. pád; dřív „v 1 krocích“ v řádku stavu, kolo 7) – EN „in 1 step“ / „in 4 steps“ */
+export function inStepsWord(n: number): string {
+  return Math.abs(n) === 1 ? tr("v {0} kroku", n) : tr("v {0} krocích", n);
+}
+
 export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLines?: string[]; notes?: boolean; detail?: boolean; head?: boolean } = {}): string[] {
   const out: string[] = [];
   const last = res.steps[res.steps.length - 1];
@@ -965,6 +991,29 @@ function motorMateName(res: MotionResult, doc: CadDoc, mi: number): string {
   return m ? (m.name ?? tr(MATE_LABEL[m.type])) : "?";
 }
 
+/**
+ * Nejzazší hodnota, kterou motor `mi` žádal v úseku zastavení s0…s1 (ve směru, kterým ho mez zastavila), když leží mimo první a
+ * poslední žádanou hodnotu úseku – profil, který za mezí dojel a couvl (zpětný zdvih), jinak null. Snímky úseku + profil motoru
+ * mezi snímky (motor bez fáze; začátek motoru fáze výsledek nenese – jen snímky).
+ */
+function farthestWanted(res: MotionResult, mi: number, s0: MotionStep, s1: MotionStep): number | null {
+  const reached = s0.reached?.[mi];
+  if (reached === undefined || !Number.isFinite(reached)) return null;
+  const dir = Math.sign(s0.motors[mi] - reached);
+  if (!dir) return null;
+  const vals = res.steps.filter((s) => s.i >= s0.i && s.i <= s1.i).map((s) => s.motors[mi]);
+  const mo = res.motors[mi];
+  const D = res.steps[res.steps.length - 1]?.t ?? 0;
+  if (mo && !mo.phase && D > 0 && s1.t > s0.t) {
+    const p = motorKeys(mo, D);
+    for (const k of p.keys) if (k.t >= s0.t && k.t <= s1.t) vals.push(k.v);
+    for (let j = 0; j <= 200; j++) vals.push(profileAt(p, s0.t + ((s1.t - s0.t) * j) / 200));
+  }
+  const far = dir > 0 ? Math.max(...vals) : Math.min(...vals);
+  const tol = 1e-3;
+  return Math.abs(far - s0.motors[mi]) > tol && Math.abs(far - s1.motors[mi]) > tol ? far : null;
+}
+
 /** nejvýš tolik odchylek v souhrnném řádku (všechny vypíše `pohyb krok N`) */
 const DEV_SUMMARY = 3;
 
@@ -997,7 +1046,11 @@ export function motionFindings(res: MotionResult, doc: CadDoc): MotionFinding[] 
     if (s0.status === "stopped") {
       const k = res.motors.findIndex((_m, mi) => s0.reached && Math.abs(s0.reached[mi] - s0.motors[mi]) > 1e-3);
       const mi = k >= 0 ? k : 0;
-      const want = s0.motors[mi] === s1.motors[mi] ? `${txt(s0.motors[mi], 3)}${unitOf(mi)}` : `${txt(s0.motors[mi], 3)} → ${txt(s1.motors[mi], 3)}${unitOf(mi)}`;
+      const far = farthestWanted(res, mi, s0, s1);
+      const want =
+        (s0.motors[mi] === s1.motors[mi] ? `${txt(s0.motors[mi], 3)}${unitOf(mi)}` : `${txt(s0.motors[mi], 3)} → ${txt(s1.motors[mi], 3)}${unitOf(mi)}`) +
+        // profil, který v úseku zastavení dojel dál a couvl (zpětný zdvih): nejzazší žádaná hodnota, ne jen první a poslední (oponent kola 6)
+        (far !== null ? tr(" (nejdál {0})", `${txt(far, 3)}${unitOf(mi)}`) : "");
       const got = `${txt(s0.reached?.[mi] ?? NaN, 3)}${unitOf(mi)}`;
       // brání jiný motor (tentýž stupeň volnosti – jeho odchylka je v kroku): jméno motoru místo „(nezjištěno)“ (bod 10 – kolo 6)
       const rivals = other.length ? [] : devs.filter((d) => d.motor !== undefined && d.motor !== mi);
