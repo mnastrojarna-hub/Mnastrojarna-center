@@ -22,7 +22,6 @@ export const SOFT_LIMITS: readonly SoftLimit[] = [
   { key: "ghosts", what: () => tr("duchové – průhledné porovnání s referencí nebo předchozí polohou"), instead: () => tr("výsledek „porovnat“ v protokolu") },
   { key: "measure", what: () => tr("grafika měření a stopa bodu pohybové studie"), instead: () => tr("hodnoty v panelu Měření, v panelu Pohyb a textem „měřit“ / „pohyb stav“") },
   { key: "surfOverlay", what: () => tr("hřebeny křivosti a řídicí body ploch třídy A"), instead: () => tr("návaznost ploch textem („analýza návaznosti“, „analýza hřebenu“)") },
-  { key: "bodyOpacity", what: () => tr("průhlednost tělesa"), instead: () => tr("řez nebo skrytí komponent") },
 ];
 
 /** Jak vybrat hranu / plochu bez 3D okna (alternativy výběru). */
@@ -34,6 +33,20 @@ export const SOFT_PICK_ALTERNATIVES = (): string[] => [
 
 /** stav prostředí pro horní lištu a `window.mncad`: plné 3D, softwarové zobrazení, žádné zobrazení */
 export type ViewEnv = "webgl" | "soft" | "none";
+
+/**
+ * Řádek zobrazení pro `window.mncad.status()` (kolo 7, bod 21): strojová část `view=webgl|soft|none projection=persp|ortho`
+ * (nepřekládá se) a lidská věta. Popisuje prostředí aplikace, ne model – v CLI (`mncad run … stav`) se nevypisuje (tam žádné
+ * zobrazení není).
+ */
+export function viewStatusLine(env: ViewEnv, o: { ortho?: boolean } = {}): string {
+  // o.ortho = uživatel zvolil pravoúhlé promítání (bez WebGL je náhled pravoúhlý vždy)
+  const proj = env === "webgl" && !o.ortho ? "persp" : "ortho";
+  const what = env === "webgl" ? tr("3D okno (WebGL)") : env === "soft" ? softStatusText() : tr("model se nezobrazuje");
+  // shodně se stavovým řádkem aplikace (`[data-projection]`): bez WebGL a s nastavenou perspektivou poznámka v závorce
+  const how = env === "none" ? "" : ` · ${proj === "persp" ? tr("perspektiva") : env === "soft" && !o.ortho ? tr("pravoúhlá (perspektiva jen ve WebGL)") : tr("pravoúhlá")}`;
+  return `${tr("Zobrazení:")} ${what}${how} · view=${env} projection=${proj}`;
+}
 
 /** text stavu prostředí (neutrální – omezení prohlížeče, ne chyba modelu) */
 export const softStatusText = (): string => tr("Softwarové zobrazení – WebGL není dostupné");

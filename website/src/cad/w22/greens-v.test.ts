@@ -121,13 +121,15 @@ describe("greens V2: čela řezu v sestavě", () => {
     expect(capSummary(0, "shadedEdges")).toBe("");
     expect(capSummary(3, "shadedEdges")).toMatch(/čela řezu: každá komponenta s objemem/);
   });
-  it("drátový model: žádné čelo; skořepina bez objemu čelo nemá; tlumená v softwarovém náhledu také ne", () => {
+  // kolo 7 (vědomá změna): softwarový náhled umí průhlednost → tlumená komponenta má průhledné čelo jako ve 3D okně
+  it("drátový model: žádné čelo; skořepina bez objemu čelo nemá; tlumená = průhledné čelo v obou rendererech", () => {
     expect(capStyles(comps, "wireframe").every((s) => s === null)).toBe(true);
     const gl = capStyles(comps, "shadedEdges");
     expect(gl[0]).not.toBeNull();
     expect(gl[1]).toBeNull();
     expect(gl[2]!.opacity).toBe(0.18); // WebGL: průhledné čelo jako průhledné tělo
     const soft = softCapStyles(comps, "shadedEdges");
-    expect(soft[2]).toBeNull(); // softwarový náhled kreslí tlumenou komponentu jen v hranách – bez čela
+    expect(soft[1]).toBeNull(); // skořepina ani v softwarovém náhledu
+    expect(soft[2]!.opacity).toBe(0.18); // softwarový náhled: stejná průhlednost (dřív jen hrany bez čela)
   });
 });

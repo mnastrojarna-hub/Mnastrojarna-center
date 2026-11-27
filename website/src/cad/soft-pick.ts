@@ -27,6 +27,8 @@ export type PickItem = SoftItem & {
   compId?: string;
   /** komponenta nejvyšší úrovně */
   topId?: string;
+  /** tlumená komponenta (průhledná 0,18) – při výběru oknem nezakrývá komponenty za sebou */
+  dim?: boolean;
 };
 
 /** Filtr výběru (shodný se `SelFilter` 3D okna). */

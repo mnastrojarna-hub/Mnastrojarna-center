@@ -1,3 +1,3 @@
 # Welle 22, Paket V, Etappe V2 (Bericht 20. 11.): Schnittflächen in der Baugruppe
 čela řezu se v drátovém zobrazení nekreslí	Schnittflächen werden im Drahtmodell nicht gezeichnet
-čela řezu: každá komponenta s objemem (barva komponenty, šrafy)	Schnittflächen: jede Komponente mit Volumen (Komponentenfarbe, Schraffur)
+čela řezu: každá komponenta s objemem (barva komponenty, šrafy vázané na model, obrys)	Schnittflächen: jede Komponente mit Volumen (Komponentenfarbe, modellgebundene Schraffur, Umriss)

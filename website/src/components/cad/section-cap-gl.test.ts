@@ -6,11 +6,12 @@
  */
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { capStyle } from "@/cad/section-cap";
-import { CAP_SHADER_ANCHORS, capMaterial, capMesh, isCapObject, patchCapShader, syncCapCamera } from "./section-cap-gl";
+import { capStyle, hatchWorld } from "@/cad/section-cap";
+import { contourLength } from "@/cad/section-contour";
+import { CAP_OUTLINE_PX, CAP_SHADER_ANCHORS, capHatchView, capMaterial, capMesh, capOutline, capOutlineSegments, isCapObject, patchCapShader, syncCapCamera, updateCapOutline } from "./section-cap-gl";
 
 const style = capStyle({ id: "deska-a", color: "#b9c2cc" }, "shadedEdges", 0)!;
-const fakeUniforms = () => ({ capProj: { value: new THREE.Matrix4() }, capHatch: { value: new THREE.Vector4(1, 0, 8, 1) }, capHatchColor: { value: new THREE.Color() } });
+const fakeUniforms = () => ({ capProj: { value: new THREE.Matrix4() }, capHatch: { value: new THREE.Vector4(1, 0, 0, 0) }, capHatchWidth: { value: 1 }, capHatchColor: { value: new THREE.Color() } });
 
 describe("čelo řezu – shader a materiál (section-cap-gl)", () => {
   it("kotvy kódu čela existují ve shaderu MeshBasicMaterial této verze three a kód se vloží právě jednou", () => {
@@ -21,14 +22,17 @@ describe("čelo řezu – shader a materiál (section-cap-gl)", () => {
     const f = shader.fragmentShader;
     expect(f.split("gl_FragDepth = capDepth;").length - 1).toBe(1);
     expect(f.split("uniform mat4 capProj;").length - 1).toBe(1);
-    expect(f.split("mod( capH, capHatch.z )").length - 1).toBe(1);
+    // kolo 7 (vědomá změna): šrafy vázané na model – hodnota z bodu čela v rovině řezu, tloušťka přes derivace (pixely)
+    expect(f.split("float capV = dot( capPt, capHatch.xyz ) + capHatch.w;").length - 1).toBe(1);
+    expect(f).toContain("fract( capV ) < capHatchWidth * capFw");
+    expect(f).not.toContain("gl_FragCoord.xy, capHatch");
     // pořadí: deklarace před main, hloubka za ořezem (zahozené fragmenty), šrafy za barvou
     expect(f.indexOf("uniform mat4 capProj;")).toBeLessThan(f.indexOf("void main() {"));
     expect(f.indexOf("gl_FragDepth")).toBeGreaterThan(f.indexOf("#include <clipping_planes_fragment>"));
     expect(f.indexOf("capHatchColor;", f.indexOf("void main"))).toBeGreaterThan(f.indexOf("#include <color_fragment>"));
     // kód hloubky jen s rovinou ořezu (bez ní shader čela zůstane platný)
     expect(f).toMatch(/#if NUM_CLIPPING_PLANES > 0[\s\S]*gl_FragDepth = capDepth;[\s\S]*#endif/);
-    expect(Object.keys(shader.uniforms).sort()).toEqual(["capHatch", "capHatchColor", "capProj"]);
+    expect(Object.keys(shader.uniforms).sort()).toEqual(["capHatch", "capHatchColor", "capHatchWidth", "capProj"]);
   });
 
   it("jiný shader bez kotev se nezmění (žádný rozbitý program)", () => {
@@ -48,8 +52,9 @@ describe("čelo řezu – shader a materiál (section-cap-gl)", () => {
     expect(m.depthWrite).toBe(true);
     expect("#" + m.color.getHexString()).toBe(style.hex);
     const u = m.userData.capUniforms;
-    expect(u.capHatch.value.z).toBe(style.hatch.step * 2); // rozteč šraf v pixelech plátna
-    expect(u.capHatch.value.w).toBe(style.hatch.width * 2);
+    // kolo 7 (vědomá změna): rozteč v mm (model), jen tloušťka čáry v pixelech plátna
+    expect(u.capHatchWidth.value).toBe(style.hatch.width * 2);
+    expect(m.userData.capHatchMm).toBe(style.hatch.stepMm);
     // všechna čela sdílejí jeden program
     const t = capMaterial(capStyle({ id: "b", color: "#4678c8", dim: true }, "shaded", 3)!, plane);
     expect(t.customProgramCacheKey()).toBe(m.customProgramCacheKey());
@@ -147,5 +152,74 @@ describe("hloubka čela = průsečík paprsku kamery s rovinou řezu (konvence t
     const pl = viewPlane(world, cam);
     const P = new THREE.Vector3(12, 20, 7).applyMatrix4(cam.matrixWorldInverse);
     expect(capPoint(P, pl, false)).toBeNull();
+  });
+});
+
+/* ───────────── kolo 7: šrafy vázané na model a obrys čela ve 3D okně ───────────── */
+describe("kolo 7 – šrafy čela vázané na model a obrys (3D okno)", () => {
+  it("uniforma šraf v pohledových souřadnicích dá v každém bodě tutéž hodnotu jako softwarový náhled (hatchWorld ve světě)", () => {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -15);
+    const world = new THREE.Matrix4().makeRotationZ(0.3).setPosition(12, -3, 5);
+    for (const cam of [new THREE.PerspectiveCamera(30, 1.5, 0.5, 5000), new THREE.OrthographicCamera(-100, 100, 80, -80, -1e6, 1e6)]) {
+      cam.position.set(60, -200, 90);
+      cam.lookAt(20, 15, 10);
+      cam.updateMatrixWorld();
+      const hv = capHatchView(world, plane, 60, 2.75, cam);
+      const { g, g0 } = hatchWorld(world.elements, [0, 1, 0], 60, 2.75);
+      for (const p of [new THREE.Vector3(20, 15, 10), new THREE.Vector3(-7, 15, 33), new THREE.Vector3(41, 15, -2)]) {
+        const q = p.clone().applyMatrix4(cam.matrixWorldInverse); // pohledové souřadnice (to, co shader má v capPt)
+        const vGl = hv.x * q.x + hv.y * q.y + hv.z * q.z + hv.w;
+        const vSoft = g[0] * p.x + g[1] * p.y + g[2] * p.z + g0;
+        expect(vGl).toBeCloseTo(vSoft, 6);
+      }
+    }
+  });
+
+  it("syncCapCamera nastaví šrafy podle matice komponenty: posun komponenty posune šrafy s ní (ne s obrazovkou)", () => {
+    const st = capStyle({ id: "a", color: "#b9c2cc" }, "shaded", 0, 0.25)!;
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -15);
+    const geo = new THREE.BoxGeometry(40, 30, 20);
+    const cam = new THREE.OrthographicCamera(-100, 100, 80, -80, -1e6, 1e6);
+    cam.position.set(0, -300, 0);
+    cam.lookAt(0, 0, 0);
+    cam.updateMatrixWorld();
+    const val = (x: number) => {
+      const cap = capMesh(geo, st, plane, new THREE.Matrix4().makeTranslation(x, 0, 0), { id: "a", topId: "a", key: "a" });
+      cap.updateMatrixWorld(true); // ve 3D okně vynucuje přepočet scéna (matrixAutoUpdate = false)
+      syncCapCamera(cap, cam);
+      const hv = ((cap.material as THREE.Material).userData.capUniforms.capHatch.value as THREE.Vector4).clone();
+      // tentýž bod komponenty (místní 3, 15, 2) v pohledu
+      const q = new THREE.Vector3(3 + x, 15, 2).applyMatrix4(cam.matrixWorldInverse);
+      return hv.x * q.x + hv.y * q.y + hv.z * q.z + hv.w;
+    };
+    expect(val(17)).toBeCloseTo(val(0), 6);
+    expect(Math.abs(val(0))).toBeGreaterThan(0);
+  });
+
+  it("obrys čela: úsečky v rovině řezu (místní souřadnice), posun do odebrané strany, přepočet po pohybu komponenty", () => {
+    const st = capStyle({ id: "a", color: "#b9c2cc" }, "shaded", 0)!;
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -15);
+    const bg = new THREE.BoxGeometry(40, 30, 20).translate(0, 15, 0).toNonIndexed(); // y 0…30
+    const pos = bg.getAttribute("position").array as Float32Array;
+    const mesh = { vertices: pos, triangles: new Uint32Array(pos.length / 3).map((_, i) => i) };
+    const l = capOutline(mesh, st, plane, new THREE.Matrix4(), { id: "a", topId: "a", key: "a" }, -0.01);
+    expect(isCapObject(l)).toBe(true);
+    expect(l.userData.capOutline).toBe(true);
+    expect("#" + (l.material as unknown as { color: THREE.Color }).color.getHexString()).toBe(st.outlineHex);
+    expect((l.material as unknown as { linewidth: number }).linewidth).toBe(CAP_OUTLINE_PX);
+    expect(l.visible).toBe(false); // bez úseček se nekreslí
+    l.updateMatrixWorld(true);
+    expect(updateCapOutline(l, { x: 800, y: 600 })).toBeGreaterThan(0);
+    expect(l.visible).toBe(true);
+    expect((l.material as unknown as { resolution: THREE.Vector2 }).resolution.toArray()).toEqual([800, 600]);
+    const a = capOutlineSegments(l)!;
+    expect(contourLength(a)).toBeCloseTo(2 * (40 + 20), 4);
+    for (let j = 1; j < a.length; j += 3) expect(a[j]).toBeCloseTo(14.99, 4);
+    // komponenta posunutá o 5 v Y: rovina řezu je v místních souřadnicích v y = 10
+    l.matrix.makeTranslation(0, 5, 0);
+    l.updateMatrixWorld(true);
+    updateCapOutline(l);
+    const b = capOutlineSegments(l)!;
+    for (let j = 1; j < b.length; j += 3) expect(b[j]).toBeCloseTo(9.99, 4);
   });
 });

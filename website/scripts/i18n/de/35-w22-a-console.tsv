@@ -45,9 +45,7 @@ Po běhu ukázat souhrn – stručný protokol MNCAD/1 (stejný jako mncad run v
 pohledy a otáčení fungují	Ansichten und Drehen funktionieren
 poloha číslem v panelu komponenty nebo textem „sestava komponenta …“	Lage als Zahl im Komponentenpanel oder als Text „baugruppe komponente …“
 pomocné roviny, osy a body	Hilfsebenen, -achsen und -punkte
-průhlednost tělesa	Transparenz des Körpers
 rozměry ukazuje „stav“ a panel Měření	Maße zeigen „status“ und das Panel Messen
-řez nebo skrytí komponent	Schnitt oder Ausblenden von Komponenten
 sestava „{0}“ – komponent {1}, různých dílů {2}, listů výkresu {3}, příloh {4}	Baugruppe „{0}“ – Komponenten {1}, verschiedene Teile {2}, Zeichnungsblätter {3}, Anhänge {4}
 seznam v historii prvků, textem „stav“	Liste in der Elementhistorie, als Text „status“
 skica se kreslí a upravuje ve 2D editoru skici	eine Skizze wird im 2D-Skizzeneditor gezeichnet und bearbeitet

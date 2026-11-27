@@ -7,6 +7,8 @@
  * Souřadnice: Z nahoru (strojírenská konvence). Kamera je dána azimutem kolem Z a elevací nad rovinou XY.
  */
 import type { Vec3 } from "./types";
+import { hatchWorld } from "./section-cap";
+import { cachedContour, localPlane } from "./section-contour";
 
 export type RGB = [number, number, number];
 export type SoftViewName = "iso" | "front" | "top" | "right" | "back" | "bottom" | "left";
@@ -42,11 +44,18 @@ export type SoftItem = {
   color: RGB;
   /** vlna 22 (řez sestavy): barva čela řezu této sítě – bez ní barva řezu scény (`SoftOptions.capColor`) */
   capColor?: RGB | null;
-  /** vlna 22: šrafy čela řezu (CSS px, `SoftOptions.capScale` pixelů plátna na CSS px; shodně se 3D oknem, viz `@/cad/section-cap`) */
+  /**
+   * vlna 22: šrafy čela řezu – kolo 7 vázané na model (úhel v rovině řezu, rozteč v mm v souřadnicích komponenty, tloušťka
+   * v CSS px × `SoftOptions.capScale`; shodně se 3D oknem, viz `@/cad/section-cap` `hatchWorld`)
+   */
   capHatch?: SoftHatch | null;
+  /** kolo 7: barva obrysu čela řezu (průsečnice roviny se sítí); bez ní se obrys nekreslí */
+  capOutline?: RGB | null;
+  /** kolo 7: průhlednost plochy (1 = neprůhledná; < 1 = prolnutí, hloubku nezapisuje – tlumená / průhledná komponenta) */
+  opacity?: number | null;
 };
-/** šrafy čela: pixel (x, y nahoru) patří čáře, když (x·nx + y·ny) mod step < width */
-export type SoftHatch = { nx: number; ny: number; step: number; width: number; color: RGB };
+/** šrafy čela vázané na model: čáry pod úhlem `angle` (° v rovině řezu), rozteč `stepMm` (mm), tloušťka `width` (CSS px) */
+export type SoftHatch = { angle: number; stepMm: number; width: number; color: RGB };
 
 export type SoftOptions = {
   width: number;
@@ -401,6 +410,32 @@ export function softRender(o: SoftOptions): SoftResult {
   };
 
   // ---------- plochy ----------
+  // rovina řezu v obraze: z(x, y) = −(k0 + nr·(x + ½ − W/2) − nu·(y + ½ − H/2)) / nd (hloubka čela, šrafy, průhledná čela)
+  const cp = clip
+    ? (() => {
+        const N = clip.normal;
+        const nd = N[0] * D[0] + N[1] * D[1] + N[2] * D[2];
+        return { nd, depthOk: nd > 1e-6 || nd < -1e-6, nr: (N[0] * R[0] + N[1] * R[1] + N[2] * R[2]) / s, nu: (N[0] * U[0] + N[1] * U[1] + N[2] * U[2]) / s, k0: N[0] * C[0] + N[1] * C[1] + N[2] * C[2] + clip.constant };
+      })()
+    : null;
+  const cs = o.capScale && o.capScale > 0 && Number.isFinite(o.capScale) ? o.capScale : 1;
+  /**
+   * Šrafy čela položky vázané na model (kolo 7): hodnota v = A0 + Ax·x' + Ay·y' + Az·z (x' = x + ½ − W/2, y' = y + ½ − H/2,
+   * z = hloubka čela) z `hatchWorld` (světové souřadnice, matice komponenty) – shodně se shaderem 3D okna; čára, když
+   * zlomková část v < tloušťka × |∇v| (tloušťka v pixelech).
+   */
+  type CapHatchPx = { A0: number; Ax: number; Ay: number; Az: number; w: number; col: number };
+  const hatchOf = (it: SoftItem): CapHatchPx | null => {
+    const h = it.capHatch;
+    if (!clip || !cp || !h || !(h.stepMm > 0) || !(h.width > 0)) return null;
+    const { g, g0 } = hatchWorld(it.matrix, clip.normal, h.angle, h.stepMm);
+    const gR = g[0] * R[0] + g[1] * R[1] + g[2] * R[2], gU = g[0] * U[0] + g[1] * U[1] + g[2] * U[2], gD = g[0] * D[0] + g[1] * D[1] + g[2] * D[2];
+    const Ax = gR / s, Ay = -gU / s, Az = gD;
+    const dzdx = cp.depthOk ? -cp.nr / cp.nd : 0, dzdy = cp.depthOk ? cp.nu / cp.nd : 0;
+    const fw = Math.hypot(Ax + Az * dzdx, Ay + Az * dzdy);
+    if (!(fw > 0) || !Number.isFinite(fw)) return null;
+    return { A0: g[0] * C[0] + g[1] * C[1] + g[2] * C[2] + g0, Ax, Ay, Az, w: h.width * cs * fw, col: pack(h.color[0], h.color[1], h.color[2]) };
+  };
   if (fill) {
     // pixely, kde je vidět vnitřek tělesa řezem (plocha řezu); po vykreslení dostanou hloubku roviny řezu
     const capm = clip ? capMask(n) : null;
@@ -411,17 +446,37 @@ export function softRender(o: SoftOptions): SoftResult {
       if (!l) luts.set(k, (l = shadeLut(c)));
       return l;
     };
-    for (let ii = 0; ii < o.items.length; ii++) {
+    /**
+     * Průhledný pixel (kolo 7 – softwarový náhled umí průhlednost jako 3D okno): barva se prolne s tím, co je pod ním
+     * (alfa „over“, i nad průhledným pozadím); hloubka se nezapisuje – průhledná plocha nic nezakrývá (shodně s
+     * `depthWrite: false` ve 3D okně), hrany a čela za ní zůstanou vidět.
+     */
+    const blend = (idx: number, col: number, a: number) => {
+      const o4 = idx << 2;
+      const sr = LITTLE_ENDIAN ? col & 255 : col >>> 24;
+      const sg = LITTLE_ENDIAN ? (col >>> 8) & 255 : (col >>> 16) & 255;
+      const sb = LITTLE_ENDIAN ? (col >>> 16) & 255 : (col >>> 8) & 255;
+      const dA = data[o4 + 3] / 255;
+      const k = dA * (1 - a);
+      const outA = a + k;
+      if (!(outA > 0)) return;
+      data[o4] = (sr * a + data[o4] * k) / outA;
+      data[o4 + 1] = (sg * a + data[o4 + 1] * k) / outA;
+      data[o4 + 2] = (sb * a + data[o4 + 2] * k) / outA;
+      data[o4 + 3] = outA * 255;
+    };
+    const drawItem = (ii: number, alpha: number) => {
       const it = o.items[ii];
       const V = it.vertices;
       const T = it.triangles;
       const nv = Math.floor(V.length / 3);
-      if (!nv || T.length < 3) continue;
-      tris += Math.floor(T.length / 3);
-      if (it.wire) continue;
+      if (!nv || T.length < 3) return;
+      const trans = alpha < 1;
       // čelo řezu této položky: vlastní barva (komponenta sestavy) nebo barva řezu scény; značka v masce čel = index + 1
       const itemCap = it.capColor ? pack(it.capColor[0], it.capColor[1], it.capColor[2]) : capCol;
       const capTag = ii + 1 < CAP_TAG_MAX ? ii + 1 : CAP_TAG_MAX;
+      // průhledné čelo: šrafy a hloubka roviny se počítají hned (neprůhledná čela až v průchodu po plochách)
+      const tHatch = trans ? hatchOf(it) : null;
       ensureScratch(nv);
       const p = project(it);
       for (let i = 0, j = 0; i < nv; i++, j += 3) {
@@ -493,6 +548,8 @@ export function softRender(o: SoftOptions): SoftResult {
           const dzdy = ((z2 - z0) * (x1 - x0) - (z1 - z0) * (x2 - x0)) * inv;
           let constCol = 0;
           const isCap = !front && clip ? capTag : 0;
+          // průhledné čelo s hloubkou v rovině řezu (jako gl_FragDepth ve 3D okně: jen když rovina leží před stěnou)
+          const tCap = trans && !front && !!clip;
           let useG = false;
           let i0 = 0, didx = 0, didy = 0;
           if (!front && clip) constCol = itemCap;
@@ -566,24 +623,47 @@ export function softRender(o: SoftOptions): SoftResult {
             if (xe > bX1) bX1 = xe;
             let z = z0 + dzdx * (xs + 0.5 - x0) + dzdy * (py - y0);
             let idx = y * W + xs;
-            if (useG) {
-              let ii = i0 + didx * (xs + 0.5 - x0) + didy * (py - y0);
+            if (tCap) {
+              const yq = py - hy;
+              for (let x = xs; x <= xe; x++, z += dzdx, idx++) {
+                let zc = z;
+                if (cp!.depthOk) {
+                  const zp = -(cp!.k0 + cp!.nr * (x + 0.5 - hx) - cp!.nu * yq) / cp!.nd;
+                  if (zp >= z) zc = zp;
+                }
+                if (!(zc > ZB[idx])) continue;
+                let cc = constCol;
+                if (tHatch) {
+                  const v = tHatch.A0 + tHatch.Ax * (x + 0.5 - hx) + tHatch.Ay * yq + tHatch.Az * zc;
+                  if (v - Math.floor(v) < tHatch.w) cc = tHatch.col;
+                }
+                blend(idx, cc, alpha);
+              }
+            } else if (useG) {
+              let ii2 = i0 + didx * (xs + 0.5 - x0) + didy * (py - y0);
               for (let x = xs; x <= xe; x++) {
                 if (z > ZB[idx]) {
-                  ZB[idx] = z;
-                  PX[idx] = lut[ii < 0 ? 0 : ii > 255 ? 255 : ii | 0];
-                  if (capm !== null) capm[idx] = 0;
+                  const cc = lut[ii2 < 0 ? 0 : ii2 > 255 ? 255 : ii2 | 0];
+                  if (trans) blend(idx, cc, alpha);
+                  else {
+                    ZB[idx] = z;
+                    PX[idx] = cc;
+                    if (capm !== null) capm[idx] = 0;
+                  }
                 }
                 z += dzdx;
-                ii += didx;
+                ii2 += didx;
                 idx++;
               }
             } else {
               for (let x = xs; x <= xe; x++) {
                 if (z > ZB[idx]) {
-                  ZB[idx] = z;
-                  PX[idx] = constCol;
-                  if (capm !== null) capm[idx] = isCap;
+                  if (trans) blend(idx, constCol, alpha);
+                  else {
+                    ZB[idx] = z;
+                    PX[idx] = constCol;
+                    if (capm !== null) capm[idx] = isCap;
+                  }
                 }
                 z += dzdx;
                 idx++;
@@ -592,63 +672,98 @@ export function softRender(o: SoftOptions): SoftResult {
           }
         }
       }
+    };
+    const alphaOf = (it: SoftItem) => (it.opacity !== undefined && it.opacity !== null && it.opacity < 1 && it.opacity >= 0 ? it.opacity : 1);
+    for (let ii = 0; ii < o.items.length; ii++) {
+      const it = o.items[ii];
+      tris += Math.floor(it.triangles.length / 3);
+      if (it.wire || alphaOf(it) < 1) continue;
+      drawItem(ii, 1);
     }
     // plocha řezu leží v rovině řezu, ne na odvrácené stěně za ní: hloubka se přepíše na rovinu, aby hrany uvnitř
-    // tělesa (za plochou řezu) zůstaly skryté jako ve 3D okně; čela komponent sestavy dostanou šrafy (vlna 22)
-    if (capm !== null && clip) {
-      const N = clip.normal;
-      const nd = N[0] * D[0] + N[1] * D[1] + N[2] * D[2];
-      const depthOk = nd > 1e-6 || nd < -1e-6;
-      const cs = o.capScale && o.capScale > 0 && Number.isFinite(o.capScale) ? o.capScale : 1;
-      let hs: ({ nx: number; ny: number; step: number; width: number; col: number } | null)[] | null = null;
+    // tělesa (za plochou řezu) zůstaly skryté jako ve 3D okně; čela komponent sestavy dostanou šrafy vázané na model
+    if (capm !== null && clip && cp) {
+      let hs: (CapHatchPx | null)[] | null = null;
       for (let k = 0; k < o.items.length && k + 1 < CAP_TAG_MAX; k++) {
-        const h = o.items[k].capHatch;
-        if (!h || !(h.step > 0) || !(h.width > 0)) continue;
+        const it = o.items[k];
+        if (it.wire || alphaOf(it) < 1) continue;
+        const h = hatchOf(it);
+        if (!h) continue;
         if (!hs) hs = new Array(o.items.length + 1).fill(null);
-        hs[k + 1] = { nx: h.nx, ny: h.ny, step: h.step * cs, width: h.width * cs, col: pack(h.color[0], h.color[1], h.color[2]) };
+        hs[k + 1] = h;
       }
-      if (depthOk || hs) {
-        // rovina: N·(C + R·r + U·u + D·z) + c = 0, r = (x + ½ − W/2)/s, u = −(y + ½ − H/2)/s
-        const nr = (N[0] * R[0] + N[1] * R[1] + N[2] * R[2]) / s;
-        const nu = (N[0] * U[0] + N[1] * U[1] + N[2] * U[2]) / s;
-        const k0 = N[0] * C[0] + N[1] * C[1] + N[2] * C[2] + clip.constant;
+      if (cp.depthOk || hs) {
         for (let y = 0, idx = 0; y < H; y++) {
-          const base = k0 - nu * (y + 0.5 - hy);
-          // šrafy v souřadnicích obrazovky s osou y nahoru – stejně jako gl_FragCoord ve 3D okně
-          const yu = H - y - 0.5;
+          const yq = y + 0.5 - hy;
+          const base = cp.k0 - cp.nu * yq;
           for (let x = 0; x < W; x++, idx++) {
             const t = capm[idx];
             if (!t) continue;
-            if (depthOk) ZB[idx] = -(base + nr * (x + 0.5 - hx)) / nd;
+            if (cp.depthOk) ZB[idx] = -(base + cp.nr * (x + 0.5 - hx)) / cp.nd;
             if (hs !== null) {
               const h = hs[t];
               if (h) {
-                const v = (x + 0.5) * h.nx + yu * h.ny;
-                if (v - h.step * Math.floor(v / h.step) < h.width) PX[idx] = h.col;
+                const v = h.A0 + h.Ax * (x + 0.5 - hx) + h.Ay * yq + h.Az * ZB[idx];
+                if (v - Math.floor(v) < h.w) PX[idx] = h.col;
               }
             }
           }
         }
       }
     }
+    // průhledné položky až po neprůhledných (prolnou se s tím, co je za nimi; pořadí jako seznam – shodně s 3D oknem)
+    for (let ii = 0; ii < o.items.length; ii++) {
+      const it = o.items[ii];
+      const a = alphaOf(it);
+      if (it.wire || !(a < 1) || !(a > 0)) continue;
+      drawItem(ii, a);
+    }
   } else {
     for (const it of o.items) tris += Math.floor(it.triangles.length / 3);
   }
 
-  // ---------- hrany ----------
-  if (edges && o.items.some((it) => it.lines && it.lines.length >= 6)) {
+  // ---------- hrany a obrysy čel ----------
+  // sady úseček: hrany sítí (s ořezem rovinou řezu) a obrysy čel řezu (kolo 7: průsečnice roviny se sítí, leží v rovině
+  // řezu – bez ořezu, kreslí se i bez hran; stejné úsečky jako ve 3D okně, `section-contour.ts`)
+  type LineSet = { it: SoftItem; lines: ArrayLike<number>; col: number; useClip: boolean; alpha: number };
+  const sets: LineSet[] = [];
+  if (edges) for (const it of o.items) if (it.lines && it.lines.length >= 6) sets.push({ it, lines: it.lines, col: it.edgeColor ? pack(...it.edgeColor) : sceneEdgeCol, useClip: true, alpha: 1 });
+  if (fill && clip) {
+    for (const it of o.items) {
+      if (!it.capOutline || it.wire) continue;
+      const a = it.opacity !== undefined && it.opacity !== null && it.opacity < 1 && it.opacity >= 0 ? it.opacity : 1;
+      if (!(a > 0)) continue;
+      const seg = cachedContour(it.vertices, it.triangles, localPlane(it.matrix, clip.normal, clip.constant));
+      if (seg.length >= 6) sets.push({ it, lines: seg, col: pack(it.capOutline[0], it.capOutline[1], it.capOutline[2]), useClip: false, alpha: a });
+    }
+  }
+  if (sets.length) {
     const x1lim = W + 2, y1lim = H + 2;
     // okolí razítka hrany: (edgeW + 2)² pixelů od (px0 − 1, py0 − 1); nejbližší plocha okolí a příznak pozadí
     // se předpočítají jednou za snímek (bez výplně je z-buffer prázdný a každá hrana je vidět)
     const NB = fill && bX1 >= bX0 ? neighbourhood(ZB, W, H, edgeW, bX0, bY0, bX1, bY1) : null;
     const NMIN = NB ? NB.min : null;
     const NBG = NB ? NB.bg : null;
-    for (const it of o.items) {
-      const L = it.lines;
-      if (!L || L.length < 6) continue;
+    const lineBlend = (idx: number, col: number, a: number) => {
+      const o4 = idx << 2;
+      const sr = LITTLE_ENDIAN ? col & 255 : col >>> 24;
+      const sg = LITTLE_ENDIAN ? (col >>> 8) & 255 : (col >>> 16) & 255;
+      const sb = LITTLE_ENDIAN ? (col >>> 16) & 255 : (col >>> 8) & 255;
+      const dA = data[o4 + 3] / 255;
+      const k = dA * (1 - a);
+      const outA = a + k;
+      data[o4] = (sr * a + data[o4] * k) / outA;
+      data[o4 + 1] = (sg * a + data[o4 + 1] * k) / outA;
+      data[o4 + 2] = (sb * a + data[o4 + 2] * k) / outA;
+      data[o4 + 3] = outA * 255;
+    };
+    for (const set of sets) {
+      const it = set.it;
+      const L = set.lines;
       const p = project(it);
-      const c = clip ? clipRow(p.m) : null;
-      const edgeCol = it.edgeColor ? pack(...it.edgeColor) : sceneEdgeCol;
+      const c = clip && set.useClip ? clipRow(p.m) : null;
+      const edgeCol = set.col;
+      const lineA = set.alpha;
       for (let j = 0; j + 5 < L.length; j += 6) {
         const ax = L[j], ay = L[j + 1], az = L[j + 2], bx = L[j + 3], by = L[j + 4], bz = L[j + 5];
         const xa0 = p.ax0 * ax + p.ax1 * ay + p.ax2 * az + p.bx;
@@ -711,7 +826,10 @@ export function softRender(o: SoftOptions): SoftResult {
               if (yy < 0 || yy >= H) continue;
               for (let u = 0; u < edgeW; u++) {
                 const xx = px0 + u;
-                if (xx >= 0 && xx < W) PX[yy * W + xx] = edgeCol;
+                if (xx >= 0 && xx < W) {
+                  if (lineA < 1) lineBlend(yy * W + xx, edgeCol, lineA);
+                  else PX[yy * W + xx] = edgeCol;
+                }
               }
             }
           }

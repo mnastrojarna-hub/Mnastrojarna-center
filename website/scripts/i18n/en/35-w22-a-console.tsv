@@ -45,9 +45,7 @@ Po běhu ukázat souhrn – stručný protokol MNCAD/1 (stejný jako mncad run v
 pohledy a otáčení fungují	views and rotating work
 poloha číslem v panelu komponenty nebo textem „sestava komponenta …“	position as a number in the component panel or as text “assembly component …”
 pomocné roviny, osy a body	reference planes, axes and points
-průhlednost tělesa	body transparency
 rozměry ukazuje „stav“ a panel Měření	dimensions are shown by “status” and the Measure panel
-řez nebo skrytí komponent	section or hiding components
 sestava „{0}“ – komponent {1}, různých dílů {2}, listů výkresu {3}, příloh {4}	assembly “{0}” – components {1}, distinct parts {2}, drawing sheets {3}, attachments {4}
 seznam v historii prvků, textem „stav“	list in the feature history, as text “status”
 skica se kreslí a upravuje ve 2D editoru skici	a sketch is drawn and edited in the 2D sketch editor
