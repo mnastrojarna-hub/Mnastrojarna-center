@@ -1,6 +1,6 @@
 // E2E vlna 22 – balík V, etapa V1 (produkční build): body 13 a 14 zprávy majitele.
 //  1. bod 13: studie 0,65 s / 112 kroků → `pohyb export webm` → WebM má délku 0,65 s ± 1 snímek (dřív 2,926 s), 20 bloků s časy
-//     i·33,3 ms, snímky se liší (otisky dat bloků) – ve WebGL i bez WebGL (E2E_NOGL=1) i v řezu; 0,25× → 2,6 s; hláška uvádí délku
+//     i·33,3 ms, snímky se liší (otisky dat bloků) – ve WebGL i bez WebGL (oba průchody v každém výchozím volání, viz níže) i v řezu; 0,25× → 2,6 s; hláška uvádí délku
 //     a poměr; zpráva exportu (data-video-*) = kontrola souboru a obrazu;
 //  2. bod 14: lišta přehrávání ukotvená dole (▶, časová osa, čas a krok, rychlost), kompaktní režim skryje panel studie, panel
 //     Řez modelem nepadne pod panel studie, „Uložit pohled“ uloží kameru a řez do studie (window.mncad.getDocument), výběr pohledu
@@ -11,20 +11,29 @@
 //     vnitřek tělesa), čela sousedních komponent se liší, čelo je i ve snímku window.mncad.screenshot a v PNG snímcích pohybové
 //     studie (uložený pohled studie s řezem) a hýbe se s komponentou; najetí myší na čelo nic nezvýrazní (kurzor) a klik na čelo
 //     nic nevybere (kontrola: bez řezu tentýž klik vybere komponentu); text `řez` v sestavě uvádí čela řezu.
-// Spuštění: E2E_BASE=http://localhost:3536 node e2e/cad-w22-v.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL;
-//           E2E_ONLY=v1 | v2 = jen jedna část)
+// Spuštění: E2E_BASE=http://localhost:3536 node e2e/cad-w22-v.e2e.cjs [výstupní složka]   – výchozí = OBA průchody v jednom
+//           volání (WebGL, pak bez WebGL; bod 23: majitel testoval bez WebGL, video v řezu bez WebGL se hlídá v každém běhu);
+//           E2E_NOGL=1 = jen průchod bez WebGL, E2E_NOGL=0 = jen WebGL (e2e/lib/gl-passes.cjs); E2E_ONLY=v1 | v2 = jen jedna část.
+//           Každá kontrola průchodu bez WebGL nese v textu „(bez WebGL)“; průchod, který nic nezkontroloval, je FAIL.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+const { glPasses } = require('./lib/gl-passes.cjs');
 const BASE = (process.env.E2E_BASE || 'http://localhost:3536').replace(/\/$/, '');
-const NO_GL = ['--disable-3d-apis', '--disable-webgl', '--disable-webgl2', '--disable-gpu'];
-const GL = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'];
-const NOGL = process.env.E2E_NOGL === '1';
+const PASSES = glPasses(process.env);
+// aktuální průchod (nastaví hlavní smyčka): NOGL = bez WebGL, tag = přípona KAŽDÉ kontroly průchodu (log obou průchodů je jeden)
+let NOGL = false;
+let tag = '';
+const counts = {};
+let pass = null;
+const ok = (c, m) => {
+  console.log((c ? 'ok: ' : 'FAIL: ') + m + tag);
+  if (pass) counts[pass] = (counts[pass] || 0) + 1;
+  if (!c) process.exitCode = 1;
+};
 const OUT = (process.argv[2] || '/tmp/cad-w22-v').replace(/\/?$/, '/');
 fs.mkdirSync(OUT, { recursive: true });
-const tag = NOGL ? ' (bez WebGL)' : '';
 
 /** minimální čtení WebM (EBML): délka, rozměr, časy a otisky bloků – nezávislé na aplikaci */
 function readWebm(b) {
@@ -132,7 +141,7 @@ async function v1(b) {
   // ── model: studie 0,65 s / 112 kroků (repro bodu 13, neutrální názvy) ──
   let log = await run(['nový díl "Deska A"', 'kvádr 200 100 10', 'nový díl "Přidržovač"', 'kvádr 200 100 10'].join('\n'));
   log += await run(['nová sestava "Studie V"', 'vložit "Deska A" ukotvit', 'vložit "Přidržovač" v 0 0 67,5', 'sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 57,5 název "ZDVIH"', 'sestava vazba rovnoběžně "Přidržovač" +X "Deska A" +X', 'sestava vazba rovnoběžně "Přidržovač" +Y "Deska A" +Y', 'pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 112 čas 0,65', 'pohyb spustit'].join('\n'));
-  ok(!/^✗/m.test(log), `model a studie 0,65 s / 112 kroků${tag}`);
+  ok(!/^✗/m.test(log), 'model a studie 0,65 s / 112 kroků');
   await player.waitFor({ timeout: 30000 });
   await p.waitForFunction(() => document.querySelector('[data-motion-player]')?.getAttribute('data-player-state') === 'ok', null, { timeout: 60000 }).catch(() => {});
   ok((await player.getAttribute('data-player-state')) === 'ok', 'lišta přehrávání dole ve 3D okně, výsledek platí');
@@ -313,7 +322,7 @@ async function v2(b) {
   // dvě desky nad sebou (B se při studii zvedá), řez Y = 15 prochází oběma; B má vlastní barvu
   let log = await run(['nový díl "Deska A"', 'kvádr 40 30 20', 'nový díl "Deska B"', 'kvádr 40 30 20'].join('\n'));
   log += await run(['nová sestava "Řez V2"', 'vložit "Deska A" ukotvit', 'vložit "Deska B" v 0 0 30', 'sestava komponenta "Deska B" barva #4678c8', 'sestava vazba vzdálenost "Deska B" spodní "Deska A" horní hodnota 10 název "ZDVIH"', 'sestava vazba rovnoběžně "Deska B" +X "Deska A" +X', 'sestava vazba rovnoběžně "Deska B" +Y "Deska A" +Y'].join('\n'));
-  ok(!/^✗/m.test(log), `V2: sestava dvou desek${tag}`);
+  ok(!/^✗/m.test(log), 'V2: sestava dvou desek');
   await run('zobraz hrany');
   await p.waitForTimeout(400);
   // řez potřebuje sítě komponent v okně – po vložení se ještě staví (✗ „v okně není žádný model“ = zkusit znovu)
@@ -415,17 +424,32 @@ async function v2(b) {
 
 (async () => {
   const only = process.env.E2E_ONLY || '';
-  const b = await chromium.launch({ args: NOGL ? NO_GL : GL });
-  for (const [name, fn] of [['v1', v1], ['v2', v2]]) {
-    if (only && only !== name) continue;
-    try {
-      await fn(b);
-    } catch (e) {
-      console.log(`FAIL: ${name}: ` + (e && e.stack ? e.stack : e));
-      process.exitCode = 1;
+  for (const ps of PASSES) {
+    pass = ps.id;
+    NOGL = ps.nogl;
+    tag = ps.tag;
+    console.log(`=== průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'} ===`);
+    const b = await chromium.launch({ args: ps.args });
+    // průchod musí být opravdu ten, za který se vydává (jinak by „bez WebGL“ kontroloval WebGL nebo naopak)
+    const probe = await b.newPage();
+    const gl = await probe.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => null);
+    await probe.close();
+    ok(gl === !ps.nogl, `průchod: WebGL v prohlížeči ${gl ? 'je' : 'není'} k dispozici (čekáno ${ps.nogl ? 'není' : 'je'})`);
+    for (const [name, fn] of [['v1', v1], ['v2', v2]]) {
+      if (only && only !== name) continue;
+      try {
+        await fn(b);
+      } catch (e) {
+        console.log(`FAIL: ${name}${tag}: ` + (e && e.stack ? e.stack : e));
+        process.exitCode = 1;
+      }
     }
+    await b.close();
   }
-  await b.close();
+  // průchod, který nic nezkontroloval (pád před první kontrolou), se nesmí v součtu ztratit
+  pass = null;
+  tag = '';
+  for (const ps of PASSES) ok((counts[ps.id] || 0) > 1, `průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'}: ${counts[ps.id] || 0} kontrol`);
 })().catch((e) => {
   console.log('FAIL: ' + (e && e.stack ? e.stack : e));
   process.exitCode = 1;
