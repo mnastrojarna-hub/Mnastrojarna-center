@@ -1,0 +1,25 @@
+# Vlna 22, kolo 7 (track a): body 12, 16, 20, 22h
+ ve fázi „{0}“	 in phase “{0}”
+čtení zapsaného souboru	reading the written file
+Dosedací plocha pružiny vybrána znovu (F{0}) – {1}	Spring seat face picked again (F{0}) – {1}
+Export – krok {0}/{1} převodu{2}	Export – conversion step {0}/{1}{2}
+chyba{0}, soubor nevznikl: {1}	error{0}, no file was written: {1}
+Klikněte na dosedací plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou dosedací plochu pružiny „{1}“.	Click the seat face of component “{0}” (or pick it from the face list) – it replaces the lost seat face of spring “{1}”.
+Neúspěšné exporty ({0})	Failed exports ({0})
+Neúspěšné exporty ({0}) – soubor nevznikl:	Failed exports ({0}) – no file was written:
+Nová dosedací plocha pružiny „{0}“ – komponenta „{1}“	New seat face of spring “{0}” – component “{1}”
+Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} z {1} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	The link is truncated – the document data ends early (the part after #s= has {0} of {1} characters). Copy the whole link again, or ask for a short link with a code.
+přenos tvaru do STEP	transferring the shape to STEP
+Revize modelu	Model revision
+samostatně nejdou přenést tělesa {0} z {1}	bodies {0} of {1} cannot be transferred on their own
+tělesa {0}, skořepiny {1}, plochy {2}	solids {0}, shells {1}, faces {2}
+tvar je NEPLATNÝ (BRepCheck)	the shape is INVALID (BRepCheck)
+tvar je platný (BRepCheck)	the shape is valid (BRepCheck)
+tvar: {0}	shape: {0}
+Vyberte plochu komponenty „{0}“ – na ni pružina dosedá.	Pick a face of component “{0}” – the spring seats on it.
+Vybrat dosedací plochu znovu	Pick seat face again
+z modelu {0}	from model {0}
+zápis textu STEP	writing the STEP text
+zapisovač STEP: krok „{0}“ skončil stavem {1} · {2}	STEP writer: step “{0}” ended with status {1} · {2}
+Změny, které běh zapsal do {0}, se vrátily.	Changes the run wrote to {0} were reverted.
+zrušeno{0}, soubor nevznikl	cancelled{0}, no file was written

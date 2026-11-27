@@ -1,0 +1,25 @@
+# Vlna 22, kolo 7 (track a): body 12, 16, 20, 22h
+ ve fázi „{0}“	 in der Phase „{0}“
+čtení zapsaného souboru	Lesen der geschriebenen Datei
+Dosedací plocha pružiny vybrána znovu (F{0}) – {1}	Auflagefläche der Feder neu gewählt (F{0}) – {1}
+Export – krok {0}/{1} převodu{2}	Export – Konvertierungsschritt {0}/{1}{2}
+chyba{0}, soubor nevznikl: {1}	Fehler{0}, keine Datei geschrieben: {1}
+Klikněte na dosedací plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou dosedací plochu pružiny „{1}“.	Klicken Sie auf die Auflagefläche der Komponente „{0}“ (oder wählen Sie sie aus der Flächenliste) – sie ersetzt die verlorene Auflagefläche der Feder „{1}“.
+Neúspěšné exporty ({0})	Fehlgeschlagene Exporte ({0})
+Neúspěšné exporty ({0}) – soubor nevznikl:	Fehlgeschlagene Exporte ({0}) – keine Datei geschrieben:
+Nová dosedací plocha pružiny „{0}“ – komponenta „{1}“	Neue Auflagefläche der Feder „{0}“ – Komponente „{1}“
+Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} z {1} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	Der Link ist abgeschnitten – die Dokumentdaten enden vorzeitig (der Teil nach #s= hat {0} von {1} Zeichen). Kopieren Sie den ganzen Link erneut oder bitten Sie um einen kurzen Link mit Code.
+přenos tvaru do STEP	Übertragung der Form nach STEP
+Revize modelu	Modellrevision
+samostatně nejdou přenést tělesa {0} z {1}	Körper {0} von {1} lassen sich einzeln nicht übertragen
+tělesa {0}, skořepiny {1}, plochy {2}	Körper {0}, Schalen {1}, Flächen {2}
+tvar je NEPLATNÝ (BRepCheck)	die Form ist UNGÜLTIG (BRepCheck)
+tvar je platný (BRepCheck)	die Form ist gültig (BRepCheck)
+tvar: {0}	Form: {0}
+Vyberte plochu komponenty „{0}“ – na ni pružina dosedá.	Wählen Sie eine Fläche der Komponente „{0}“ – auf ihr liegt die Feder auf.
+Vybrat dosedací plochu znovu	Auflagefläche neu wählen
+z modelu {0}	aus Modell {0}
+zápis textu STEP	Schreiben des STEP-Texts
+zapisovač STEP: krok „{0}“ skončil stavem {1} · {2}	STEP-Schreiber: Schritt „{0}“ endete mit Status {1} · {2}
+Změny, které běh zapsal do {0}, se vrátily.	Die während des Laufs in {0} geschriebenen Änderungen wurden zurückgenommen.
+zrušeno{0}, soubor nevznikl	abgebrochen{0}, keine Datei geschrieben

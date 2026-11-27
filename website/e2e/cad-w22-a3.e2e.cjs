@@ -323,6 +323,63 @@ async function drawing(p, tag, lang) {
   } else ok(false, `${tag}22f: přepínač pohledu iso nenalezen (selektor data-view-toggle)`);
 }
 
+/*
+ * 22f kolo 7: přesně scénář majitele – výkres ULOŽENÝ s formátem A2, rychlá změna A2 → A3 a hned zavření výkresu, pak zavření
+ * karty prohlížeče. Dřív e2e začínal z „auto“ a dotaz při zavření karty měl jen ověřovací sondu. Teď: uložený soubor má A2,
+ * po změně jen výkresu se při zavření karty objeví skutečný dotaz beforeunload (změna se tedy počítá jako neuložená) a dokument
+ * v tu chvíli nese A3; po Ctrl+S má soubor A3, znovu otevřený soubor také a zavření karty už se neptá.
+ */
+async function drawingUnload(b, tag) {
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
+  await ctx.addInitScript(fsInit); // běžný uživatel (ne automatizace) – jinak se dotaz při zavření karty vypíná
+  const p = await ctx.newPage();
+  const dialogs = [];
+  p.on('dialog', (d) => { dialogs.push(d.type()); d.dismiss().catch(() => {}); });
+  try {
+    await start(p, `${BASE}/cad`);
+    await p.evaluate((t) => window.mncad.run(t), 'nový díl "Deska U"\nkvádr 60 40 10\nvýkres');
+    await p.waitForSelector('[data-sheet]', { timeout: 120000 }); await p.waitForTimeout(800);
+    const sel = p.getByLabel('Formát listu');
+    await sel.click(); await p.keyboard.press('Escape'); // skutečný klik myší (uživatelská aktivace stránky)
+    await sel.selectOption('A2');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    const n0 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved = await lastWrite(p, n0, 20000);
+    const s0 = findDoc(saved, 'Deska U');
+    ok(s0?.drawings?.[0]?.options?.sheet === 'A2', `${tag}22f kolo 7: výchozí stav = uložený výkres s formátem A2 (${s0?.drawings?.[0]?.options?.sheet})`);
+    // změna A2 → A3 a hned zavření výkresu (Esc do 100 ms), pak hned zavření karty
+    await p.evaluate((t) => window.mncad.run(t), 'výkres');
+    await p.waitForSelector('[data-sheet]', { timeout: 120000 }); await p.waitForTimeout(500);
+    await p.getByLabel('Formát listu').selectOption('A3');
+    await p.keyboard.press('Escape');
+    await p.close({ runBeforeUnload: true });
+    await new Promise((r) => setTimeout(r, 1500)); // stránka se smí zavřít – čekání nesmí záviset na ní
+    ok(!p.isClosed() && dialogs[0] === 'beforeunload', `${tag}22f kolo 7: zavření karty po změně jen výkresu → skutečný dotaz beforeunload (dialogy: ${dialogs.join(',') || 'žádný'}, karta ${p.isClosed() ? 'zavřena' : 'zůstala'})`);
+    if (p.isClosed()) return;
+    const d = await p.evaluate(() => window.mncad.getDocument());
+    ok(d.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: dokument v okamžiku dotazu nese A3 (${d.drawings?.[0]?.options?.sheet})`);
+    const n1 = await p.evaluate(() => window.__fs.writes.length);
+    await p.keyboard.press('Control+s');
+    const saved2 = await lastWrite(p, n1, 20000);
+    const s1 = findDoc(saved2, 'Deska U');
+    ok(s1?.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: Ctrl+S po dotazu zapsal A3 (${s1?.drawings?.[0]?.options?.sheet})`);
+    if (saved2) {
+      await p.locator('input[type=file]:not([data-insert-input])').first().setInputFiles({ name: 'deska-u.mncad', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved2)) });
+      await p.waitForTimeout(2500);
+      const re = await p.evaluate(() => window.mncad.getDocument());
+      ok(re.drawings?.[0]?.options?.sheet === 'A3', `${tag}22f kolo 7: znovu otevřený soubor má A3 (${re.drawings?.[0]?.options?.sheet})`);
+    }
+    await p.keyboard.press('Control+s'); await p.waitForTimeout(1500); // otevřený soubor uložit → čistý stav
+    const before = dialogs.length;
+    await p.close({ runBeforeUnload: true });
+    await new Promise((r) => setTimeout(r, 1500)); // stránka se smí zavřít – čekání nesmí záviset na ní
+    ok(p.isClosed() && dialogs.length === before, `${tag}22f kolo 7: po uložení se zavření karty už neptá (dialogů navíc ${dialogs.length - before}, karta ${p.isClosed() ? 'zavřena' : 'zůstala'})`);
+  } finally {
+    await ctx.close();
+  }
+}
+
 /* ───────────────────────── 22h: export z menu s dialogem „Uložit jako“ (FS Access) a zrušení ───────────────────────── */
 async function menuExport(b, tag) {
   const ctx = await b.newContext({ viewport: { width: 1500, height: 900 } });
@@ -448,6 +505,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
     await ctx.close();
   }
   await menuExport(b, '');
+  await drawingUnload(b, '');
   for (const [tag, url, lang] of [['', `${BASE}/cad`, 'cs'], ['[en] ', `${BASE}/en/cad`, 'en'], ['[de] ', `${BASE}/de/cad`, 'de']]) await ctrlSave(b, tag, url, lang);
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
@@ -460,6 +518,7 @@ const launch = async (o) => { const x = await chromium.launch(o); browsers.push(
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
   await ctrlSave(nogl, '[bez WebGL] ', `${BASE}/cad`, 'cs');
+  await drawingUnload(nogl, '[bez WebGL] ');
   await nogl.close();
 })()
   .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })

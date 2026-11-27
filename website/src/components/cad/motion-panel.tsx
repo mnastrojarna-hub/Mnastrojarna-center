@@ -46,6 +46,7 @@ import { MotionPlayer, type PlayerHost } from "./motion-player";
 import { appRuns } from "./run-host";
 import { motionRunOf, trackedMotion } from "./motion-runs";
 import { modelRev } from "@/cad/engine/result-key";
+import { motionCsvWithRev } from "@/cad/motion-export-rev";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
@@ -402,7 +403,7 @@ export function MotionPanel({
     setRec(tr("Připravuji snímky…"));
     await ensureProcessMeshes(r, d, envRef.current().process); // exportované snímky obsahují obrobek po střihu / otisku
     try {
-      const rep = await exportMotion(r, d, { kind, speed: v.speed, fps: v.fps, seconds: v.seconds, perStep: kind === "png" && (sig ? !!sig.perStep : true), views, annot: v.annot !== false && !st.annot?.off, annotSettings: st.annot, name: d.name, csv: motionCsv(r, d) }, host);
+      const rep = await exportMotion(r, d, { kind, speed: v.speed, fps: v.fps, seconds: v.seconds, perStep: kind === "png" && (sig ? !!sig.perStep : true), views, annot: v.annot !== false && !st.annot?.off, annotSettings: st.annot, name: d.name, csv: motionCsvWithRev(motionCsv(r, d), d) }, host);
       setReport(rep);
       flash(rep.text);
     } finally {
@@ -425,7 +426,7 @@ export function MotionPanel({
     const r = motionCached(d, envRef.current()) ?? (await compute());
     if (!r || motionCached(docRef.current, envRef.current()) !== r) return;
     setPlay(null);
-    if (kind === "csv") save(`${d.name || "sestava"}-pohyb.csv`, motionCsv(r, d), "text/csv;charset=utf-8");
+    if (kind === "csv") save(`${d.name || "sestava"}-pohyb.csv`, motionCsvWithRev(motionCsv(r, d), d), "text/csv;charset=utf-8"); // + revize modelu (kolo 7, bod 12)
     else await exportFrames(r, kind, video);
   };
   // pokyny z textových příkazů „pohyb přehrát / krok / export“: až po doběhnutí běhu (dokument běhu se zapisuje na jeho konci –

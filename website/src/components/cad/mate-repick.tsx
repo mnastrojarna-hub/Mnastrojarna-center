@@ -8,9 +8,13 @@
  * Ztracená HRANA / VRCHOL (fáze 2, kolo 4): „Vybrat hranu znovu“ / „Vybrat vrchol znovu“ – klik na hranu / vrchol téhož dílu
  * v modelu, nebo výběr ze seznamu hran / vrcholů dílu (`data-repick-ent`, popis jako otisk ztracené reference) = text
  * `sestava vazba N plocha a E3`.
+ * Ztracená DOSEDACÍ PLOCHA PRUŽINY (kolo 7): „Vybrat dosedací plochu znovu“ – klik na plochu téže komponenty v modelu nebo výběr
+ * ze seznamu ploch; zapíše se stejným textovým příkazem jako ručně (`sestava pružina "P" mezi "Deska A" F6 "Přidržovač" F5`),
+ * takže kontrola plochy (rovinná, kolmá k ose) a protokol jsou tytéž.
  */
 import { useEffect, useState } from "react";
 import { faceShort, type CompFaceRow } from "@/cad/agent-asm";
+import { compArgText } from "@/cad/spring-lost";
 import type { CompEntRow } from "@/cad/asm-agent";
 import { entKey } from "@/cad/mate-geo";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
@@ -33,13 +37,18 @@ export function useMateRepick(o: {
   geo: Map<string, MateFaceInfo>;
   /** zapíše opravenou sestavu a přepočítá vazby */
   apply: (d: CadDoc) => void;
+  /** textový příkaz přes agenta (nová dosedací plocha pružiny – stejná cesta jako `sestava pružina … mezi …`) */
+  run?: (text: string) => Promise<string>;
   flash: (t: string) => void;
 }) {
+  /** `mate` = id vazby, nebo `spring:<id komponenty pružiny>` (dosedací plocha pružiny, strana a / b) */
   const [active, setActive] = useState<{ mate: string; side: Side } | null>(null);
   const [rows, setRows] = useState<CompFaceRow[] | null>(null);
   const [ents, setEnts] = useState<CompEntRow[] | null>(null);
-  const mate = active ? o.doc.mates?.find((m) => m.id === active.mate) : undefined;
-  const old: MateRef | undefined = active && mate ? mate[active.side] : undefined;
+  const springId = active?.mate.startsWith("spring:") ? active.mate.slice(7) : null;
+  const springComp = springId ? o.doc.components?.find((c) => c.id === springId && c.spring) : undefined;
+  const mate = active && !springId ? o.doc.mates?.find((m) => m.id === active.mate) : undefined;
+  const old: MateRef | undefined = active && mate ? mate[active.side] : springComp && (active?.side === "a" || active?.side === "b") ? springComp.spring![active.side] : undefined;
   /** co se vybírá: plocha, nebo (ztracená hrana / vrchol) táž entita jako původní reference */
   const want: "face" | "edge" | "vertex" = old?.ent ?? "face";
   const compName = (id?: string) => o.doc.components?.find((c) => c.id === id)?.name ?? "?";
@@ -60,6 +69,15 @@ export function useMateRepick(o: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [old?.compId, active?.mate]);
   const need = old?.lost ? (old.lost.kind === "cylinder" || old.lost.kind === "cone" ? "cylinder" : old.lost.kind === "plane" ? "plane" : null) : null;
+  /** výběr nové dosedací plochy pružiny (komponenta pružiny `id`, ztracená strana) */
+  const startSpring = (id: string, side: "a" | "b") => {
+    const key = `spring:${id}`;
+    if (active?.mate === key) return setActive(null);
+    const c = o.doc.components?.find((x) => x.id === id && x.spring);
+    if (!c?.spring) return;
+    setActive({ mate: key, side });
+    o.flash(tr("Klikněte na dosedací plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou dosedací plochu pružiny „{1}“.", compName(c.spring[side].compId), c.name));
+  };
   const start = (mateId: string, side: Side) => {
     if (active?.mate === mateId) return setActive(null);
     const m = o.doc.mates?.find((x) => x.id === mateId);
@@ -90,8 +108,24 @@ export function useMateRepick(o: {
     o.apply(next);
     o.flash(ent === "edge" ? tr("Hrana vazby vybrána znovu (E{0}) – vazba se zase řeší.", index + 1) : tr("Vrchol vazby vybrán znovu (V{0}) – vazba se zase řeší.", index + 1));
   };
+  /** nová dosedací plocha pružiny: tentýž textový příkaz jako ručně (kontrola plochy a protokol jako text) */
+  const chooseSeat = async (leafId: string, face: number) => {
+    if (!active || !springComp?.spring || !old || face < 0) return;
+    const leaf = o.leaves.find((l) => l.id === leafId);
+    if (!leaf) return;
+    if (leaf.topId !== old.compId) return o.flash(tr("Vyberte plochu komponenty „{0}“ – na ni pružina dosedá.", compName(old.compId)));
+    const s = springComp.spring;
+    const sideArg = (k: "a" | "b") => `${compArgText(o.doc, s[k].compId)} F${(k === active.side ? face : s[k].face) + 1}`;
+    const text = `sestava pružina ${compArgText(o.doc, springComp.id)} mezi ${sideArg("a")} ${sideArg("b")}`;
+    setActive(null);
+    if (!o.run) return o.flash(text);
+    const out = await o.run(text).catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
+    const bad = out.split("\n").find((l) => l.startsWith("✗"));
+    o.flash(bad ?? tr("Dosedací plocha pružiny vybrána znovu (F{0}) – {1}", face + 1, text));
+  };
   /** nová plocha strany vazby: `leafId` = list (díl), `face` = index plochy v dílu */
   const choose = async (leafId: string, face: number) => {
+    if (springId) return chooseSeat(leafId, face);
     if (!active || !mate || !old || face < 0) return;
     if (old.ent) return o.flash(old.ent === "edge" ? tr("Ztracená reference byla hrana – vyberte hranu.") : tr("Ztracená reference byl vrchol – vyberte vrchol."));
     const leaf = o.leaves.find((l) => l.id === leafId);
@@ -110,7 +144,7 @@ export function useMateRepick(o: {
   const panel =
     active && old ? (
       <div data-repick-panel={active.mate} className="mx-2 mb-2 rounded border border-[#f3c4c0] bg-[#fef3f2] p-2 text-[11.5px] leading-snug text-[#912018]">
-        <p className="mb-1 font-semibold">{want === "edge" ? tr("Nová hrana vazby – komponenta „{0}“", compName(old.compId)) : want === "vertex" ? tr("Nový vrchol vazby – komponenta „{0}“", compName(old.compId)) : tr("Nová plocha vazby – komponenta „{0}“", compName(old.compId))}</p>
+        <p className="mb-1 font-semibold">{springComp ? tr("Nová dosedací plocha pružiny „{0}“ – komponenta „{1}“", springComp.name, compName(old.compId)) : want === "edge" ? tr("Nová hrana vazby – komponenta „{0}“", compName(old.compId)) : want === "vertex" ? tr("Nový vrchol vazby – komponenta „{0}“", compName(old.compId)) : tr("Nová plocha vazby – komponenta „{0}“", compName(old.compId))}</p>
         {old.ent ? (
           <>
             <p className="mb-1.5">{want === "edge" ? tr("Klikněte na hranu v modelu, nebo ji vyberte ze seznamu (souřadnice dílu):") : tr("Klikněte na vrchol v modelu, nebo ho vyberte ze seznamu (souřadnice dílu):")}</p>
@@ -159,5 +193,5 @@ export function useMateRepick(o: {
         </button>
       </div>
     ) : null;
-  return { active, want: active ? want : null, start, choose, chooseEnt, cancel: () => setActive(null), panel };
+  return { active, want: active ? want : null, start, startSpring, choose, chooseEnt, cancel: () => setActive(null), panel };
 }

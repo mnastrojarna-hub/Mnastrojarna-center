@@ -16,13 +16,18 @@
 //     plochou (data-mate-spring, data-springs-lost), nic se nepřichytí jinam, panel pružiny ✗ bez délky; oprava = Upravit pružinu → ✓.
 //  kolo 5: `stav` stručně nese `springs.lost=1` v = status / D / Σ (i sestava jen s pružinou bez vazeb); „Odebrat pružinu“ v seznamu
 //     vazeb jde textovým příkazem `sestava pružina #k odebrat` (✓ pružina odebrána).
-// Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
+// Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (výchozí = oba průchody, E2E_NOGL=1 jen bez WebGL, E2E_NOGL=0 jen WebGL)
 const { chromium } = require('playwright');
-const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+// průchody s WebGL i bez WebGL v KAŽDÉM výchozím běhu (kolo 7, bod 23 – dřív bez WebGL jen s E2E_NOGL=1); přípona průchodu u kontroly
+const { glPasses } = require('./lib/gl-passes.cjs');
+const PASSES = glPasses(process.env);
+let tag = '';
+let pass = null;
+const counts = {};
+const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m + tag); if (pass) counts[pass] = (counts[pass] || 0) + 1; if (!c) process.exitCode = 1; };
 const BASE = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, '');
-const NO_GL = ['--disable-3d-apis', '--disable-webgl', '--disable-webgl2', '--disable-gpu'];
-const GL = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'];
-const NOGL = process.env.E2E_NOGL === '1';
+/** aktuální průchod (nastaví hlavní smyčka na konci souboru) */
+let NOGL = false;
 const SHOTS = process.argv[2] ? process.argv[2].replace(/\/?$/, '/shots/') : null;
 const line = (log, re) => (String(log).split('\n').find((l) => re.test(l)) || '').trim();
 // vlna 22 C2: souhrn bez průniku teď zní „Kolize: žádný průnik v N polohách“ – musí ho chytit i tento negativní test
@@ -42,8 +47,8 @@ async function open(b, path) {
   return { ctx, p };
 }
 
-(async () => {
-  const b = await chromium.launch({ args: NOGL ? NO_GL : GL });
+async function mainPass(args) {
+  const b = await chromium.launch({ args });
   const { p } = await open(b, '/cad');
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -595,4 +600,22 @@ async function open(b, path) {
     await o.ctx.close();
   }
   await b.close();
+}
+
+(async () => {
+  for (const ps of PASSES) {
+    pass = ps.id;
+    NOGL = ps.nogl;
+    tag = ps.tag;
+    console.log(`=== průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'} ===`);
+    // průchod musí být opravdu ten, za který se vydává
+    const probe = await chromium.launch({ args: ps.args });
+    const pg = await probe.newPage();
+    const gl = await pg.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => null);
+    await probe.close();
+    ok(gl === !ps.nogl, `průchod: WebGL v prohlížeči ${gl ? 'je' : 'není'} k dispozici (čekáno ${ps.nogl ? 'není' : 'je'})`);
+    await mainPass(ps.args).catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e) + tag); process.exitCode = 1; });
+  }
+  tag = '';
+  for (const ps of PASSES) ok((counts[ps.id] || 0) > 1, `průchod ${ps.nogl ? 'bez WebGL' : 'WebGL'}: ${counts[ps.id] || 0} kontrol`);
 })().catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; });

@@ -25,7 +25,9 @@ import { isVolumeFormat, solidVerdict } from "../../solid-export";
 import { modelSolids } from "../solid-check";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
-import { runExportJob } from "../export-job";
+import { exportModelRev, runExportJob } from "../export-job";
+import { failedPhaseOf, failText, recordExportFailure } from "../../export-failures";
+import { CadCancelled } from "../../kernel-client";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
 import { modelId, sameModel } from "../../doc-outputs";
@@ -168,6 +170,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   const hold: { check?: ExportCheck } = {};
   // export jako úloha s fázemi (vlna 22, bod 22h – engine/export-job.ts): přestavba modelu, převod, zápis, kontrola
   // zpětným načtením; pořadí řádků protokolu jako dřív (soubor, pak kontrola); fáze hlásí hostitel (CLI --progress, běh v GUI)
+  const t0 = Date.now();
   const job = await runExportJob(
     d,
     fmt,
@@ -183,7 +186,16 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
       write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file", weak),
     },
     { check: cmd.check !== false, verifyFirst: strictCheck, ...(ms?.parts ? { parts: ms.parts } : {}) },
-  );
+  ).catch((err: unknown) => {
+    // neúspěšný / zrušený export zůstane v dokumentu (bod 22h kolo 7 – cad/export-failures.ts): fáze, chyba, revize, čas
+    const r = runOf(ctx);
+    if (r.doc.kind !== "draft") {
+      const cancelled = err instanceof CadCancelled;
+      r.doc = recordExportFailure(r.doc, { format: fmt, file: name, state: cancelled ? "cancelled" : "error", phase: failedPhaseOf(err), error: failText(err), modelRev: exportModelRev(d), ms: Date.now() - t0 });
+      r.changed = true;
+    }
+    throw err;
+  });
   const f = job.out;
   const prePrint = () => {
     if (!pre) return;

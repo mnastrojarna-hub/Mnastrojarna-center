@@ -1265,7 +1265,8 @@ počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předc
 protokol se nikdy nečte jako výsledek nového běhu (atributy `data-run-id`, `data-run-state` u výstupu); tlačítko
 **Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
 ✗ `run.cancelled` před dalším řádkem; zapsal-li běh před zrušením jiný dokument (přechod `nový díl` / `záložka`), dokumenty, které
-založil, se zahodí a dokumenty zapsané do dřívějších záložek vyjmenuje ✗ `run.cancelled-partial` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+založil, se zahodí a zápisy do dřívějších záložek se vrátí do stavu před během („Změny, které běh zapsal do „Deska A“, se vrátily.“);
+jen záložku, kterou mezitím změnil někdo jiný, zrušení nepřepíše a vyjmenuje ji ✗ `run.cancelled-partial` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
 měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny `pohyb přehrát` se panelu doručí až po zápisu
 dokumentu běhu.
 
@@ -3067,7 +3068,9 @@ O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb7
   - Tvary odkazu (část za `#` se na server nikdy neposílá):
     `…/cad#q=<id 10 znaků>.<klíč 22 znaků base64url>` – vlastní úložiště, obsah AES-GCM, 128bitový klíč jen v odkazu;
     `…/cad#s=1d.<data>` – data = base64url(deflate-raw(JSON `{"v":1,"exp":<ms|null>,"from"?,"view":"model|drawing","doc":{…}}`)),
-    `#s=1dp.<sůl>.<data>` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256), `#s=1r.<data>` bez komprese;
+    `#s=1dpk.<sůl>.<n>.<kontrola>.<data>` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256; n = počet znaků dat, kontrola =
+    base64url(SHA-256(data)) prvních 6 B – useknutý / změněný odkaz se pozná i bez hesla; starší `#s=1dp.<sůl>.<data>` bez
+    kontroly se otevírá dál), `#s=1r.<data>` bez komprese;
     `…/cad#r=<cesta>.<klíč>[.p<sůl>]` – úložiště Supabase. V Node odkaz otevře `openShareLink(parseShareHash(hash))`
     (share.ts).
 - Mnoho souborů a málo místa ve stručném protokolu: místo jednotlivých řádků F jeden souhrnný
@@ -3505,6 +3508,11 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /**
+   * neúspěšné a zrušené exporty dokumentu (vlna 22 kolo 7, bod 22h – cad/export-failures.ts): formát, soubor, fáze, ve které
+   * úloha skončila, chyba, revize modelu, čas. Soubor nevznikl – záznam není výstup (nikdy „odpovídá modelu“), jen trvalá stopa.
+   */
+  exportFailures?: ExportFailRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
   /**

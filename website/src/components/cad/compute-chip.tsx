@@ -15,6 +15,8 @@ export function progressLabel(p: CadProgress): string {
   if (p.op === "compare" && p.phase === "start") return tr("Porovnávám s referenčním modelem…");
   if (p.op === "stepSplit") return p.phase === "feature" ? tr("Čtu strukturu sestavy STEP – díl {0}/{1}", p.index + 1, p.total) : tr("Čtu strukturu sestavy STEP…");
   if (p.op === "asmParts" && p.phase === "feature") return tr("Načítám díl {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
+  // kroky uvnitř převodu STEP (bod 22h kolo 7, formats/export.ts writeStepFile): přenos tvaru / zápis textu / čtení souboru
+  if (p.op === "export" && p.phase === "feature") return tr("Export – krok {0}/{1} převodu{2}", p.index + 1, p.total, p.name ? ` (${p.name})` : "");
   if (p.phase === "feature") return tr("Počítám prvek {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
   if (p.phase === "mesh") return tr("Počítám síť modelu…");
   if (p.op === "drawing") return tr("Počítám pohledy výkresu…");

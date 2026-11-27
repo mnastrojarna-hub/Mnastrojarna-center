@@ -388,16 +388,20 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
     expect(withCheck).toMatch(/^F step "Export\.step" \d+B check=ok rev=r·[0-9a-f]{6}/m);
   }, 120_000);
 
-  it("16. zrušený běh, který před zrušením zapsal jiný dokument: nikdy „beze změny“ – ✗ run.cancelled-partial ho jmenuje; založená záložka zmizí", async () => {
+  // kolo 7 (bod 12): vědomě změněno – zápis do dřívější záložky se při zrušení vrací; „beze změny“ smí zaznít jen proto, že
+  // dokument je opravdu v původním stavu (kontrola obsahu níže), a hláška vyjmenuje, co se vrátilo
+  it("16. zrušený běh, který před zrušením zapsal jiný dokument: zápis se vrátí a hláška to řekne; založená záložka zmizí", async () => {
     setLang("cs");
     const ws = new MemoryWorkspace();
     await runReport(ws, 'nový díl "Deska A"\nkvádr 30 30 5', hostOf());
     const ac = new AbortController();
     const rep = await runReport(ws, 'kvádr 5 5 5 v 0 0 5\nnový díl "Deska B"\nkvádr 1 1 1\nnový díl "Deska C"\nkvádr 2 2 2', hostOf(), { signal: ac.signal, hooks: { opEnd: (l: number | null) => void (l === 4 && ac.abort()) } });
     const out = formatShort(rep, { budget: Infinity, notes: true });
-    expect(out).toMatch(/^✗ L- run\.cancelled-partial /m);
-    expect(out).not.toMatch(/beze změny/);
-    expect(rep.console).toMatch(/zůstaly v „Deska A“/);
+    expect(out).toMatch(/^✗ L- run\.cancelled /m);
+    expect(rep.console).toMatch(/Změny, které běh zapsal do „Deska A“, se vrátily/);
+    const a = ws.tabs().find((t) => t.title === "Deska A")!;
+    await ws.activate(a.id);
+    expect(ws.present().features.length).toBe(1); // „beze změny“ je pravda: kvádr 5 5 5 z běhu v Desce A není
     expect(rep.console).toMatch(/Dokumenty založené během \(„Deska B“\) se zahodily/);
     expect(ws.tabs().map((t) => t.title)).not.toContain("Deska B");
   }, 120_000);

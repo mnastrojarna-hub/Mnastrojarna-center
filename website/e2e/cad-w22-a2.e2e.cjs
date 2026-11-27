@@ -190,6 +190,72 @@ async function edgeClick(p, tag, run, idle) {
   await p.screenshot({ path: `${S}w22a2-${tag}-4-edge-click.png` });
 }
 
+/**
+ * Kolo 7 (bod 20): ztracená DOSEDACÍ PLOCHA PRUŽINY se vybere znovu jako plocha vazby – tlačítko „Vybrat dosedací plochu znovu“
+ * v seznamu vazeb (dřív jen „Zadat dosedací plochy znovu“ = panel pružiny s automatickou volbou). S WebGL ze seznamu ploch
+ * (`data-repick-face`), bez WebGL KLIKNUTÍM na horní plochu desky v pohledu shora. Zápis = tentýž textový příkaz
+ * `sestava pružina … mezi … F… … F…` (protokol, kontrola rovinné plochy), pak stav bez `springs.lost`.
+ */
+async function springFlow(p, tag) {
+  const run = (t, o) => p.evaluate(([t, o]) => window.mncad.run(t, o), [t, o]);
+  const idle = () => p.waitForFunction(() => !window.mncad.progress(), null, { timeout: 120000 });
+  const log = await run([
+    'nový díl "Deska S"', 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat',
+    'nový díl "Přidržovač S"', 'kvádr 10 10 10',
+    'nový díl "Pružina S"', 'pružina tlačná d 1 De 8 L0 30 n 6 konce broušené',
+    'nová sestava "Sestava S"', 'vložit "Deska S" ukotvit', 'vložit "Přidržovač S" v 5 15 30', 'vložit "Pružina S" v 10 20 5',
+    'sestava pružina "Pružina S" mezi "Deska S" F3 "Přidržovač S" F5 volná 30 blok 8 tuhost 2',
+  ].join('\n'));
+  ok(/✓ pružina/.test(log), `[${tag}] pružina: dosedá na plochu schodu F3 desky`);
+  const edit = await run(['sestava upravit "Deska S"', 'smazat "Kvádr 2"', 'sestava hotovo'].join('\n'));
+  ok(/mate\.lost|ztracen/.test(edit), `[${tag}] pružina: po smazání schodu ztracená dosedací plocha`);
+  await idle();
+  const btnOk = await p.waitForFunction(() => !!document.querySelector('[data-spring-repick]'), null, { timeout: 60000 }).then(() => true, () => false);
+  const label = btnOk ? ((await p.locator('[data-spring-repick]').first().textContent().catch(() => '')) || '').trim() : '';
+  ok(btnOk && label === 'Vybrat dosedací plochu znovu', `[${tag}] pružina: seznam vazeb nabízí „Vybrat dosedací plochu znovu“ (tlačítko: „${label}“)`);
+  if (!btnOk) return;
+  await p.locator('[data-spring-repick]').first().click();
+  await p.locator('[data-repick-panel]').waitFor({ timeout: 15000 });
+  const head = ((await p.locator('[data-repick-panel] p').first().textContent()) || '').trim();
+  ok(/^Nová dosedací plocha pružiny „Pružina S“ – komponenta „Deska S“/.test(head), `[${tag}] pružina: panel nového výběru je pro dosedací plochu pružiny („${head}“)`);
+  if (tag === 'nowebgl') {
+    // klik na horní plochu desky v pohledu shora, vpravo od přidržovače a pružiny (x ≈ 85 % šířky desky)
+    await p.locator('[data-soft-view="top"]').click(); await p.waitForTimeout(700);
+    const at = await p.evaluate(() => {
+      const c = document.querySelector('[data-soft-canvas]');
+      const r = c.getBoundingClientRect();
+      const g = c.getContext('2d');
+      const y = Math.round(c.height / 2);
+      const row = g.getImageData(0, y, c.width, 1).data;
+      const bg = [row[8], row[9], row[10]];
+      const hit = (x) => Math.abs(row[x * 4] - bg[0]) + Math.abs(row[x * 4 + 1] - bg[1]) + Math.abs(row[x * 4 + 2] - bg[2]) > 40;
+      let a = -1, b = -1;
+      for (let x = 2; x < c.width - 2; x++) if (hit(x)) { if (a < 0) a = x; b = x; }
+      if (a < 0) return null;
+      return { x: (a + (b - a) * 0.85) / (c.width / r.width), y: y / (c.height / r.height) };
+    });
+    ok(!!at, `[${tag}] pružina: deska v pohledu shora nalezena`);
+    if (!at) return;
+    const bb = await p.locator('[data-soft-canvas]').boundingBox();
+    await p.mouse.click(Math.round(bb.x + at.x), Math.round(bb.y + at.y));
+  } else {
+    await p.waitForFunction(() => (document.querySelector('[data-repick-face]')?.options.length ?? 0) > 1, null, { timeout: 60000 });
+    const opts = await p.evaluate(() => [...document.querySelector('[data-repick-face]').options].map((o) => ({ v: o.value, t: o.textContent })));
+    // po smazání schodu má deska jedinou plochu +Z (horní, z = 10); seznam = „F6 rovinná +Z“
+    const tops = opts.filter((o) => /rovinná \+Z/.test(o.t || ''));
+    const top = tops.length === 1 ? tops[0] : null;
+    ok(!!top, `[${tag}] pružina: seznam ploch desky nabízí jedinou horní plochu +Z (${opts.slice(1).map((o) => o.t).join(' | ')})`);
+    if (!top) return;
+    await p.locator('[data-repick-face]').selectOption(top.v);
+  }
+  const fixed = await p.waitForFunction(() => !document.querySelector('[data-mate-spring]'), null, { timeout: 60000 }).then(() => true, () => false);
+  const sp = await p.evaluate(() => window.mncad.getDocument().components.find((c) => c.spring)?.spring);
+  ok(fixed && sp && !sp.a.lost && sp.a.face >= 0, `[${tag}] pružina: dosedací plocha vybrána znovu ${tag === 'nowebgl' ? 'KLIKNUTÍM' : 'ze seznamu'} – řádek ztracené pružiny zmizel, A = F${sp ? sp.a.face + 1 : '?'} bez ztráty`);
+  const st = await run('stav', { protocol: 'short' });
+  ok(!/springs\.lost=/.test(st), `[${tag}] pružina: stav bez springs.lost (${(st.split('\n').find((l) => /^D /.test(l)) || '').slice(0, 160)})`);
+  await p.screenshot({ path: `${S}w22a2-${tag}-5-spring.png` });
+}
+
 const browsers = [];
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -202,6 +268,7 @@ const browsers = [];
   await start(p, BASE + '/cad');
   await flow(p, 'webgl');
   await edgeFlow(p, 'webgl');
+  await springFlow(p, 'webgl');
   ok(errs.length === 0, 'žádná chyba stránky (WebGL): ' + errs.slice(0, 3).join(' | '));
   await ctx.close();
 
@@ -226,6 +293,7 @@ const browsers = [];
   ok(noGl, 'druhý průchod běží bez WebGL (softwarový náhled)');
   await flow(p2, 'nowebgl');
   await edgeFlow(p2, 'nowebgl');
+  await springFlow(p2, 'nowebgl');
   ok(errs2.length === 0, 'žádná chyba stránky (bez WebGL): ' + errs2.slice(0, 3).join(' | '));
   await b2.close();
   await b.close();

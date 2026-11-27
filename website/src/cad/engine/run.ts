@@ -7,6 +7,8 @@
  * (zrušený výpočet dokument nezmění), zápis do záložky, výsledky přidaných prvků po stavbě, stav dokumentu.
  * Výsledek: `RunReport` se záznamy s kódem (stručný protokol CLI/HTTP) a `console` = dnešní text konzole prohlížeče.
  */
+import { modelRev } from "./result-key";
+import { carryOutputs } from "../history-outputs";
 import { docStatusText, parseAgentText, type AgentOp } from "../agent";
 import { stripLineComment } from "../agent-comment";
 import { getLang, tr } from "../i18n";
@@ -236,12 +238,13 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     host.ui?.restoreKernel?.();
     // vlna 22, bod 12: co běh zapsal už před zrušením (přechod na jiný dokument – `nový díl`, `záložka` …), se nezamlčí:
     // záložky, které běh založil, se zavřou (zrušený běh = nic nového); kroky historie dřívějších záložek se vyjmenují
-    const { closed, kept } = await rollbackRun(ws, run);
+    const { closed, kept, restored } = await rollbackRun(ws, run);
     if (!kept.length) rb.code("run.cancelled");
     else rb.code("run.cancelled-partial", { args: [kept.map((n) => `„${n}“`).join(", ")] });
     const present = ws.present();
     const head = kept.length ? tr("✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v {0} (Zpět je vrátí).", kept.map((n) => `„${n}“`).join(", ")) : tr("✗ Výpočet zrušen – dokument zůstal beze změny.");
-    log.tailLine(head + (closed.length ? " " + tr("Dokumenty založené během ({0}) se zahodily.", closed.map((n) => `„${n}“`).join(", ")) : ""), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
+    const back = restored.length ? " " + tr("Změny, které běh zapsal do {0}, se vrátily.", restored.map((n) => `„${n}“`).join(", ")) : "";
+    log.tailLine(head + back + (closed.length ? " " + tr("Dokumenty založené během ({0}) se zahodily.", closed.map((n) => `„${n}“`).join(", ")) : ""), "", docStatusText(present, null, present.kind === "assembly" ? asmStatusOf(ws, present, ws.docKey()) : undefined));
     return log.text();
   }
 }
@@ -250,9 +253,9 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
  * Zrušený běh (vlna 22, bod 12): záložky, které běh založil před zrušením, se zavřou a znovu se aktivuje záložka, ve které
  * běh začal; dokumenty zapsané krokem historie do dřívějších záložek zůstanou (`kept` – hláška je vyjmenuje, Zpět je vrátí).
  */
-async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: string[]; kept: string[] }> {
+async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: string[]; kept: string[]; restored: string[] }> {
   const w = run.wrote;
-  if (!w) return { closed: [], kept: [] };
+  if (!w) return { closed: [], kept: [], restored: [] };
   const closed: string[] = [];
   for (const t of [...w.opened].reverse()) {
     if (!ws.tabs().some((x) => x.id === t.id)) continue;
@@ -267,8 +270,25 @@ async function rollbackRun(ws: Workspace, run: EngineRun): Promise<{ closed: str
       w.committed.push(t.name); // záložku nešlo zavřít – zůstala, hláška ji vyjmenuje
     }
   }
+  // dřívější záložky, do kterých běh zapsal (kolo 7, bod 12 – dřív jen vyjmenované): vrátit stav před prvním zápisem běhu.
+  // Jen když záložku od posledního zápisu běhu nikdo nezměnil (revize modelu = poslední zápis); záznamy exportů a neúspěšných
+  // exportů zůstanou (soubor na disku zrušení nesmaže – history-outputs.ts). Jinak zůstane vyjmenovaná v ✗ run.cancelled-partial.
+  const restored: string[] = [];
+  for (const x of [...(w.restore ?? [])].reverse()) {
+    if (!ws.tabs().some((t) => t.id === x.id)) continue;
+    try {
+      await ws.activate(x.id);
+      const cur = ws.present();
+      if (modelRev(cur) !== x.lastRev) continue;
+      ws.commit(carryOutputs(x.prev, cur));
+      restored.push(x.name);
+    } catch {
+      /* záložku nešlo vrátit – zůstane vyjmenovaná */
+    }
+  }
   if (run.startTab && ws.tabs().some((x) => x.id === run.startTab) && !ws.tabs().find((x) => x.id === run.startTab)?.active) await ws.activate(run.startTab).catch(() => undefined);
-  return { closed: closed.reverse(), kept: [...new Set(w.committed)] };
+  const back = new Set(restored);
+  return { closed: closed.reverse(), kept: [...new Set(w.committed)].filter((n) => !back.has(n)), restored: [...new Set(restored)].reverse() };
 }
 
 /** hloubka vnoření podsestav (sestava bez podsestav = 1); hlubší než `MAX_DEPTH` se při stavbě vynechají (5.2 č. 29) */
