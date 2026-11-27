@@ -119,7 +119,7 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   ok(/✓ pružina „[^“]+“: délka 38 → 18 mm \(min 18 · L0 44 · Ln 18\) · síla 150 → 650 N \(max 650 N\)/.test(log) && /^⚠ .*motor 1 stojí na mezi v krocích 11 .*dosaženo 18 mm/m.test(log), 'pružina v pohybu: ' + line(log, /pružina „[^“]+“: délka 38/) + ' | ' + line(log, /stojí na mezi/));
   log = await run('pohyb export csv');
   const head = (log.split('\n').find((l) => /^﻿?Krok;/.test(l.trim())) || '').trim();
-  ok(/ L \[mm\];[^;]+ F \[N\]$/.test(head), 'CSV studie: sloupce délky a síly pružiny – ' + head.slice(-60));
+  ok(/ L \[mm\];[^;]+ F \[N\];Revize modelu$/.test(head), 'CSV studie: sloupce délky a síly pružiny – ' + head.slice(-60));
 
   // ── export STEP s pružinou v aktuální délce ──
   log = await run('pohyb smazat\nsestava vazba "ZDVIH" hodnota=30\nexport step', 300000);

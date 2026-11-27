@@ -48,20 +48,59 @@ describe("kolo 3: zrušení běhu, revize ve STEP, záznam úlohy exportu", asyn
     expect(r.console).toMatch(/✗ Výpočet zrušen – dokument zůstal beze změny\. Dokumenty založené během \(„Deska B“\) se zahodily\./);
   });
 
-  it("bod 12: zrušení po zápisu do existující záložky – ✗ run.cancelled-partial ji vyjmenuje, nikdy „beze změny“", async () => {
+  // kolo 7 (bod 12): vědomě změněno – dřív zapsaný krok v dřívější záložce zůstal a ✗ run.cancelled-partial ho jen vyjmenoval;
+  // teď zrušení stav záložky vrátí (engine/run.ts rollbackRun, `wrote.restore`) a „beze změny“ je pravda
+  it("bod 12: zrušení po zápisu do existující záložky – zápis se vrátí, hláška to řekne (dřív jen vyjmenoval)", async () => {
     setLang("cs");
     const ws = new MemoryWorkspace();
     await runScript(ws, 'nový díl "Deska A"\nkvádr 20 10 10', hostOf()); // dřívější běh: záložka „Deska A“
     const r = await runScript(ws, 'kvádr 5 5 5 v 0 0 10\nnový díl "Deska D"\nkvádr 10 10 10', hostOf(), cancelAt(2));
     const e = r.entries.find((x) => x.code?.startsWith("run.cancelled"));
-    expect(e?.code).toBe("run.cancelled-partial");
+    expect(e?.code).toBe("run.cancelled");
     expect(e?.level).toBe("error");
-    expect(r.console).not.toMatch(/beze změny/);
     // „Deska D“ ještě záložku neměla (zrušeno dřív, než se zapsala) – nic se nezavíralo
-    expect(r.console).toMatch(/✗ Výpočet zrušen – rozpracovaný dokument se nezapsal, ale změny zapsané před zrušením zůstaly v „Deska A“ \(Zpět je vrátí\)\.\n/);
+    expect(r.console).toMatch(/✗ Výpočet zrušen – dokument zůstal beze změny\. Změny, které běh zapsal do „Deska A“, se vrátily\.\n/);
     expect(ws.tabs().some((t) => t.title === "Deska D")).toBe(false);
     expect(ws.tabs().find((t) => t.active)?.title).toBe("Deska A");
-    expect(ws.present().features.length).toBe(2); // zapsaný krok zůstal – a hláška to říká
+    expect(ws.present().features.length).toBe(1); // zapsaný krok se vrátil
+  });
+
+  it("bod 12 (kolo 7): záložku mezitím změnil někdo jiný → nevrací se (nepřepíše cizí změnu), ✗ run.cancelled-partial ji vyjmenuje", async () => {
+    setLang("cs");
+    const ws = new MemoryWorkspace();
+    await runScript(ws, 'nový díl "Deska A"\nkvádr 20 10 10', hostOf());
+    const ac = new AbortController();
+    // po zápisu běhu do „Deska A“ (řádek 2 = přechod na nový dokument) ji „uživatel“ ještě změní, pak přijde zrušení
+    const hooks = { opEnd: (l: number | null) => void (l === 2 && (ws.commit({ ...ws.present(), name: ws.present().name, features: ws.present().features.slice(0, 1) }), ac.abort())) };
+    const r = await runScript(ws, 'kvádr 5 5 5 v 0 0 10\nnový díl "Deska D"\nkvádr 10 10 10', hostOf(), { signal: ac.signal, hooks });
+    expect(r.entries.find((x) => x.code?.startsWith("run.cancelled"))?.code).toBe("run.cancelled-partial");
+    expect(r.console).not.toMatch(/beze změny/);
+    expect(r.console).toMatch(/zůstaly v „Deska A“ \(Zpět je vrátí\)/);
+  });
+
+  it("bod 12 (kolo 7, oponentura): cizí změna MIMO geometrii (výkres, materiál, vazby) se zrušením nezahodí – ✗ run.cancelled-partial, ne „beze změny“", async () => {
+    setLang("cs");
+    // dřív porovnání revizí geometrie (modelRev) tuto změnu nevidělo: záložka se přepsala stavem před během a konzole tvrdila
+    // „dokument zůstal beze změny … se vrátily“ – cizí list výkresu / materiál / název zmizel bez slova
+    const edits: [(d: CadDoc) => CadDoc, (d: CadDoc) => boolean][] = [
+      [(d) => ({ ...d, drawings: [{ id: "dX", name: "Cizí list" } as never] }), (d) => d.drawings?.[0]?.id === "dX"],
+      [(d) => ({ ...d, material: "1.2379" }) as CadDoc, (d) => (d as { material?: string }).material === "1.2379"],
+      [(d) => ({ ...d, mates: [...(d.mates ?? []), { id: "mX" } as never] }), (d) => !!d.mates?.some((m) => m.id === "mX")],
+    ];
+    for (const [edit, kept] of edits) {
+      const ws = new MemoryWorkspace();
+      await runScript(ws, 'nový díl "Deska A"\nkvádr 20 10 10', hostOf());
+      const ac = new AbortController();
+      const hooks = { opEnd: (l: number | null) => void (l === 2 && (ws.commit(edit(ws.present())), ac.abort())) };
+      const r = await runScript(ws, 'kvádr 5 5 5 v 0 0 10\nnový díl "Deska D"\nkvádr 10 10 10', hostOf(), { signal: ac.signal, hooks });
+      expect(r.entries.find((x) => x.code?.startsWith("run.cancelled"))?.code).toBe("run.cancelled-partial");
+      expect(r.console).not.toMatch(/beze změny|se vrátily/);
+      const a = ws.tabs().find((t) => t.title === "Deska A")!;
+      await ws.activate(a.id);
+      const cur = ws.present();
+      expect(cur.features.length).toBe(2); // zápis běhu zůstal (Zpět ho vrátí) …
+      expect(kept(cur)).toBe(true); // … a cizí změna také
+    }
   });
 
   it("bod 12: STEP nese revizi modelu v hlavičce = řádek F `rev=`; zpětné načtení s revizí projde (✓ kontrola)", async () => {

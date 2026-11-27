@@ -121,6 +121,8 @@ import { computeBegin, computesSnapshot, tracked, type ComputeKind, type Compute
 import { trackedMotion } from "./motion-runs"; // výpočty pohybové studie v témže modelu výpočtů (vlna 22, bod 12)
 import { ComputeStatus } from "./compute-status";
 import { discardTarget, exportRun, recordExportJob, type ExportRunDeps } from "./export-run";
+import { failedPhaseOf, failText, recordExportFailure } from "@/cad/export-failures";
+import { exportModelRev } from "@/cad/engine/export-job";
 import type { ExportFormat3d } from "@/cad/engine/export-job";
 import { ExportList, RunWaitChip } from "./run-chip";
 import { projectJson, stripModelRev } from "@/cad/engine/project-json";
@@ -1114,6 +1116,15 @@ export function CadApp() {
     }, () => apiHostRef.current);
     // každé volání nejdřív zapíše rozepsané změny (22e, 22f); výstupy počkají na dokončený stav (12) – run-host.ts guardApi
     window.mncad = guardApi(api, { flush: (why) => flushPending(why), wait: (what) => waitOutputsRef.current(what) });
+    // testovací háček e2e (vlna 22 kolo 7, bod 20 – cad/screen-probe.ts): kde kliknout myší na plochu / hranu / vrchol komponenty
+    // (WebGL i softwarový náhled, ověřeno týmž výběrem jako klik); výběr ani dokument nemění – kliká test skutečnou myší
+    (window as unknown as { mncadTest?: unknown }).mncadTest = {
+      screenOf: (comp: string | null, kind: "face" | "edge" | "vertex", index: number) => {
+        const d = histRef.current.present;
+        const id = comp == null ? undefined : (d.components?.find((c) => c.id === comp || c.name === comp)?.id ?? comp);
+        return vp.current?.screenOf?.({ ...(id !== undefined ? { compId: id } : {}), kind, index }) ?? null;
+      },
+    };
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
       window.removeEventListener("hashchange", onHash);
@@ -1360,7 +1371,7 @@ export function CadApp() {
   // Sestava › Pružina mezi díly: výběr dosedacích ploch a tabulka (components/cad/springs/spring-between.tsx)
   const springPick = useSpringBetween({ doc, isAsm, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
   // ztracená reference vazby (vlna 22, bod 20): nový výběr plochy klikem v modelu nebo ze seznamu ploch (mate-repick.tsx)
-  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, entRows: async (leaf, ent) => (await import("@/cad/asm-agent")).compEnts(histRef.current.present, leaf, ent, asmEnvRef.current()), entInfo: (k, i, e) => cad.mateEnt(k, i, e), geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, flash: (t) => flash(t) });
+  const repick = useMateRepick({ doc, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, entRows: async (leaf, ent) => (await import("@/cad/asm-agent")).compEnts(histRef.current.present, leaf, ent, asmEnvRef.current()), entInfo: (k, i, e) => cad.mateEnt(k, i, e), geo: mateGeo.current, apply: (d) => { commit(d); void resolveMates(d); }, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
   const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
@@ -2689,6 +2700,8 @@ export function CadApp() {
     cancelKernel: () => cancelRef.current(),
     onProgress: (fn) => cad.onProgress((p) => fn(p && p.phase === "feature" ? { index: p.index, total: p.total, ...(p.name ? { name: p.name } : {}) } : null)),
   });
+  /** rozpracovaný export z menu (záznam neúspěchu – bod 22h kolo 7) */
+  const failRef = useRef<{ format: string; file: string; modelRev: string; ms: number } | null>(null);
   const exportDepsRef = useRef(exportDeps);
   exportDepsRef.current = exportDeps;
   /**
@@ -2707,6 +2720,8 @@ export function CadApp() {
         return flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
       }
       const h = exportRun(appRuns, { format: format as ExportFormat3d, label: `${meta.label} · ${target.name}`, source: "menu", target }, exportDeps(meta.mime));
+      const t0 = Date.now();
+      failRef.current = { format, file: target.name, modelRev: exportModelRev(histRef.current.present), get ms() { return Date.now() - t0; } };
       flash(tr("Export {0}: úloha {1} – průběh a výsledek v seznamu Exporty", meta.label, h.id));
       setExportChk(null);
       const r = await h.done;
@@ -2725,8 +2740,12 @@ export function CadApp() {
       flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check + (changed ? " · " + tr("⚠ model se během exportu změnil – soubor odpovídá revizi {0}, ne nynějšímu modelu", r.modelRev) : ""));
       track("cad_export", { format });
     } catch (e) {
+      // neúspěšný / zrušený export zůstane v dokumentu (bod 22h kolo 7 – cad/export-failures.ts): fáze, chyba, revize, čas
+      if (failRef.current) recordOutput((cur) => recordExportFailure(cur, { ...failRef.current!, state: isRunCancelled(e) || isCancelled(e) ? "cancelled" : "error", phase: failedPhaseOf(e), error: failText(e) }));
       if (isRunCancelled(e) || isCancelled(e)) flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
       else flash((e as Error).message);
+    } finally {
+      failRef.current = null;
     }
   };
   // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně modelu / záložky zmizí. Klíčem jsou části
@@ -4037,7 +4056,7 @@ export function CadApp() {
             {isAsm ? (
               <>
               {repick.panel}
-              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} repickMate={repick.active?.mate ?? null} onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))} />
+              <AsmTree doc={doc} selected={asmSel} picked={subPick.ids} onSelect={selectAsmComp} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} mateState={hasMates ? mateState : undefined} onResolve={() => void resolveMates(doc)} onRepick={repick.start} onRepickSpring={repick.startSpring} repickMate={repick.active?.mate ?? null} onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))} />
               </>
             ) : (
               <Manager doc={doc} status={treeSt} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} bodies={result?.bodies} onActivateBody={(name) => commit({ ...doc, activeBody: name })} tab={mgrTab} onTab={setMgrTab} selectedIds={featSel ? Object.keys(featSel) : undefined} bodyHidden={bodyHidden} onToggleBody={result?.mesh ? () => setBodyHidden((v) => !v) : undefined} />

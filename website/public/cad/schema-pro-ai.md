@@ -970,7 +970,8 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
 - **Souhrn po tuhých skupinách (bod 15):** výchozí výpis pohybu = jeden řádek na skupinu dílů se stále stejnou vzájemnou polohou
   (tolerance, žádné „58 + 1“ ze zaokrouhlení): ` „Horní deska“ + 20 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm`, pak
   ` stojí: 1 („Deska A“)` a nesplněné vazby; po dílech `pohyb detail` / `pohyb stav detail` (EN `motion detail`). Strojově na konci
-  řádku `groups=21:z-30,1:z-24.75` (počet dílů : osy ± posunutí v kroku největšího vychýlení).
+  řádku `groups=21:z-30:Horní%20deska,1:z-24.75:Razník` (počet dílů : osy ± posunutí v kroku největšího vychýlení : jméno
+  kořene skupiny – znaky mezera , : = " % zapsané jako v URL, `%20` = mezera; kolo 7).
 - `pohyb` / `pohyb stav` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
@@ -1265,7 +1266,8 @@ počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předc
 protokol se nikdy nečte jako výsledek nového běhu (atributy `data-run-id`, `data-run-state` u výstupu); tlačítko
 **Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
 ✗ `run.cancelled` před dalším řádkem; zapsal-li běh před zrušením jiný dokument (přechod `nový díl` / `záložka`), dokumenty, které
-založil, se zahodí a dokumenty zapsané do dřívějších záložek vyjmenuje ✗ `run.cancelled-partial` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+založil, se zahodí a zápisy do dřívějších záložek se vrátí do stavu před během („Změny, které běh zapsal do „Deska A“, se vrátily.“);
+jen záložku, kterou mezitím změnil někdo jiný, zrušení nepřepíše a vyjmenuje ji ✗ `run.cancelled-partial` (nikdy „beze změny“). Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
 měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny `pohyb přehrát` se panelu doručí až po zápisu
 dokumentu běhu.
 
@@ -3067,7 +3069,9 @@ O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb7
   - Tvary odkazu (část za `#` se na server nikdy neposílá):
     `…/cad#q=<id 10 znaků>.<klíč 22 znaků base64url>` – vlastní úložiště, obsah AES-GCM, 128bitový klíč jen v odkazu;
     `…/cad#s=1d.<data>` – data = base64url(deflate-raw(JSON `{"v":1,"exp":<ms|null>,"from"?,"view":"model|drawing","doc":{…}}`)),
-    `#s=1dp.<sůl>.<data>` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256), `#s=1r.<data>` bez komprese;
+    `#s=1dpk.<sůl>.<n>.<kontrola>.<data>` totéž s heslem (AES-GCM, klíč PBKDF2-SHA-256; n = počet znaků dat, kontrola =
+    base64url(SHA-256(data)) prvních 6 B – useknutý / změněný odkaz se pozná i bez hesla; starší `#s=1dp.<sůl>.<data>` bez
+    kontroly se otevírá dál), `#s=1r.<data>` bez komprese;
     `…/cad#r=<cesta>.<klíč>[.p<sůl>]` – úložiště Supabase. V Node odkaz otevře `openShareLink(parseShareHash(hash))`
     (share.ts).
 - Mnoho souborů a málo místa ve stručném protokolu: místo jednotlivých řádků F jeden souhrnný
@@ -3505,6 +3509,11 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /**
+   * neúspěšné a zrušené exporty dokumentu (vlna 22 kolo 7, bod 22h – cad/export-failures.ts): formát, soubor, fáze, ve které
+   * úloha skončila, chyba, revize modelu, čas. Soubor nevznikl – záznam není výstup (nikdy „odpovídá modelu“), jen trvalá stopa.
+   */
+  exportFailures?: ExportFailRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
   /**

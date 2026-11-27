@@ -4,6 +4,7 @@
  * tělesa, režim, duplicitní id), stavba a topologie přes jádro hostitele.
  */
 import { dropResults } from "./result-key";
+import { docSig } from "./doc-sig";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "../bodies";
 import { resolveDatumNames } from "../agent-prim";
 import { freeName } from "../agent-edit";
@@ -60,9 +61,21 @@ export async function flush(ctx: OpCtx): Promise<void> {
     if (t) w.opened.push({ id: t.id, name: r.doc.name, ...(t.reused ? { prev } : {}) });
     r.tabbed = true;
   } else {
+    const before = ctx.ws.present();
     ctx.ws.commit(r.doc);
     const at = ctx.ws.tabs().find((t) => t.active)?.id; // zápis do záložky, kterou založil tento běh, vrátí její zavření
-    if (!w.opened.some((x) => x.id === at) && !w.committed.includes(r.doc.name)) w.committed.push(r.doc.name);
+    if (!w.opened.some((x) => x.id === at)) {
+      if (!w.committed.includes(r.doc.name)) w.committed.push(r.doc.name);
+      // dřívější záložka (bod 12 kolo 7): zrušení běhu vrátí stav před PRVNÍM zápisem běhu do ní. Otisk CELÉHO zapsaného
+      // dokumentu (engine/doc-sig.ts, ne revize geometrie): jakákoli cizí změna potom (výkres, vazba, razítko …) vrácení zastaví
+      if (at) {
+        const rs = (w.restore ??= []);
+        const hit = rs.find((x) => x.id === at);
+        const lastSig = docSig(ctx.ws.present());
+        if (hit) hit.lastSig = lastSig;
+        else rs.push({ id: at, name: r.doc.name, prev: before, lastSig });
+      }
+    }
   }
   r.changed = false;
 }

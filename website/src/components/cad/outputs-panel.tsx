@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { exportLine, exportState, fmtDate, fmtTime, modelId, sheetIssueLine, staleOutputs } from "@/cad/doc-outputs";
 import { tr } from "@/cad/i18n";
+import { failureLine } from "@/cad/export-failures";
 import type { CadDoc } from "@/cad/types";
 import { cn } from "@/lib/cn";
 
@@ -87,6 +88,17 @@ export function OutputsPanel({ doc, analyses, copies, onRecompute, bottom = 40 }
               {[...exps].reverse().map((r) => (
                 <div key={r.id} data-outputs-export={exportState(doc, r, mid)} data-outputs-export-rev={r.modelRev} data-outputs-job={r.job?.state} data-outputs-job-check={r.job?.check ? (r.job.check.ok ? "ok" : "warn") : undefined} className={cn("mb-0.5 text-[11.5px]", exportState(doc, r, mid) === "stale" && "text-amber-900")} title={`${fmtDate(r.at)} ${fmtTime(r.at)}`}>
                   {exportLine(doc, r, mid)} <span className="text-ink-700/50">{fmtTime(r.at)}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {(doc.exportFailures?.length ?? 0) > 0 && (
+            <>
+              {/* neúspěšné / zrušené exporty – trvale v dokumentu (bod 22h kolo 7, cad/export-failures.ts); soubor nevznikl */}
+              <div className="mb-1 mt-2 font-semibold">{tr("Neúspěšné exporty ({0})", doc.exportFailures!.length)}</div>
+              {[...doc.exportFailures!].reverse().map((f) => (
+                <div key={f.id} data-outputs-failed={f.state} data-outputs-failed-phase={f.phase} data-outputs-failed-rev={f.modelRev} className="mb-0.5 text-[11.5px] text-red-800">
+                  {failureLine(f)}
                 </div>
               ))}
             </>

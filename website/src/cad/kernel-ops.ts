@@ -19,7 +19,7 @@ import { clearCompareCache, compareTransferables, compareWithReference } from ".
 import { clashDetail, clearClashDetailCache } from "./clash-detail";
 import { clearance, clearClearanceCache } from "./clearance-kernel";
 import { clearProcessCache, processOp } from "./process-kernel";
-import { exportShape } from "./formats/export";
+import { exportShape, stepStageText } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type ShapeSrc } from "./inspect";
 import { measureQuery } from "./measure";
 import { surfQuery } from "./surf-query";
@@ -365,7 +365,8 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
       case "export": {
         const b = await shapeOfDoc(m.doc);
         if (!b) throw new Error(tr("Model je prázdný."));
-        const buf = await exportShape(b, m.format, m.doc.name);
+        // průběh uvnitř převodu STEP (bod 22h kolo 7): kroky přenos / zápis / čtení jako průběh operace export
+        const buf = await exportShape(b, m.format, m.doc.name, (st, index, total, detail) => post({ id: m.id, progress: { phase: "feature", index, total, name: detail ? `${stepStageText(st)} – ${detail}` : stepStageText(st) } }));
         reply(post, m, buf, [buf]);
         break;
       }

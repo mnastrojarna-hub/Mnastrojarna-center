@@ -57,7 +57,7 @@ const linkValue = async (dlg, page, notEqual) => {
   ok(url1 !== url, 'změna platnosti přegeneruje odkaz');
   await dlg.getByLabel('Heslo k odkazu').fill('tajne');
   const urlPw = await linkValue(dlg, p, url1);
-  ok(urlPw.includes('#s=1dp.'), 'odkaz s heslem má jiný tvar (šifrováno)');
+  ok(urlPw.includes('#s=1dpk.'), 'odkaz s heslem má jiný tvar (šifrováno)');
   ok(/chráněno heslem/.test(await dlg.innerText()), 'dialog ukazuje „chráněno heslem“');
   await dlg.getByRole('button', { name: 'Zavřít', exact: true }).last().click();
   ok(!(await dlg.isVisible().catch(() => false)), 'dialog zavřen');

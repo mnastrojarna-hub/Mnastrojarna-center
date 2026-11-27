@@ -7,6 +7,8 @@ import { getLang, tr } from "./i18n";
 import { motionCsv, motionSummary, type MotionResult } from "./motion";
 import type { DynMotionStep, DynResult } from "./motion-dynamic";
 import type { CadDoc } from "./types";
+import { csvWithRev } from "./motion-export-rev";
+import { modelRev } from "./engine/result-key";
 
 /** číslo do CSV (středník, desetinná čárka pro Excel – jako motionCsv v cad/motion.ts) */
 const num = (v: number, d = 3) => (Math.round(v * 10 ** d) / 10 ** d || 0).toString().replace(".", ",");
@@ -97,8 +99,16 @@ export function studySummary(res: MotionResult, doc: CadDoc, o: Parameters<typeo
   return isDyn(res) ? [...base, ...dynamicLines(res, doc)] : base;
 }
 
-/** CSV studie: u dynamiky navíc poloha těžiště, rychlost a zrychlení každého tělesa v hlavní ose. */
+/**
+ * CSV studie: u dynamiky navíc poloha těžiště, rychlost a zrychlení každého tělesa v hlavní ose. Poslední sloupec „Revize
+ * modelu“ = revize sestavy, ze které výsledek vznikl (vlna 22 kolo 7, bod 12 – cad/motion-export-rev.ts). Jedna funkce pro
+ * všechny cesty: soubor z panelu Pohyb, ZIP snímků, `pohyb export csv` (soubor i výpis v konzoli) a `mncad.motion().csv`.
+ */
 export function studyCsv(res: MotionResult, doc: CadDoc): string {
+  return csvWithRev(studyCsvCols(res, doc), modelRev(doc));
+}
+
+function studyCsvCols(res: MotionResult, doc: CadDoc): string {
   const csv = motionCsv(res, doc);
   if (!isDyn(res)) return csv;
   const lines = csv.replace(/^﻿/, "").replace(/\r\n$/, "").split("\r\n");

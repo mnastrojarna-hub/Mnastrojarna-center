@@ -11,6 +11,7 @@
  * (`výkres vydat B` – vydání je rozhodnutí člověka), exporty ze starší revize (soubory se samy nepřepisují), měření a porovnání
  * (výsledek bez původního zadání zopakovat nejde).
  */
+import { failuresLines } from "../export-failures";
 import type { OutputsCmd } from "../agent-outputs";
 import { staleCopies, staleCopyText } from "../asm-refresh";
 import { exportsText, modelId, recordExport, sameModel, type ModelId, sheetIssueLine, staleExportText, staleExports, staleOutputs, staleOutputsText, staleSheets, staleSheetText, type ExportInput, type StaleItem } from "../doc-outputs";
@@ -107,6 +108,7 @@ function overviewText(d: CadDoc, items: readonly StaleItem[]): string {
   L.push(sheets.length ? tr("Listy ({0}):", sheets.length) : tr("Listy: žádné"));
   for (const s of sheets) L.push(`  ${s.name}: ${sheetIssueLine(d, s, id)}`);
   L.push(exportsText(d, id));
+  L.push(...failuresLines(d));
   L.push(staleOutputsText(d, items));
   return L.join("\n");
 }
@@ -189,9 +191,10 @@ export async function outputsCmd(ctx: OpCtx, cmd: OutputsCmd): Promise<void> {
   if (cmd.kind === "exports") {
     const n = d.outputs?.length ?? 0;
     if (cmd.clear) {
-      if (n) {
-        const { outputs: _gone, ...rest } = d;
+      if (n || d.exportFailures?.length) {
+        const { outputs: _gone, exportFailures: _failed, ...rest } = d;
         void _gone;
+        void _failed;
         r.doc = rest as CadDoc;
         r.changed = true;
       }
@@ -199,7 +202,9 @@ export async function outputsCmd(ctx: OpCtx, cmd: OutputsCmd): Promise<void> {
       return;
     }
     const id = modelId(d);
-    sayKv(ctx, `exports=${n} stale=${staleExports(d, id).length} rev=${id.rev}`, exportsText(d, id));
+    // neúspěšné exporty (bod 22h kolo 7): pole `failed=` na konci řádku a jejich seznam pod záznamy exportů
+    const failed = d.exportFailures?.length ?? 0;
+    sayKv(ctx, `exports=${n} stale=${staleExports(d, id).length} rev=${id.rev}${failed ? ` failed=${failed}` : ""}`, [exportsText(d, id), ...failuresLines(d)].join("\n"));
     return;
   }
   if (cmd.kind === "recompute") return recomputeAll(ctx);

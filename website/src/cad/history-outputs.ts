@@ -12,6 +12,7 @@
  * Revize modelu v záznamu zůstává revizí EXPORTOVANÉHO modelu – po kroku Zpět, který model vrátí, je záznam poctivě „ZASTARALÝ“.
  */
 import { OUTPUTS_MAX } from "./doc-outputs";
+import { carryFailures } from "./export-failures";
 import type { CadDoc, ExportRecord } from "./types";
 
 const ids = (d: CadDoc): Set<string> => new Set((d.outputs ?? []).map((r) => r.id));
@@ -36,8 +37,11 @@ export function addRecords(doc: CadDoc, recs: ExportRecord[]): CadDoc {
   return { ...doc, outputs: list.slice(-OUTPUTS_MAX) };
 }
 
-/** krok Zpět z `from` do `target`: cíl dostane záznamy exportů, které vznikly po něm (viz hlavička) */
-export const carryOutputs = (target: CadDoc, from: CadDoc): CadDoc => addRecords(target, addedRecords(target, from));
+/**
+ * krok Zpět z `from` do `target`: cíl dostane záznamy exportů, které vznikly po něm (viz hlavička) – i záznamy NEÚSPĚŠNÝCH
+ * exportů (kolo 7, bod 22h – cad/export-failures.ts: soubor nevznikl, ale stopa po pokusu Zpět nemizí)
+ */
+export const carryOutputs = (target: CadDoc, from: CadDoc): CadDoc => carryFailures(addRecords(target, addedRecords(target, from)), from);
 
 export type OutHist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
 
@@ -55,5 +59,6 @@ export function recordOutsideHistory<H extends OutHist>(h: H, fn: (d: CadDoc) =>
   const present = fn(h.present);
   if (present === h.present) return h;
   const added = addedRecords(h.present, present);
-  return { ...h, present, future: added.length ? h.future.map((f) => addRecords(f, added)) : h.future };
+  const failed = present.exportFailures !== h.present.exportFailures;
+  return { ...h, present, future: added.length || failed ? h.future.map((f) => carryFailures(addRecords(f, added), present)) : h.future };
 }

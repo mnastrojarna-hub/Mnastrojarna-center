@@ -14,7 +14,8 @@ import type { MotionResult } from "@/cad/motion";
 import { annotRows, cameraDir, type AnnotRow } from "@/cad/motion-views";
 import { checkFrames, checkText, combineChecks, frameSig, planText, poseAt, poseKey, sigChanged, stepPlan, studySpan, videoPlan, type FrameCheck, type FrameRecord, type PoseAt, type VideoPlan } from "@/cad/motion-video";
 import type { CadDoc, MotionAnnotSettings, MotionView, StudySection, Vec3 } from "@/cad/types";
-import { checkWebm, muxWebm, readWebm, webpVp8, type WebmFrame } from "@/cad/webm-mux";
+import { checkWebm, muxWebm, readWebm, tagWebm, webpVp8, type WebmFrame } from "@/cad/webm-mux";
+import { modelRev } from "@/cad/engine/result-key"; // revize modelu ve videu (vlna 22 kolo 7, bod 12)
 import type { NeutralCam } from "./viewport";
 
 export type ExportHost = {
@@ -310,9 +311,11 @@ export async function exportMotion(res: MotionResult, doc: CadDoc, o: ExportOpts
     if (!out) return { ...fail(tr("✗ kodér nevrátil žádný snímek – nic se neuložilo"), plan), encoder: enc.kind, check };
     let fileSeconds: number | null = null;
     if (out.ext === "webm") {
+      // revize modelu, ze kterého snímky vznikly, do souboru (značka MODEL_REVISION – kolo 7, bod 12); kontrola ji čte zpět
+      out.data = tagWebm(out.data, { MODEL_REVISION: modelRev(doc), TITLE: doc.name || tr("sestava") });
       const info = readWebm(out.data);
       fileSeconds = info.duration !== null ? info.duration / 1000 : null;
-      const bad = checkWebm(info, plan);
+      const bad = [...checkWebm(info, plan), ...(info.tags.MODEL_REVISION === modelRev(doc) ? [] : [tr("revize modelu v souboru chybí")])];
       if (bad.length) return { ...fail(tr("✗ Video neuloženo: hotový soubor neodpovídá plánu ({0}) – {1}", bad.join(", "), planText(plan)), plan), encoder: enc.kind, check, fileSeconds };
     }
     const file = `${o.name || tr("sestava")}-pohyb${o.kind === "png" || out.ext === "zip" ? "-snimky" : ""}.${out.ext}`;
@@ -326,7 +329,7 @@ export async function exportMotion(res: MotionResult, doc: CadDoc, o: ExportOpts
           ? tr("Prohlížeč neumí kódovat video – uloženy snímky PNG s časovým plánem (ZIP, příkaz ffmpeg uvnitř): {0}", planText(plan))
           : tr("Snímky PNG ({0}) s časovým plánem uloženy (ZIP): {1}", plan.frames, planText(plan));
     const viewsText = o.views.length ? ` · ${tr("pohledy: {0}", o.views.map((v) => `„${v.name}“`).join(", "))}` : "";
-    return { ok: true, level, kind: o.kind, plan, encoder: enc.kind, check, file, bytes: out.data.length, fileSeconds, text: `${mark} ${head}${viewsText} · ${checkText(check)}` };
+    return { ok: true, level, kind: o.kind, plan, encoder: enc.kind, check, file, bytes: out.data.length, fileSeconds, text: `${mark} ${head}${viewsText} · ${checkText(check)} · ${tr("z modelu {0}", modelRev(doc))}` };
   } catch (e) {
     return fail(`✗ ${tr("Export se nepodařil: {0}", (e as Error).message)}`, plan);
   } finally {

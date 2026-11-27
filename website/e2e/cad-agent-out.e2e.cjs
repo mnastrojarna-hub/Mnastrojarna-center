@@ -117,7 +117,7 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     log = await consoleRun('odkaz');
     ok(log.includes('URL: ' + url) && /✓ poslední sdílený odkaz/.test(log), 'odkaz → vypíše poslední odkaz znovu');
     log = await consoleRun('sdílet výkres dní 7 heslo tajne');
-    ok(/#s=1dp\./.test(log) && /\(výkres\)/.test(log) && /s heslem/.test(log), 'sdílet výkres dní 7 heslo … → odkaz s heslem na výkres');
+    ok(/#s=1dpk\./.test(log) && /\(výkres\)/.test(log) && /s heslem/.test(log), 'sdílet výkres dní 7 heslo … → odkaz s heslem na výkres');
     await p.screenshot({ path: S + 'out-share-log.png' });
     await p.keyboard.press('Escape');
     await p.waitForTimeout(500);

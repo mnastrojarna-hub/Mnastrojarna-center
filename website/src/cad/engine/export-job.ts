@@ -125,6 +125,15 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
     cur = null;
   };
   const rev = exportModelRev(doc);
+  try {
+    return await jobBody();
+  } catch (e) {
+    // fáze, ve které úloha skončila – trvalý záznam neúspěšného exportu (bod 22h kolo 7, cad/export-failures.ts)
+    const at = (cur as { phase: ExportPhase } | null)?.phase;
+    if (at && e && typeof e === "object" && !("exportPhase" in e)) Object.defineProperty(e, "exportPhase", { value: at, enumerable: false });
+    throw e;
+  }
+  async function jobBody(): Promise<ExportJobResult<T>> {
   // prázdný model a 2D výkres: bez přestavby – převod skončí srozumitelnou chybou (`modelBytes`)
   const rebuild = o.rebuild ?? (doc.kind !== "assembly" && doc.kind !== "draft" && !isEmptyDoc(doc));
   let built: CheckOut | undefined;
@@ -162,4 +171,5 @@ export async function runExportJob<T>(doc: CadDoc, format: ExportFormat3d, deps:
   }
   close();
   return { doc, data, out, ...(check ? { check } : {}), modelRev: rev, phases };
+  }
 }

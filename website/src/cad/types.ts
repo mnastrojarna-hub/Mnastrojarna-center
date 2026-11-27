@@ -279,6 +279,11 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /**
+   * neúspěšné a zrušené exporty dokumentu (vlna 22 kolo 7, bod 22h – cad/export-failures.ts): formát, soubor, fáze, ve které
+   * úloha skončila, chyba, revize modelu, čas. Soubor nevznikl – záznam není výstup (nikdy „odpovídá modelu“), jen trvalá stopa.
+   */
+  exportFailures?: ExportFailRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
   /**
@@ -548,6 +553,8 @@ export type ExportRecord = {
    */
   job?: ExportJobRecord;
 };
+/** neúspěšný / zrušený export (bod 22h kolo 7): soubor nevznikl; `phase` = fáze úlohy, ve které skončila (model / convert / verify / write) */
+export type ExportFailRecord = { id: string; format: string; file?: string; state: "error" | "cancelled"; phase?: string; error: string; modelRev: string; at: string; ms?: number };
 /** záznam úlohy exportu v dokumentu (bod 22h): stav, čas, fáze a výsledek kontroly – zůstane s dokumentem i po zavření relace */
 export type ExportJobRecord = { id?: string; state?: string; ms?: number; phases?: { phase: string; ms: number }[]; check?: { ok: boolean; text: string } };
 
