@@ -18,6 +18,7 @@ import { applyClashPolicy, isFault, staticRuleCtx, stepRuleCtx, touchTol, type M
 import { getLang, tr } from "./i18n";
 import type { AsmComponent, CadDoc, ClashRule, Placement, Vec3 } from "./types";
 import type { BetweenHit, SweepInfo } from "./motion-clearance";
+import { lostSpringComps } from "./spring-lost";
 import { sweepKv, sweepLabel } from "./clearance-report";
 import { fmtNum as kvNum } from "./engine/protocol";
 
@@ -232,10 +233,22 @@ export function undeterminedWhy(x: Pick<ClashDetail, "why" | "hole" | "note">): 
  * Text jednoho nálezu (skupiny) do protokolu a panelu: „4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4, #5, #6] (365,2 mm³) –
  * místo [15; 30; 31,5]; …“.
  */
+/**
+ * Pružina se ztracenou dosedací plochou (⚠ spring.lost) stojí v NEOVĚŘENÉ délce – kolize s ní to řekne u dvojice (bod 7, kolo 7:
+ * dřív „kolize „Deska A“ × „Pružina“ (445,6 mm³)“ bez souvislosti s tím, že délka pružiny se nekontrolovala). Jen komponenty
+ * nejvyšší úrovně (pružina sestavy). Bez takové pružiny prázdné.
+ */
+export function lostSpringNote(d: CadDoc, items: readonly Pick<ClashDetail, "a" | "b" | "aPath" | "bPath">[]): string {
+  const lost = new Map(lostSpringComps(d).map((c) => [c.id, c.name] as const));
+  if (!lost.size) return "";
+  const names = new Set(items.flatMap((x) => [pathA(x), pathB(x)].flatMap((p) => (p.length === 1 && lost.has(p[0]) ? [lost.get(p[0])!] : []))));
+  return [...names].map((n) => tr(" · pružina „{0}“ v neověřené délce (ztracená dosedací plocha – spring.lost)", n)).join("");
+}
+
 export function groupText(g: ClashGroup, doc: CadDoc): string {
   const n = g.items.length > 1 ? `${g.items.length}× ` : "";
   const where = groupPlaces(g);
-  const place = where ? ` – ${tr("místo")} ${where}` : "";
+  const place = (where ? ` – ${tr("místo")} ${where}` : "") + (isFault(g.cls) ? lostSpringNote(doc, g.items) : "");
   const pair = groupPairText(g);
   switch (g.cls) {
     case "real":
@@ -516,7 +529,7 @@ export function stepClashReport(d: CadDoc, s: ClashStep): { lines: string[]; cod
   for (const x of list.filter((y) => isFault(y.cls))) {
     const a = leafLabel(d, pathA(x));
     const b = leafLabel(d, pathB(x));
-    const place = x.at ? ` – ${tr("místo")} ${placeText(x)}` : "";
+    const place = (x.at ? ` – ${tr("místo")} ${placeText(x)}` : "") + lostSpringNote(d, [x]);
     if (x.cls === "real") codes.push({ code: "clash.real", args: [a, b, fmtVol(x.volume)], text: `${tr("kolize „{0}“ × „{1}“ ({2} mm³)", a, b, fmtVol(x.volume))}${place}` });
     else codes.push({ code: "clash.undetermined", args: [a, b], text: `${tr("kolizi „{0}“ × „{1}“ nelze vyhodnotit", a, b)}: ${undeterminedWhy(x)}${place}` });
   }

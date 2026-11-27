@@ -93,7 +93,7 @@ Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05
  doraz „Doraz stírače Stírací deska → Horní deska“ (max 25 mm): dotyk 0–0,5 s
  Kontrola energie: odchylka 0 % z 0,02288 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0,0229 J, dotyky -0,0229 J, zadané síly 0 J)
 ✓ motor 1: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
- pohání: „Horní deska“ + 4 díly – spolu s ním kvůli pevné vazbě (zámku): „Pružina 2×19,5×41“, „Pružina 2×19,5×41“, „Pružina 2×19,5×41“ a další · směr −Z
+ pohání: „Horní deska“ + 4 díly – spolu s ním kvůli pevné vazbě (zámku): „Pružina 2×19,5×41 #4“, „Pružina 2×19,5×41 #5“, „Pružina 2×19,5×41 #6“ a další · směr −Z
 Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět
  „Horní deska“ + 4 díly (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm · na konci zpět ve výchozí poloze
  „Stírací deska“: ΔZ −15 mm · na konci zpět ve výchozí poloze

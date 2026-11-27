@@ -1,0 +1,10 @@
+# vlna 22, balík M – kolo 7 (fáze 2)
+ (nejdál {0})	 (am weitesten {0})
+ · pružina „{0}“ v neověřené délce (ztracená dosedací plocha – spring.lost)	 · Feder „{0}“ in nicht geprüfter Länge (Auflagefläche verloren – spring.lost)
+ – pohání motor {0}	 – angetrieben von Antrieb {0}
+Hodnota vazby – hlavní zdvih (začátek a konec = hodnoty vazby)	Verknüpfungswert – Hauptweg (Anfang und Ende = Werte der Verknüpfung)
+Vedení – posuv od výchozí polohy (Souosost, Drážka, Dráha, Šroub)	Führung – Weg ab der Ausgangslage (Konzentrisch, Nut, Bahn, Schraube)
+nesplněné vazby {0}	nicht erfüllte Verknüpfungen {0}
+v {0} kroku	in {0} Schritt
+v {0} krocích	in {0} Schritten
+#!dynamic

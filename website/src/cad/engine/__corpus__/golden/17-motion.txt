@@ -52,4 +52,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 110 × 20 × 20 mm · objem Σ 24 cm³ · hmotnost Σ 0,188 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

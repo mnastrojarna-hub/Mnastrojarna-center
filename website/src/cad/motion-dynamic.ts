@@ -830,7 +830,6 @@ export async function runDynamic(
         broken.push({ id: l.id, label: l.label, kind: "limit", value: v, ...(l.min !== undefined ? { min: l.min } : {}), ...(l.max !== undefined ? { max: l.max } : {}), dev: v - bound, unit: l.unit });
       }
     }
-    if (conflicts.length) conflictSteps++;
     const place: Record<string, Placement> = {};
     for (const c of comps) {
       const P = poses.get(c.id);
@@ -838,18 +837,32 @@ export async function runDynamic(
     }
     // motor na mezi (kolo 6): porušená mez při předepsaném pohybu motoru
     const wanted = hasMotors ? motors.map((x) => motorAt(x.mo, t, duration)) : [];
-    // motor „chyba“, který v tomto snímku jede (profil se mění), a porušená mez = neplatný snímek; motory „stop“ zastaví
-    const movingNow = (i: number) => Math.abs(motorAt(motors[i].mo, t, duration) - motorAt(motors[i].mo, Math.max(0, t - dt), duration)) > 1e-12;
+    // motor „chyba“, který žádá jinou hodnotu než v posledním platném snímku (jede, NEBO po dojezdu stojí za mezí), a porušená
+    // mez = neplatný snímek; motory „stop“ zastaví. Dřív (kolo 6b) jen motor, který v tomto snímku jel: motor, který dojel za mez
+    // a tam stál (rychlost 30.35 → zdvih skončí v 1 s), dal kroky 6–12 s Deskou A 10,35 mm v přidržovači jako běžné polohy
+    // (oponent kola 6). Snímek bez platného předchůdce (porušeno už v kroku 0) je neplatný vždy.
+    const pastValid = (i: number) => !lastTargets || Math.abs(wanted[i] - lastTargets[i]) > 1e-9 || Math.abs(motorAt(motors[i].mo, t, duration) - motorAt(motors[i].mo, Math.max(0, t - dt), duration)) > 1e-12;
     let status: MotionStep["status"];
     if (hasMotors && (broken.length || anyFrozen())) {
       const inv = involved(broken.map((b) => b.id));
-      if (broken.length && motors.some((_, i) => inv.has(i) && limitMode(i) === "error" && movingNow(i))) status = "invalid";
+      if (broken.length && motors.some((_, i) => inv.has(i) && limitMode(i) === "error" && pastValid(i))) status = "invalid";
       else {
         if (broken.length && freezeMoving(lastTargets ?? motors.map((x) => x.target), broken.map((b) => b.id))) frozenBy = limits.filter((l) => broken.some((b) => b.id === l.id));
         if (frozen.some((f, i) => f !== null && Math.abs(wanted[i] - f) > 1e-3)) status = "stopped";
       }
     }
     if (!anyFrozen()) frozenBy = [];
+    // zastavený motor nedosáhl žádané hodnoty = nesplněný pohon, stejně jako v kinematice (motion.ts: `out.short` → vazba motoru /
+    // `motor:id`). Dřív dynamika u zastavení na mezi psala „Vazby splněny ve všech krocích“ a conflicts=0, kinematika téhož
+    // dokumentu „nesplněné vazby v N krocích“ + motion.conflict (oponent kola 6)
+    if (status === "stopped")
+      motors.forEach((x, i) => {
+        const f = frozen[i];
+        if (f === null || Math.abs(wanted[i] - f) <= 1e-3) return;
+        const id = x.abs ? x.m.id : `motor:${x.mo.id}`;
+        if (!conflicts.includes(id)) conflicts.push(id);
+      });
+    if (conflicts.length) conflictSteps++;
     if (status === "invalid" && lastValid) for (const id of Object.keys(place)) place[id] = lastValid.place[id] ?? place[id];
     const dyn: Record<string, DynStepBody> = {};
     bodies.forEach((b, i) => {

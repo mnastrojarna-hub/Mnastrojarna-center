@@ -146,7 +146,7 @@ describe("stav pro příkaz `stav`", () => {
     expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "unchecked", line: "Pohyb: nespočítáno – „pohyb spustit“ nebo Vypočítat pohyb v panelu studie" });
     await motionRun(withStudy, e);
     // kolize se nekontrolovaly → „mates-ok“, ne „ok“ (oprava po kontrole: strojové `motion=ok` jen po kontrole kolizí)
-    expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "mates-ok", line: "Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)" });
+    expect(motionStatusOf(slot.store, "d", withStudy)).toEqual({ state: "mates-ok", line: "Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)" });
     expect(motionStatusOf(slot.store, "d", resizePart(withStudy, "Deska A", [50, 100, 10]))).toEqual({ state: "stale", line: "Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: geometrie dílu „Deska A“; přepočítá „pohyb spustit“" });
     expect(motionStatusOf(slot.store, "jiný", withStudy)!.state).toBe("unchecked");
   });

@@ -1,0 +1,10 @@
+# vlna 22, balík M – kolo 7 (fáze 2)
+ (nejdál {0})	 (farthest {0})
+ · pružina „{0}“ v neověřené délce (ztracená dosedací plocha – spring.lost)	 · spring “{0}” at an unverified length (lost seat face – spring.lost)
+ – pohání motor {0}	 – driven by motor {0}
+Hodnota vazby – hlavní zdvih (začátek a konec = hodnoty vazby)	Mate value – main stroke (start and end = mate values)
+Vedení – posuv od výchozí polohy (Souosost, Drážka, Dráha, Šroub)	Guide – travel from the initial position (concentric, slot, path, screw)
+nesplněné vazby {0}	unsatisfied mates {0}
+v {0} kroku	in {0} step
+v {0} krocích	in {0} steps
+#!dynamic

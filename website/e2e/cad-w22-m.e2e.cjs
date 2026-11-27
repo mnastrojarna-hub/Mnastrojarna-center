@@ -502,6 +502,11 @@ async function open(b, path) {
   await openPanel();
   await mp.locator('[data-motor-new]').click();
   await mp.locator('[data-motor-kind="linear"]').click();
+  // kolo 7 (bod 10): nabídka vazeb ve dvou skupinách – hodnota vazby (hlavní zdvih, předvybraná) × vedení; vazba s motorem to řekne
+  const gVal = await mp.locator('[data-motor-mate] optgroup[data-motor-mate-group="value"] option').allInnerTexts();
+  const gGuide = await mp.locator('[data-motor-mate] optgroup[data-motor-mate-group="guide"] option').allInnerTexts();
+  const pre = await mp.locator('[data-motor-mate]').evaluate((s) => s.options[s.selectedIndex]?.text || '');
+  ok(gVal.length === 1 && /ZDVIH.* – pohání motor 1/.test(gVal[0]) && gGuide.length === 1 && /VEDENÍ/.test(gGuide[0]) && /ZDVIH/.test(pre), `bod 10 (kolo 7): skupiny vazeb motoru – hodnota [${gVal.join(' | ')}] · vedení [${gGuide.join(' | ')}] · předvybráno „${pre}“`);
   const vOpt = (await mp.locator('[data-motor-mate] option').allInnerTexts()).find((o) => /VEDENÍ/.test(o));
   if (vOpt) await mp.locator('[data-motor-mate]').selectOption({ label: vOpt });
   let conf = 0;

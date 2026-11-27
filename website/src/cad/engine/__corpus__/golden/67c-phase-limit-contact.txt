@@ -28,7 +28,7 @@
 Pohybová studie: 24 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 (1 s) → 57,5 (2 s) mm ↓↑ zdvih 30,35 mm · úseků 2
 Úroveň simulace: kvazistatika – v každém kroku rovnováha pružin a kontaktů (meze vazeb, délka pružiny na doraz) – nezávisle na předchozím kroku a směru pohybu (zvoleno automaticky: sestava má pružinu „Pružina“ na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Fáze 1 „Nájezd“: kroky 0–9 · t = 0–0,75 s · začátek: od začátku studie · kvazistatika · nesplněné vazby 0
- Fáze 2 „Přidržení“: kroky 10–12 · t = 0,812–1 s · začátek: vazba „Dosed“ ≤ 0 · kvazistatika · nesplněné vazby 0
+ Fáze 2 „Přidržení“: kroky 10–12 · t = 0,807–1 s · začátek: vazba „Dosed“ ≤ 0 · kvazistatika · nesplněné vazby 0
  Fáze 3 „Návrat“: kroky 13–24 · t = 1,028–2 s · začátek: vazba „ZDVIH“ ≥ 28 · kvazistatika · nesplněné vazby 0
  „Přidržovač“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −24,5 mm · na konci zpět ve výchozí poloze
  „Deska A“: ΔZ −30,35 mm · na konci zpět ve výchozí poloze

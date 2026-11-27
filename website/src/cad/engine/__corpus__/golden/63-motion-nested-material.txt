@@ -85,7 +85,7 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 3 komponent (4 dílů po rozložení podsestav) · obálka 60 × 40 × 55 mm · objem Σ 25,63 cm³ · hmotnost Σ 0,201 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroky, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 5 ===
 ✓ nový díl „Vodítko“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže

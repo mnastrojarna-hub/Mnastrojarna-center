@@ -198,7 +198,15 @@ export async function motorConflicts(doc: CadDoc, geo: GeoProvider, study: Pick<
 
 /** Popis dosahu motoru slovy: „pohání: „Přidržovač“ + 1 díl (zámek: „Šroub M12“) · osa −Z“ */
 export function reachText(r: MotorReach, doc: CadDoc): string {
-  const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  // instance jako v kolizích a stromu (clash-report.ts compLabel): přezdívka „Kostka [K7]“, jinak „Kostka #7“ u opakovaného dílu –
+  // dřív u sestavy se 100 komponentami „„Kostka“, „Kostka“, „Kostka“ a další“ (kolo 7, měření bodu 10)
+  const comps = doc.components ?? [];
+  const nm = (id: string) => {
+    const c = comps.find((x) => x.id === id);
+    if (!c) return id;
+    if (c.alias) return `${c.name} [${c.alias}]`;
+    return comps.filter((x) => x.name === c.name).length > 1 ? `${c.name} #${comps.indexOf(c) + 1}` : c.name;
+  };
   if (r.blocked || !r.comps.length) return tr("nepohne se (stupeň volnosti drží vazby)");
   const others = r.comps.length - 1;
   const lockedTxt = r.locked.length ? tr(" – spolu s ním kvůli pevné vazbě (zámku): {0}{1}", r.locked.slice(0, 3).map((id) => `„${nm(id)}“`).join(", "), r.locked.length > 3 ? tr(" a další") : "") : "";
