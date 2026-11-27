@@ -9,6 +9,7 @@ import { flush, runOf } from "../run-doc";
 import { startRunDoc } from "../runs";
 import { coded, say, type OpHandler } from "./util";
 import { docNameIssue } from "../../drawing-notes-rules";
+import { scopedText } from "../codes";
 
 export const newOp: OpHandler<"new"> = async (op, ctx) => {
   await flush(ctx);
@@ -28,5 +29,5 @@ export const newOp: OpHandler<"new"> = async (op, ctx) => {
   if (name !== op.name) ctx.report.code("name.renamed-auto", { line: ctx.line, doc: name, args: [name] }); // výchozí název očíslován (5.2 č. 15, ℹ jen do protokolu)
   st.report();
   // D5: název dílu je údaj razítka – krátce, bez vět, bez údajů razítka a pokynů (✗; dokument vznikne, export ho odmítne)
-  if (ni) coded(ctx, ni.code, { args: [tr("název dílu"), ni.text] });
+  if (ni) coded(ctx, ni.code, { text: scopedText(ni.code, tr("název dílu"), ni.text) });
 };

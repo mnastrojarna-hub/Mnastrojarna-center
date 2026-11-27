@@ -7,7 +7,7 @@
 import { functionalUsage, pmiUsage, type FunctionalCmd } from "../../agent-functional";
 import { classifyNote, leaderCount, LEADER_MAX_CHARS, NOTE_MAX_LEADERS, noteStyle, processWords, titleDataLabel, titleHint } from "../../drawing-notes-rules";
 import { treatmentWord } from "../../pmi-marks";
-import { CodedError } from "../codes";
+import { scopedError } from "../codes";
 import { acceptLine, sheetTail } from "../accept";
 import { runMeasure } from "../../agent-measure-run";
 import { markLabel } from "../../dim-complete";
@@ -58,16 +58,16 @@ function pmiText(m: FunctionalMark): string {
 /** text popisu / předpisu úpravy z textové cesty (agent): krátký, heslovitý, žádný údaj razítka (R1 / R2 / R4) */
 function checkPmiText(kind: "note" | "treatment", text: string): void {
   const why = noteStyle(text, LEADER_MAX_CHARS);
-  if (why) throw new CodedError("drawing.note-style", [tr("model"), tr("„{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“", text, why, LEADER_MAX_CHARS)]);
+  if (why) throw scopedError("drawing.note-style", tr("model"), tr("„{0}“: {1} – popis u plochy krátce a heslovitě (nejvýš {2} znaků), např. „Brousit“, „Leštit Ra 0,4“", text, why, LEADER_MAX_CHARS));
   // kolo 4 (F10): pokyn pro výrobu / expedici („Odmastit“, „Zabalit do VCI“) do modelu nepatří – ✗ hned u příkazu, ne až na listu
   const pw = processWords(text);
-  if (pw.length) throw new CodedError("drawing.note-style", [tr("model"), tr("„{0}“ je pokyn pro výrobu / expedici („{1}“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří", text, pw[0])]);
+  if (pw.length) throw scopedError("drawing.note-style", tr("model"), tr("„{0}“ je pokyn pro výrobu / expedici („{1}“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří", text, pw[0]));
   if (kind === "treatment") return;
   const cls = classifyNote(text);
   const bad = cls?.parts.filter((p) => p.key !== "edges" && p.key !== "roughness") ?? [];
   if (bad.length) {
     const heat = bad.some((p) => p.key === "heatTreatment" || p.key === "hardness" || p.key === "surfaceTreatment");
-    throw new CodedError("drawing.note-title-data", [tr("model"), tr("„{0}“ obsahuje {1} – {2}", text, bad.map((p) => titleDataLabel(p.key)).join(", "), heat ? tr("úprava jen této plochy = oblastní úprava (úprava F… tepelná|povrchová \"…\" [od a do b]), úprava celého dílu do razítka ({0})", titleHint(bad)) : tr("patří do razítka: {0}", titleHint(bad)))]);
+    throw scopedError("drawing.note-title-data", tr("model"), tr("„{0}“ obsahuje {1} – {2}", text, bad.map((p) => titleDataLabel(p.key)).join(", "), heat ? tr("úprava jen této plochy = oblastní úprava (úprava F… tepelná|povrchová \"…\" [od a do b]), úprava celého dílu do razítka ({0})", titleHint(bad)) : tr("patří do razítka: {0}", titleHint(bad))));
   }
 }
 
@@ -75,7 +75,7 @@ function checkPmiText(kind: "note" | "treatment", text: string): void {
 function checkLeaders(d: CadDoc, what: string): void {
   // stejný počet jako kontrola výkresu (odkazy z modelu i z výkresu, popisy s volným textem, značky drsnosti se slovy – D2)
   const n = leaderCount(d);
-  if (n > NOTE_MAX_LEADERS) throw new CodedError("drawing.leaders-limit", [tr("model"), tr("{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)", what, n, NOTE_MAX_LEADERS)]);
+  if (n > NOTE_MAX_LEADERS) throw scopedError("drawing.leaders-limit", tr("model"), tr("{0} – dokument by měl {1} místních popisů (odkazů se šipkou), nejvýš {2}; slučte popisy stejné úpravy, úpravu celého dílu dejte do razítka, nadbytečné zrušte (poznámka zrušit F…)", what, n, NOTE_MAX_LEADERS));
 }
 
 const nextId = (ms: readonly FunctionalMark[]) => {

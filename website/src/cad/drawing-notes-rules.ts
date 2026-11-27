@@ -22,7 +22,7 @@
  *   tolerance, obecná drsnost) mimo razítko.
  */
 import { tr } from "./i18n";
-import type { CadDoc, DrawingAnnotation, DrawingDoc, FunctionalMark } from "./types";
+import type { CadDoc, DrawingAnnotation, DrawingDoc, Feature, FunctionalMark } from "./types";
 
 /** nejvýš řádků volného textu nad razítkem (celý dokument – všechny výkresy a listy) */
 export const NOTE_MAX_LINES = 5;
@@ -59,12 +59,15 @@ const fold = (s: string) => vis(s).toLowerCase().normalize("NFD").replace(/[̀-�
 const words = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean);
 
 /** začátky slov (bez diakritiky) – tepelné zpracování (cs / en / de); nitridace je tepelně-chemické zpracování */
-const HEAT = ["kalit", "kalen", "zakal", "prokal", "popoust", "popust", "zihan", "zihat", "zihn", "vyzih", "normaliz", "cementov", "cementac", "nitrid", "nitrocement", "karbonitrid", "vytvrd", "vytvrz", "tvrdit", "tvrzen", "zatvrd", "indukc", "zuslecht", "harden", "quench", "temper", "anneal", "carburi", "nitrocarbur", "induction", "case-hard", "hart", "gehart", "gehaert", "haert", "vergut", "verguet", "anlass", "angelass", "gluh", "glueh", "gegluh", "einsatzh", "aufkohl", "nitrier", "induktiv", "flammh"];
+const HEAT = ["kalit", "kalen", "zakal", "prokal", "popoust", "popust", "zihan", "zihat", "zihn", "vyzih", "normaliz", "cementov", "cementac", "nitrid", "nitrocement", "karbonitrid", "vytvrd", "vytvrz", "tvrdit", "tvrzen", "zatvrd", "indukc", "zuslecht", "harden", "quench", "temper", "anneal", "carburi", "nitrocarbur", "induction", "case-hard", "hart", "gehart", "gehaert", "haert", "vergut", "verguet", "anlass", "angelass", "gluh", "glueh", "gegluh", "einsatzh", "aufkohl", "nitrier", "induktiv", "flammh", "stabiliz", "kryogen", "cryogen", "tiefkuhl", "tenifer", "tufftrid", "qpq", "nitrocarb", "spannungsarm", "entspann", "tvrzen"];
 /** zkratky tepelného zpracování jako celé slovo (CHT = hloubka cementace / kalené vrstvy, EHT, NHT) */
 const HEAT_EXACT = new Set(["cht", "eht", "nht", "sht"]);
-const SURFACE = ["cernit", "cernen", "brunyr", "brunir", "chromat", "cinov", "pocin", "kataforez", "katafor", "nater", "natrit", "nastrik", "metaliz", "kathod", "tauchlack", "verzinn", "blackox", "e-coat", "ecoat", "zinkov", "pozink", "galvan", "chromov", "pochrom", "niklov", "poniklov", "elox", "anodiz", "anodis", "lakov", "nalakov", "praskov", "fosfat", "pasivov", "trysk", "povlak", "pisk", "otryskat", "kulickov", "blacken", "zincplat", "galvaniz", "plated", "plating", "chrome", "nickel", "paint", "powder", "coating", "coated", "phosphat", "passivat", "sandblast", "shotblast", "beadblast", "blast", "brunier", "verzink", "verchrom", "vernickel", "eloxier", "lackier", "beschicht", "phosphatier", "sandstrahl", "kugelstrahl", "strahl", "pulverbe", "povrch", "surface", "oberflach"];
+const SURFACE = ["cernit", "cernen", "brunyr", "brunir", "chromat", "cinov", "pocin", "kataforez", "katafor", "nater", "natrit", "nastrik", "metaliz", "kathod", "tauchlack", "verzinn", "blackox", "e-coat", "ecoat", "zinkov", "pozink", "galvan", "chromov", "pochrom", "niklov", "poniklov", "elox", "anodiz", "anodis", "lakov", "nalakov", "praskov", "fosfat", "pasivov", "trysk", "povlak", "pisk", "otryskat", "kulickov", "blacken", "zincplat", "galvaniz", "plated", "plating", "chrome", "nickel", "paint", "powder", "coating", "coated", "phosphat", "passivat", "sandblast", "shotblast", "beadblast", "blast", "brunier", "verzink", "verchrom", "vernickel", "eloxier", "lackier", "beschicht", "phosphatier", "sandstrahl", "kugelstrahl", "strahl", "pulverbe", "povrch", "surface", "oberflach", "pasiv", "passiv", "geomet", "dacromet", "deltatone", "smalt", "emailier", "fosf", "phosph"];
 const SURFACE_EXACT = new Set(["tin", "tialn", "ticn", "crn", "dlc", "pvd", "cvd", "eloxal", "zn", "znni", "fezn", "ral", "zink", "zinc", "zinek", "nikl", "ni", "chemni", "chrom", "ktl", "kts"]);
-const EDGES = ["sraz", "otrep", "odjehl", "odhrot", "omil", "otup", "fazet", "deburr", "burr", "chamfer", "edge", "corner", "kante", "ecke", "entgrat", "gratfrei", "fase", "gebrochen", "brechen"];
+const EDGES = ["sraz", "otrep", "odjehl", "odhrot", "omil", "otup", "fazet", "deburr", "burr", "chamfer", "edge", "corner", "kant", "ecke", "entgrat", "grat", "fase", "gebrochen", "brechen"];
+/** kolo 5 (correct-F5): slova, která začínají jako tepelné zpracování, ale jsou povlakem („Hartcoat“, „Hartverchromt“) nebo
+ *  materiálem („Hartmetall“, „Tvrdokov“) – rozhodují dřív než seznam HEAT */
+const SURFACE_FIRST = ["hartcoat", "hartanod", "hartverchrom", "hartchrom", "hardcoat", "hardanod", "hardchrom", "harteloxal"];
 /** hrana / roh jako celé slovo („Hranol“ hranou není) */
 const EDGE_WORDS = new Set(["hrana", "hrany", "hran", "hranu", "hrane", "hranach", "hranami", "hranam", "roh", "rohy", "rohu", "rohach", "rohum"]);
 const TOL = ["nepredepsan", "volnerozmer", "volnemir", "obecnetoler", "allgemeintoler", "freimass", "toleranc", "toleranz", "unspecified", "unbemass", "untoleriert", "untolerated"];
@@ -72,10 +75,10 @@ const TOL = ["nepredepsan", "volnerozmer", "volnemir", "obecnetoler", "allgemein
 const TOL_EXACT = new Set(["tol"]);
 const MAT_EXACT = new Set(["mat", "werkst", "wst"]);
 const ROUGH = ["drsnost", "roughness", "rauheit", "rauigkeit", "oberflachenrauh"];
-const HARDW = ["tvrdost", "hardness", "harte", "haerte"];
+const HARDW = ["tvrdost", "hardness", "harte", "haerte", "rockwell", "vickers", "brinell"];
 const MATERIAL = ["material", "werkstoff", "materiau", "polotovar"];
 /** druh materiálu („Ocel C45“, „Ocel 19 436“) – údaj razítka jen v krátkém zápisu, ve větě („předpis výrobce oceli“) ne */
-const MATERIAL_FAMILY = ["ocel", "steel", "stahl", "hlinik", "aluminium", "aluminum", "mosaz", "brass", "messing", "bronz", "litina", "nerez"];
+const MATERIAL_FAMILY = ["ocel", "steel", "stahl", "hlinik", "aluminium", "aluminum", "mosaz", "brass", "messing", "bronz", "litina", "nerez", "dural", "silumin", "tvrdokov", "hartmetall", "hardmetal", "karbid", "carbide", "hss"];
 /** slova bez významu pro rozhodnutí (čísla, jednotky, předložky, „díl“, „plochy“, popisky polí …) */
 const FILLER = new Set([
   "a", "i", "na", "dle", "podle", "normy", "norma", "normou", "vse", "vsech", "vsechny", "celem", "cele", "cely", "celou", "dil", "dilu", "plochy", "plocha", "plochach", "ploch", "mm", "x", "stupnu", "stupne", "st", "s", "se", "v", "ve", "z", "ze", "do", "o",
@@ -88,7 +91,14 @@ const FILLER = new Set([
 
 /** tvrdost: číslo před jednotkou („58-60 HRC“) i jednotka před číslem („HRC 58-62“, „HV10 600“) */
 // jednotka vpředu: zatížení HV jen připojené bez mezery („HV10 600“) – „HV 650“ je 650 HV, ne „0 HV65“ (kolo 4, F4)
-const HARD_RE = /(\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?\s*(?:HRC|HRB|HRA|HV\s?(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\b|\b(?:HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?)/i;
+// kolo 5 (correct-F4): rozsah i „÷“ a „/“ („58÷62 HRC“, „58/60 HRC“ – jen celá čísla, ne „1.2379 / 58 HRC“), mez „≥ 58 HRC“,
+// „HRC ≥ 58“, „min. 58 HRC“ a tolerance za jednotkou („58 HRC ±2“ = 56–60 HRC, nikdy obecná tolerance ±2)
+const HARD_UNIT = String.raw`(?:HRC|HRB|HRA|HV\s?(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)`;
+const HARD_UNIT_FRONT = String.raw`(?:HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)`;
+const HARD_NUM = String.raw`(?:\d{2,4}\s*[÷\/]\s*\d{2,4}|\d+(?:[.,]\d+)?(?:\s*(?:[-–…÷]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?)`;
+const HARD_PRE = String.raw`(?:(?:min\.?|max\.?|[≥≤]|[<>]=?)\s*)?`;
+const HARD_TAIL = String.raw`(?:\s*(?:±\s*\d+(?:[.,]\d+)?|\+\s*\d+(?:[.,]\d+)?(?:\s*\/\s*-\s*\d+(?:[.,]\d+)?)?|(?:min|max)\b\.?))?`;
+const HARD_RE = new RegExp(String.raw`((?<![\d.,])${HARD_PRE}${HARD_NUM}\s*${HARD_UNIT}\b${HARD_TAIL}|\b${HARD_UNIT_FRONT}\s*${HARD_PRE}${HARD_NUM}${HARD_TAIL})`, "i");
 const TOL_RE = /((?:(?:ČSN|CSN|DIN)\s+)?(?:EN\s+)?ISO\s*)?(?:2768\s*[-–]?\s*(?:[12]\s*[-–]?\s*)?([fmcv])\s*[-/]?\s*([HKL])?\b|22081)/i;
 /** starší obecné tolerance DIN 7168 (f, m, g, sg) */
 const DIN7168_RE = /\bDIN\s*7168\s*[-–]?\s*(sg|f|m|g)\b/i;
@@ -100,6 +110,10 @@ const IT_RE = /\bIT\s?(?:0[01]|1[0-8]|[1-9])\b/;
 /** obecná tolerance zapsaná hodnotou („±0,1“) – s nekótovanými rozměry / slovem tolerance */
 const PM_RE = /±\s*\d+(?:[.,]\d+)?|(?:^|\s)\+\s*\d+(?:[.,]\d+)?\s*\/\s*-\s*\d+(?:[.,]\d+)?/;
 const RA_RE = /\b(R[az]|Rmax)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/;
+/** všechny hodnoty drsnosti v textu i s mezí („Rz 6,3 / Ra 0,8“, „Ra 0,8 max“) – kolo 5: přesun nesmí žádnou ztratit */
+const RA_ALL_RE = /\b(R[az]|Rmax)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(\s*(?:max|min)\b\.?)?/g;
+/** zásada nezávislosti ISO 8015 – patří k nepředepsaným tolerancím (kolo 5: „ISO 2768-mK / ISO 8015“ zůstane celé) */
+const ISO8015_RE = /\b(?:(?:ČSN|CSN|DIN)\s+)?(?:EN\s+)?ISO\s*8015\b/i;
 /** třída drsnosti N1–N12 (ISO 1302) */
 const NCLASS_RE = /\bN(?:1[0-2]|[1-9])\b/;
 const WNR_RE = /\b1\.\d{4}\b/;
@@ -107,7 +121,7 @@ const WNR_RE = /\b1\.\d{4}\b/;
 const CSN_RE = /\b1[0-9]\s?\d{3}(?:\.\d{1,2})?\b/;
 /** ČSN ocel bez slova materiálu: třída 11–19 a mezera („11 523“, „19 436.4“) – ne počet kusů („15 000 ks“) */
 const CSN_BARE_RE = /\b1[1-9]\s\d{3}(?:\.\d{1,2})?\b(?!\s*(?:ks|kus|pcs|stk|stück|x|×|mm|m\b|kg|nm|h\b|min|%|,-|kč|eur))/i;
-const EN_STEEL_RE = /\b(?:C\d{2,3}E?|DC0[1-7]|DD1[1-4]|DX5[1-7]D?|Ms\s?\d{2}|CW\d{3}[A-Z]|Ck\d{2,3}|AISI\s?\d{3}[A-Z]?|EN[-\s]?GJ[LSM][A-Z]?-?\d{2,4}(?:-\d{1,2})?|GGG?-?\d{2,3}|Hardox\s?\d{0,3}|Toolox\s?\d{0,2}|Weldox\s?\d{0,4}|Strenx\s?\d{0,4}|Domex\s?\d{0,4}|PA\s?\d{1,2}(?:\.\d)?|POM(?:-[CH])?|PEEK|PTFE|PE-?(?:HD|LD|UHMW|\d{3,4})|PVC|PMMA|ABS|S\d{3}(?:JR|J0|J2|MC)?|\d{2,3}(?:Cr|Mn|Ni|Mo|Si|V|W){1,4}\d{1,2}(?:-\d{1,2})*|X\d{1,3}(?:Cr|Mo|Ni|V|W|Mn|Co|Si|Ti|N){1,5}\d{0,2}(?:-\d{1,2})*|EN\s?AW-?\d{4}|Al(?:Mg|Si|Cu|Zn)\w*|CuZn\d\w*|CuSn\d\w*|100Cr6)\b/;
+const EN_STEEL_RE = /\b(?:C\d{2,3}E?|DC0[1-7]|DD1[1-4]|DX5[1-7]D?|Ms\s?\d{2}|CW\d{3}[A-Z]|Ck\d{2,3}|AISI\s?\d{3}[A-Z]?|EN[-\s]?GJ[LSM][A-Z]?-?\d{2,4}(?:-\d{1,2})?|GGG?-?\d{2,3}|Hardox\s?\d{0,3}|Toolox\s?\d{0,2}|Weldox\s?\d{0,4}|Strenx\s?\d{0,4}|Domex\s?\d{0,4}|PA\s?\d{1,2}(?:\.\d)?|POM(?:-[CH])?|PEEK|PTFE|PE-?(?:HD|LD|UHMW|\d{3,4})|PVC|PMMA|ABS|S\d{3}(?:JR|J0|J2|MC)?|\d{2,3}(?:Cr|Mn|Ni|Mo|Si|V|W){1,4}\d{1,2}(?:-\d{1,2})*|X\d{1,3}(?:Cr|Mo|Ni|V|W|Mn|Co|Si|Ti|N){1,5}\d{0,2}(?:-\d{1,2})*|EN\s?AW-?\d{4}|Al(?:Mg|Si|Cu|Zn)\w*|CuZn\d\w*|CuSn\d\w*|100Cr6|S[tT]\s?\d{2}(?:-\d)?|Al\s?[2-7]\d{3}(?:\s?-?\s?T\d{1,4})?|[2-7]\d{3}\s?-?\s?T\d{1,4}|HSS(?:-?E)?(?:-?PM)?|(?:K(?:100|105|107|110|190|294|305|340|353|360|390|460|490|600|720|890)|M(?:200|201|238|261|268|300|303|310|314|333|340|368|390|398)|S(?:290|390|393|500|600|690|700|705)|W(?:300|302|303|320|360|400|500))(?:\s?(?:ISOPLAST|ISODISC|MICROCLEAN|AMPO))?|(?:Tvrdokov|Hartmetall|Carbide|Karbid)\s?[KPMN]\d{2})\b/;
 /** nástrojové oceli obchodním názvem (Uddeholm, Böhler, PM oceli, JIS) – v nástrojárně běžné označení materiálu (kolo 4, bod 9) */
 const TOOL_STEEL_RE = /\b(?:(?:Vanadis|Sverker|Elmax|Calmax|Caldie|Vancron|Vanax|Uddeholm|Orvar|Stavax|Rigor|Impax|Nimax|Dievar|Unimax|Mirrax|Corrax|Ramax|Sleipner|Formvar|Holdax|Polmax|Thyrodur|Thyroplast|Thyrotherm|Cryodur|Toolox|Hardox)(?:\s?(?:ESR|SuperClean|Supreme|HH|Extra))?(?:\s?\d{1,4})?|(?:Böhler|Bohler|Boehler)(?:\s?[A-Z]\d{3})?|CPM\s?\d{1,2}V|CPM\s?[A-Z]\d{1,2}V?|ASP\s?\d{2}|SKD\s?\d{1,2}|SKH\s?\d{1,2}|(?:AISI|tool\s+steel|ocel)\s+(?:D2|D3|O1|A2|M2|H13|S7|P20))\b/i;
 const EDGE_ISO_RE = /ISO\s*13715\b/i;
@@ -132,6 +146,8 @@ export type NoteClass = {
   rest: string[];
   /** text míchá údaj razítka s dalším obsahem (věta kolem údaje) – nejde čistě přesunout, agent ho musí rozdělit */
   mixed: boolean;
+  /** kolo 5 (correct-F4): části textu, které by přesun ztratil nebo rozdělil do jiné buňky („58÷“, „ISO 8015“) – nepřesouvá se */
+  lost?: string[];
 };
 
 type SegKinds = { kinds: Set<TitleDataKey>; extra: string[]; hard?: string; tol?: string; ra?: string; mat?: string; /** údaj neúplný („ISO 2768“ bez třídy) – do razítka se nepřesune, agent ho doplní */ incomplete?: boolean; /** rozměr v textu (Ø20, R5, M8) – „Ø20 ±0,1“ není obecná tolerance */ dimRef?: boolean };
@@ -139,7 +155,7 @@ type SegKinds = { kinds: Set<TitleDataKey>; extra: string[]; hard?: string; tol?
 /** tvrdost s jednotkou vpředu („HRC 58-62“, „HRC58“) → zápis razítka „58-62 HRC“ (stejný tvar, jaký přijme `výkres razítko tvrdost=`) */
 export function normHardness(v: string): string {
   const t = v.replace(/\s+/g, " ").trim();
-  const m = /^(HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*(\d.*)$/i.exec(t);
+  const m = /^(HRC|HRB|HRA|HV(?:0[.,]\d{1,2}|\d{1,2})?|HBW|HB)\s*((?:(?:min\.?|max\.?|[≥≤]|[<>]=?)\s*)?\d.*)$/i.exec(t);
   return m ? `${m[2].trim()} ${m[1].replace(/\s+/g, "").toUpperCase()}` : t;
 }
 
@@ -189,12 +205,19 @@ function segKinds(seg: string): SegKinds {
       }
     }
   }
+  // kolo 5: ISO 8015 k nepředepsaným tolerancím (s ISO 2768 v jedné buňce „ISO 2768-mK / ISO 8015“)
+  const i8015 = ISO8015_RE.exec(rest);
+  if (i8015) {
+    kinds.add("tolerance");
+    tol = tol ? `${tol} / ISO 8015` : "ISO 8015";
+    rest = rest.replace(i8015[0], " ");
+  }
   let ra: string | undefined;
-  const rm = RA_RE.exec(rest);
-  if (rm) {
+  const ras = [...rest.matchAll(RA_ALL_RE)];
+  if (ras.length) {
     kinds.add("roughness");
-    ra = `${rm[1]} ${rm[2]}`;
-    rest = rest.replace(rm[0], " ");
+    ra = ras.map((m) => `${m[1]} ${m[2]}${m[3] ? ` ${m[3].trim()}` : ""}`).join(" / ");
+    for (const m of ras) rest = rest.replace(m[0], " ");
   } else {
     const n = take(NCLASS_RE);
     if (n) {
@@ -222,6 +245,8 @@ function segKinds(seg: string): SegKinds {
   }
   // obecná tolerance hodnotou („Tol. ±0,1“, „Obecně ±0,2“, „±0,1“) – ± kdekoli v poznámce je tolerance (D3)
   if (PM_RE.test(rest)) {
+    // kolo 5 (correct-F4): „±“ u jiného údaje (tvrdost, povlak, drsnost) není obecná tolerance – takový text se nepřesune
+    if ([...kinds].some((k) => k !== "tolerance")) incomplete = true;
     kinds.add("tolerance");
     tol = tol ?? PM_RE.exec(rest)![0].trim();
     rest = rest.replace(PM_RE, " ");
@@ -237,12 +262,17 @@ function segKinds(seg: string): SegKinds {
     if (pair.startsWith("povrchovauprav") || pair.startsWith("surfacetreat") || pair.startsWith("surfacefinish") || pair.startsWith("oberflachenbeh") || pair.startsWith("oberflaechenbeh")) kinds.add("surfaceTreatment");
     // „nekótované rozměry / tolerance“ = nepředepsané tolerance; „nekótované hrany“ jsou hrany (ISO 13715), ne tolerance
     if (startsAny(pair, TOL) || pair.startsWith("generaltoler") || pair.startsWith("obecnetoler") || pair.startsWith("volnerozm") || pair.startsWith("nekotovanerozm") || pair.startsWith("nekotovanetoler") || pair.startsWith("nekotovanychrozm")) kinds.add("tolerance");
+    // kolo 5 (correct-F5): slovo i jako složenina („Plazmanitridace“, „Vakuumgehärtet“, „Gasnitrieren“, „Manganfosfát“,
+    // „Scharfkantig“) – kmen se hledá i za předponou složeniny (`stripCompound`), ne jen na začátku slova
+    const hit = (list: readonly string[]) => startsAny(w, list) || startsAny(stripCompound(w), list);
     if (startsAny(w, HARDW)) kinds.add("hardness");
-    else if (startsAny(w, HEAT) || HEAT_EXACT.has(w)) kinds.add("heatTreatment");
+    else if (startsAny(w, SURFACE_FIRST)) kinds.add("surfaceTreatment");
+    else if (startsAny(w, MAT_FIRST)) kinds.add("material");
+    else if (hit(HEAT) || HEAT_EXACT.has(w)) kinds.add("heatTreatment");
     else if (startsAny(w, ROUGH)) kinds.add("roughness");
     else if (startsAny(w, TOL) || TOL_EXACT.has(w)) kinds.add("tolerance");
-    else if (startsAny(w, SURFACE) || SURFACE_EXACT.has(w)) kinds.add("surfaceTreatment");
-    else if (startsAny(w, EDGES) || EDGE_WORDS.has(w)) kinds.add("edges");
+    else if (hit(SURFACE) || SURFACE_EXACT.has(w)) kinds.add("surfaceTreatment");
+    else if (hit(EDGES) || EDGE_WORDS.has(w)) kinds.add("edges");
     // „zaoblit“ jen u rohů / hran („Rohy zaoblit R0,5“) – „zaoblení R5“ u kóty je rozměr
     // „Zaoblit R0,5“ (pokyn s poloměrem) je stav hran celého dílu
     else if (w.startsWith("zaobl") && (ws2.some((x) => EDGE_WORDS.has(x)) || (/^zaoblit/.test(w) && /\bR\s?\d/.test(seg)))) kinds.add("edges");
@@ -276,6 +306,7 @@ export function classifyNote(text: string): NoteClass | null {
   const rest: string[] = [];
   let mixed = false;
   let any = false;
+  const lost: string[] = [];
   for (const seg of segs) {
     const k = segKinds(seg);
     if (!k.kinds.size) {
@@ -287,10 +318,12 @@ export function classifyNote(text: string): NoteClass | null {
     if (k.extra.length > 2 || k.incomplete || (k.dimRef && k.kinds.has("tolerance"))) mixed = true;
     // hodnota pole = text části bez popisku pole a bez hodnot, které patří jiným polím (tvrdost, ISO 2768, Ra, materiál)
     let body = clean(seg.replace(LABEL_RE, ""));
-    for (const x of [k.mat, k.ra && (RA_RE.exec(seg)?.[0] ?? k.ra), k.tol && TOL_RE.exec(seg)?.[0]]) if (x && body !== x) body = clean(body.replace(x, " "));
+    for (const x of [k.mat, ...(k.ra ? [...seg.matchAll(RA_ALL_RE)].map((m) => m[0]) : []), k.tol && TOL_RE.exec(seg)?.[0], k.tol && ISO8015_RE.exec(seg)?.[0]]) if (x && body !== x) body = clean(body.replace(x, " "));
+    const segVals: string[] = [];
     const push = (key: TitleDataKey, value: string) => {
       const v = clean(value);
       if (!v) return;
+      segVals.push(v);
       const had = parts.find((p) => p.key === key);
       if (had) had.value = `${had.value}, ${v}`;
       else parts.push({ key, value: v });
@@ -307,12 +340,45 @@ export function classifyNote(text: string): NoteClass | null {
     if (k.kinds.has("material")) push("material", k.mat ? (k.kinds.size === 1 ? clean(seg.replace(LABEL_RE, "")) : k.mat) : body);
     if (k.kinds.has("surfaceTreatment")) push("surfaceTreatment", body);
     if (k.kinds.has("edges")) push("edges", body);
+    // kolo 5 (correct-F4): přesun jen beze ztráty – každý číselný údaj celý v jedné buňce, každé slovo v některé buňce
+    const l = lostTokens(seg, segVals);
+    if (l.length) {
+      mixed = true;
+      lost.push(...l);
+    }
   }
   if (!any) return null;
   if (rest.length) mixed = true;
   // věta jako hodnota buňky („Nekótované hrany sražení 0,5x45 stupňů, ostré hrany zbavit otřepů“) = do razítka se nepřesune
   if (parts.some((p) => p.value.length > TITLE_VALUE_MAX)) mixed = true;
-  return { parts, rest, mixed };
+  return { parts, rest, mixed, ...(lost.length ? { lost: [...new Set(lost)] } : {}) };
+}
+
+/** text poznámky bez pořadového čísla a popisku pole („Tvrdost: 58 HRC“ → „58 HRC“) – hodnota celé buňky v radě */
+export const noteBody = (text: string): string => clean(stripEnum(vis(text).replace(/\s+/g, " ")).replace(LABEL_RE, ""));
+
+/** slova, která přesun smí vynechat: popisky polí („Tvrdost:“, „Hrany:“, „Nepředepsané tolerance“), třída ISO 2768 slovem, druh materiálu */
+const LOSS_OK = [...TOL, ...HARDW, ...ROUGH, ...MATERIAL, ...MATERIAL_FAMILY, "voln", "nekot", "obecn", "allgem", "general", "unspec", "mittel", "fein", "grob", "medium", "fine", "coarse", "stredn", "jemn", "hrub", "velmi", "very", "sehr", "trida", "class", "klasse", "povrch", "surface", "oberfl", "edges", "kanten", "tepeln", "heat", "warmebeh", "waermebeh", "mezn", "uchylk", "abmass", "grenzabm", "deviation", "bez", "ohne", "without", "vsude", "overall", "uberall", "ueberall", "rundum"];
+const lossFold = (s: string) => fold(stripEnum(s)).replace(/[÷–—…]/g, "-").replace(/×/g, "x").replace(/\b2768\s*-\s*[12]\b/g, "2768");
+/** číselný údaj i s rozsahem / tolerancí („58-62“, „58/60“, „±2“, „0,5x45“, „1.2379/1.2842“) – musí zůstat celý v jedné buňce */
+const NUM_GROUP_RE = /[±+]?\s*\d+(?:[.,]\d+)?(?:\s*(?:[-x/]|\+\s*\/?\s*-?|±|az|to|bis)\s*\d+(?:[.,]\d+)?)*/g;
+/**
+ * Kolo 5 (correct-F4) – kontrola tam a zpět: co by se z textu `text` přesunem do buněk s hodnotami `values` ztratilo nebo
+ * rozdělilo. Číselný údaj (i rozsah „58÷62“, tolerance „±2“, dvě hodnoty „Rz 6,3 / Ra 0,8“) musí být celý v jedné buňce,
+ * každé slovo mimo popisky polí a výplň v některé buňce. Prázdné pole = přesun je bezeztrátový.
+ */
+export function lostTokens(text: string, values: readonly string[]): string[] {
+  // popisek pole na začátku části („Volné míry“, „Tvrdost:“, „Mat.“) se do hodnoty nepíše – neztrácí se
+  const src = lossFold(segmentsOf(stripEnum(vis(text).replace(/\s+/g, " "))).map((x) => x.replace(LABEL_RE, "")).join(" ; "));
+  const vals = values.map((v) => lossFold(v).replace(/\s+/g, ""));
+  const vw = new Set(values.flatMap((v) => fold(v).match(/[a-z]{2,}/g) ?? []));
+  const out: string[] = [];
+  for (const m of src.matchAll(NUM_GROUP_RE)) {
+    const g = m[0].replace(/\s+/g, "");
+    if (!vals.some((v) => v.includes(g))) out.push(m[0].trim());
+  }
+  for (const w of src.match(/[a-z]{2,}/g) ?? []) if (!vw.has(w) && !FILLER.has(w) && !EDGE_WORDS.has(w) && !MAT_EXACT.has(w) && !TOL_EXACT.has(w) && !startsAny(w, LOSS_OK)) out.push(w);
+  return [...new Set(out)];
 }
 
 /** název pole razítka do protokolu (malými písmeny) */
@@ -364,7 +430,7 @@ export function noteStyle(text: string, max = NOTE_MAX_CHARS, maxWords = NOTE_MA
   // víc vět = konec věty (slovo aspoň 3 písmen, ne zkratka „Ing.“, „s.r.o.“, „max.“) a za ním další slovo
   if ([...t.matchAll(/(\p{L}+)[.!?]\s+\p{L}/gu)].some((m) => m[1].length >= 3 && !ABBR.has(fold(m[1])))) return tr("víc vět na řádku");
   // tečka za zkratkou („pozn.“, „max.“, „W.Nr.“) není věta – věta = aspoň tři slova a tečka / ! / ? na konci
-  if (ws.length >= 3 && (/[!?]$/.test(t) || (/\.$/.test(t) && !/\b(?:ap|atd|tzv|max|min|cca|resp|tj|tl|č|st|ks|pozn|W\.Nr)\.$/i.test(t)))) return tr("věta s tečkou na konci");
+  if (ws.length >= 3 && (/[!?]$/.test(t) || (/\.$/.test(t) && !/\b(?:ap|atd|tzv|max|min|cca|resp|tj|tl|č|st|ks|pozn|W\.Nr|s\.r\.o|spol|a\.s|k\.s|v\.o\.s|inc|ltd|co|corp|gmbh|ag|kg|ing|bc|mgr|dr)\.$/i.test(t)))) return tr("věta s tečkou na konci");
   if ((t.match(/,\s+(?=\D)/g) ?? []).length > 2) return tr("víc než dvě čárky (souvětí)");
   // věta rozdělená na řádky („Po obrobení díl očistit,“ / „a odeslat zákazníkovi“) – řádek končí čárkou nebo začíná spojkou
   if (ws.length >= 2 && /[,;]$/.test(t)) return tr("řádek pokračuje na dalším (věta rozdělená na řádky)");
@@ -442,6 +508,12 @@ export function stampOrigin(prev: DrawingDoc | undefined, next: DrawingDoc, by: 
       mChanged = true;
     }
   }
+  // kolo 5 (bypass-F4): popisky pohledů a názvy pohledů modelů se tisknou u pohledu – původ jako u buňky razítka
+  const vl = viewLabelSig(next);
+  if (vl && vl !== (prev ? viewLabelSig(prev) : "") && map.viewLabels !== by) {
+    map.viewLabels = by;
+    mChanged = true;
+  }
   const revs = nm.revisions as Rev[] | undefined;
   if (Array.isArray(revs)) {
     const prevRevs = (pm.revisions as Rev[] | undefined) ?? [];
@@ -471,18 +543,34 @@ export function stampOrigin(prev: DrawingDoc | undefined, next: DrawingDoc, by: 
  * Výjimka (kolo 4, bod 10 / F1): text, který soubor sám nese jako agentův (`"by":"agent"` – soubor uložil agent, v tomto
  * nebo dřívějším běhu, i běh, který skončil ✗), zůstane agentův – `uložit` + `otevřít` ho na „loaded“ nevypere.
  */
+/**
+ * Údaje listu, které tvoří generátor (jádro / `sheetMeta`), ne autor – v uloženém / vloženém dokumentu se neberou (kolo 5,
+ * bypass-F2): poznámky k plechu, popisy ploch z modelu, kusovník, pozice, svary, tabulky pružin a kol, závity, hmotnost,
+ * legenda úprav, revize modelu, číslo listu. Jinak by JSON řádek / `--open` nesl volný text mimo všechny kontroly.
+ */
+export const GENERATED_META = ["formNotes", "pmi", "bom", "components", "welds", "springData", "gears", "springs", "massKg", "threads", "zoneLegend", "modelRev", "sheetIndex", "sheetCount", "material"] as const;
+/** meta listu bez údajů generátoru (vrací kopii; nic ke smazání = tentýž objekt) */
+export function withoutGenerated<M extends Record<string, unknown>>(m: M): M {
+  if (!GENERATED_META.some((k) => k in m)) return m;
+  const out = { ...m } as Record<string, unknown>;
+  for (const k of GENERATED_META) delete out[k];
+  return out as M;
+}
+
 export function stampAgentNotes<T extends Pick<CadDoc, "drawings"> & Partial<Pick<CadDoc, "functional" | "materialName" | "name" | "kind" | "draft">>>(doc: T, by: "agent" | "loaded" = "agent"): T {
   const out: T = { ...doc };
   /** původ položky: agent, nebo „loaded“ – kromě položky, kterou soubor nese jako agentovu */
   const keep = (old: unknown): Src => (by === "loaded" && old === "agent" ? "agent" : by);
   if (doc.drawings?.length) {
     out.drawings = doc.drawings.map((s) => {
-      const m = { ...(s.meta ?? {}) } as Record<string, unknown>;
+      // kolo 5 (bypass-F2): údaje generátoru z JSON / souboru se zahodí – list je spočítá znovu z modelu
+      const m = { ...withoutGenerated((s.meta ?? {}) as Record<string, unknown>) };
       const old = ((m as MetaBy).by ?? {}) as Record<string, unknown>;
       const map: Record<string, Src> = {};
       for (const k of TEXT_FIELDS) if (str(m[k]).trim()) k === "note" ? (m.noteBy = keep(m.noteBy)) : (map[k] = keep(old[k]));
       if (s.name?.trim()) map.sheetName = keep(old.sheetName);
       if (s.drawing?.trim()) map.drawingName = keep(old.drawingName);
+      if (viewLabels(s).length) map.viewLabels = keep(old.viewLabels);
       if (Object.keys(map).length) m.by = map;
       else delete m.by;
       if (!str(m.note).trim()) delete m.noteBy;
@@ -491,6 +579,9 @@ export function stampAgentNotes<T extends Pick<CadDoc, "drawings"> & Partial<Pic
     });
   }
   if (doc.functional?.length) out.functional = doc.functional.map((f) => (f.kind === "note" || f.kind === "treatment" ? { ...f, by: keep(f.by) } : f));
+  // kolo 5 (bypass-F6): texty kusovníku komponent sestavy z JSON / souboru – původ jako ostatní texty
+  const comps = (doc as { components?: (Parameters<typeof bomCells>[0] & { textBy?: unknown })[] }).components;
+  if (doc.kind === "assembly" && comps?.length) (out as { components?: unknown[] }).components = comps.map((c) => (bomCells(c).length ? { ...c, textBy: keep(c.textBy) } : c));
   if (doc.materialName?.trim()) (out as { materialBy?: Src }).materialBy = keep((doc as { materialBy?: unknown }).materialBy);
   if (doc.name?.trim()) (out as { nameBy?: Src }).nameBy = keep((doc as { nameBy?: unknown }).nameBy);
   if (doc.kind === "draft" && doc.draft) (out as { draft?: unknown }).draft = stampDraftText(doc.draft, by);
@@ -665,8 +756,10 @@ export function freeTextLines(doc: Pick<CadDoc, "drawings">, sheets?: number[], 
       out.push({ sheet: si, pos, ref: `a${i + 1}`, key: `ann:${a.id}`, kind: a.type === "text" ? "text" : "note", text, lines: lineCount(text) * tall, by: a.by ?? "user" });
     });
     // popis s odkazem (callout), jehož řádky nejsou technický údaj díry / závitu / sražení (D2: „Brousit jemně“ = volný text)
+    // kolo 5 (bypass-F3): i popis s příznakem „auto“ – příznak z JSON dokladem generátoru není; generátor píše jen technické
+    // řádky (Ø9 skrz, M8 ↧12), takže skutečný vygenerovaný popis se nepočítá a podvržený ano
     s.annotations.forEach((a, i) => {
-      if (a.type !== "callout" || a.auto) return;
+      if (a.type !== "callout") return;
       const free = calloutFreeLines(a.lines);
       if (free.length) out.push({ sheet: si, pos, ref: `a${i + 1}`, key: `ann:${a.id}`, kind: "callout", text: free.join("\n"), lines: free.reduce((n, l) => n + lineCount(l), 0), by: a.by ?? "user" });
     });
@@ -828,26 +921,79 @@ export function dimTextHidesValue(a: DrawingAnnotation): boolean {
 /** název / číslo výkresu, který odkazuje na jiný díl nebo na poznámky (D4: „…/2“, „Technické požadavky“, „Poznámky“, „notes“) */
 const NOTES_TITLE_RE = /\/\s*\d{1,3}\s*$|požadav|pozadav|poznámk|poznamk|pokyny|\bnotes?\b|requirement|hinweis|anforderung|anmerkung|bemerkung|technische\s+angaben/i;
 /**
- * dokument je jen „nosič textu“ (D4, kolo 4 – bod 6): těleso jen z primitiv (žádná díra, řez, úkos …) a buď do 5 mm, nebo
- * bez jediné kóty, nebo s víc řádky volného textu agenta než kót – holé primitivum, jehož výkres je hlavně text. Velikost
- * sama nerozhoduje (kvádr 6×6×6 se 3 kótami a 5 pokyny nosičem zůstane).
+ * dokument je jen „nosič textu“ (D4, kolo 4 – bod 6, kolo 5 – bypass-F5 / correct-F1): výkres dílu nese volný text a buď
+ * nemá jedinou kótu, nebo má kót mnohem méně než řádků textu (3 × méně), nebo je těleso drobné (do 10 mm) a řádků je víc
+ * než kót nebo aspoň 3 – **bez ohledu na prvky** (jedna díra v kostičce 6 mm nosič nezruší). Holé primitivum do 5 mm s textem a holé
+ * primitivum s víc řádky než kót nosičem zůstává jako dřív.
  */
-const PRIMITIVES = new Set(["box", "cylinder", "sphere", "cone", "torus", "wedge"]);
+const PRIMITIVES = new Set(["box", "cylinder", "sphere", "cone", "torus", "wedge", "tube"]);
+/** prvky, které těleso nezvětší (díra, zaoblení, sražení, závit, pomocné prvky) – rozměr tělesa dají primitiva */
+const NOT_ADDING = new Set(["hole", "fillet", "chamfer", "thread", "draft", "datum", "datumAxis", "datumPoint", "csys", "deleteFace"]);
+/** největší rozměr tělesa z primitiv (mm); null = těleso má prvek, jehož rozměr z údajů nepoznám (vysunutí skici …) */
+function bodyExtent(fs: readonly Feature[]): number | null {
+  if (!fs.every((f) => PRIMITIVES.has(f.type) || NOT_ADDING.has(f.type))) return null;
+  const dims = fs.filter((f) => PRIMITIVES.has(f.type)).flatMap((f) => {
+    const x = f as unknown as Record<string, unknown>;
+    return ["size", "radius", "height", "r", "r1", "r2", "radius1", "radius2", "outer", "diameter", "length", "width"].flatMap((k) => (Array.isArray(x[k]) ? (x[k] as unknown[]) : [x[k]])).filter((v): v is number => typeof v === "number");
+  });
+  return dims.length ? Math.max(...dims.map(Math.abs)) : null;
+}
 function placeholderPart(doc: AuditInput): boolean {
   const fs = doc.features ?? [];
-  if (doc.kind === "assembly" || doc.kind === "draft" || !fs.length || !fs.every((f) => PRIMITIVES.has(f.type))) return false;
-  const dims = fs.flatMap((f) => {
-    const x = f as unknown as Record<string, unknown>;
-    return ["size", "radius", "height", "r", "r1", "r2", "diameter", "length", "width"].flatMap((k) => (Array.isArray(x[k]) ? (x[k] as unknown[]) : [x[k]])).filter((v): v is number => typeof v === "number");
-  });
-  if (!dims.length) return false;
-  if (Math.max(...dims.map(Math.abs)) <= 5) return true;
-  // holé primitivum, jehož výkres nese víc řádků volného textu agenta než kót (kvádr 6×6×6 se 3 kótami a 5 pokyny)
+  if (doc.kind === "assembly" || doc.kind === "draft" || !fs.length) return false;
   const ds = doc.drawings ?? [];
   const kot = ds.reduce((n, s) => n + dimCount(s), 0);
-  const txt = ds.length ? linesOf(freeTextLines(doc).filter((x) => x.by === "agent")) : 0;
-  return kot === 0 || txt > kot;
+  const txt = ds.length ? linesOf(freeTextLines(doc).filter((x) => x.by !== "auto")) : 0;
+  const ext = bodyExtent(fs);
+  if (fs.every((f) => PRIMITIVES.has(f.type)) && ext !== null) {
+    if (ext <= 5) return true;
+    if (kot === 0 || txt > kot) return true;
+  }
+  if (!txt) return false;
+  // drobné těleso (do 10 mm): víc řádků než kót, nebo 3 a víc řádků – drobný díl (kolík, vložka) nese údaje v razítku, ne v poznámkách
+  return kot === 0 || kot * 3 < txt || (ext !== null && ext <= 10 && (txt > kot || txt >= 3));
 }
+
+/**
+ * Kolo 5 (bypass-F5): dokumenty běhu (pracovní prostor) pro kontrolu „druhý výkres téhož dílu“ – nastaví smyčka běhu
+ * (engine/run.ts); bez ní (GUI, čistý test) se vazba mezi dokumenty nekontroluje.
+ */
+let siblingDocs: (() => readonly Pick<CadDoc, "name" | "drawings" | "features">[]) | null = null;
+export function setNotesSiblings(fn: (() => readonly Pick<CadDoc, "name" | "drawings" | "features">[]) | null): void {
+  siblingDocs = fn;
+}
+/** geometrie dílu bez identit prvků (dva dokumenty se stejným tělesem) */
+const geomSig = (fs: readonly unknown[] | undefined): string => JSON.stringify((fs ?? []).map((f) => ({ ...(f as Record<string, unknown>), id: undefined, name: undefined })));
+/**
+ * číslo výkresu dokumentu, které je číslem jiného dokumentu běhu s příponou („MN-1-B“, „MN-1/2“, „MN-1 B“) – a ten druhý dokument
+ * má totéž těleso: výkres téhož dílu podruhé, jen kvůli dalším poznámkám (D4: výkres se nedělí)
+ */
+function siblingOf(doc: AuditInput): { number: string; other: string } | null {
+  const list = siblingDocs?.() ?? [];
+  if (!list.length || doc.kind === "assembly" || doc.kind === "draft") return null;
+  const nums = (d: Pick<CadDoc, "drawings">) => [...new Set((d.drawings ?? []).map((s) => str((s.meta as Record<string, unknown>).number).trim()).filter(Boolean))];
+  const mine = nums(doc);
+  if (!mine.length) return null;
+  const sig = geomSig(doc.features);
+  for (const o of list) {
+    if (o.name === doc.name || !o.drawings?.length) continue;
+    for (const on of nums(o)) {
+      const n = mine.find((x) => x !== on && x.startsWith(on) && /^\s*[-_/.\s]\s*[A-Za-z0-9]{1,3}$/.test(x.slice(on.length)));
+      if (n && (geomSig(o.features) === sig || placeholderPart(doc))) return { number: n, other: o.name };
+    }
+  }
+  return null;
+}
+
+/** popisek pohledu (detail, pomocný pohled, řez lomenou čarou, řez) – jen písmeno / dvojice písmen („B“, „A-A“, „Detail C“) */
+const VIEW_LABEL_RE = /^(?:(?:detail|pohled|řez|rez|view|section|schnitt|ansicht|einzelheit)\s+)?[A-Z]{1,2}\d{0,2}(?:\s*[-–]\s*[A-Z]{1,2}\d{0,2})?$/i;
+/** popisky pohledů listu a názvy pohledů dalších modelů (kanál textu u pohledu – kolo 5, bypass-F4) */
+export function viewLabels(s: Pick<DrawingDoc, "options">): { what: "label" | "model"; text: string }[] {
+  const o = (s.options ?? {}) as { details?: { label?: string }[]; aux?: { label?: string }[]; cuts?: { label?: string }[]; section?: { label?: string } | null; models?: { name?: string }[] };
+  const lab = [...(o.details ?? []), ...(o.aux ?? []), ...(o.cuts ?? []), ...(o.section && typeof o.section === "object" ? [o.section] : [])].map((x) => str(x?.label).trim()).filter(Boolean);
+  return [...lab.map((text) => ({ what: "label" as const, text })), ...(o.models ?? []).map((m) => ({ what: "model" as const, text: str(m?.name).trim() })).filter((x) => x.text)];
+}
+const viewLabelSig = (s: Pick<DrawingDoc, "options">): string => viewLabels(s).map((x) => `${x.what}:${x.text}`).join("\u0001");
 
 /** popisy a úpravy plochy v modelu (doc.functional) */
 const pmiMarks = (doc: AuditInput): FunctionalMark[] => (doc.kind === "assembly" || doc.kind === "draft" ? [] : (doc.functional ?? []).filter((m) => (m.kind === "note" || m.kind === "treatment") && !!m.text));
@@ -855,18 +1001,141 @@ const pmiMarks = (doc: AuditInput): FunctionalMark[] => (doc.kind === "assembly"
 /** původ podle podílu: agent, pokud se na položkách podílel; jinak načtený soubor, jinak člověk */
 const mixBy = (bs: readonly Origin[]): Origin => (bs.includes("agent") ? "agent" : bs.includes("loaded") ? "loaded" : bs.includes("user") ? "user" : "auto");
 
+// ---------------------------------------------------------------- název = jmenná fráze (D5, kolo 5 – correct-F6)
+
+/** kmeny slov obrábění – „Brousit“, „Lapovat F3“, „Leštit čela“ jsou pokyny, ne název ani jméno */
+const MACHINING = ["brous", "zabrous", "lest", "lapov", "honov", "frez", "soustruz", "vrtat", "vystruz", "rezat", "obrob", "superfinis", "polir", "grind", "hone", "schleif", "polier", "honen", "lappen", "frasen", "drehen", "bohren", "reiben"];
+/** slovesný tvar (infinitiv / rozkaz) – cs „kalit, nitridovat, srazte“, de „härten, nitrieren, entgraten“ */
+const VERB_CS = /(?:[iy]t|at|ovat|nout|out|ujte)$/;
+const VERB_DE = /(?:en|ern|eln)$/;
+/** anglický rozkaz na začátku názvu („Harden all over“, „Deburr edges“) – jen jednoznačná slovesa (ne „Drill bushing“, „Round bar“) */
+const EN_VERBS = new Set(["harden", "temper", "quench", "anneal", "normalize", "normalise", "carburize", "carburise", "nitride", "blacken", "anodize", "anodise", "galvanize", "galvanise", "passivate", "deburr", "chamfer", "paint", "sandblast", "shotblast", "degrease", "preserve", "pack", "inspect", "clean", "ship", "deliver", "protect", "grind", "hone", "engrave"]);
+/** podstatné jméno děje – „kalení, nitridace, Härtung, hardening“ */
+const PROCESS_NOUN = /(?:eni|ani|ace|ovani|ung|ing|tion|ation)$/;
+/** předpony složenin, za kterými následuje slovo úpravy („Plazmanitridace“, „Vakuumgehärtet“, „Induktionsgehärtet“, „Manganfosfát“) */
+const COMPOUND = ["plazma", "plasma", "vakuum", "vakuov", "vacuum", "salzbad", "durch", "induktions", "induktiv", "indukcni", "indukcne", "flamm", "laser", "einsatz", "kryogen", "kryogenne", "cryo", "tief", "mangan", "zink", "zinek", "eisen", "scharf", "gas", "ge"];
+/** slovo bez předpon složeniny (nejdřív delší předpony, opakovaně; zbytek aspoň 4 písmena) */
+export function stripCompound(w: string): string {
+  let x = w;
+  for (let k = 0; k < 3; k++) {
+    const p = COMPOUND.find((c) => x.length - c.length >= 4 && x.startsWith(c));
+    if (!p) break;
+    x = x.slice(p.length);
+  }
+  return x;
+}
+/**
+ * slovo je slovem úpravy / obrábění / pokynu – kmen + krátká koncovka (nejvýš 6 písmen): „kalit, kalená, nitridovat,
+ * gehärtet“ ano; „Temperierplatte“, „Kantenschutz“, „Hartmetall“ (kmen + další podstatné jméno) ne
+ */
+const treatWord = (w: string): boolean =>
+  [w, stripCompound(w)].some((x) => [HEAT, SURFACE, EDGES, MACHINING, PROCESS].some((list) => list.some((p) => x.startsWith(p) && x.length - p.length <= 6)) || HEAT_EXACT.has(x) || SURFACE_EXACT.has(x)) && !MAT_FIRST.some((m) => w.startsWith(m));
+/** materiálová slova, která začínají jako slovo úpravy („Hartmetall“ ≠ „hart“ = kalit) */
+const MAT_FIRST = ["hartmetall", "hardmetal", "tvrdokov", "karbid", "carbide"];
+
+/** německá podstatná jména v množném čísle, která končí jako sloveso („Kanten“, „Ecken“, „Fasen“) */
+const DE_NOUN_EN = new Set(["kanten", "ecken", "fasen", "platten", "flachen", "schneiden"]);
+/** předměty anglického rozkazu („Deburr all edges“, „Harden all over“) – s jiným podstatným jménem je to název („Chamfer tool“) */
+const EN_OBJ = new Set(["all", "edges", "edge", "corners", "corner", "surfaces", "surface", "part", "parts", "over", "sharp", "holes", "faces", "both", "sides", "and", "to", "the", "of"]);
+
+/**
+ * Pokyn v názvu / jménu / buňce razítka (D5): slovo úpravy, obrábění nebo expedice ve slovesném tvaru („Kalit“, „Srazit hrany“,
+ * „Leštit čela“, „Härten“), anglický rozkaz bez dalšího podstatného jména („Harden all over“, „Deburr edges“), podstatné jméno
+ * děje s hodnotou („Kalení 58“, „Nitridace 0,3“) nebo text jen z podstatných jmen děje („Kalení a popouštění“, „Härtung“).
+ * Jmenná fráze projde („Kalená vložka“, „Temperierplatte“, „Corner bracket“, „Chamfer tool“, „Povrchová deska“, „Tryska“).
+ * Vrací slovo, které pokyn dělá, nebo null.
+ */
+export function instructionWord(text: string): string | null {
+  const ws = words(text).filter((w) => w.length >= 2 && !isNum(w));
+  const content = ws.filter((w) => !FILLER.has(w));
+  for (const w of ws) {
+    if (!treatWord(w)) continue;
+    if (VERB_CS.test(w) || (VERB_DE.test(w) && !DE_NOUN_EN.has(w))) return w;
+    if (PROCESS_NOUN.test(w) && /\d/.test(text)) return w;
+  }
+  if (content.length && EN_VERBS.has(content[0]) && content.slice(1).every((w) => EN_OBJ.has(w) || treatWord(w))) return content[0];
+  if (content.length && content.every((w) => (treatWord(w) && PROCESS_NOUN.test(w)) || FILLER.has(w))) return content[0];
+  return null;
+}
+
+/**
+ * Název (dílu, listu, výkresu, buňky razítka „název“) je jmenná fráze (D5, kolo 5 – correct-F6): ✗ jen věta / souvětí,
+ * údaj razítka doložený hodnotou (tvrdost s HRC, ISO 2768, Ra, sražení 0,5×45°, označení materiálu) nebo pokyn
+ * (`instructionWord`). Samotné slovo „Kalená“, „Povrchová“, „Corner“, „Edge“ v názvu údajem razítka není.
+ */
+export function nameIssue(t: string, max = TITLE_FREE_MAX): { code: "drawing.note-style" | "drawing.note-title-data"; why?: string; data?: NoteClass["parts"]; word?: string } | null {
+  const why = noteStyle(t, max, 6);
+  if (why) return { code: "drawing.note-style", why };
+  const bad = titleDataIn(t, [], false);
+  if (bad.length) return { code: "drawing.note-title-data", data: bad };
+  const w = instructionWord(t);
+  if (w) return { code: "drawing.note-style", word: w };
+  return null;
+}
+
 /** název dílu (D5): krátce, bez vět, bez údajů razítka a pokynů – kontrola i pro příkaz `nový díl` / `název` */
 export function docNameIssue(name: string): { code: "drawing.note-style" | "drawing.note-title-data" | "drawing.notes-sheet"; text: string } | null {
   const t = name.trim();
   if (!t) return null;
   // D4: díl „MN-1 poznámky“ / „Technické požadavky“ = nosič poznámek k jinému dílu
   if (NOTES_TITLE_RE.test(t)) return { code: "drawing.notes-sheet", text: tr("název dílu „{0}“ – díl / výkres poznámek nebo požadavků k jinému dílu nevzniká: požadavky patří do razítka a k ploše na výkres dílu", cut(t)) };
-  const why = noteStyle(t, TITLE_FREE_MAX, 6);
-  if (why) return { code: "drawing.note-style", text: tr("název dílu „{0}“: {1} – název krátce (např. „Deska“, „Razník 12“), údaje razítka do razítka, pokyny nikam", cut(t), why) };
-  const bad = titleDataIn(t);
-  if (bad.length) return { code: "drawing.note-title-data", text: tr("název dílu „{0}“ obsahuje údaj razítka ({1}) – patří do razítka: {2}", cut(t), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) };
-  const pw = processWords(t);
-  if (pw.length) return { code: "drawing.note-style", text: tr("název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří", cut(t), pw[0]) };
+  const ni = nameIssue(t);
+  if (!ni) return null;
+  if (ni.why) return { code: "drawing.note-style", text: tr("název dílu „{0}“: {1} – název krátce (např. „Deska“, „Razník 12“), údaje razítka do razítka, pokyny nikam", cut(t), ni.why) };
+  if (ni.data) return { code: "drawing.note-title-data", text: tr("název dílu „{0}“ obsahuje údaj razítka ({1}) – patří do razítka: {2}", cut(t), ni.data.map((p) => titleDataLabel(p.key)).join(", "), titleHint(ni.data)) };
+  return { code: "drawing.note-style", text: tr("název dílu „{0}“ je pokyn („{1}“) – název krátce, pokyny na výkres nepatří", cut(t), ni.word ?? "") };
+}
+
+/** buňky kusovníku sestavy, které agent zapisuje příkazem `sestava komponenta …` (kolo 5, bypass-F6 / correct-F2) */
+export type BomField = "name" | "number" | "group" | "material" | "alias" | "catalog" | "vendor" | "size" | "grade";
+/**
+ * Hodnota buňky kusovníku od agenta (název, číslo, skupina, materiál, přezdívka, katalog, výrobce, rozměr, třída): ne věta,
+ * ne pokyn („Odmastit“, „Konzervovat olejem“, „Zabalit do VCI“, „Měrný protokol“), v materiálu / třídě jen označení materiálu
+ * (tepelné zpracování, tvrdost, povrch patří do razítka výkresu dílu). `null` = v pořádku.
+ */
+export function bomCellIssue(field: BomField, value: string): { code: "drawing.note-style" | "drawing.note-title-data"; text: string } | null {
+  const v = vis(value).replace(/\s+/g, " ").trim();
+  if (!v || CELL_NONE_RE.test(v)) return null;
+  const why = noteStyle(v, TITLE_FREE_MAX, 6);
+  if (why) return { code: "drawing.note-style", text: tr("„{0}“: {1} – buňka kusovníku nese krátký údaj (název, číslo, označení)", cut(v), why) };
+  const pw = processWords(v);
+  const iw = instructionWord(v);
+  if (pw.length || iw) return { code: "drawing.note-style", text: tr("„{0}“ je pokyn („{1}“) – kusovník nese název, číslo a označení, pokyny pro výrobu a expedici na výkres nepatří", cut(v), pw[0] ?? iw ?? "") };
+  const bad = field === "material" || field === "grade" ? titleDataIn(v, ["material"], true) : titleDataIn(v, [], false);
+  if (bad.length) return { code: "drawing.note-title-data", text: tr("„{0}“ obsahuje údaj razítka ({1}) – v kusovníku jen označení materiálu (např. „1.2379“); tepelné zpracování, tvrdost a povrch patří do razítka výkresu dílu: {2}", cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) };
+  return null;
+}
+/** texty kusovníku komponent sestavy (pole → hodnota) */
+export function bomCells(c: { name?: string; number?: string; group?: string; material?: string; alias?: string; supply?: { catalog?: string; vendor?: string; size?: string; grade?: string }; source?: { kind?: string; doc?: { materialName?: string } } }): [BomField, string][] {
+  const out: [BomField, string][] = [];
+  const add = (f: BomField, v: unknown) => typeof v === "string" && v.trim() && out.push([f, v.trim()]);
+  add("name", c.name);
+  add("number", c.number);
+  add("group", c.group);
+  add("alias", c.alias);
+  add("material", c.source?.kind === "part" ? c.source.doc?.materialName : c.material);
+  add("catalog", c.supply?.catalog);
+  add("vendor", c.supply?.vendor);
+  add("size", c.supply?.size);
+  add("grade", c.supply?.grade);
+  return out;
+}
+
+/**
+ * Kolo 5 (correct-F3): hodnota volné buňky razítka svého druhu – počet kusů je číslo („4 ks“, „2 + 1“), datum číslicemi,
+ * revize krátký znak („A“, „B1“, „02“). Jména, zákazník, projekt a číslo výkresu hlídá `instructionWord` (pokyn ✗).
+ */
+export function cellKindIssue(key: string, value: string): string | null {
+  const v = vis(value).replace(/\s+/g, " ").trim();
+  if (!v || CELL_NONE_RE.test(v)) return null;
+  switch (key) {
+    case "quantity":
+      return /^\d+(?:\s*[+×x]\s*\d+)?\s*(?:ks|kus[ůy]?|pcs|pc|stk|stück|stueck|st)?\.?$/i.test(v) ? null : tr("počet kusů je číslo (např. „4 ks“, „2 + 1“), ne „{0}“", v);
+    case "date":
+      return /\d/.test(v) || v.length <= 3 ? null : tr("datum je zápis data (např. „27. 11. 2026“), ne „{0}“", v);
+    case "revision":
+      return v.length <= 8 && !/\s\S+\s/.test(v) ? null : tr("revize je krátké označení (např. „A“, „B1“), ne „{0}“", v);
+  }
   return null;
 }
 
@@ -926,14 +1195,29 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
     }
   });
   if (ds.length && placeholderPart(doc) && items.some((x) => x.by !== "auto")) {
-    push({ code: "drawing.notes-sheet", by: mixBy(items.map((x) => x.by)), sheet: main, key: "doc:placeholder", item: String(total), text: tr("dokument „{0}“ je jen nosič textu (holé těleso z primitiv, víc řádků poznámek ({1}) než kót) – výkres jen s poznámkami nevzniká; údaje dejte do razítka výkresu dílu", doc.name ?? "", total), data: { placeholder: true } });
+    push({ code: "drawing.notes-sheet", by: mixBy(items.map((x) => x.by)), sheet: main, key: "doc:placeholder", item: String(total), text: tr("dokument „{0}“ je jen nosič textu ({1} řádků poznámek, kót {2}{3}) – výkres jen s poznámkami nevzniká; díl okótujte (kótovat chytře), údaje dejte do razítka výkresu dílu", doc.name ?? "", total, ds.reduce((n, s) => n + dimCount(s), 0), bodyExtent(doc.features ?? []) !== null && bodyExtent(doc.features ?? [])! <= 10 ? tr(", těleso do 10 mm") : ""), data: { placeholder: true } });
   }
+  // kolo 5 (bypass-F5): druhý výkres téhož dílu (číslo jiného dokumentu s příponou, totéž těleso) s poznámkami agenta
+  const sib = ds.length && items.some((x) => x.by !== "auto") ? siblingOf(doc) : null;
+  if (sib) push({ code: "drawing.notes-sheet", by: mixBy(items.map((x) => x.by)), sheet: main, key: "doc:sibling", item: sib.number, text: tr("výkres „{0}“ je druhý výkres dílu „{1}“ (číslo s příponou, totéž těleso) s dalšími poznámkami – výkres se nedělí; poznámky patří na výkres dílu „{1}“ (nejvýš 5 řádků), údaje do jeho razítka", sib.number, sib.other), data: { sibling: sib.other } });
+  // kolo 5 (bypass-F4): popisky pohledů (detail, pomocný pohled, řez) jen písmenem, název pohledu modelu jmennou frází
+  ds.forEach((s, si) => {
+    const m = s.meta as Record<string, unknown>;
+    for (const l of viewLabels(s)) {
+      const by = metaBy(m, "viewLabels");
+      if (l.what === "label" && !VIEW_LABEL_RE.test(l.text)) push({ code: "drawing.note-style", by, sheet: si, key: "meta:viewLabels", item: l.text, text: tr("popisek pohledu „{0}“ – detail / pomocný pohled / řez se označí jen písmenem (např. „B“, „A-A“, „Detail C“); text u pohledu není kanál poznámek", cut(l.text)) });
+      else if (l.what === "model") {
+        const ni = nameIssue(l.text);
+        if (ni) push({ code: ni.code, by, sheet: si, key: "meta:viewLabels", item: l.text, text: tr("název pohledu modelu „{0}“ – {1}; pohled jiného modelu nese jeho název (jmenná fráze, např. „Čep“, „Deska A“)", cut(l.text), ni.why ?? (ni.data ? ni.data.map((p) => titleDataLabel(p.key)).join(", ") : tr("pokyn („{0}“)", ni.word ?? ""))) });
+      }
+    }
+  });
   // -- R2 místní popisy: odkazy z modelu + odkazy na výkrese + popisy s odkazem s volným textem + značky drsnosti se slovy
   const marks = pmiMarks(doc);
   const leaders: { by: Origin; text: string; where: string }[] = marks.filter((m) => m.kind === "note").map((m) => ({ by: m.by ?? "user", text: m.text!, where: tr("model {0}", m.face?.index !== undefined ? `F${m.face.index + 1}` : "F?") }));
   ds.forEach((s, si) =>
     s.annotations.forEach((a, i) => {
-      if (a.type === "callout" && !a.auto && calloutFreeLines(a.lines).length) leaders.push({ by: a.by ?? "user", text: calloutFreeLines(a.lines).join(" "), where: `${names(si)} a${i + 1}` });
+      if (a.type === "callout" && calloutFreeLines(a.lines).length) leaders.push({ by: a.by ?? "user", text: calloutFreeLines(a.lines).join(" "), where: `${names(si)} a${i + 1}` });
       if (a.type === "roughness" && roughWords(a.ra ?? "").length) leaders.push({ by: a.by ?? "user", text: a.ra, where: `${names(si)} a${i + 1}` });
       if (a.type !== "note" || isFreeAnn(a)) return;
       leaders.push({ by: a.by ?? "user", text: a.text, where: `${names(si)} a${i + 1}` });
@@ -1029,12 +1313,25 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
           continue;
         }
       }
+      // kolo 5 (correct-F6): buňka „název“ se stejným textem jako název dílu se hlásí jednou – u názvu dílu (doc:name), ne u každého
+      // listu a příkazu znovu; vlastní název v razítku = jmenná fráze (nameIssue)
+      if (k === "name") {
+        if (v === doc.name?.trim()) continue;
+        const ni = nameIssue(v);
+        if (ni) push({ code: ni.code, by, sheet: si, key: `meta:${k}`, item: v, text: ni.why ? tr("buňka razítka {0} „{1}“: {2} – hodnota buňky heslovitě (např. tepelné=\"kalit a popustit\", tvrdost=\"58-60 HRC\")", k, cut(v), ni.why) : ni.data ? tr("buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}", k, cut(v), ni.data.map((p) => titleDataLabel(p.key)).join(", "), titleHint(ni.data)) : tr("buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk", k, cut(v), ni.word ?? "") });
+        continue;
+      }
       if (TITLE_NO_DATA.has(k)) {
-        const bad = titleDataIn(v);
+        // kolo 5 (correct-F3): údaj razítka v buňce jména / zákazníka / projektu jen doloženou hodnotou (slovo „Galvanovna“ v názvu
+        // zákazníka údajem není); pokyn = sloveso úpravy / obrábění / expedice („Leštit čela“, „Lapovat F3“, „Brousit na čisto“)
+        const bad = titleDataIn(v, [], false);
         const pw = processWords(v);
+        const iw = instructionWord(v);
+        const kind = cellKindIssue(k, v);
         if (bad.length) push({ code: "drawing.note-title-data", by, sheet: si, key: `meta:${k}`, item: v, text: tr("buňka razítka {0} „{1}“ obsahuje údaj jiného pole ({2}) – zapište ho do jeho buňky: {3}", k, cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) });
         // D2: volná buňka (zákazník, projekt, kontroloval …) nese jméno / číslo, ne pokyn pro výrobu
-        else if (pw.length) push({ code: "drawing.note-style", by, sheet: si, key: `meta:${k}`, item: v, text: tr("buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk", k, cut(v), pw[0]) });
+        else if (pw.length || iw) push({ code: "drawing.note-style", by, sheet: si, key: `meta:${k}`, item: v, text: tr("buňka razítka {0} „{1}“ je pokyn („{2}“), ne jméno / číslo – pokyny na výkres nepatří, údaje razítka do jejich buněk", k, cut(v), pw[0] ?? iw ?? "") });
+        else if (kind) push({ code: "drawing.note-style", by, sheet: si, key: `meta:${k}`, item: v, text: tr("buňka razítka {0} „{1}“: {2}", k, cut(v), kind) });
       }
     }
     // název listu a výkresu (razítko „List …“, záložka) – krátce, bez vět, bez údajů razítka a pokynů
@@ -1042,9 +1339,11 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
       const t = (v ?? "").trim();
       if (!t) continue;
       const by = metaBy(m, k);
-      const why = noteStyle(t, TITLE_FREE_MAX, 6);
-      const bad = why ? [] : titleDataIn(t);
-      const pw = why || bad.length ? [] : processWords(t);
+      // kolo 5 (correct-F6): název listu / výkresu je jmenná fráze – jen věta, údaj s hodnotou nebo pokyn ✗ („Povrchová deska“ projde)
+      const ni = nameIssue(t);
+      const why = ni?.why;
+      const bad = ni?.data ?? [];
+      const pw = ni?.word ? [ni.word] : [];
       const lbl = k === "sheetName" ? tr("listu") : tr("výkresu");
       if (why || bad.length || pw.length) push({ code: bad.length ? "drawing.note-title-data" : "drawing.note-style", by, sheet: si, key: `meta:${k}`, item: t, text: why ? tr("název {0} „{1}“: {2} – název listu / výkresu krátce (např. „Detail“, „Řezy“)", lbl, cut(t), why) : bad.length ? tr("název {0} „{1}“ obsahuje údaj razítka ({2}) – patří do razítka: {3}", lbl, cut(t), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) : tr("název {0} „{1}“ je pokyn („{2}“) – název listu / výkresu krátce (např. „Detail“, „Řezy“)", lbl, cut(t), pw[0]) });
     }
@@ -1059,8 +1358,9 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
         push({ code: "drawing.note-style", by, sheet: si, key: `rev:${r.rev}`, item: v, text: tr("revize {0} „{1}“: {2} – popis změny krátce (např. „Ø20 → Ø22“, „doplněna díra Ø9“)", r.rev, cut(v), why) });
         continue;
       }
-      // údaj razítka v revizi jen jako popis změny buňky, která ho v razítku nese
-      const bad = titleDataIn(v, [], false).filter((p) => !(p.key === "material" ? !!doc.materialName?.trim() : str(m[p.key]).trim()));
+      // údaj razítka v revizi jen jako popis změny buňky, která ho v razítku nese – kolo 5 (bypass-F1): tepelné zpracování,
+      // povrch a hrany se poznají i slovem („doplněno kalit a popustit“, „změna: cementovat“), ne jen hodnotou
+      const bad = titleDataIn(v, [], true).filter((p) => !(p.key === "material" ? !!doc.materialName?.trim() : str(m[p.key]).trim()));
       if (bad.length) {
         push({ code: "drawing.note-title-data", by, sheet: si, key: `rev:${r.rev}`, item: v, text: tr("revize {0} „{1}“ nese údaj razítka ({2}), který v razítku není – zapište ho do razítka: {3}", r.rev, cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) });
         continue;
@@ -1084,8 +1384,20 @@ export function auditDoc(doc: AuditInput, gen: GenText = {}, names: (sheet: numb
     if (why || bad.length) push({ code: why ? "drawing.note-style" : "drawing.note-title-data", by: doc.materialBy ?? "user", sheet: -1, key: "doc:material", item: v, text: why ? tr("materiál „{0}“: {1} – označení materiálu heslovitě (např. „1.2379“, „C45“)", cut(v), why) : tr("materiál „{0}“ obsahuje údaj jiného pole ({1}) – zapište ho do jeho buňky: {2}", cut(v), bad.map((p) => titleDataLabel(p.key)).join(", "), titleHint(bad)) });
     else if (pw.length) push({ code: "drawing.note-style", by: doc.materialBy ?? "user", sheet: -1, key: "doc:material", item: v, text: tr("materiál „{0}“ je pokyn („{1}“) – materiál je označení (např. „1.2379“, „C45“)", cut(v), pw[0]) });
   }
+  // kolo 5 (bypass-F6): buňky kusovníku sestavy, které zapsal agent (příkaz `sestava komponenta …`, JSON dokument)
+  if (doc.kind === "assembly") {
+    for (const c of (doc as { components?: (Parameters<typeof bomCells>[0] & { id: string; textBy?: Src })[] }).components ?? []) {
+      if (!c.textBy) continue;
+      for (const [f, v] of bomCells(c)) {
+        // název komponenty z vloženého dílu (ten hlídá díl sám) – jen přejmenování / přezdívka od agenta
+        if (f === "material" && c.source?.kind === "part") continue;
+        const bi = bomCellIssue(f, v);
+        if (bi) push({ code: bi.code, by: c.textBy, sheet: -1, key: `comp:${c.id}:${f}`, item: v, text: tr("kusovník – komponenta „{0}“ ({1}): {2}", c.name ?? "", f, bi.text) });
+      }
+    }
+  }
   // D5: název dílu se tiskne v razítku výchozího listu i listu bez vlastního názvu
-  if (doc.name?.trim() && doc.kind !== "draft" && (!ds.length || ds.some((s) => !str((s.meta as Record<string, unknown>).name).trim()))) {
+  if (doc.name?.trim() && doc.kind !== "draft" && (!ds.length || ds.some((s) => !str((s.meta as Record<string, unknown>).name).trim() || str((s.meta as Record<string, unknown>).name).trim() === doc.name!.trim()))) {
     const ni = docNameIssue(doc.name);
     if (ni) push({ code: ni.code, by: doc.nameBy ?? "user", sheet: -1, key: "doc:name", item: doc.name.trim(), text: ni.text });
   }
@@ -1105,10 +1417,12 @@ export function auditItems(doc: AuditInput, gen: GenText = {}): Map<string, stri
     for (const k of TEXT_FIELDS) if (str(m[k]).trim()) out.set(`${si}|meta:${k}`, str(m[k]).trim());
     out.set(`${si}|meta:sheetName`, s.name ?? "");
     out.set(`${si}|meta:drawingName`, s.drawing ?? "");
+    out.set(`${si}|meta:viewLabels`, viewLabelSig(s));
     for (const r of (m.revisions as Rev[] | undefined) ?? []) out.set(`${si}|rev:${r.rev}`, r.note ?? "");
   });
   for (const m of pmiMarks(doc)) out.set(`-1|pmi:${m.id}`, m.text ?? "");
   if (doc.materialName?.trim()) out.set("-1|doc:material", doc.materialName.trim());
+  if (doc.kind === "assembly") for (const c of (doc as { components?: (Parameters<typeof bomCells>[0] & { id: string })[] }).components ?? []) for (const [f, v] of bomCells(c)) out.set(`-1|comp:${c.id}:${f}`, v);
   if (doc.name?.trim()) out.set("-1|doc:name", doc.name.trim());
   void gen;
   return out;
@@ -1122,7 +1436,7 @@ export function auditItems(doc: AuditInput, gen: GenText = {}): Map<string, stri
 export function newAgentFindings(before: readonly AuditFinding[], after: readonly AuditFinding[], itemsBefore: Map<string, string>, itemsAfter: Map<string, string>): AuditFinding[] {
   return after.filter((f) => {
     if (f.by !== "agent" || findingLevel(f) !== "error") return false;
-    if (f.key.startsWith("doc") && (f.code === "drawing.notes-limit" || f.code === "drawing.leaders-limit" || f.key === "doc:placeholder")) {
+    if (f.key.startsWith("doc") && (f.code === "drawing.notes-limit" || f.code === "drawing.leaders-limit" || f.key === "doc:placeholder" || f.key === "doc:sibling")) {
       const p = before.find((b) => b.code === f.code && b.key === f.key);
       // limit, který příkaz zvýšil, nebo limit načteného souboru, kterého se agent příkazem nově účastní (D1)
       return !p || Number(f.item) > Number(p.item) || p.by !== "agent";
@@ -1147,7 +1461,7 @@ export function notesRuleIssues(doc: AuditInput, sheets?: number[], extra: GenTe
 /** místní popisy dokumentu (R2 / D2): odkazy z modelu a z výkresu, popisy s odkazem s volným textem, značky drsnosti se slovy */
 export const leaderCount = (doc: AuditInput): number =>
   pmiMarks(doc).filter((m) => m.kind === "note").length +
-  (doc.drawings ?? []).reduce((n, s) => n + s.annotations.filter((a) => (a.type === "note" && !isFreeAnn(a)) || (a.type === "callout" && !a.auto && calloutFreeLines(a.lines).length > 0) || (a.type === "roughness" && roughWords(a.ra ?? "").length > 0)).length, 0);
+  (doc.drawings ?? []).reduce((n, s) => n + s.annotations.filter((a) => (a.type === "note" && !isFreeAnn(a)) || (a.type === "callout" && calloutFreeLines(a.lines).length > 0) || (a.type === "roughness" && roughWords(a.ra ?? "").length > 0)).length, 0);
 
 /** text měřítka pro stav: „Poznámky nad razítkem: 3/5 řádků (agent 2, ručně 1) · místní popisy 2/8“ */
 export function notesBudgetLine(doc: AuditInput, _sheets?: number[], extra: GenText = {}): string {
