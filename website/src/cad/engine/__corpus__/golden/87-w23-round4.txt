@@ -21,7 +21,7 @@
 ℹ řádek 22: list List 1: přesunuto do razítka – „HV 650“ → tvrdost „650 HV“ (údaje razítka se nepíšou jako poznámka)
 ℹ řádek 23: list List 1: přesunuto do razítka – „Black oxide“ → povrchová úprava „Black oxide“ (údaje razítka se nepíšou jako poznámka)
 ✗ řádek 24: list List 1: údaj razítka mimo svou buňku razítka – „Vanadis 23“: materiál „Vanadis 23“ se liší od materiálu modelu „1.2379“ – materiál razítka je materiál modelu; jiný materiál zadejte modelu (materiál Vanadis 23), poznámkou ne
-✗ řádek 25: list model: text není strojařsky heslovitý – „Odmastit“ je pokyn pro výrobu / expedici („odmastit“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří
+✗ řádek 25: model: text není strojařsky heslovitý – „Odmastit“ je pokyn pro výrobu / expedici („odmastit“) – popis plochy nese technický údaj (např. „Brousit“, „Lapovat“), pokyny do modelu ani na výkres nepatří
 → popis F2 „Lapovat“ v modelu – výkres ho přebírá jako odkaz se šipkou na plochu – výsledek po vyhodnocení listu níže
 Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A3 (aktivní)

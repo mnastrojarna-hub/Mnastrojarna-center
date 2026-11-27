@@ -87,7 +87,8 @@ export const titleUsage = () =>
   tr("výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" kontroloval=\"…\" schválil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" polotovar=\"…\" počet=\"…\" tepelné=\"…\" tvrdost=\"58–60 HRC\" povrch=\"…\" drsnost=\"Ra 3,2\" nepředepsané=\"ISO 2768-mK|desetinná\" úhly=\"…\" sražení=\"…\" hrany=\"…\" zákazník=\"…\" projekt=\"…\" firma=\"…\" logo=\"soubor.png\" šablona=iso7200|kompaktní|nástrojářská poznámka=\"…\"");
 
 /** tvrdost s jednotkou: 58 HRC, 58–60 HRC, 58+2 HRC, 650 HV10, 220 HB, 60 ± 2 HRC */
-const HARDNESS_RE = /^(?:min\.?\s*|max\.?\s*|≥\s*|≤\s*)?\d+(?:[.,]\d+)?(?:\s*(?:[-–…]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?\s*(?:HRC|HRB|HRA|HV\s?\d{0,2}|HBW|HB)\b/i;
+// kolo 5 (correct-F4): i rozsah „58÷62 HRC“, „58/60 HRC“ a mez „≥ 58 HRC“, „> 58 HRC“ (tvar přesunu z poznámky)
+const HARDNESS_RE = /^(?:min\.?\s*|max\.?\s*|≥\s*|≤\s*|[<>]=?\s*)?(?:\d{2,4}\s*[÷/]\s*\d{2,4}|\d+(?:[.,]\d+)?(?:\s*(?:[-–…÷]|\+\s*\/?\s*-?|±|až|to|bis)\s*\d+(?:[.,]\d+)?)?)\s*(?:HRC|HRB|HRA|HV\s?\d{0,2}|HBW|HB)\b/i;
 /**
  * D3: hodnota, kterou poznámka přesouvá do buňky razítka, musí mít tvar, jaký přijme `výkres razítko …=` (tvrdost
  * s jednotkou „58–60 HRC“, drsnost s hodnotou „Ra 3,2“) – jinak důvod (null = v pořádku).

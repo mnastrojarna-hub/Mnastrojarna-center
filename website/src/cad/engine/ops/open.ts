@@ -19,6 +19,6 @@ export const openOp: OpHandler<"open"> = async (op, ctx) => {
   if (res.note) say(ctx, `  ${res.note}`);
   st.report();
   // soubor z disku = text „loaded“ (vlna 23, D1 – engine/open-file.ts): porušení pravidel textu ⚠ drawing.notes-loaded, ne ✗
-  for (const f of (await import("../../drawing-agent")).ingestFindings(res.doc)) coded(ctx, f.code, { args: f.args });
+  for (const f of (await import("../../drawing-agent")).ingestFindings(res.doc)) coded(ctx, f.code, { args: f.args, ...(f.text ? { text: f.text } : {}) });
   await freshenRunDoc(ctx, op.line); // pružiny: délka z dosedacích ploch, ⚠ spring.stale (vlna 22, bod 7)
 };

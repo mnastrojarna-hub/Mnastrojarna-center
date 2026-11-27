@@ -243,10 +243,23 @@ export class CodedError extends Error {
   constructor(
     readonly code: Code,
     readonly args: unknown[] = [],
+    /** vlastní (už lokalizovaný) text místo textu kódu – nález celého dokumentu (`scopedText`) */
+    text?: string,
   ) {
-    super(tr(BY_CODE.get(code)!.key, ...args));
+    super(text ?? tr(BY_CODE.get(code)!.key, ...args));
   }
 }
+
+/**
+ * Text kódu „list {0}: … – {1}“ pro nález, který se netýká listu (vlna 23, kolo 5 – correct-F7): místo „list materiál:“ /
+ * „list model:“ / „list název dílu:“ začne textem `where` („materiál: přesunuto do razítka – …“). Nezávislé na jazyce –
+ * nahradí se vše před `{0}` (cs „list “, en „sheet “, de „Blatt “).
+ */
+export function scopedText(code: Code, where: string, ...rest: unknown[]): string {
+  return tr(BY_CODE.get(code)!.key, "\u0000", ...rest).replace(/^[^\u0000]*\u0000/, where);
+}
+/** výjimka s kódem pro nález celého dokumentu (materiál, název dílu, popis v modelu) – text bez „list …:“ */
+export const scopedError = (code: Code, where: string, msg: string): CodedError => new CodedError(code, [where, msg], scopedText(code, where, msg));
 
 /** lokalizovaný text kódu v aktuálním jazyce (`setLang`) */
 export function codeText(code: Code, ...args: unknown[]): string {
