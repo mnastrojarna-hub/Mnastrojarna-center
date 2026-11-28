@@ -6,7 +6,7 @@ kapitola „Průběžný stav“ – ta se dokončuje **před** balíky této vl
 
 Obsah: 1. zadání majitele · 2. závazný výklad (pravidla R8–R14) · 3. co už v kódu je · 4. nálezy z reportů ·
 5. vlastní pozorování výstupního výkresu · 6. zásady ovládání (UX) · 7. balíky práce · 8. pořadí · 9. co je potřeba od majitele ·
-10. příjem dalších reportů.
+10. příjem dalších reportů · **11. nová funkce: živý sdílený odkaz (společná práce v reálném čase)** · 12. přepočet výkresu po změně modelu.
 
 ---
 
@@ -236,6 +236,12 @@ Viz kapitola 6. Výstup: tabulka nálezů a opravy.
 ### K12 – Výkres jako strojařský (C1–C3, C5, C7)
 Částečný řez jedním klikem, skryté hrany, rozvržení s předností kótovaných pohledů, poznámky jen nad hlavičkou i u člověka jako výchozí umístění.
 
+### K13 – Živý sdílený odkaz (společná práce v reálném čase)
+Celé zadání, výklad L1–L12, technické řešení, etapy L0–L5 a zkoušky jsou v kapitole 11.
+
+### K14 – Přepočet výkresu po změně modelu (R15)
+Viz kapitola 12. Malý balík; je předpokladem K13 (L12) a souvisí s K1.
+
 ---
 
 ## 8. Pořadí
@@ -250,8 +256,10 @@ Viz kapitola 6. Výstup: tabulka nálezů a opravy.
 | 5 | K9, K5, K10, K12. | Obsluha a vzhled. |
 | 6 | K11 audit ovládání + zapracování dalších reportů. | Průběžně doplňovat. |
 | 7 | Závěrečná zkouška: oba testy GUI-A a GUI-B zopakovat od nuly myší a klávesnicí a porovnat s reporty. | Jediný důkaz, že nálezy zmizely. |
+| 8 | **K14 přepočet výkresu** (kapitola 12) – lze zařadit už ke kroku 2, je to malý balík a živá spolupráce na něm stojí. | Základ chování výkresu. |
+| 9 | **K13 živý odkaz** (kapitola 11), po etapách L0–L5. | Nová funkce; velká. Začít rozborem L0 souběžně s kroky 1–3, stavět až na opraveném jádru. |
 
-Rozsah: 12 balíků, z toho K1 a K2 velké (každý několik kol oprav a oponentur), ostatní střední až malé.
+Rozsah: 14 balíků, z toho K1, K2 a K13 velké (každý několik kol oprav a oponentur), ostatní střední až malé.
 
 ---
 
@@ -272,4 +280,137 @@ Každý nový report se zapíše sem a jeho nálezy se zařadí do kapitoly 4 (n
 | 28. 11. | GUI-A: report „rekonstrukce čelistí ze skenu“ (PDF, 5 stran) | zapracováno: A1–A10 |
 | 28. 11. | GUI-B: zip „svařenec z fotografií“ (report, CSV 67 položek, výkres, modely) | zapracováno: B01–B10, C1–C11 |
 | 28. 11. | Zadání majitele: úplné kótování, tolerance, uložení, závity, kontrolní výkres | zapracováno: R8–R14, K1, K2 |
+| 28. 11. | Zadání majitele: živý sdílený odkaz, řízení pohledu, odloučení; přepočet výkresu po změně modelu | zapracováno: kapitoly 11 a 12, balíky K13 a K14 |
 | – | Hlavní report (majitel ohlásil) | čeká se |
+
+---
+
+## 11. Nová funkce: živý sdílený odkaz – společná práce v reálném čase (balík K13)
+
+### 11.1 Zadání majitele (28. 11. 2026, zkráceno)
+
+> Ke sdílenému odkazu by mohl být ještě sdílený odkaz **live**, zase zkrácený. Když budeme dva kreslit, jeden něco nakreslí, pošle
+> druhému odkaz a na live bude stoprocentně v reálném čase vidět model, výkres a všechno – celá rozpracovaná plocha, všechna okna.
+> Oba můžou pracovat víceméně nezávisle, ale já to pošlu kolegovi: „tady to mám rozpracované, co si myslíš o tomhle rozměru“ –
+> a on mi ho nediktuje, rovnou ho tam změní. Ne že to uvidím za 5 vteřin nebo až kliknu na aktualizovat. Uvidím to naprosto živě,
+> jak to upravuje – jako kdyby mi sdílel obrazovku, jen s tím rozdílem, že můžeme oba pracovat na jednom modelu.
+> Abychom se nehádali: buď má řízení on, nebo já, nebo někdo třetí (co se týče pohledu – jeden řídí, druhý kouká), anebo každý
+> pracuje zvlášť, ale cokoliv vysunu, přepíšu, upravím, se automaticky živě změní i jemu. Ještě tlačítko **odloučit** a začít
+> vlastní vývojovou větev – přepne se z live odkazu na klasický sdílený odkaz.
+> Nepodcenit, detailně otestovat, musí to být fakt cool a uživatelsky skvělé. Navíc tak 4 tlačítka, mimo lištu, schovatelná
+> šipkou, aby nepřekážela. Dobré na telefonu i na počítači, i v kombinaci počítač + telefon.
+
+### 11.2 Závazný výklad (L1–L12)
+
+| # | Požadavek | Co znamená „splněno“ |
+| --- | --- | --- |
+| L1 | **Živý odkaz je krátký.** | Stejný tvar jako dnešní `mnastrojarna.cz/s#KÓD`, např. `mnastrojarna.cz/l#KÓD` (10 znaků). Obsah je šifrovaný, klíč je jen v odkazu, server ho nevidí (jako dnes). |
+| L2 | **Skutečně v reálném čase.** | Potvrzená změna (rozměr, vysunutí, kóta) je u kolegy do 300 ms + jeho přepočet. Rozpracované věci (tažení bodu skici, psaní do pole, otáčení pohledu, kurzor) se přenášejí průběžně, zpoždění do 150 ms. Žádné tlačítko „aktualizovat“. |
+| L3 | **Vidí se všechno.** | Model, skica, sestava, výkres, všechny záložky dokumentů a otevřené panely. Každý účastník má jméno a barvu; je vidět jeho kurzor, výběr, na které záložce je a který prvek právě upravuje. |
+| L4 | **Oba upravují jeden model.** | Úpravy obou se slévají bez ztráty. Dva lidé mění různé prvky → platí obojí. Dva mění totéž pole → platí pozdější a první dostane viditelnou zprávu „Petr změnil 20 → 22“ s možností vrátit. |
+| L5 | **Řízení pohledu.** | Tři režimy: *Každý sám* (výchozí) · *Vedu já* (ostatní vidí můj pohled, záložku, přiblížení, výběr – jako sdílená obrazovka) · *Sleduji Petra*. Řízení jde předat, vyžádat i převzít; sledující se kdykoliv jedním klikem „pustí“. Řídit může kdokoliv z účastníků, i třetí. Sledování neblokuje úpravy. |
+| L6 | **Odloučit.** | Tlačítko „Odloučit“ udělá z aktuálního stavu vlastní kopii: odpojí se od živé relace a dostane klasický sdílený odkaz (snímek). Ostatní pokračují. Živá relace se tím nemění. |
+| L7 | **Čtyři tlačítka mimo lištu.** | Plovoucí panel: ① účastníci (kolečka s iniciálami, stav spojení) ② řízení pohledu (Každý sám / Vedu / Sleduji) ③ pozvat (kopírovat odkaz, QR kód pro telefon) ④ odloučit / ukončit. Panel jde schovat šipkou do malého jazýčku a zase vysunout; jde přetáhnout jinam. Nepřekrývá výkres ani formuláře. |
+| L8 | **Telefon i počítač.** | Na telefonu spodní lišta s týmiž čtyřmi funkcemi, ovládání palcem; připojení přes QR kód. Kombinace počítač + telefon je testovaný případ (jeden kreslí na počítači, druhý ukazuje a mění rozměr z telefonu). |
+| L9 | **Práva a bezpečnost.** | Dva odkazy: *k úpravám* a *jen k nahlížení*. Kdo má jen nahlížecí, nemůže změny podvrhnout (změny jsou podepsané klíčem, který je jen v odkazu k úpravám). Zakladatel může relaci ukončit, odkaz zneplatnit a účastníka odebrat. Platnost odkazu jako u běžného sdílení. |
+| L10 | **Výpadek spojení neznamená ztrátu práce.** | Při výpadku pracuje každý dál u sebe; po obnovení se změny slijí. Stav spojení je pořád vidět (zelená / oranžová „obnovuji“ / šedá „offline“). Pozdě příchozí dostane celý aktuální stav. |
+| L11 | **Zpět vrací jen moje kroky.** | Ctrl+Z nevrátí kolegovu práci. Historie ukazuje, kdo co změnil. |
+| L12 | **Výkres žije s modelem.** | Viz kapitola 12 – změna modelu od kohokoliv zneplatní výkres všem a všem se nabídne přepočet. |
+
+### 11.3 Technické řešení – co platí už teď a co rozhodne rozbor L0
+
+**Pevná omezení:** web je statický export na sdíleném hostingu s PHP 5.6 → žádný vlastní server s trvalým spojením. Dnešní
+sdílení (`website/src/cad/share*.ts`, `public/cad/share/index.php`, `store.php`) ukládá šifrovaný snímek a čte ho jednou.
+Dotazování PHP po vteřině není „real-time“ a zadání ho výslovně vylučuje.
+
+**Přenos (od nejvhodnějšího):**
+
+| Varianta | Jak | Pro | Proti |
+| --- | --- | --- | --- |
+| **A – služba s WebSocketem (doporučeno): Supabase Realtime** | Prohlížeč se připojí na kanál relace (Broadcast + Presence). Zprávy jsou šifrované už v prohlížeči, služba je jen přeposílá. | Supabase je v plánovaném stacku projektu; funguje za firewallem i na mobilních sítích; nízké zpoždění; nic se neprovozuje. | Potřebuje projekt Supabase a veřejný klíč (od majitele); limity tarifu (počet spojení a zpráv – ověřit v L0); závislost na třetí straně. |
+| B – přímé spojení prohlížečů (WebRTC) | Navázání přes `store.php`, pak data přímo mezi účastníky. | Nejnižší zpoždění, data nejdou přes nikoho. | Na části sítí (mobilní operátoři, firemní sítě) se bez prostředníka TURN nespojí → musel by se platit a provozovat. Více účastníků = síť spojení každý s každým. |
+| C – vlastní malý server (Node / Cloudflare) | Vlastní přeposílač zpráv. | Plná kontrola. | Provoz, cena, další nasazování. |
+| D – PHP dotazování | `store.php` po 1 s. | Nic nového. | Není real-time. **Jen jako nouzový režim** „omezené spojení“, pokud A spadne. |
+
+Doporučení: **A jako hlavní, D jako nouzový režim**, B případně později jako zrychlení. Kód přenosu za jedním rozhraním
+(`LiveTransport`), aby šel vyměnit.
+
+**Co se přenáší:** nikdy geometrie, vždy jen **dokument** (strom prvků, skici, sestava, listy výkresu, kóty) – každý prohlížeč si
+model přepočítá svým jádrem, stejně jako dnes po otevření odkazu. Dvě vrstvy:
+1. *Trvalá vrstva* – změny dokumentu. Slévání bez konfliktů po položkách (prvek, entita skici, kóta, pole hlavičky mají vlastní ID;
+   pro každé pole platí poslední zápis, pořadí prvků drží řazení, které snese souběžné vkládání). Hotová knihovna pro to (Yjs)
+   nebo vlastní lehké řešení nad dnešním úložištěm dokumentu – **rozhodne L0** podle toho, jak je dnes udělaná historie a Zpět.
+2. *Prchavá vrstva* – kurzory, výběr, kamera, aktivní záložka, rozpracovaný formulář, tažení ve skice. Neukládá se, posílá se
+   20–30× za vteřinu s omezením toku; ztráta zprávy nevadí.
+
+**Stav pro pozdě příchozí a po odchodu všech:** průběžný šifrovaný snímek do stávajícího `store.php` (např. každých 30 s a při
+odchodu) + dorovnání od připojených účastníků.
+
+**Rizika, která musí L0 a zkoušky pokrýt:**
+- *Stejná verze aplikace u všech.* Různé verze jádra dají různou geometrii. Při připojení porovnat verzi; liší-li se, vyzvat k obnovení stránky.
+- *Stejný výsledek přepočtu.* Odkazy na hrany a plochy (otisky entit) musí u obou vyjít stejně; jinak se zaoblení u kolegy chytí jinam. Test: po každé operaci porovnat otisk geometrie (objem, počet ploch, revize `r·…`) mezi účastníky a při neshodě `⚠` oběma.
+- *Souběžné úpravy téhož prvku*, smazání prvku, který druhý právě upravuje, souběžná úprava jedné skici.
+- *Těžké modely a telefon.* Telefon přepočítává pomaleji. Etapa L4: telefon může místo vlastního přepočtu dostat hotovou síť od počítače kolegy („lehký divák“).
+- *Zpět* po cizí změně téhož pole; *dlouhý výpadek* a slití dvou odlišných větví.
+- *Soukromí:* jména účastníků jen v relaci; nic nešifrovaného mimo prohlížeč; nahlížecí odkaz nesmí umět zapisovat.
+- *Limity služby* při rychlém tažení (omezit tok, slučovat zprávy).
+
+### 11.4 Jak to má vypadat a chovat se (návrh ovládání)
+
+- **Spuštění:** v dialogu Sdílet vedle „Odkaz (snímek)“ nová volba **„Živě“** → hned vznikne odkaz a QR kód, panel živé relace vyjede. Jedno kliknutí, žádné nastavování.
+- **Příchod kolegy:** otevře odkaz, zadá jméno (zapamatuje se), vidí model. U prvního účastníka krátké oznámení „Petr se připojil“.
+- **Plovoucí panel (4 tlačítka):** kolečka účastníků · přepínač řízení · pozvat · odloučit/ukončit. Sbalení šipkou do jazýčku u okraje; na telefonu spodní lišta nad stávajícím spodním panelem.
+- **Kdo co dělá:** barevný rámeček kolem prvku ve stromu a kóty na výkresu, které kolega právě upravuje, s jeho jménem; jeho kurzor v 3D i na výkresu; u záložky dokumentu barevná tečka, kdo na ní je.
+- **Sledování:** klik na kolečko kolegy = „Sledovat“. Okraj plochy dostane jeho barvu a štítek „Sleduji Petra – pustit“. Jakýkoliv můj zásah do pohledu sledování ukončí (s možností vrátit se).
+- **Vedení:** „Vedu“ → ostatním nabídka „Jana vede – sledovat?“ (nenutit; výchozí pro nově příchozí je sledovat toho, kdo vede).
+- **Ukázat prstem:** dlouhý stisk / Alt+klik udělá u všech krátké „pípnutí“ – kroužek na místě („tenhle rozměr“). Malá věc, která nahradí půlku vysvětlování.
+- **Souběžná změna téhož pole:** zpráva u pole se jménem a hodnotami, tlačítko „Vrátit moji“.
+- **Odloučení:** potvrzení jednou větou („Vznikne vaše kopie, živá relace běží dál“), pak běžný sdílený odkaz na kopii.
+- **Konec relace:** zakladatel „Ukončit pro všechny“; ostatním zůstane poslední stav jako místní kopie.
+
+### 11.5 Etapy
+
+| Etapa | Obsah | Hotovo, když |
+| --- | --- | --- |
+| **L0 – rozbor** | Jak je dnes uložen dokument, historie a Zpět; kudy vedou všechny zápisy (GUI, textové příkazy, agent); volba slévání (knihovna × vlastní); ověření limitů a zpoždění varianty A na skutečné síti (počítač + telefon na datech); návrh protokolu a šifrování; návrh panelu (obrázek). | Písemný návrh + měření zpoždění; rozhodnutí o variantě. |
+| **L1 – živé nahlížení** | Jeden upravuje, ostatní živě vidí model, výkres, záložky, kurzor, kameru (sledování). Odkaz k nahlížení, QR, panel, telefon. | Dva prohlížeče: změna u jednoho je u druhého do 300 ms + přepočet; tažení bodu skici plynulé. |
+| **L2 – společné úpravy** | Oba upravují; slévání, souběh, Zpět jen vlastních kroků, kdo co upravuje, zprávy o přepsání. | Zkouška souběhu (níže) bez ztráty a bez rozdílu stavů. |
+| **L3 – řízení a odloučení** | Vedu / Sleduji / předat / vyžádat, ukázat prstem, Odloučit, Ukončit, odebrat účastníka. | Tři účastníci, střídání vedení. |
+| **L4 – telefon a slabé spojení** | Spodní lišta, lehký divák, nouzový režim, výpadky a znovupřipojení. | Počítač + telefon na mobilních datech, vypnutí Wi-Fi uprostřed tažení. |
+| **L5 – agenti** | Agent (CLI / konzole) se může připojit do živé relace jako účastník se jménem; jeho změny jsou vidět stejně. Platí pro něj všechna pravidla R1–R14. | Člověk sleduje, jak agent kótuje. |
+
+### 11.6 Zkoušky (nepodcenit)
+
+- **Automatické se dvěma až třemi prohlížeči naráz** (Playwright, více kontextů; jeden s emulací telefonu): každá operace u A → porovnat stav dokumentu a otisk geometrie u B a C.
+- **Souběh:** A a B mění totéž pole ve stejném okamžiku; A maže prvek, který B upravuje; oba kreslí do jedné skici; A přesouvá kótu, B mění model; 200 náhodných operací od každého → stavy se musí shodnout.
+- **Síť:** uměle 200 ms / 1 s zpoždění, 5 % ztráty, výpadek 30 s, znovupřipojení, zavření karty uprostřed operace, pozdě příchozí u velkého modelu.
+- **Zpoždění:** měřit čas od potvrzení u A po zobrazení u B; mez L2.
+- **Práva:** nahlížecí odkaz nesmí zapsat ani podvrženou zprávou; po zneplatnění odkazu se nikdo nepřipojí.
+- **Verze:** rozdílná verze aplikace → výzva, ne tichý rozjezd.
+- **Ovládání:** panel nepřekáží (sbalení, přetažení), telefon na výšku i na šířku, ovládání jednou rukou.
+- **Oponent:** nezávislá kontrola se snaží dostat dva účastníky do rozdílného stavu.
+
+### 11.7 Co je potřeba od majitele
+
+- Souhlas s variantou A a **projekt Supabase** (adresa a veřejný klíč). Do té doby se vše připraví tak, aby po doplnění fungovalo; vývoj a zkoušky poběží proti místní náhradě.
+- Rozhodnutí: kolik účastníků naráz (návrh: do 6), zda má živý odkaz stejnou platnost jako běžný (návrh: ano, 10 dní, relace se dá ukončit dřív).
+
+---
+
+## 12. Přepočet výkresu po změně modelu (balík K14, pravidlo R15)
+
+Zadání majitele: „Změní-li se model, přepočítá se výkres. Změní se jen rozměr, tolerance zůstane. Vždycky tam vyskočí výrazné
+tlačítko *Přepočítat výkres*, které nejde přehlédnout. Takhle fungují všechny CADy. Změna kóty na výkrese model nemění.“
+
+| # | Požadavek | Co znamená „splněno“ |
+| --- | --- | --- |
+| R15a | Změna modelu zneplatní výkres. | Na každém listu, který z modelu vychází, se objeví výrazný pruh „Model se změnil – **Přepočítat výkres**“ (barva, nahoře přes list, nejde přehlédnout); starý výkres je zešedlý nebo označený. Volba „přepočítávat automaticky“ v Nastavení. |
+| R15b | Kóty jsou svázané s geometrií. | Po přepočtu má kóta novou hodnotu; **tolerance, uložení, přípona, poloha popisku a styl zůstanou**. Kóta, jejíž entita zanikla, se neodstraní tiše – zčervená a je v seznamu „osiřelé kóty“ s nabídkou připojit jinam. |
+| R15c | Výkres model nemění. | Přepsání hodnoty kóty na výkresu model nezmění (a u agenta je to `✗`, R13). Řízení modelu z kóty je jiná, samostatná funkce (zatím ne). |
+| R15d | Platí i v živé relaci a pro vydané listy. | Změna od kolegy zneplatní výkres všem. Vydaný list (revize) se nepřepisuje – dostane označení „zastaralý“ jako dnes. |
+| R15e | Po přepočtu znovu kontrola. | Úplnost kót (R8) a překryvy se vyhodnotí znovu; nový prvek bez kóty je hned v panelu „Co chybí“. |
+
+Stav dnes (ověřit při reprodukci): pruh zastaralosti u vydaného listu existuje (`components/cad/drawing-issue.tsx`,
+`drawing-workspace.tsx`, „přepočítat vše“ v `outputs-panel.tsx`, vlna 22 body 18–19). K14 = projít chování u nevydaného listu,
+zachování tolerancí a poloh kót po změně modelu, osiřelé kóty, výraznost tlačítka; e2e: změnit rozměr modelu → pruh → přepočet →
+kóta má novou hodnotu a starou toleranci.
